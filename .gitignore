@@ -38,3 +38,10 @@ node_modules/
 
 # Distribution directories and files
 dist/
+
+.cursor/
+.roo/
+.clinerules/
+AGENTS.md
+CLAUDE.md
+.trae/
