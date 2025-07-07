@@ -103,16 +103,11 @@ export async function createEvent(
       return { event: null, error: 'User not authenticated' }
     }
 
-    const schemaName = getUserSchemaName(user)
-
-    // Execute raw query with schema name
-    const { data, error } = await supabase.rpc('create_user_event', {
-      user_schema: schemaName,
-      event_title: event.event_title,
-      event_starts_at: event.event_starts_at,
-      event_ends_at: event.event_ends_at,
-      event_location: event.event_location || null,
-      event_description: event.event_description || null
+    const { data, error } = await supabase.functions.invoke('vectorize-event', {
+      body: { 
+        user_id: user.id,
+        event: event
+      }
     })
 
     if (error) {
@@ -120,22 +115,82 @@ export async function createEvent(
       return { event: null, error: error.message }
     }
 
-    // Transform response to match our CalendarEvent interface
-    const createdEvent: CalendarEvent = {
-      id: data.id,
-      event_title: data.event_title,
-      event_starts_at: data.event_starts_at,
-      event_ends_at: data.event_ends_at,
-      event_location: data.event_location,
-      event_description: data.event_description,
-      event_created_at: data.event_created_at,
-      event_updated_at: data.event_updated_at
-    }
+    return { event: data, error: null };
 
-    return { event: createdEvent, error: null }
   } catch (err: any) {
     console.error('Unexpected error in createEvent:', err)
     return { event: null, error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+
+/**
+ * Update an existing event in the user's schema
+ * @param user The authenticated user
+ * @param eventId The ID of the event to update
+ * @param event The event data to update
+ * @returns The updated event or error
+ */
+export async function updateEvent(
+  user: User,
+  eventId: string,
+  event: Partial<Omit<CalendarEvent, 'id' | 'event_created_at' | 'event_updated_at'>>
+): Promise<{ event: CalendarEvent | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { event: null, error: 'User not authenticated' };
+    }
+
+    const { data, error } = await supabase.functions.invoke('vectorize-event', {
+      body: { 
+        user_id: user.id,
+        event: { ...event, id: eventId }
+      }
+    })
+
+    if (error) {
+      console.error('Error updating event:', error);
+      return { event: null, error: error.message };
+    }
+
+    return { event: data, error: null };
+  } catch (err: any) {
+    console.error('Unexpected error in updateEvent:', err);
+    return { event: null, error: err.message || 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Delete an event from the user's schema
+ * @param user The authenticated user
+ * @param eventId The ID of the event to delete
+ * @returns Success boolean or error
+ */
+export async function deleteEvent(
+  user: User,
+  eventId: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const schemaName = getUserSchemaName(user);
+
+    const { data, error } = await supabase.rpc('delete_user_event', {
+      user_schema: schemaName,
+      event_id: eventId,
+    });
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: data, error: null };
+  } catch (err: any) {
+    console.error('Unexpected error in deleteEvent:', err);
+    return { success: false, error: err.message || 'An unexpected error occurred' };
   }
 }
 

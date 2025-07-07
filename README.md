@@ -26,7 +26,7 @@ Glydeeee is a full-stack application that provides users with a personal calenda
 - [Supabase account](https://supabase.com/) (for your own project)
 - [OpenAI account](https://platform.openai.com/) (for embeddings)
 
-## Quick Start (Recommended)
+## Quick Start with Docker (Recommended)
 
 1. **Clone the repository**
 
@@ -35,37 +35,33 @@ Glydeeee is a full-stack application that provides users with a personal calenda
    cd glydeeee
    ```
 
-2. **Set up environment variables for the frontend**
+2. **Set up environment variables**
 
-   Copy the template and fill in your values:
-
-   ```bash
-   cp apps/frontend/.env.template apps/frontend/.env
-   ```
-
-   Edit `apps/frontend/.env` and set:
-   - `VITE_SUPABASE_URL` (from your Supabase project)
-   - `VITE_SUPABASE_ANON_KEY` (from your Supabase project)
-   - `VITE_OPENAI_API_KEY` (from your OpenAI account)
-
-3. **Install frontend dependencies**
+   Copy the `.env.example` file to `.env` and add your keys:
 
    ```bash
-   cd apps/frontend
-   npm install
+   cp .env.example .env
    ```
 
-4. **Start the frontend development server**
+   Edit `.env` and set:
+   - `OPENAI_API_KEY` (from your OpenAI account)
+   - `SUPABASE_URL` (your Supabase project URL, e.g. `https://<project-ref>.supabase.co`)
+   - `SUPABASE_ANON_KEY` (from your Supabase project settings)
+   - `SUPABASE_SERVICE_KEY` (for agent, from Supabase project settings)
+
+   > **Note:** This project expects you to use a **remote Supabase project**. You do not need to run Supabase locally. Make sure your Supabase project is set up and the required Edge Functions are deployed.
+
+3. **Start the application stack**
 
    ```bash
-   npm run dev
+   docker-compose up --build
    ```
-   The app will be available at http://localhost:5173
 
+   The frontend will be available at http://localhost:3000.
 
-## Optional: Docker Compose
+## Development without Docker
 
-If you want to run a local Postgres or Supabase stack, you can use Docker Compose. This is not required for the default cloud workflow.
+You can run the frontend and agent locally using Node.js. Make sure your `.env` is set up as above.
 
 ## Project Structure
 
@@ -92,8 +88,8 @@ glydeeee/
 ## Troubleshooting
 
 - **Edge Function 500 errors**: Check Supabase Edge Function logs for details
-- **Embedding is null**: Ensure your OpenAI API key is set in `apps/frontend/.env` and is valid
-- **Database errors**: Make sure all migrations are applied and per-user schemas/tables exist
+- **Embedding is null**: Ensure your OpenAI API key is set in `.env` and is valid
+- **Database errors**: Make sure all migrations are applied and per-user schemas/tables exist in your remote Supabase project
 - **Auth issues**: Double-check your Supabase project URL and anon key
 
 ## License

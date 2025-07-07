@@ -41,6 +41,7 @@ BEGIN
     event_location TEXT,
     event_description TEXT,
     recurrence JSONB,
+    embedding vector(1536),
     event_created_at TIMESTAMPTZ DEFAULT now(),
     event_updated_at TIMESTAMPTZ DEFAULT now()
   )', REPLACE(NEW.id::text, '-', ''));

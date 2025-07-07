@@ -1,32 +1,29 @@
 version: '3.8'
+
 services:
   frontend:
-    build: ./apps/frontend
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
-      - "3000:3000"
-    volumes:
-      - ./apps/frontend:/app
+      - "3000:80"
     environment:
-      - VITE_SUPABASE_URL=http://localhost:54321
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - VITE_API_URL=http://localhost:8000
 
   agent:
-    build: ./apps/agent
+    build:
+      context: ./apps/agent
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./apps/agent:/app
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SUPABASE_URL=http://localhost:54321
+      - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
 
-  supabase:
-    image: supabase/supabase-local
-    ports:
-      - "54321:54321"
-      - "54322:54322"
-      - "54323:54323"
-    volumes:
-      - ./apps/supabase:/app/supabase 
+volumes:
+  db_data:
