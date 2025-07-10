@@ -31,7 +31,7 @@ export default serve(async (req) => {
     message = body.message
     sessionId = body.session_id
     embedding = body.embedding
-    console.log('Request body:', body)
+    console.log('Request body:', { user_id: body.user_id, content_length: body.message?.length })
     if (!userId || !message || !sessionId) throw new Error('Missing user_id, message, or session_id in request body')
   } catch (e) {
     console.log('Request parse error:', e)
@@ -51,13 +51,14 @@ export default serve(async (req) => {
     const query = `INSERT INTO "${schema}"."chat_messages" (content, sender, session_id, user_id, embedding, timestamp) VALUES ($1, $2, $3, $4, $5::vector, NOW()) RETURNING id`;
     console.log('Insert query:', query)
     const { rows } = await client.queryObject<{ id: number }>(query, [message, 'user', sessionId, userId, embeddingLiteral])
-    console.log('Insert result:', rows)
+    console.log('Insert result:', { rows_inserted: rows?.length })
     return new Response(JSON.stringify({ success: true, id: rows[0]?.id }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (e: any) {
     console.log('DB error:', e)
+    console.log('Error details:', { schema: `u_${userId?.replace(/-/g, '')}`, embedding: embeddingLiteral?.substring(0, 50) + '...' })
     return new Response(JSON.stringify({ success: false, error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -103,19 +103,32 @@ export async function createEvent(
       return { event: null, error: 'User not authenticated' }
     }
 
-    const { data, error } = await supabase.functions.invoke('vectorize-event', {
-      body: { 
+    // Use the agent service for embedding generation
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:3001'
+    const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         user_id: user.id,
         event: event
-      }
+      })
     })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Agent service error: ${errorText}`)
+    }
+    
+    const data = await response.json()
 
-    if (error) {
-      console.error('Error creating event:', error)
-      return { event: null, error: error.message }
+    if (!data.success) {
+      console.error('Error creating event:', data.error)
+      return { event: null, error: data.error }
     }
 
-    return { event: data, error: null };
+    return { event: data.event, error: null };
 
   } catch (err: any) {
     console.error('Unexpected error in createEvent:', err)
@@ -141,19 +154,32 @@ export async function updateEvent(
       return { event: null, error: 'User not authenticated' };
     }
 
-    const { data, error } = await supabase.functions.invoke('vectorize-event', {
-      body: { 
+    // Use the agent service for embedding generation
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:3001'
+    const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         user_id: user.id,
         event: { ...event, id: eventId }
-      }
+      })
     })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Agent service error: ${errorText}`)
+    }
+    
+    const data = await response.json()
 
-    if (error) {
-      console.error('Error updating event:', error);
-      return { event: null, error: error.message };
+    if (!data.success) {
+      console.error('Error updating event:', data.error);
+      return { event: null, error: data.error };
     }
 
-    return { event: data, error: null };
+    return { event: data.event, error: null };
   } catch (err: any) {
     console.error('Unexpected error in updateEvent:', err);
     return { event: null, error: err.message || 'An unexpected error occurred' };

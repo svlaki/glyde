@@ -1,5 +1,0 @@
-langchain
-langgraph
-langchain_openai
-fastapi
-uvicorn

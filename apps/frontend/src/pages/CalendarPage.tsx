@@ -102,12 +102,28 @@ export function CalendarPage() {
                     center: 'title',
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
                   }}
-                  events={events.map(e => ({ ...e, title: e.event_title, start: e.event_starts_at, end: e.event_ends_at }))}
+                  events={events.map(e => {
+                    // Convert UTC time to local time for display
+                    const startDate = new Date(e.event_starts_at);
+                    const endDate = new Date(e.event_ends_at);
+                    
+                    // Create new date objects that represent the same "wall clock" time in local timezone
+                    const localStart = new Date(startDate.getTime() + (startDate.getTimezoneOffset() * 60000));
+                    const localEnd = new Date(endDate.getTime() + (endDate.getTimezoneOffset() * 60000));
+                    
+                    return { 
+                      ...e, 
+                      title: e.event_title, 
+                      start: localStart.toISOString(), 
+                      end: localEnd.toISOString() 
+                    };
+                  })}
                   dateClick={handleDateClick}
                   eventClick={handleEventClick}
                   height="auto"
                   aspectRatio={1.8}
                   themeSystem="standard"
+                  timeZone="local"
                   eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
                 />
               </div>
@@ -193,10 +209,13 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-gray-100 sm:max-w-md">
+      <DialogContent className="bg-gray-800 border-gray-700 text-gray-100 sm:max-w-md" aria-describedby="event-dialog-description">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">{event ? 'Edit Event' : 'Add Event'}</DialogTitle>
         </DialogHeader>
+        <div id="event-dialog-description" className="sr-only">
+          {event ? 'Edit the details of an existing calendar event' : 'Create a new calendar event by filling in the details below'}
+        </div>
         <div className="space-y-4 py-4">
           <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} />
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />

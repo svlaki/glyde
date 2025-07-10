@@ -4,7 +4,6 @@ import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { useAuth } from '../../lib/authContext'
 import { supabase } from '../../lib/supabase'
-import { generateEmbedding } from '../../lib/utils'
 
 function generateSessionId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -40,7 +39,7 @@ export function ChatPanel() {
     async function fetchMessages() {
       if (!user || !session?.access_token) return
       try {
-        const url = 'https://furwuyjptohobrvyyzfy.functions.supabase.co/chatHistory'
+        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
         const res = await fetch(url, {
           method: 'POST',
           headers: {
@@ -82,18 +81,7 @@ export function ChatPanel() {
       console.error('User not authenticated or missing session token')
       return
     }
-    // Generate embedding in the frontend
-    const openAIApiKey = import.meta.env.VITE_OPENAI_API_KEY
-    if (!openAIApiKey) {
-      console.warn('VITE_OPENAI_API_KEY is not set. Embedding generation will fail.')
-    }
-    let embedding: number[] | null = null
-    try {
-      embedding = await generateEmbedding({ input, apiKey: openAIApiKey })
-      if (!embedding) console.warn('Embedding generation failed or returned null')
-    } catch (err) {
-      console.warn('Embedding generation error:', err)
-    }
+    // Embedding generation will be handled by the agent service
     const msg: ChatMessage = {
       id: `${Date.now()}`,
       content: input,
@@ -103,10 +91,10 @@ export function ChatPanel() {
     setMessages(prev => [...prev, msg])
     lastTimestampRef.current = msg.timestamp
     setInput('')
-    // POST to Supabase Edge Function
+    // POST to Agent Chat Edge Function
     try {
-      const url = 'https://furwuyjptohobrvyyzfy.functions.supabase.co/chat'
-      await fetch(url, {
+      const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat`
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,10 +103,24 @@ export function ChatPanel() {
         body: JSON.stringify({
           user_id: user.id,
           message: input,
-          session_id: sessionId.current,
-          embedding
+          session_id: sessionId.current
         })
       })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.response) {
+          // Add AI response to messages
+          const aiMsg: ChatMessage = {
+            id: result.id || `${Date.now()}-ai`,
+            content: result.response,
+            sender: 'assistant',
+            timestamp: new Date().toISOString()
+          }
+          setMessages(prev => [...prev, aiMsg])
+          lastTimestampRef.current = aiMsg.timestamp
+        }
+      }
     } catch (err) {
       console.error('Failed to send message', err)
     }

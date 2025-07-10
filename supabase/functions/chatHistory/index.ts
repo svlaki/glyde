@@ -27,10 +27,10 @@ export default serve(async (req) => {
     const body = await req.json()
     userId = body.user_id
     sessionId = body.session_id
-    console.log('Request body:', body)
+    // Parse request body for user_id and session_id
     if (!userId || !sessionId) throw new Error('Missing user_id or session_id in request body')
   } catch (e) {
-    console.log('Request parse error:', e)
+    console.error('Request parse error:', e)
     return new Response(`Invalid request: ${e.message}`, { status: 400, headers: corsHeaders })
   }
 
@@ -38,15 +38,14 @@ export default serve(async (req) => {
   try {
     const schema = `u_${userId.replace(/-/g, '')}`
     const query = `SELECT * FROM "${schema}"."chat_messages" WHERE session_id = $1 ORDER BY timestamp ASC`;
-    console.log('Select query:', query)
     const { rows } = await client.queryObject(query, [sessionId])
-    console.log('Select result:', rows)
+    // Successfully retrieved chat messages
     return new Response(JSON.stringify({ success: true, messages: rows }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (e: any) {
-    console.log('DB error:', e)
+    console.error('DB error:', e)
     return new Response(JSON.stringify({ success: false, error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
