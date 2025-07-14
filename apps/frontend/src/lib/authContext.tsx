@@ -12,12 +12,30 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  // DEV BYPASS: Skip authentication for UI development
+  const DEV_BYPASS = true
+  
+  const [user, setUser] = useState<User | null>(DEV_BYPASS ? {
+    id: 'dev-user-123',
+    email: 'dev@example.com',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    aud: 'authenticated',
+    role: 'authenticated',
+    app_metadata: {},
+    user_metadata: {}
+  } as User : null)
+  
   const [session, setSession] = useState<Session | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(DEV_BYPASS)
+  const [isLoading, setIsLoading] = useState(DEV_BYPASS ? false : true)
 
   useEffect(() => {
+    // Skip all auth logic if in dev bypass mode
+    if (DEV_BYPASS) {
+      return
+    }
+    
     // Check for existing session on mount
     async function getInitialSession() {
       try {
