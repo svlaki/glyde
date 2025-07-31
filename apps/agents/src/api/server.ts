@@ -1,10 +1,26 @@
+import dotenv from 'dotenv';
+
+// Configure dotenv first
+dotenv.config({ path: '.env' });
+
+// Set environment variables explicitly if needed
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.OPENAI_API_KEY) {
+  console.error('Missing required environment variables');
+  process.exit(1);
+}
+
+console.log('Environment variables loaded successfully');
+
+// Initialize Supabase client first
+import { initializeSupabase } from '../services/SupabaseService.js';
+initializeSupabase();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { generateEventEmbedding, generateChatEmbedding, searchSimilarContent } from './embedding.js';
-import { handleChatMessage, getChatHistory } from './chat.js';
-
-dotenv.config();
+import { handleChatMessage, getChatHistory, handleStreamingChat } from './chat.js';
+import { createUserSchema } from './user.js';
+import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent } from './events.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -25,7 +41,17 @@ app.post('/api/embeddings/search', searchSimilarContent);
 
 // Chat endpoints
 app.post('/api/chat', handleChatMessage);
+app.post('/api/chat/stream', handleStreamingChat);
 app.post('/api/chat/history', getChatHistory);
+
+// User endpoints
+app.post('/api/user/create-schema', createUserSchema);
+
+// Events endpoints
+app.post('/api/events', getUserEvents);
+app.post('/api/events/create', createUserEvent);
+app.post('/api/events/update', updateUserEvent);
+app.post('/api/events/delete', deleteUserEvent);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

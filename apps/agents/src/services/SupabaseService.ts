@@ -1,14 +1,29 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
 
+// Export supabase client for use in other modules
+export let supabase: SupabaseClient;
+
+// Initialize supabase client
+export function initializeSupabase() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  }
+  
+  supabase = createClient(supabaseUrl, supabaseKey);
+}
+
 export class SupabaseService {
   private client: SupabaseClient;
 
   constructor() {
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    
-    this.client = createClient(supabaseUrl, supabaseKey);
+    if (!supabase) {
+      initializeSupabase();
+    }
+    this.client = supabase;
   }
 
   getClient(): SupabaseClient {
@@ -53,41 +68,39 @@ export class SupabaseService {
   }
 
   async createEvent(userId: string, event: Partial<DatabaseEvent>): Promise<DatabaseEvent | null> {
-    // Removed excessive logging
-    
-    // Use the vectorize-event Edge Function
-    const { data, error } = await this.client.functions.invoke('vectorize-event', {
-      body: {
-        user_id: userId,
-        event: event
+    try {
+      const response = await fetch('http://localhost:8000/api/embeddings/event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          event: event
+        })
+      });
+
+      const data = await response.json() as { 
+        success: boolean; 
+        event?: DatabaseEvent; 
+        error?: string; 
+      };
+
+      if (!response.ok) {
+        console.error('Error creating event:', data.error);
+        return null;
       }
-    });
 
-    // Removed excessive logging
+      if (!data.success) {
+        console.error('Event creation failed:', data.error);
+        return null;
+      }
 
-    if (error) {
+      return data.event || null;
+    } catch (error) {
       console.error('Error creating event:', error);
-      // Don't throw immediately - try to recover
       return null;
     }
-
-    if (data && !data.success) {
-      console.error('Edge Function returned error:', data.error);
-      return null;
-    }
-
-    // Return a basic event object since the Edge Function doesn't return the full event
-    return {
-      id: event.id || 'generated',
-      event_title: event.event_title || '',
-      event_starts_at: event.event_starts_at || '',
-      event_ends_at: event.event_ends_at || '',
-      event_location: event.event_location,
-      event_description: event.event_description,
-      event_created_at: new Date().toISOString(),
-      event_updated_at: new Date().toISOString(),
-      embedding: []
-    };
   }
 
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent>): Promise<DatabaseEvent | null> {
@@ -128,67 +141,69 @@ export class SupabaseService {
   }
 
   async getChatMessages(userId: string, sessionId: string, limit: number = 50): Promise<DatabaseChatMessage[]> {
-    // Removed excessive logging
-    
-    // Use the chatHistory Edge Function
-    const { data, error } = await this.client.functions.invoke('chatHistory', {
-      body: {
-        user_id: userId,
-        session_id: sessionId
+    try {
+      const response = await fetch('http://localhost:8000/api/chat/history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          session_id: sessionId,
+          limit: limit
+        })
+      });
+
+      const data = await response.json() as { 
+        success?: boolean; 
+        messages?: DatabaseChatMessage[]; 
+        error?: string; 
+      };
+
+      if (!response.ok) {
+        console.error('Error fetching chat messages:', data.error);
+        return [];
       }
-    });
 
-    // Removed excessive logging
-
-    if (error) {
+      return data.messages || [];
+    } catch (error) {
       console.error('Error fetching chat messages:', error);
       return [];
     }
-
-    if (data && !data.success) {
-      console.error('ChatHistory Edge Function returned error:', data.error);
-      return [];
-    }
-
-    return data?.messages || [];
   }
 
   async addChatMessage(userId: string, message: Partial<DatabaseChatMessage>): Promise<DatabaseChatMessage | null> {
-    // Removed excessive logging
-    
-    // Use the chat Edge Function
-    const { data, error } = await this.client.functions.invoke('chat', {
-      body: {
-        user_id: userId,
-        message: message.content,
-        session_id: message.session_id,
-        embedding: message.embedding
+    try {
+      const response = await fetch('http://localhost:8000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          message: message.content,
+          session_id: message.session_id,
+          sender: message.sender,
+          embedding: message.embedding
+        })
+      });
+
+      const data = await response.json() as { 
+        success?: boolean; 
+        message?: DatabaseChatMessage; 
+        error?: string; 
+      };
+
+      if (!response.ok) {
+        console.error('Error adding chat message:', data.error);
+        return null;
       }
-    });
 
-    // Removed excessive logging
-
-    if (error) {
+      return data.message || null;
+    } catch (error) {
       console.error('Error adding chat message:', error);
-      // Return null instead of throwing
       return null;
     }
-
-    if (data && !data.success) {
-      console.error('Chat Edge Function returned error:', data.error);
-      return null;
-    }
-
-    // Return a basic message object since the Edge Function doesn't return the full message
-    return {
-      id: data?.id || 'generated',
-      content: message.content || '',
-      sender: message.sender || 'user',
-      session_id: message.session_id || '',
-      user_id: userId,
-      timestamp: message.timestamp || new Date().toISOString(),
-      embedding: message.embedding || []
-    };
   }
 
   async searchSimilarEvents(userId: string, queryEmbedding: number[], limit: number = 10): Promise<VectorSearchResult<DatabaseEvent>[]> {

@@ -30,6 +30,18 @@ BEGIN
       event_updated_at TIMESTAMPTZ DEFAULT now()
     )', schema_name);
   
+  -- Create chat_messages table if it doesn't exist
+  EXECUTE format('
+    CREATE TABLE IF NOT EXISTS %I.chat_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      session_id TEXT NOT NULL,
+      user_id UUID NOT NULL,
+      content TEXT NOT NULL,
+      embedding vector(1536),
+      sender TEXT NOT NULL,
+      timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
+    )', schema_name);
+  
   -- Create settings table if it doesn't exist
   EXECUTE format('
     CREATE TABLE IF NOT EXISTS %I.settings (

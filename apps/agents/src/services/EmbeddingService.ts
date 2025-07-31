@@ -4,7 +4,7 @@ import { SupabaseService } from './SupabaseService.js';
 
 export class EmbeddingService {
   private embeddings: OpenAIEmbeddings;
-  private supabaseService: SupabaseService;
+  private supabaseService: SupabaseService | null = null;
 
   constructor() {
     this.embeddings = new OpenAIEmbeddings({
@@ -12,8 +12,13 @@ export class EmbeddingService {
       modelName: 'text-embedding-3-small',
       dimensions: 1536,
     });
-    
-    this.supabaseService = new SupabaseService();
+  }
+
+  private getSupabaseService(): SupabaseService {
+    if (!this.supabaseService) {
+      this.supabaseService = new SupabaseService();
+    }
+    return this.supabaseService;
   }
 
   // Use the same embedding function as frontend for consistency
@@ -44,7 +49,7 @@ export class EmbeddingService {
     return await SupabaseVectorStore.fromExistingIndex(
       this.embeddings,
       {
-        client: this.supabaseService.getClient(),
+        client: this.getSupabaseService().getClient(),
         tableName: `${schema}.${tableName}`,
         queryName: `match_${tableName}`,
       }
@@ -56,7 +61,7 @@ export class EmbeddingService {
     
     try {
       const vectorStore = new SupabaseVectorStore(this.embeddings, {
-        client: this.supabaseService.getClient(),
+        client: this.getSupabaseService().getClient(),
         tableName: 'events',
         queryName: 'match_documents',
         filter: { user_schema: schema }

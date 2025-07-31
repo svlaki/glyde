@@ -4,13 +4,16 @@ import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { SupabaseService } from '../../services/SupabaseService.js';
+import { SupabaseService, supabase } from '../../services/SupabaseService.js';
+import { BaseAgent } from '../base/BaseAgent.js';
+import { AgentContext, AgentResponse, AgentType } from '../../types/agents.js';
 
 // Utility function to create a local time example for the prompt
 function createLocalTimeExample(hour: number, minute: number = 0): string {
   const date = new Date();
   date.setHours(hour, minute, 0, 0);
-  return date.toISOString();
+  // Return both local time representation and ISO for clarity
+  return `${date.toISOString()} (which represents ${hour}:${minute.toString().padStart(2, '0')} local time)`;
 }
 
 // Define the state structure for our conversation agent
@@ -32,19 +35,60 @@ const ConversationState = Annotation.Root({
 
 type ConversationStateType = typeof ConversationState.State;
 
-export class ConversationAgent {
+export class ConversationAgent extends BaseAgent {
   private graph: any;
-  private supabaseService: SupabaseService;
-  private model: ChatOpenAI;
 
   constructor() {
-    this.supabaseService = new SupabaseService();
-    this.model = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
-      temperature: 0.1,
-    });
-
+    super('conversation', "gpt-4o-mini");
     this.graph = this.createGraph();
+  }
+
+  async initialize(): Promise<void> {
+    // Initialize any required resources
+  }
+
+  async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
+    try {
+      const result = await this.graph.invoke({
+        messages: [new HumanMessage(message)],
+        userId: context.userId,
+      });
+
+      // Get the last AI message and any execution results
+      const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
+      const lastAiMessage = aiMessages[aiMessages.length - 1];
+      
+      let response = lastAiMessage?.content || "I processed your request.";
+      
+      if (result.lastResult) {
+        response += `\n\n${result.lastResult}`;
+      }
+
+      return {
+        content: response,
+        type: 'text'
+      };
+    } catch (error) {
+      console.error('Error processing message with LangGraph:', error);
+      return {
+        content: "Sorry, I encountered an error processing your request. Please try again.",
+        type: 'text'
+      };
+    }
+  }
+
+  getSystemPrompt(): string {
+    return "You are a helpful personal assistant that helps users manage their calendar and tasks through natural language commands.";
+  }
+
+  getCapabilities(): string[] {
+    return [
+      "Create, update, delete calendar events",
+      "Search and list calendar events", 
+      "Create tasks",
+      "Natural language date/time parsing",
+      "Smart defaults for event creation"
+    ];
   }
 
   private createGraph(): any {
@@ -65,8 +109,8 @@ export class ConversationAgent {
         description: "Create a new calendar event. Parse natural language into structured event data. Use smart defaults for missing information. Be intelligent about time defaults based on event type.",
         schema: z.object({
           title: z.string().describe("Event title extracted from user input or inferred from context"),
-          startTime: z.string().describe("Start time in ISO format. Parse relative dates like 'tomorrow', '1pm', 'Friday' into proper timestamps. Use intelligent time defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
-          endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
+          startTime: z.string().describe("Start time in ISO format. CRITICAL: Parse user's intended local time (e.g., '2pm tomorrow' means 2pm in USER's timezone). Create ISO timestamp that represents the user's local time, not server time. Use intelligent defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
+          endTime: z.string().describe("End time in ISO format. CRITICAL: Must be in same timezone as startTime. If not specified, add 1 hour to start time"),
           location: z.string().nullable().describe("Event location. Leave empty if not specified"),
           description: z.string().nullable().describe("Event description. Leave empty if not specified"),
         }),
@@ -91,8 +135,8 @@ export class ConversationAgent {
           eventId: z.string().nullable().describe("Event ID to update (optional - if not provided, search by description)"),
           searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
           title: z.string().nullable().describe("New event title"),
-          startTime: z.string().nullable().describe("New start time in ISO format"),
-          endTime: z.string().nullable().describe("New end time in ISO format"),
+          startTime: z.string().nullable().describe("New start time in ISO format. CRITICAL: Parse user's intended local time, create ISO timestamp representing user's timezone"),
+          endTime: z.string().nullable().describe("New end time in ISO format. CRITICAL: Must be in same timezone as startTime"),
           location: z.string().nullable().describe("New event location"),
           description: z.string().nullable().describe("New event description"),
         }),
@@ -181,14 +225,33 @@ export class ConversationAgent {
 
     // Bind tools to the model
     const modelWithTools = this.model.bindTools(tools);
+    
+    // Register tools with the base agent
+    this.registerTools(tools);
 
     // Define the workflow nodes
     const callModel = async (state: ConversationStateType) => {
-      // Load recent events for context
-      const recentEvents = await this.supabaseService.getEvents(state.userId);
-      // Debug: Show recent events for context
-      if (recentEvents.length > 0) {
-        console.log(`Found ${recentEvents.length} events for user context`);
+      // Load recent events for context using RPC function
+      let recentEvents: any[] = [];
+      try {
+        const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+        const { data: eventsData, error } = await supabase.rpc('get_user_events', {
+          user_schema: userSchema,
+          start_date: null,
+          end_date: null,
+        });
+        
+        if (error) {
+          console.error('Error loading recent events for context:', error);
+        } else {
+          recentEvents = (eventsData || []).slice(0, 10); // Limit to 10 for context
+          // Debug: Show recent events for context
+          if (recentEvents.length > 0) {
+            console.log(`Found ${recentEvents.length} events for user context`);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading recent events for context:', error);
       }
       
       // Get recent chat messages for conversation context
@@ -213,12 +276,17 @@ Current LOCAL date: ${new Date().toLocaleDateString()}
 Current LOCAL time: ${new Date().toLocaleTimeString()}
 Current timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
 
-CRITICAL: You are running on a server, but the user is in timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
-When generating ISO timestamps, you MUST account for the user's timezone offset.
+CRITICAL TIMEZONE HANDLING:
+- You are running on a server in timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
+- When users say times like "2pm", they mean 2pm in THEIR local timezone
+- You MUST create timestamps that represent the user's intended local time
+- DO NOT assume the user is in the same timezone as the server
 
-IMPORTANT: When users say "tomorrow" they mean the next LOCAL day, not the next UTC day.
-Today (LOCAL): ${new Date().toLocaleDateString()}
-Tomorrow (LOCAL): ${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()}
+IMPORTANT: When users say "tomorrow" they mean the next LOCAL day in their timezone.
+Server time info (for reference only):
+- Server today: ${new Date().toLocaleDateString()}
+- Server tomorrow: ${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()}
+- Server timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
 
 IMPORTANT INSTRUCTIONS:
 1. Always be proactive and helpful - don't ask for clarification unless absolutely necessary
@@ -227,20 +295,31 @@ IMPORTANT INSTRUCTIONS:
 4. Only ask for clarification if the request is truly ambiguous
 
 Date/Time Parsing Rules - FOLLOW THESE EXACTLY:
-- "tomorrow" = THE NEXT LOCAL DAY (${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()}) at the specified time or 9am if no time given
-- "today" = THE CURRENT LOCAL DAY (${new Date().toLocaleDateString()}) at the specified time
-- "1pm to 2pm" = 1:00 PM to 2:00 PM on the specified day (use LOCAL timezone)
-- "at 2pm" = 2:00 PM for 1 hour (default duration) in LOCAL timezone
-- "next week" = Monday of next week at 9am LOCAL time
-- "Friday" = next Friday at 9am LOCAL time (or this Friday if it hasn't passed)
-- If no end time: add 1 hour to start time
-- If no date: assume today unless time has passed, then tomorrow
-- Parse "1pm" as 13:00 LOCAL TIME, "2pm" as 14:00 LOCAL TIME, etc.
-- ALWAYS convert to ISO format but respect the user's local timezone
-- CRITICAL: Generate timestamps that represent the LOCAL time, not UTC time
-- Example: If user wants "lunch at 12pm" and they're in America/Chicago, generate a timestamp that shows 12pm in Chicago, not 12pm UTC
-- CORRECT example for 12pm local: ${createLocalTimeExample(12)}
-- CORRECT example for 7pm local: ${createLocalTimeExample(19)}
+
+CRITICAL: When creating timestamps, you MUST ensure the time represents what the user intended in THEIR timezone.
+
+Steps for creating timestamps:
+1. Parse the user's intended time (e.g., "2pm tomorrow")
+2. Convert to the user's local date/time
+3. Generate ISO timestamp that preserves that local time
+
+Examples of CORRECT timestamp generation:
+- User says "2pm tomorrow" → Create date for tomorrow, set time to 14:00 in user's timezone
+- User says "9am today" → Create date for today, set time to 09:00 in user's timezone
+
+Time parsing rules:
+- "tomorrow" = Next day at specified time (or 9am default)
+- "today" = Current day at specified time  
+- "1pm to 2pm" = 1:00 PM to 2:00 PM (user's timezone)
+- "at 2pm" = 2:00 PM for 1 hour duration
+- "Friday" = Next Friday at specified time (or 9am default)
+- Parse "1pm" as 13:00, "2pm" as 14:00, etc.
+
+CRITICAL EXAMPLES:
+- CORRECT for 12pm local: ${createLocalTimeExample(12)}
+- CORRECT for 7pm local: ${createLocalTimeExample(19)}
+
+Remember: The ISO timestamp should represent the user's intended local time, not server time!
 
 Smart Defaults - USE THESE WITHOUT ASKING:
 - Title: Extract from context (e.g., "meeting", "lunch", "doctor appointment") or use "Event"
@@ -337,15 +416,28 @@ Your capabilities:
           
           switch (action.name) {
             case "create_event":
-              
-              const event = await this.supabaseService.createEvent(state.userId, {
-                event_title: action.args.title,
-                event_starts_at: action.args.startTime,
-                event_ends_at: action.args.endTime,
-                event_location: action.args.location,
-                event_description: action.args.description,
-              });
-              result = `✅ Created event: "${action.args.title}"`;
+              try {
+                // Create event using RPC function to avoid schema access issues
+                const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                const { data: createdEvent, error: createError } = await supabase.rpc('create_user_event', {
+                  user_schema: userSchema,
+                  event_title: action.args.title,
+                  event_starts_at: action.args.startTime,
+                  event_ends_at: action.args.endTime,
+                  event_location: action.args.location || null,
+                  event_description: action.args.description || null,
+                });
+                
+                if (createError) {
+                  console.error('Error creating event:', createError);
+                  result = `❌ Failed to create event: ${createError.message}`;
+                } else {
+                  result = `✅ Created event: "${action.args.title}"`;
+                }
+              } catch (error) {
+                console.error('Error creating event:', error);
+                result = `❌ Error creating event: ${error instanceof Error ? error.message : 'Unknown error'}`;
+              }
               break;
 
             case "update_event":
@@ -377,18 +469,29 @@ Your capabilities:
               }
               
               if (eventId) {
-                const updatedEvent = await this.supabaseService.updateEvent(
-                  state.userId,
-                  eventId,
-                  {
-                    event_title: action.args.title,
-                    event_starts_at: action.args.startTime,
-                    event_ends_at: action.args.endTime,
-                    event_location: action.args.location,
-                    event_description: action.args.description,
+                try {
+                  // Update event using RPC function to avoid schema access issues
+                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                  const { data: updatedEvent, error: updateError } = await supabase.rpc('update_user_event', {
+                    user_schema: userSchema,
+                    event_id: eventId,
+                    event_title: action.args.title || null,
+                    event_starts_at: action.args.startTime || null,
+                    event_ends_at: action.args.endTime || null,
+                    event_location: action.args.location || null,
+                    event_description: action.args.description || null,
+                  });
+                  
+                  if (updateError) {
+                    console.error('Error updating event:', updateError);
+                    result = `❌ Failed to update event: ${updateError.message}`;
+                  } else {
+                    result = `✅ Updated event: "${action.args.title || 'Event'}"`;
                   }
-                );
-                result = `✅ Updated event: "${action.args.title || 'Event'}"`;
+                } catch (error) {
+                  console.error('Error updating event:', error);
+                  result = `❌ Error updating event: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                }
               } else {
                 result = `❌ No event ID provided and no search query given`;
               }
@@ -430,16 +533,25 @@ Your capabilities:
               }
               
               if (deleteEventId) {
-                // Attempting to delete single event
-                const deleteResult = await this.supabaseService.deleteEvent(
-                  state.userId,
-                  deleteEventId
-                );
-                // Single delete completed
-                if (deleteResult.success) {
-                  result = `✅ Deleted event successfully`;
-                } else {
-                  result = `❌ Failed to delete event: ${deleteResult.error}`;
+                try {
+                  // Delete event using RPC function to avoid schema access issues
+                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                  const { data: deleteSuccess, error: deleteError } = await supabase.rpc('delete_user_event', {
+                    user_schema: userSchema,
+                    event_id: deleteEventId,
+                  });
+                  
+                  if (deleteError) {
+                    console.error('Error deleting event:', deleteError);
+                    result = `❌ Failed to delete event: ${deleteError.message}`;
+                  } else if (deleteSuccess) {
+                    result = `✅ Deleted event successfully`;
+                  } else {
+                    result = `❌ Event not found or could not be deleted`;
+                  }
+                } catch (error) {
+                  console.error('Error deleting event:', error);
+                  result = `❌ Error deleting event: ${error instanceof Error ? error.message : 'Unknown error'}`;
                 }
               } else {
                 // No event ID or search query provided
@@ -453,20 +565,31 @@ Your capabilities:
 
               // Find events to delete
               if (action.args.date) {
-                // Get all events on the specified date
+                // Get all events on the specified date using RPC function
                 const startDate = new Date(action.args.date);
                 const endDate = new Date(startDate);
                 endDate.setDate(endDate.getDate() + 1);
                 
-                // Searching events by date
-                
-                eventsToDelete = await this.supabaseService.getEvents(
-                  state.userId,
-                  startDate.toISOString(),
-                  endDate.toISOString()
-                );
-                
-                // Found events by date
+                try {
+                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                  const { data: eventsData, error } = await supabase.rpc('get_user_events', {
+                    user_schema: userSchema,
+                    start_date: startDate.toISOString(),
+                    end_date: endDate.toISOString(),
+                  });
+                  
+                  if (error) {
+                    console.error('Error fetching events by date:', error);
+                    result = `❌ Error fetching events by date: ${error.message}`;
+                    break;
+                  } else {
+                    eventsToDelete = eventsData || [];
+                  }
+                } catch (error) {
+                  console.error('Error fetching events by date:', error);
+                  result = `❌ Error fetching events by date: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                  break;
+                }
               } else if (action.args.searchQuery) {
                 // Use semantic search to find events
                 try {
@@ -499,17 +622,17 @@ Your capabilities:
               // Delete all found events
               for (const event of eventsToDelete) {
                 try {
-                  // Attempting to delete event
-                  const deleteResult = await this.supabaseService.deleteEvent(
-                    state.userId,
-                    event.id
-                  );
-                  // Delete operation completed
-                  if (deleteResult.success) {
+                  // Delete event using RPC function to avoid schema access issues
+                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                  const { data: deleteSuccess, error: deleteError } = await supabase.rpc('delete_user_event', {
+                    user_schema: userSchema,
+                    event_id: event.id,
+                  });
+                  
+                  if (!deleteError && deleteSuccess) {
                     deletedCount++;
-                    // Successfully deleted event
                   } else {
-                    // Delete failed
+                    console.error('Error deleting event:', event.id, deleteError);
                   }
                 } catch (error) {
                   console.error('Error deleting event:', event.id, error);
@@ -526,18 +649,32 @@ Your capabilities:
               break;
 
             case "list_events":
-              const events = await this.supabaseService.getEvents(
-                state.userId,
-                action.args.startDate,
-                action.args.endDate
-              );
-              result = `📅 Found ${events.length} events`;
-              if (events.length > 0) {
-                const eventList = events.slice(0, 5).map(e => 
-                  `• ${e.event_title} (${new Date(e.event_starts_at).toLocaleDateString()})`
-                ).join('\n');
-                result += `:\n${eventList}`;
-                if (events.length > 5) result += `\n...and ${events.length - 5} more`;
+              try {
+                // Get events using RPC function to avoid schema access issues
+                const userSchema = `u_${state.userId.replace(/-/g, '')}`;
+                const { data: eventsData, error } = await supabase.rpc('get_user_events', {
+                  user_schema: userSchema,
+                  start_date: action.args.startDate || null,
+                  end_date: action.args.endDate || null,
+                });
+                
+                if (error) {
+                  console.error('Error fetching events:', error);
+                  result = `❌ Error fetching events: ${error.message}`;
+                } else {
+                  const events = eventsData || [];
+                  result = `📅 Found ${events.length} events`;
+                  if (events.length > 0) {
+                    const eventList = events.slice(0, 5).map((e: any) => 
+                      `• ${e.event_title} (${new Date(e.event_starts_at).toLocaleDateString()})`
+                    ).join('\n');
+                    result += `:\n${eventList}`;
+                    if (events.length > 5) result += `\n...and ${events.length - 5} more`;
+                  }
+                }
+              } catch (error) {
+                console.error('Error listing events:', error);
+                result = `❌ Error listing events: ${error instanceof Error ? error.message : 'Unknown error'}`;
               }
               break;
 
@@ -618,27 +755,4 @@ Your capabilities:
     return workflow.compile();
   }
 
-  async processMessage(userId: string, message: string): Promise<string> {
-    try {
-      const result = await this.graph.invoke({
-        messages: [new HumanMessage(message)],
-        userId,
-      });
-
-      // Get the last AI message and any execution results
-      const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
-      const lastAiMessage = aiMessages[aiMessages.length - 1];
-      
-      let response = lastAiMessage?.content || "I processed your request.";
-      
-      if (result.lastResult) {
-        response += `\n\n${result.lastResult}`;
-      }
-
-      return response;
-    } catch (error) {
-      console.error('Error processing message with LangGraph:', error);
-      return "Sorry, I encountered an error processing your request. Please try again.";
-    }
-  }
 }

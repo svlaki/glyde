@@ -12,30 +12,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // DEV BYPASS: Skip authentication for UI development
-  const DEV_BYPASS = true
-  
-  const [user, setUser] = useState<User | null>(DEV_BYPASS ? {
-    id: 'dev-user-123',
-    email: 'dev@example.com',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    aud: 'authenticated',
-    role: 'authenticated',
-    app_metadata: {},
-    user_metadata: {}
-  } as User : null)
-  
+  const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(DEV_BYPASS)
-  const [isLoading, setIsLoading] = useState(DEV_BYPASS ? false : true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Skip all auth logic if in dev bypass mode
-    if (DEV_BYPASS) {
-      return
-    }
-    
     // Check for existing session on mount
     async function getInitialSession() {
       try {
@@ -48,8 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(session.user)
           setIsAuthenticated(true)
           
-          // Call Edge Function with the initial session
-          await callEdgeFunction(session)
+          // Call user schema creation with the initial session
+          await callUserSchemaCreation(session)
         } else {
           console.log('No initial session found')
           setSession(null)
@@ -75,9 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(!!session?.user)
         
         if (session?.user && session.access_token) {
-          await callEdgeFunction(session)
+          await callUserSchemaCreation(session)
         } else {
-          console.log('Session missing user or access_token, not calling Edge Function.')
+          console.log('Session missing user or access_token, not calling user schema creation.')
         }
       }
     )
@@ -87,11 +69,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
   
-  // Helper function to call the Edge Function
-  async function callEdgeFunction(session: Session) {
+  // Helper function to call the user schema creation endpoint
+  async function callUserSchemaCreation(session: Session) {
     try {
-      console.log('About to call Edge Function with user:', session.user, 'token:', session.access_token)
-      const res = await fetch('https://furwuyjptohobrvyyzfy.functions.supabase.co/createUserSchema', {
+      console.log('About to call user schema creation with user:', session.user, 'token:', session.access_token)
+      const res = await fetch('http://localhost:8000/api/user/create-schema', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -100,13 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ user_id: session.user.id, user_email: session.user.email })
       })
       
-      console.log('Edge Function response status:', res.status)
-      const text = await res.text()
-      console.log('Edge Function response body:', text)
+      console.log('User schema creation response status:', res.status)
+      const data = await res.json()
+      console.log('User schema creation response body:', data)
       
-      if (!res.ok) throw new Error(text)
+      if (!res.ok) throw new Error(data.error || 'Failed to create user schema')
     } catch (err) {
-      console.error('Edge Function error:', err)
+      console.error('User schema creation error:', err)
     }
   }
 

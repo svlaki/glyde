@@ -97,10 +97,56 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedInteraction, setSelectedInteraction] = useState<string>('');
 
-  // Use rich sample data instead of loading from API
+  // Load real user events from the backend
   useEffect(() => {
-    setEvents(generateRichSampleData());
-  }, []);
+    if (user) {
+      loadUserEvents();
+    }
+  }, [user]);
+
+  async function loadUserEvents() {
+    if (!user) return;
+    
+    try {
+      const { events: userEvents, error } = await fetchUserEvents(user);
+      if (error) {
+        console.error('Error loading user events:', error);
+        // Show empty calendar if there's an error
+        setEvents([]);
+      } else {
+        // Transform user events to match the calendar format
+        const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
+          // Database has correct time (e.g., 13:00 for 1pm) but it's displaying as wrong time
+          // Let's just pass the database time directly without any conversion
+          console.log('Raw database time:', event.event_starts_at);
+          
+          return {
+            id: event.id,
+            event_title: event.event_title,
+            event_starts_at: event.event_starts_at,
+            event_ends_at: event.event_ends_at,
+            event_location: event.event_location,
+            event_description: event.event_description,
+            event_created_at: event.event_created_at,
+            event_updated_at: event.event_updated_at,
+            title: event.event_title,
+            start: event.event_starts_at,
+            end: event.event_ends_at,
+            backgroundColor: 'rgba(147, 197, 253, 0.8)',
+            borderColor: '#3B82F6',
+            textColor: '#1F2937'
+          };
+        });
+        
+        // Show user events (empty array if no events)
+        setEvents(formattedEvents);
+      }
+    } catch (error) {
+      console.error('Error loading user events:', error);
+      // Show empty calendar on error
+      setEvents([]);
+    }
+  }
 
   function handleDateClick(info: any) {
     setSelectedDate(info.dateStr);
@@ -160,7 +206,7 @@ export function CalendarPage() {
                 eventClick={handleEventClick}
                 height="100%"
                 themeSystem="standard"
-                timeZone="local"
+                timeZone="UTC"
                 eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
                 slotMinTime="06:00:00"
                 slotMaxTime="23:00:00"
@@ -292,7 +338,7 @@ export function CalendarPage() {
           onClose={handleModalClose}
           event={selectedEvent}
           date={selectedDate}
-          onSave={() => setEvents(generateRichSampleData())}
+          onSave={loadUserEvents}
           user={user}
         />
       )}
@@ -417,8 +463,11 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
   useEffect(() => {
     if (event) {
       setTitle(event.event_title || '');
-      setStartTime(event.event_starts_at ? new Date(event.event_starts_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '');
-      setEndTime(event.event_ends_at ? new Date(event.event_ends_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+      // Convert UTC time to local time for display in the form
+      const startDate = new Date(event.event_starts_at);
+      const endDate = new Date(event.event_ends_at);
+      setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
+      setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
       setDescription(event.event_description || '');
     } else {
       setTitle('');
@@ -434,8 +483,9 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
     const baseDate = date ? date.split('T')[0] : (event?.event_starts_at.split('T')[0]);
     if (!baseDate) return;
 
-    const starts_at = new Date(`${baseDate}T${startTime}`);
-    const ends_at = new Date(`${baseDate}T${endTime}`);
+    // Create dates in local timezone and convert to ISO string
+    const starts_at = new Date(`${baseDate}T${startTime}:00`);
+    const ends_at = new Date(`${baseDate}T${endTime}:00`);
 
     const eventData = { 
       event_title: title.trim(), 

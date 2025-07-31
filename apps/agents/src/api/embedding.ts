@@ -2,8 +2,22 @@ import { Request, Response } from 'express';
 import { EmbeddingService } from '../services/EmbeddingService.js';
 import { SupabaseService } from '../services/SupabaseService.js';
 
-const embeddingService = new EmbeddingService();
-const supabaseService = new SupabaseService();
+let embeddingService: EmbeddingService | null = null;
+let supabaseService: SupabaseService | null = null;
+
+function getEmbeddingService(): EmbeddingService {
+  if (!embeddingService) {
+    embeddingService = new EmbeddingService();
+  }
+  return embeddingService;
+}
+
+function getSupabaseService(): SupabaseService {
+  if (!supabaseService) {
+    supabaseService = new SupabaseService();
+  }
+  return supabaseService;
+}
 
 export async function generateEventEmbedding(req: Request, res: Response): Promise<void> {
   try {
@@ -22,10 +36,10 @@ export async function generateEventEmbedding(req: Request, res: Response): Promi
     let result;
     if (event.id) {
       console.log('Step 2: Updating existing event...');
-      result = await supabaseService.updateEvent(user_id, event.id, event);
+      result = await getSupabaseService().updateEvent(user_id, event.id, event);
     } else {
       console.log('Step 2: Creating new event...');
-      result = await supabaseService.createEvent(user_id, event);
+      result = await getSupabaseService().createEvent(user_id, event);
     }
     console.log('Step 2 complete: Event operation finished');
 
@@ -64,10 +78,10 @@ export async function generateChatEmbedding(req: Request, res: Response): Promis
     }
 
     // Generate embedding for the message
-    const embedding = await embeddingService.generateEmbedding(message);
+    const embedding = await getEmbeddingService().generateEmbedding(message);
 
     // Store the message with embedding
-    const result = await supabaseService.addChatMessage(user_id, {
+    const result = await getSupabaseService().addChatMessage(user_id, {
       session_id,
       user_id,
       content: message,
@@ -99,11 +113,11 @@ export async function searchSimilarContent(req: Request, res: Response): Promise
     const results: any = {};
 
     if (type === 'events' || type === 'both') {
-      results.events = await embeddingService.searchSimilarEvents(user_id, query, limit);
+      results.events = await getEmbeddingService().searchSimilarEvents(user_id, query, limit);
     }
 
     if (type === 'chats' || type === 'both') {
-      results.chats = await embeddingService.searchSimilarChats(user_id, query, limit);
+      results.chats = await getEmbeddingService().searchSimilarChats(user_id, query, limit);
     }
 
     res.json({

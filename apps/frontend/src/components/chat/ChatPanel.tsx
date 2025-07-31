@@ -68,8 +68,14 @@ export function ChatPanel() {
         console.error('Error fetching messages:', err)
       }
     }
-    pollingRef.current = setInterval(fetchMessages, 3000)
+    // Load messages initially, but don't poll since we have streaming
     fetchMessages()
+    
+    // Only poll if streaming is disabled
+    if (!isPolling) {
+      pollingRef.current = setInterval(fetchMessages, 10000) // Reduced to 10 seconds
+    }
+    
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)
     }
@@ -91,7 +97,7 @@ export function ChatPanel() {
     setMessages(prev => [...prev, msg])
     lastTimestampRef.current = msg.timestamp
     setInput('')
-    // POST to Agent Chat Edge Function
+    // Use regular chat endpoint for now (streaming has issues)
     try {
       const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat`
       const response = await fetch(url, {
@@ -110,9 +116,8 @@ export function ChatPanel() {
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.response) {
-          // Add AI response to messages
           const aiMsg: ChatMessage = {
-            id: result.id || `${Date.now()}-ai`,
+            id: `${Date.now()}-ai`,
             content: result.response,
             sender: 'assistant',
             timestamp: new Date().toISOString()
@@ -120,6 +125,8 @@ export function ChatPanel() {
           setMessages(prev => [...prev, aiMsg])
           lastTimestampRef.current = aiMsg.timestamp
         }
+      } else {
+        console.error('Chat response failed:', response.status, response.statusText)
       }
     } catch (err) {
       console.error('Failed to send message', err)

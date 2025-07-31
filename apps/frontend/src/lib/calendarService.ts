@@ -38,53 +38,33 @@ export async function fetchUserEvents(
       return { events: [], error: 'User not authenticated' }
     }
 
-    const schemaName = getUserSchemaName(user)
-    
-    // Try to execute the RPC function
-    try {
-      const { data, error } = await supabase.rpc('get_user_events', {
-        user_schema: schemaName,
+    // Use the backend API instead of direct Supabase calls
+    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
         start_date: startDate ? startDate.toISOString() : null,
         end_date: endDate ? endDate.toISOString() : null
       })
-      
-      if (error) {
-        console.error('Error fetching events:', error)
-        throw new Error(error.message)
-      }
-      
-      // Transform data to match our CalendarEvent interface
-      const formattedEvents: CalendarEvent[] = data.map((event: any) => ({
-        id: event.id,
-        event_title: event.event_title,
-        event_starts_at: event.event_starts_at,
-        event_ends_at: event.event_ends_at,
-        event_location: event.event_location,
-        event_description: event.event_description,
-        event_created_at: event.event_created_at,
-        event_updated_at: event.event_updated_at
-      }))
-      
-      return { events: formattedEvents, error: null }
-    } catch (rpcError: any) {
-      console.error('RPC Error:', rpcError)
-      
-      // Always return sample data for now
-      const sampleEvents = generateSampleEvents()
-      return { 
-        events: sampleEvents, 
-        error: `Error fetching events: ${rpcError.message}. Using sample data.` 
-      }
+    });
+
+    if (!response.ok) {
+      return { events: [], error: 'Failed to fetch events from backend' }
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return { events: data.events || [], error: null }
+    } else {
+      return { events: [], error: data.error || 'Unknown error' }
     }
   } catch (err: any) {
     console.error('Unexpected error in fetchUserEvents:', err)
-    
-    // Always return sample data for now
-    const sampleEvents = generateSampleEvents()
-    return { 
-      events: sampleEvents, 
-      error: `Unexpected error: ${err.message}. Using sample data.` 
-    }
+    return { events: [], error: err.message || 'An unexpected error occurred' }
   }
 }
 
@@ -104,7 +84,7 @@ export async function createEvent(
     }
 
     // Use the agent service for embedding generation
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:3001'
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
     const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
       method: 'POST',
       headers: {
@@ -155,7 +135,7 @@ export async function updateEvent(
     }
 
     // Use the agent service for embedding generation
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:3001'
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
     const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
       method: 'POST',
       headers: {
