@@ -24,7 +24,7 @@ export const searchEventsTool = tool(
     const events = searchResults.map(result => {
       const event = result.metadata;
       const startTime = new Date(event.event_starts_at).toLocaleString();
-      return `📅 ${event.event_title} - ${startTime}${event.event_location ? ` at ${event.event_location}` : ''}`;
+      return `📅 ${event.event_title} - ${startTime}${(event as any).event_location ? ` at ${(event as any).event_location}` : ''}`;
     });
 
     return `Found ${events.length} matching events:\n${events.join('\n')}`;

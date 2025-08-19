@@ -21,19 +21,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session on mount
     async function getInitialSession() {
       try {
-        setIsLoading(true)
-        const { data: { session } } = await supabase.auth.getSession()
+        console.log('🔍 [AUTH CONTEXT] Starting initial session check...')
+        console.log('  - Supabase client:', supabase)
+        console.log('  - Supabase auth:', supabase.auth)
         
-        if (session) {
-          console.log('Initial session found:', session)
-          setSession(session)
-          setUser(session.user)
+        setIsLoading(true)
+        const result = await supabase.auth.getSession()
+        console.log('🔍 [AUTH CONTEXT] getSession result:', result)
+        console.log('  - Data:', result.data)
+        console.log('  - Session:', result.data?.session)
+        console.log('  - Error:', result.error)
+        
+        if (result.data?.session) {
+          console.log('✅ [AUTH CONTEXT] Initial session found:', result.data.session)
+          console.log('  - User:', result.data.session.user)
+          console.log('  - Access token:', result.data.session.access_token ? 'Present' : 'Missing')
+          setSession(result.data.session)
+          setUser(result.data.session.user)
           setIsAuthenticated(true)
           
           // Call user schema creation with the initial session
-          await callUserSchemaCreation(session)
+          await callUserSchemaCreation(result.data.session)
         } else {
-          console.log('No initial session found')
+          console.log('ℹ️ [AUTH CONTEXT] No initial session found')
           setSession(null)
           setUser(null)
           setIsAuthenticated(false)
@@ -48,21 +58,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getInitialSession()
     
     // Set up auth state change listener
+    console.log('🔄 [AUTH CONTEXT] Setting up auth state change listener...')
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log('onAuthStateChange fired. Event:', _event, 'Session:', session)
+      async (event, session) => {
+        console.log('🔄 [AUTH CONTEXT] onAuthStateChange fired')
+        console.log('  - Event:', event)
+        console.log('  - Session:', session)
+        console.log('  - User:', session?.user)
+        console.log('  - Access token:', session?.access_token ? 'Present' : 'Missing')
         
         setSession(session)
         setUser(session?.user ?? null)
         setIsAuthenticated(!!session?.user)
         
         if (session?.user && session.access_token) {
+          console.log('✅ [AUTH CONTEXT] Valid session found, calling user schema creation...')
           await callUserSchemaCreation(session)
         } else {
-          console.log('Session missing user or access_token, not calling user schema creation.')
+          console.log('ℹ️ [AUTH CONTEXT] Session missing user or access_token, not calling user schema creation.')
+          console.log('  - Has user:', !!session?.user)
+          console.log('  - Has access_token:', !!session?.access_token)
         }
       }
     )
+    console.log('✅ [AUTH CONTEXT] Auth state change listener set up successfully')
     
     return () => {
       subscription.unsubscribe()

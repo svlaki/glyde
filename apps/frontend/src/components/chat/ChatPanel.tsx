@@ -9,9 +9,14 @@ function generateSessionId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  onEventCreated?: () => void;
+}
+
+export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sessionId = useRef<string>(generateSessionId())
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -30,6 +35,92 @@ export function ChatPanel() {
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
+
+  // Show intelligent briefing and weekly analysis when page loads
+  useEffect(() => {
+    if (!user || !session?.access_token) return
+    
+    const showBriefing = async () => {
+      try {
+        // Get weekly analysis from backend
+        const analysisRes = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/analysis/week`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            user_id: user.id
+          })
+        })
+        
+        if (analysisRes.ok) {
+          const analysis = await analysisRes.json()
+          
+          if (analysis.success && analysis.analysis) {
+            // Build the briefing message from the analysis
+            let briefingMessage = analysis.analysis.greeting
+            
+            // Add key insights if any
+            if (analysis.analysis.insights && analysis.analysis.insights.length > 0) {
+              briefingMessage += '\n\n📊 Key Insights:\n'
+              analysis.analysis.insights.forEach((insight: any) => {
+                const icon = insight.type === 'warning' ? '⚠️' : 
+                            insight.type === 'health' ? '💪' :
+                            insight.type === 'productivity' ? '🎯' : '💡'
+                briefingMessage += `${icon} ${insight.message}\n`
+              })
+            }
+            
+            // Add quick action suggestions if any
+            if (analysis.analysis.quickActions && analysis.analysis.quickActions.length > 0) {
+              briefingMessage += '\n🚀 Quick Actions:\n'
+              analysis.analysis.quickActions.forEach((action: any, index: number) => {
+                briefingMessage += `${index + 1}. ${action.label}\n`
+              })
+            }
+            
+            briefingMessage += '\nWhat would you like to work on today?'
+            
+            setMessages([{
+              id: 'briefing-' + Date.now(),
+              content: briefingMessage,
+              sender: 'assistant',
+              timestamp: new Date().toISOString()
+            }])
+            
+            return
+          }
+        }
+        
+        // Fallback to simple briefing if analysis fails
+        const today = new Date()
+        const currentHour = today.getHours()
+        const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening'
+        
+        setMessages([{
+          id: 'welcome-' + Date.now(),
+          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
+          sender: 'assistant',
+          timestamp: new Date().toISOString()
+        }])
+        
+      } catch (err) {
+        console.error('Error showing briefing:', err)
+        // If briefing fails, show a simple time-aware message
+        const hour = new Date().getHours()
+        const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+        setMessages([{
+          id: 'welcome-' + Date.now(),
+          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
+          sender: 'assistant',
+          timestamp: new Date().toISOString()
+        }])
+      }
+    }
+    
+    showBriefing()
+  }, [user, session])
 
   useEffect(() => {
     if (!isPolling) {
@@ -97,9 +188,9 @@ export function ChatPanel() {
     setMessages(prev => [...prev, msg])
     lastTimestampRef.current = msg.timestamp
     setInput('')
-    // Use regular chat endpoint for now (streaming has issues)
+    // Use agent/process endpoint for better context awareness
     try {
-      const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat`
+      const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/agent/process`
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -107,23 +198,62 @@ export function ChatPanel() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          user_id: user.id,
-          message: input,
-          session_id: sessionId.current
+          context: {
+            userId: user.id,
+            sessionId: sessionId.current,
+            conversationHistory: messages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            }))
+          },
+          message: input
         })
       })
 
       if (response.ok) {
         const result = await response.json()
+        let responseContent = ''
+        
+        // Handle different response formats
         if (result.success && result.response) {
+          if (typeof result.response === 'object' && result.response.content) {
+            responseContent = result.response.content
+          } else if (typeof result.response === 'string') {
+            responseContent = result.response
+          }
+        } else if (result.content) {
+          responseContent = result.content
+        }
+        
+        if (responseContent) {
           const aiMsg: ChatMessage = {
             id: `${Date.now()}-ai`,
-            content: result.response,
+            content: responseContent,
             sender: 'assistant',
             timestamp: new Date().toISOString()
           }
           setMessages(prev => [...prev, aiMsg])
           lastTimestampRef.current = aiMsg.timestamp
+          
+          // Check if the response indicates an event was created
+          // Look for common indicators in the response
+          const eventIndicators = [
+            'scheduled', 'created', 'added to your calendar', 
+            'event has been', 'booked', 'meeting set',
+            'appointment made', 'added the event'
+          ];
+          
+          const lowerResponse = responseContent.toLowerCase();
+          const eventWasCreated = eventIndicators.some(indicator => 
+            lowerResponse.includes(indicator)
+          );
+          
+          if (eventWasCreated && onEventCreated) {
+            // Give the backend a moment to process
+            setTimeout(() => {
+              onEventCreated();
+            }, 1000);
+          }
         }
       } else {
         console.error('Chat response failed:', response.status, response.statusText)
@@ -138,31 +268,35 @@ export function ChatPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-white rounded-lg">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
-        {messages.length === 0 && (
-          <div className="text-gray-500 text-center py-12">
-            <div className="text-lg mb-2">💬</div>
-            <div>Start a conversation with your assistant</div>
-          </div>
-        )}
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden" style={{ width: '100%', maxWidth: '100%' }}>
+      {/* Messages Area with fixed height */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxWidth: '100%' }}>
         {messages.map(msg => (
           <div
             key={msg.id}
             className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className={`max-w-[75%] ${msg.sender === 'user' ? 'order-2' : 'order-1'}`}>
+            <div className={`max-w-[70%]`}>
               <div
-                className={`rounded-2xl px-4 py-3 text-sm break-words ${
+                className={`inline-block px-4 py-3 rounded-2xl shadow-sm ${
                   msg.sender === 'user' 
-                    ? 'bg-black text-white rounded-br-md' 
-                    : 'bg-gray-100 text-gray-900 rounded-bl-md'
+                    ? 'rounded-br-md' 
+                    : 'rounded-bl-md'
                 }`}
+                style={{
+                  wordBreak: 'break-word',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  backgroundColor: msg.sender === 'user' 
+                    ? '#2563EB' // Nice blue for user messages
+                    : '#10B981', // Nice green for assistant messages
+                  color: '#FFFFFF',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+                }}
               >
                 {msg.content}
               </div>
-              <div className={`text-xs mt-1 px-2 ${
+              <div className={`text-xs mt-1 px-1 ${
                 msg.sender === 'user' ? 'text-right text-gray-500' : 'text-left text-gray-500'
               }`}>
                 {new Date(msg.timestamp).toLocaleTimeString([], { 
@@ -177,24 +311,26 @@ export function ChatPanel() {
       </div>
       
       {/* Input Area */}
-      <div className="p-4 bg-white">
-        <div className="flex gap-3 items-end">
+      <div className="p-3 bg-white border-t border-gray-200">
+        <div className="flex gap-2 items-center">
           <div className="flex-1">
             <Input
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleInputKeyDown}
-              placeholder="Type your message..."
-              className="bg-gray-50 border-gray-200 text-black placeholder-gray-500 rounded-full px-4 py-3 focus:ring-2 focus:ring-black focus:border-transparent"
+              placeholder="Type a message..."
+              className="bg-gray-100 border-0 text-gray-800 placeholder-gray-500 rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
               autoFocus
             />
           </div>
           <Button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="bg-black hover:bg-gray-800 text-white rounded-full px-6 py-3 min-w-[80px]"
+            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-2.5 min-w-[40px] h-[40px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Send
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
           </Button>
         </div>
       </div>

@@ -17,8 +17,10 @@ async function initializeAgents() {
   }
 }
 
-// Initialize on module load
-initializeAgents();
+// Delay initialization to ensure env vars are loaded
+setTimeout(() => {
+  initializeAgents();
+}, 100);
 
 export async function processAgentMessage(req: Request, res: Response): Promise<void> {
   try {

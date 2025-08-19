@@ -35,33 +35,71 @@ export function Auth() {
   }
 
   async function handleSignUp() {
+    console.log('🔐 [AUTH] Starting signup process...')
+    console.log('  - Email:', email)
+    console.log('  - Password length:', password.length)
+    console.log('  - Supabase client:', supabase)
+    console.log('  - Supabase auth:', supabase.auth)
+    
     setLoading(true)
     setError(null)
     try {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        setError(error.message)
+      console.log('🔐 [AUTH] Calling supabase.auth.signUp...')
+      const result = await supabase.auth.signUp({ email, password })
+      console.log('🔐 [AUTH] SignUp result:', result)
+      console.log('  - Data:', result.data)
+      console.log('  - Error:', result.error)
+      
+      if (result.error) {
+        console.error('❌ [AUTH] SignUp error:', result.error)
+        console.error('  - Message:', result.error.message)
+        console.error('  - Status:', result.error.status)
+        console.error('  - Details:', result.error)
+        setError(result.error.message)
+      } else {
+        console.log('✅ [AUTH] SignUp successful!')
+        console.log('  - User:', result.data.user)
+        console.log('  - Session:', result.data.session)
       }
       // No redirect here - the auth state change will trigger the redirect
     } catch (err) {
+      console.error('❌ [AUTH] SignUp catch block error:', err)
+      console.error('  - Error type:', typeof err)
+      console.error('  - Error constructor:', err?.constructor?.name)
+      console.error('  - Error details:', err)
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
+      console.log('🔐 [AUTH] SignUp process finished')
       setLoading(false)
     }
   }
 
   async function handleSignIn() {
+    console.log('🔑 [AUTH] Starting signin process...')
+    console.log('  - Email:', email)
+    console.log('  - Password length:', password.length)
+    
     setLoading(true)
     setError(null)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) {
-        setError(error.message)
+      console.log('🔑 [AUTH] Calling supabase.auth.signInWithPassword...')
+      const result = await supabase.auth.signInWithPassword({ email, password })
+      console.log('🔑 [AUTH] SignIn result:', result)
+      console.log('  - Data:', result.data)
+      console.log('  - Error:', result.error)
+      
+      if (result.error) {
+        console.error('❌ [AUTH] SignIn error:', result.error)
+        setError(result.error.message)
+      } else {
+        console.log('✅ [AUTH] SignIn successful!')
       }
       // No redirect here - the auth state change will trigger the redirect
     } catch (err) {
+      console.error('❌ [AUTH] SignIn catch block error:', err)
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
+      console.log('🔑 [AUTH] SignIn process finished')
       setLoading(false)
     }
   }

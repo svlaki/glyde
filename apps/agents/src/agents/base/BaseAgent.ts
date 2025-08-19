@@ -1,4 +1,4 @@
-import { BaseMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
@@ -16,6 +16,7 @@ export abstract class BaseAgent {
     this.model = new ChatOpenAI({
       modelName,
       temperature: 0.1,
+      apiKey: process.env.OPENAI_API_KEY,
     });
     this.supabaseService = new SupabaseService();
     this.embeddingService = new EmbeddingService();
@@ -39,15 +40,26 @@ export abstract class BaseAgent {
 
     // Load recent chat messages
     const recentChats = context.conversationHistory.slice(-10).map(msg => ({
-      content: msg.content as string,
+      content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
       embedding: [], // TODO: Generate embeddings for chat messages
       timestamp: new Date().toISOString()
     }));
 
+    // Convert ConversationMessage to BaseMessage format for memory
+    const baseMessages: BaseMessage[] = context.conversationHistory.map(msg => {
+      if (msg.role === 'user') {
+        return new HumanMessage(msg.content);
+      } else if (msg.role === 'assistant') {
+        return new AIMessage(msg.content);
+      } else {
+        return new SystemMessage(msg.content);
+      }
+    });
+
     return {
       shortTerm: {
         sessionId: context.sessionId,
-        messages: context.conversationHistory,
+        messages: baseMessages,
         context: this.buildConversationContext(context.conversationHistory),
         lastUpdated: new Date().toISOString()
       },
@@ -77,9 +89,9 @@ export abstract class BaseAgent {
     };
   }
 
-  private buildConversationContext(messages: BaseMessage[]): string {
+  private buildConversationContext(messages: import('../../types/agents.js').ConversationMessage[]): string {
     const recentMessages = messages.slice(-5);
-    return recentMessages.map(msg => `${msg._getType()}: ${msg.content}`).join('\n');
+    return recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
   }
 
   private buildSemanticContext(events: any[], chats: any[]): string {

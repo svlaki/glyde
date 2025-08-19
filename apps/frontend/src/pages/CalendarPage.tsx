@@ -8,6 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { fetchUserEvents, createEvent, updateEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
+import { InteractionBox, Interaction } from '../components/InteractionBox';
+import { useInteractions } from '../lib/interactionContext';
+import { useAgentInteractions } from '../lib/agentInteractionHook';
+import { ChatPanel } from '../components/chat/ChatPanel';
+import { DevTestPanel } from '../components/DevTestPanel';
+import { supabase } from '../lib/supabase';
 
 // Extended CalendarEvent interface for UI display
 interface ExtendedCalendarEvent extends CalendarEvent {
@@ -15,7 +21,6 @@ interface ExtendedCalendarEvent extends CalendarEvent {
   borderColor?: string;
   textColor?: string;
 }
-import { ChatPanel } from '../components/chat/ChatPanel';
 
 // Generate rich sample data for the calendar
 function generateRichSampleData(): ExtendedCalendarEvent[] {
@@ -88,19 +93,46 @@ function generateRichSampleData(): ExtendedCalendarEvent[] {
 }
 
 export function CalendarPage() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedInteraction, setSelectedInteraction] = useState<string>('');
+  const { interactions, addInteraction, removeInteraction } = useInteractions();
+  
+  // Connect to agent system for interactions
+  useAgentInteractions();
 
   // Load real user events from the backend
   useEffect(() => {
     if (user) {
       loadUserEvents();
+      
+      // Set up real-time subscription to events table in user's schema
+      const userSchema = `u_${user.id.replace(/-/g, '')}`;
+      const channel = supabase
+        .channel(`events-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+            schema: userSchema,
+            table: 'events'
+          },
+          (payload) => {
+            console.log('Real-time event change detected:', payload);
+            // Reload events when any change occurs
+            loadUserEvents();
+          }
+        )
+        .subscribe();
+      
+      // Cleanup subscription on unmount
+      return () => {
+        channel.unsubscribe();
+      };
     }
   }, [user]);
 
@@ -116,9 +148,32 @@ export function CalendarPage() {
       } else {
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
-          // Database has correct time (e.g., 13:00 for 1pm) but it's displaying as wrong time
-          // Let's just pass the database time directly without any conversion
-          console.log('Raw database time:', event.event_starts_at);
+          // Calculate color based on event title
+          const title = event.event_title.toLowerCase();
+          let color = event.color || '#3B82F6';
+          
+          // Only recalculate if color is default blue
+          if (color === '#3b82f6' || color === '#3B82F6') {
+            if (title.includes('meeting') || title.includes('sync') || title.includes('call')) {
+              color = '#60A5FA'; // Light Blue
+            } else if (title.includes('deep work') || title.includes('focus')) {
+              color = '#2563EB'; // Dark Blue
+            } else if (title.includes('planning') || title.includes('review')) {
+              color = '#A78BFA'; // Purple
+            } else if (title.includes('dentist') || title.includes('doctor') || title.includes('appointment')) {
+              color = '#059669'; // Dark Green
+            } else if (title.includes('exercise') || title.includes('gym') || title.includes('workout')) {
+              color = '#34D399'; // Bright Green
+            } else if (title.includes('break') || title.includes('lunch')) {
+              color = '#F59E0B'; // Amber
+            } else if (title.includes('mindfulness') || title.includes('meditation')) {
+              color = '#6EE7B7'; // Light Green
+            } else if (title.includes('dinner') || title.includes('breakfast')) {
+              color = '#FB923C'; // Orange
+            } else if (title.includes('personal') || title.includes('family')) {
+              color = '#F472B6'; // Pink
+            }
+          }
           
           return {
             id: event.id,
@@ -132,9 +187,10 @@ export function CalendarPage() {
             title: event.event_title,
             start: event.event_starts_at,
             end: event.event_ends_at,
-            backgroundColor: 'rgba(147, 197, 253, 0.8)',
-            borderColor: '#3B82F6',
-            textColor: '#1F2937'
+            backgroundColor: color,
+            borderColor: color,
+            textColor: '#FFFFFF',
+            color: color
           };
         });
         
@@ -169,13 +225,52 @@ export function CalendarPage() {
     setSelectedDate(null);
   }
 
+  async function handleCreateEventFromInteraction(eventData: { title: string; startTime: string; endTime: string; description?: string }) {
+    if (!user) return;
+
+    const today = new Date();
+    const baseDate = today.toISOString().split('T')[0];
+    
+    const starts_at = new Date(`${baseDate}T${eventData.startTime}:00`);
+    const ends_at = new Date(`${baseDate}T${eventData.endTime}:00`);
+
+    const newEvent = {
+      event_title: eventData.title,
+      event_starts_at: starts_at.toISOString(),
+      event_ends_at: ends_at.toISOString(),
+      event_description: eventData.description || '',
+    };
+
+    const { event, error } = await createEvent(user, newEvent);
+    if (!error && event) {
+      await loadUserEvents(); // Refresh calendar
+    } else {
+      console.error('Failed to create event from interaction:', error);
+    }
+  }
+
+  function handleInteractionResponse(interactionId: string, response: string) {
+    removeInteraction(interactionId);
+    // Refresh calendar to show any newly created events
+    // Refresh for any positive response (yes or any multiple choice option that's not 'no')
+    if (response !== 'no') {
+      // Small delay to ensure backend processing is complete
+      setTimeout(() => {
+        loadUserEvents();
+      }, 1000);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white text-black">
+      {/* Development Test Panel */}
+      <DevTestPanel />
+      
       <div className="flex h-screen">
         {/* Left Side - Calendar */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col border-r-4 border-black">
           {/* Header */}
-          <div className="bg-white p-2">
+          <div className="bg-white p-2 border-b-2 border-black">
             <div className="flex items-center justify-between">
               <h1 className="text-lg font-light text-black">Calendar</h1>
               <div className="text-sm text-gray-500">Welcome, {user?.email}</div>
@@ -195,15 +290,84 @@ export function CalendarPage() {
                 }}
                 events={events.map(e => ({
                   ...e,
+                  id: e.id,
                   title: e.event_title,
                   start: e.event_starts_at,
                   end: e.event_ends_at,
-                  backgroundColor: e.backgroundColor || '#3B82F6',
-                  borderColor: e.borderColor || '#3B82F6',
-                  textColor: e.textColor || '#FFFFFF',
+                  backgroundColor: e.color || e.backgroundColor || '#3B82F6',
+                  borderColor: e.color || e.borderColor || '#3B82F6',
+                  textColor: '#FFFFFF',
                 }))}
                 dateClick={handleDateClick}
                 eventClick={handleEventClick}
+                editable={true}
+                droppable={true}
+                eventDrop={async (info) => {
+                  // Update event when dragged to new time
+                  const updatedEvent = {
+                    event_starts_at: info.event.start?.toISOString(),
+                    event_ends_at: info.event.end?.toISOString() || new Date(info.event.start!.getTime() + 60 * 60 * 1000).toISOString(),
+                  };
+                  
+                  try {
+                    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/update`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`
+                      },
+                      body: JSON.stringify({
+                        user_id: user?.id,
+                        event_id: info.event.id,
+                        event: updatedEvent
+                      })
+                    });
+                    
+                    if (response.ok) {
+                      // Refresh the calendar to show the update
+                      await loadUserEvents();
+                    } else {
+                      info.revert();
+                      console.error('Failed to update event');
+                    }
+                  } catch (error) {
+                    info.revert();
+                    console.error('Error updating event:', error);
+                  }
+                }}
+                eventResize={async (info) => {
+                  // Update event duration when resized
+                  const updatedEvent = {
+                    event_starts_at: info.event.start?.toISOString(),
+                    event_ends_at: info.event.end?.toISOString(),
+                  };
+                  
+                  try {
+                    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/update`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`
+                      },
+                      body: JSON.stringify({
+                        user_id: user?.id,
+                        event_id: info.event.id,
+                        event: updatedEvent
+                      })
+                    });
+                    
+                    if (response.ok) {
+                      // Refresh the calendar to show the update
+                      await loadUserEvents();
+                    } else {
+                      info.revert();
+                      console.error('Failed to resize event');
+                    }
+                  } catch (error) {
+                    info.revert();
+                    console.error('Error resizing event:', error);
+                  }
+                }}
                 height="100%"
                 themeSystem="standard"
                 timeZone="UTC"
@@ -221,111 +385,19 @@ export function CalendarPage() {
           </div>
 
           {/* Interactions Box - Bottom */}
-          <div className="h-[140px] p-2 bg-white">
-            <div className="h-full">
-              <div className="bg-white rounded-lg p-2 h-full">
-                <h3 className="text-lg font-light text-black mb-4">Quick Interactions</h3>
-                
-                <div className="flex gap-4 h-full">
-                  {/* First Interaction Box */}
-                  <div className="flex-1 bg-white rounded-lg p-4 flex flex-col items-center justify-center">
-                    <p className="text-base text-gray-600 mb-4 text-center">Would you like to learn Chinese tomorrow?</p>
-                    <div className="flex gap-3 justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInteraction('chinese-yes')}
-                        className="w-20 h-20 rounded-lg font-semibold text-sm transition-all duration-200 ease-in-out"
-                        style={{ 
-                          backgroundColor: 'rgba(167, 243, 208, 0.7)', 
-                          border: '1px solid rgba(5, 150, 105, 0.2)',
-                          color: '#064e3b',
-                          boxShadow: selectedInteraction === 'chinese-yes' ? '0 0 0 2px rgba(167, 243, 208, 1)' : 'none'
-                        }}
-                      >
-                        Yes
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInteraction('chinese-no')}
-                        className="w-20 h-20 rounded-lg font-semibold text-sm transition-all duration-200 ease-in-out"
-                        style={{ 
-                          backgroundColor: 'rgba(252, 165, 165, 0.7)',
-                          border: '1px solid rgba(220, 38, 38, 0.2)',
-                          color: '#7f1d1d',
-                          boxShadow: selectedInteraction === 'chinese-no' ? '0 0 0 2px rgba(252, 165, 165, 1)' : 'none'
-                        }}
-                      >
-                        No
-                      </button>
-                    </div>
-                    {selectedInteraction && selectedInteraction.startsWith('chinese') && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Selected: <span className="font-semibold">{selectedInteraction.replace('chinese-', '')}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Second Interaction Box */}
-                  <div className="flex-1 bg-white rounded-lg p-4 flex flex-col items-center justify-center">
-                    <p className="text-base text-gray-600 mb-4 text-center">Are you bad at Marvel Rivals?</p>
-                    <div className="flex gap-3 justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInteraction('marvel-terrible')}
-                        className="w-20 h-20 rounded-lg font-semibold text-sm transition-all duration-200 ease-in-out"
-                        style={{
-                          backgroundColor: 'rgba(253, 230, 138, 0.7)',
-                          border: '1px solid rgba(217, 119, 6, 0.2)',
-                          color: '#78350f',
-                           boxShadow: selectedInteraction === 'marvel-terrible' ? '0 0 0 2px rgba(253, 230, 138, 1)' : 'none'
-                        }}
-                      >
-                        Terrible
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInteraction('marvel-okay')}
-                        className="w-20 h-20 rounded-lg font-semibold text-sm transition-all duration-200 ease-in-out"
-                        style={{
-                          backgroundColor: 'rgba(147, 197, 253, 0.7)',
-                          border: '1px solid rgba(37, 99, 235, 0.2)',
-                          color: '#1e3a8a',
-                           boxShadow: selectedInteraction === 'marvel-okay' ? '0 0 0 2px rgba(147, 197, 253, 1)' : 'none'
-                        }}
-                      >
-                        Okay
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInteraction('marvel-pro')}
-                        className="w-20 h-20 rounded-lg font-semibold text-sm transition-all duration-200 ease-in-out"
-                        style={{
-                          backgroundColor: 'rgba(196, 181, 253, 0.7)',
-                          border: '1px solid rgba(124, 58, 237, 0.2)',
-                          color: '#4c1d95',
-                           boxShadow: selectedInteraction === 'marvel-pro' ? '0 0 0 2px rgba(196, 181, 253, 1)' : 'none'
-                        }}
-                      >
-                        Pro
-                      </button>
-                    </div>
-                    {selectedInteraction && selectedInteraction.startsWith('marvel') && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        Selected: <span className="font-semibold">{selectedInteraction.replace('marvel-', '')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="border-t-4 border-black">
+            <InteractionBox 
+              interactions={interactions}
+              onResponseComplete={handleInteractionResponse}
+            />
           </div>
         </div>
 
         {/* Right Side - Chat */}
-        <div className="w-96 bg-white flex flex-col">
-          <div className="flex-1 p-3">
-            <div className="h-full">
-              <ChatPanel />
+        <div className="w-96 bg-white flex flex-col" style={{ maxWidth: '384px', minWidth: '384px' }}>
+          <div className="flex-1 p-3 overflow-hidden">
+            <div className="h-full overflow-hidden">
+              <ChatPanel onEventCreated={loadUserEvents} />
             </div>
           </div>
         </div>
@@ -512,40 +584,73 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white border-gray-200 text-black sm:max-w-md" aria-describedby="event-dialog-description">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-light text-black">{event ? 'Edit Event' : 'Add Event'}</DialogTitle>
+      <DialogContent 
+        className="fixed bg-white border-2 border-gray-400 text-black sm:max-w-md shadow-2xl z-[100]" 
+        style={{ 
+          backgroundColor: '#ffffff', 
+          opacity: '1 !important',
+          backdropFilter: 'none'
+        }} 
+        aria-describedby="event-dialog-description"
+      >
+        <DialogHeader className="bg-white">
+          <DialogTitle className="text-xl font-semibold text-gray-900 bg-white">
+            {event ? 'Edit Event' : 'Create New Event'}
+          </DialogTitle>
         </DialogHeader>
         <div id="event-dialog-description" className="sr-only">
           {event ? 'Edit the details of an existing calendar event' : 'Create a new calendar event by filling in the details below'}
         </div>
-        <div className="space-y-4 py-4">
-          <Input 
-            placeholder="Event title"
-            value={title} 
-            onChange={e => setTitle(e.target.value)}
-            className="bg-white border-gray-300 text-black placeholder-gray-500"
-          />
-          <Input 
-            type="time" 
-            value={startTime} 
-            onChange={e => setStartTime(e.target.value)}
-            className="bg-white border-gray-300 text-black"
-          />
-          <Input 
-            type="time" 
-            value={endTime} 
-            onChange={e => setEndTime(e.target.value)}
-            className="bg-white border-gray-300 text-black"
-          />
-          <Input 
-            placeholder="Description"
-            value={description} 
-            onChange={e => setDescription(e.target.value)}
-            className="bg-white border-gray-300 text-black placeholder-gray-500"
-          />
+        <div className="space-y-4 py-4 bg-white">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Event Title</label>
+            <Input 
+              placeholder="Enter event title..."
+              value={title} 
+              onChange={e => setTitle(e.target.value)}
+              className="w-full bg-white border-gray-300 text-black placeholder-gray-500"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Time
+              </label>
+              <Input 
+                type="time" 
+                value={startTime} 
+                onChange={e => setStartTime(e.target.value)}
+                className="w-full bg-white border-gray-300 text-black"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Time
+              </label>
+              <Input 
+                type="time" 
+                value={endTime} 
+                onChange={e => setEndTime(e.target.value)}
+                className="w-full bg-white border-gray-300 text-black"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea 
+              placeholder="Add event details..."
+              value={description} 
+              onChange={e => setDescription(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={3}
+            />
+          </div>
         </div>
-        <DialogFooter className="sm:justify-between">
+        <DialogFooter className="flex justify-between">
           <div>
             {event && (
               <Button 
@@ -557,7 +662,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
               </Button>
             )}
           </div>
-          <div className="space-x-2">
+          <div className="flex gap-2">
             <Button 
               variant="outline" 
               onClick={onClose}
@@ -567,9 +672,9 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
             </Button>
             <Button 
               onClick={handleSave}
-              className="bg-black hover:bg-gray-800 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              Save
+              {event ? 'Save' : 'Create'}
             </Button>
           </div>
         </DialogFooter>

@@ -1,10 +1,15 @@
 import { BaseMessage } from '@langchain/core/messages';
 
+export interface ConversationMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
 export interface AgentContext {
   userId: string;
   sessionId: string;
   userSchema: string;
-  conversationHistory: BaseMessage[];
+  conversationHistory: ConversationMessage[];
   userProfile?: UserProfile;
 }
 

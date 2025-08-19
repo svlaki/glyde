@@ -57,14 +57,13 @@ export class EmbeddingService {
   }
 
   async searchSimilarEvents(userId: string, query: string, k: number = 10) {
-    const schema = this.getUserSchema(userId);
-    
     try {
+      // Since we're using public.events table, we need to filter by user_id
       const vectorStore = new SupabaseVectorStore(this.embeddings, {
         client: this.getSupabaseService().getClient(),
-        tableName: 'events',
-        queryName: 'match_documents',
-        filter: { user_schema: schema }
+        tableName: 'event_embeddings', // Use embeddings table if it exists
+        queryName: 'match_event_embeddings',
+        filter: { user_id: userId }
       });
       
       // Simple one-line search
@@ -72,7 +71,29 @@ export class EmbeddingService {
       return results;
     } catch (error) {
       console.error('Vector search error:', error);
-      return [];
+      // Fallback to basic text search if vector search fails
+      try {
+        const { data: events } = await this.getSupabaseService().getClient()
+          .from('events')
+          .select('*')
+          .eq('user_id', userId)
+          .ilike('title', `%${query}%`)
+          .limit(k);
+        
+        // Transform to match expected format
+        return (events || []).map(event => ({
+          pageContent: event.title,
+          metadata: {
+            id: event.id,
+            event_title: event.title,
+            event_starts_at: event.start_time,
+            event_ends_at: event.end_time
+          }
+        }));
+      } catch (fallbackError) {
+        console.error('Fallback search error:', fallbackError);
+        return [];
+      }
     }
   }
 

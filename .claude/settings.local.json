@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:supabase.com)",
+      "Bash(supabase:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(claude mcp:*)",
+      "Bash(claude doctor)",
+      "Bash(npm run:*)",
+      "Bash(taskkill:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "Bash(npm start)",
+      "mcp__supabase__get_logs",
+      "Bash(tasklist:*)",
+      "mcp__supabase__list_migrations",
+      "Bash(powershell:*)",
+      "Bash(npm install)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm install:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(timeout:*)",
+      "Bash(npx supabase migration:*)",
+      "Bash(start http://localhost:5173)"
+    ],
+    "deny": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\pipej\\Projects\\glydeproper\\apps"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}

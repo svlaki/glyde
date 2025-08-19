@@ -7,6 +7,7 @@ import { z } from "zod";
 import { SupabaseService, supabase } from '../../services/SupabaseService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse, AgentType } from '../../types/agents.js';
+import { CalendarIntelligenceService } from '../../services/CalendarIntelligenceService.js';
 
 // Utility function to create a local time example for the prompt
 function createLocalTimeExample(hour: number, minute: number = 0): string {
@@ -23,6 +24,10 @@ const ConversationState = Annotation.Root({
     default: () => [],
   }),
   userId: Annotation<string>(),
+  userEvents: Annotation<any[]>({
+    reducer: (existing, update) => update || existing,
+    default: () => [],
+  }),
   pendingActions: Annotation<any[]>({
     reducer: (existing, update) => update,
     default: () => [],
@@ -39,7 +44,7 @@ export class ConversationAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('conversation', "gpt-4o-mini");
+    super('conversation', "gpt-4o"); // Use GPT-4 for better intelligence
     this.graph = this.createGraph();
   }
 
@@ -49,9 +54,37 @@ export class ConversationAgent extends BaseAgent {
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
     try {
+      // Pre-load user events for context
+      const supabaseService = new SupabaseService();
+      const userEvents = await supabaseService.getEvents(context.userId);
+      console.log(`Loading ${userEvents?.length || 0} events for user ${context.userId}`);
+      
+      // Build conversation history from context
+      const messages: BaseMessage[] = [];
+      
+      // Add conversation history if available
+      if (context.conversationHistory && context.conversationHistory.length > 0) {
+        // Keep last 10 messages for context (5 exchanges)
+        const recentHistory = context.conversationHistory.slice(-10);
+        for (const msg of recentHistory) {
+          // Ensure content is a string
+          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          
+          if (msg.role === 'user') {
+            messages.push(new HumanMessage(content));
+          } else if (msg.role === 'assistant') {
+            messages.push(new AIMessage(content));
+          }
+        }
+      }
+      
+      // Add the current message
+      messages.push(new HumanMessage(message));
+      
       const result = await this.graph.invoke({
-        messages: [new HumanMessage(message)],
+        messages: messages,
         userId: context.userId,
+        userEvents: userEvents || [],
       });
 
       // Get the last AI message and any execution results
@@ -220,7 +253,34 @@ export class ConversationAgent extends BaseAgent {
       }
     );
 
-    const tools = [createEventTool, updateEventTool, deleteEventTool, deleteMultipleEventsTool, listEventsTool, searchEventsTool, createTaskTool];
+    const findFreeTimeTool = tool(
+      async ({ duration, date }) => {
+        return `Find free time parameters: ${JSON.stringify({ duration, date })}`;
+      },
+      {
+        name: "find_free_time",
+        description: "Find available time slots in the calendar",
+        schema: z.object({
+          duration: z.number().describe("Duration needed in minutes"),
+          date: z.string().nullable().describe("Date to search (ISO format). If null, searches from today"),
+        }),
+      }
+    );
+
+    const getDailyBriefingTool = tool(
+      async ({ date }) => {
+        return `Get daily briefing for: ${date || 'today'}`;
+      },
+      {
+        name: "daily_briefing",
+        description: "Get a summary of the day's events and insights",
+        schema: z.object({
+          date: z.string().nullable().describe("Date for briefing (ISO format). If null, uses today"),
+        }),
+      }
+    );
+
+    const tools = [createEventTool, updateEventTool, deleteEventTool, deleteMultipleEventsTool, listEventsTool, searchEventsTool, createTaskTool, findFreeTimeTool, getDailyBriefingTool];
     const toolNode = new ToolNode(tools);
 
     // Bind tools to the model
@@ -231,27 +291,27 @@ export class ConversationAgent extends BaseAgent {
 
     // Define the workflow nodes
     const callModel = async (state: ConversationStateType) => {
-      // Load recent events for context using RPC function
+      // Load recent events for context using SupabaseService
       let recentEvents: any[] = [];
-      try {
-        const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-        const { data: eventsData, error } = await supabase.rpc('get_user_events', {
-          user_schema: userSchema,
-          start_date: null,
-          end_date: null,
-        });
-        
-        if (error) {
-          console.error('Error loading recent events for context:', error);
-        } else {
-          recentEvents = (eventsData || []).slice(0, 10); // Limit to 10 for context
-          // Debug: Show recent events for context
-          if (recentEvents.length > 0) {
+      
+      // Use pre-loaded events if available, otherwise fetch them
+      if (state.userEvents && state.userEvents.length > 0) {
+        recentEvents = state.userEvents;
+        console.log(`Using ${recentEvents.length} pre-loaded events for context`);
+      } else {
+        try {
+          const supabaseService = new SupabaseService();
+          const eventsData = await supabaseService.getEvents(state.userId);
+          
+          if (eventsData && eventsData.length > 0) {
+            recentEvents = eventsData; // Get all events for better context
             console.log(`Found ${recentEvents.length} events for user context`);
+          } else {
+            console.log('No events found for user context');
           }
+        } catch (error) {
+          console.error('Error loading recent events for context:', error);
         }
-      } catch (error) {
-        console.error('Error loading recent events for context:', error);
       }
       
       // Get recent chat messages for conversation context
@@ -264,89 +324,99 @@ export class ConversationAgent extends BaseAgent {
         : '';
       
       const eventContext = recentEvents.length > 0 
-        ? `\n\nCURRENT EVENTS:\n${recentEvents.slice(0, 10).map((e, index) => 
-            `${index + 1}. ${e.event_title} (${new Date(e.event_starts_at).toLocaleDateString()})`
-          ).join('\n')}`
-        : '\n\nCURRENT EVENTS: No events found';
+        ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
+            // Parse the UTC time string correctly
+            const startStr = e.event_starts_at || e.start_time;
+            const endStr = e.event_ends_at || e.end_time;
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            
+            // Extract the UTC hour to determine time of day (events are stored in UTC)
+            const utcHour = start.getUTCHours();
+            const timeOfDay = utcHour < 12 ? 'morning' : utcHour < 17 ? 'afternoon' : 'evening';
+            
+            // Format the date and time (will use local timezone for display)
+            const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+            const startTime = `${utcHour % 12 || 12}:${start.getUTCMinutes().toString().padStart(2, '0')} ${utcHour < 12 ? 'AM' : 'PM'}`;
+            const endHour = end.getUTCHours();
+            const endTime = `${endHour % 12 || 12}:${end.getUTCMinutes().toString().padStart(2, '0')} ${endHour < 12 ? 'AM' : 'PM'}`;
+            
+            return `- "${e.event_title || e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.event_location || e.location ? ` at ${e.event_location || e.location}` : ''} [Date: ${start.toISOString().split('T')[0]}]`;
+          }).join('\n')}`
+        : `\n\nUSER'S CALENDAR: No events found`;
 
-      const systemMessage = new SystemMessage(`You are a helpful personal assistant that helps users manage their calendar and tasks through natural language commands.${eventContext}${conversationContext}
+      // Calculate temporal context for better understanding
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfterTomorrow = new Date(now);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      
+      // Helper function to format date for comparison
+      const formatDateForComparison = (date: Date) => date.toISOString().split('T')[0];
+      
+      const systemMessage = new SystemMessage(`You are an intelligent personal calendar assistant. You help users manage their time effectively.
 
-Current date and time: ${new Date().toISOString()}
-Current LOCAL date: ${new Date().toLocaleDateString()}
-Current LOCAL time: ${new Date().toLocaleTimeString()}
-Current timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
+CRITICAL: Your user's complete calendar (ALL EVENTS):${eventContext}
 
-CRITICAL TIMEZONE HANDLING:
-- You are running on a server in timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
-- When users say times like "2pm", they mean 2pm in THEIR local timezone
-- You MUST create timestamps that represent the user's intended local time
-- DO NOT assume the user is in the same timezone as the server
+CURRENT TIME CONTEXT:
+- Right now: ${now.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+- Today's date: ${formatDateForComparison(now)}
+- Tomorrow's date: ${formatDateForComparison(tomorrow)} (${tomorrow.toLocaleDateString('en-US', { weekday: 'long' })})
+- Day after tomorrow: ${formatDateForComparison(dayAfterTomorrow)} (${dayAfterTomorrow.toLocaleDateString('en-US', { weekday: 'long' })})
 
-IMPORTANT: When users say "tomorrow" they mean the next LOCAL day in their timezone.
-Server time info (for reference only):
-- Server today: ${new Date().toLocaleDateString()}
-- Server tomorrow: ${new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()}
-- Server timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}
+YOUR CAPABILITIES:
+1. Answer calendar questions using the events listed above
+2. Create new events with natural language understanding
+3. Update and delete events
+4. Find scheduling conflicts
+5. Suggest optimal meeting times
+6. Provide daily briefings and summaries
 
-IMPORTANT INSTRUCTIONS:
-1. Always be proactive and helpful - don't ask for clarification unless absolutely necessary
-2. Parse natural language dates and times intelligently
-3. Use smart defaults for missing information
-4. Only ask for clarification if the request is truly ambiguous
+IMPORTANT - When User Requests Multiple Events:
+- If user says "schedule multiple events", "create several events", "add a bunch of events", "schedule a week of events", etc.
+- You MUST use the create_event tool multiple times to create each event
+- If user asks for "random events" for testing, create realistic sample events like:
+  - Morning workouts, team meetings, lunch appointments
+  - Project work sessions, doctor appointments, social events
+  - Study time, family dinners, personal activities
+- DO NOT just describe what you would schedule - ACTUALLY CREATE THE EVENTS using the create_event tool
 
-Date/Time Parsing Rules - FOLLOW THESE EXACTLY:
+TEMPORAL REFERENCE UNDERSTANDING:
+When user mentions relative time references, interpret them as follows:
+- "tomorrow morning" = tomorrow between 8am-12pm
+- "tomorrow afternoon" = tomorrow between 12pm-5pm
+- "tomorrow evening" = tomorrow between 5pm-9pm
+- "tomorrow night" = tomorrow after 9pm
+- "this morning/afternoon/evening" = today during those times
+- "next Monday/Tuesday/etc" = the next occurrence of that day
+- "next week" = 7-14 days from now
+- "this week" = current week (Monday to Sunday)
+- "this weekend" = upcoming Saturday and Sunday
 
-CRITICAL: When creating timestamps, you MUST ensure the time represents what the user intended in THEIR timezone.
+WHEN ANSWERING CALENDAR QUESTIONS:
+- ALWAYS look at the events context above first
+- When user asks about "tomorrow morning meeting" or similar:
+  1. Identify the date (tomorrow = ${formatDateForComparison(tomorrow)})
+  2. Identify the time period (morning = 8am-12pm)
+  3. Search for events matching BOTH criteria
+  4. Be specific about which event you found
+- If user asks "what's on my calendar", list the events you see
+- If user asks about a specific day, filter events for that day
+- If multiple events match the criteria, list them all
 
-Steps for creating timestamps:
-1. Parse the user's intended time (e.g., "2pm tomorrow")
-2. Convert to the user's local date/time
-3. Generate ISO timestamp that preserves that local time
+WHEN CREATING EVENTS:
+- Parse natural language dates/times intelligently
+- "2pm tomorrow" = tomorrow at 14:00
+- "lunch next Tuesday" = next Tuesday at 12:00
+- Use 1 hour duration if not specified
+- Check for conflicts and warn the user
+- Confirm what you scheduled
 
-Examples of CORRECT timestamp generation:
-- User says "2pm tomorrow" → Create date for tomorrow, set time to 14:00 in user's timezone
-- User says "9am today" → Create date for today, set time to 09:00 in user's timezone
-
-Time parsing rules:
-- "tomorrow" = Next day at specified time (or 9am default)
-- "today" = Current day at specified time  
-- "1pm to 2pm" = 1:00 PM to 2:00 PM (user's timezone)
-- "at 2pm" = 2:00 PM for 1 hour duration
-- "Friday" = Next Friday at specified time (or 9am default)
-- Parse "1pm" as 13:00, "2pm" as 14:00, etc.
-
-CRITICAL EXAMPLES:
-- CORRECT for 12pm local: ${createLocalTimeExample(12)}
-- CORRECT for 7pm local: ${createLocalTimeExample(19)}
-
-Remember: The ISO timestamp should represent the user's intended local time, not server time!
-
-Smart Defaults - USE THESE WITHOUT ASKING:
-- Title: Extract from context (e.g., "meeting", "lunch", "doctor appointment") or use "Event"
-- Location: Leave empty string unless specified
-- Description: Leave empty string unless specified
-- Duration: 1 hour if not specified
-
-SMART TIME DEFAULTS when no time is specified:
-Use your best judgment for reasonable times based on the event type:
-- breakfast → morning time
-- lunch → midday time  
-- dinner → evening time
-- meeting → business hours
-- appointment → business hours
-- call → afternoon
-- workout → morning or evening
-- generic events → business hours
-
-Examples of CORRECT parsing - be intelligent about times:
-- "Schedule a meeting tomorrow 1pm to 2pm" → specific time given, use it
-- "Set up lunch at 12pm" → specific time given, use it
-- "Doctor appointment Friday 3pm" → specific time given, use it
-- "Book dinner tomorrow" → no time given, pick reasonable dinner time (evening)
-- "Lunch tomorrow" → no time given, pick reasonable lunch time (midday)
-- "Breakfast meeting" → no time given, pick reasonable breakfast time (morning)
-- "Call John Friday" → no time given, pick reasonable call time (afternoon)
-- "Workout tomorrow" → no time given, pick reasonable workout time (morning/evening)
+WHEN DELETING/UPDATING:
+- Be careful and confirm the right event
+- Use semantic search if user references event by description
+- Support bulk operations like "delete all events tomorrow"
 
 CRITICAL - Tool Selection Rules:
 - "Delete all events tomorrow/today/Friday" → use delete_multiple_events with date
@@ -359,8 +429,11 @@ CRITICAL - Tool Selection Rules:
 
 IMPORTANT: When using delete_multiple_events with searchQuery "*", this will delete ALL events in the user's calendar. Only use this for explicit "delete everything" or "clear calendar" requests.
 
-- "Delete my dinner party" → use delete_event with searchQuery
-- "Delete the meeting about X" → use delete_event with searchQuery
+- "Delete [specific event name]" → use delete_event with searchQuery containing ONLY the event name
+- "Get rid of [event name] tomorrow" → use delete_event with searchQuery "morning standup tomorrow"
+- "Remove the [event name]" → use delete_event with searchQuery containing the event name
+- "Delete my dinner party" → use delete_event with searchQuery "dinner party"
+- "Delete the meeting about X" → use delete_event with searchQuery "meeting about X"
 - "Delete that event" → use delete_event with eventId of most recently mentioned/created event
 - "Delete it" → use delete_event with eventId of most recently mentioned/created event
 - "Delete all of those" → use delete_multiple_events with searchQuery based on what was just shown/discussed
@@ -370,6 +443,8 @@ IMPORTANT: When using delete_multiple_events with searchQuery "*", this will del
 - "Search for events about X" → use search_events
 - "What events do I have Friday" → use list_events with date range
 - "What does my workout schedule look like" → use search_events with "workout gym exercise fitness" query
+
+IMPORTANT FOR DELETE: When user says "get rid of [event]" or "delete [event] tomorrow", pass the searchQuery with temporal context like "morning standup tomorrow" so the fallback search can find it.
 
 CONTEXTUAL REFERENCES:
 When user says "that event", "it", "the event", etc., refer to:
@@ -382,9 +457,18 @@ For contextual references, use semantic search or date-based search instead of g
 
 Your capabilities:
 1. Create, update, delete, and search calendar events
-2. Create, update, delete, and search tasks
-3. Parse natural language into structured actions
-4. ALWAYS use the most appropriate tool based on user intent`);
+2. Detect and warn about scheduling conflicts
+3. Find free time slots in the calendar
+4. Generate daily briefings and weekly summaries
+5. Smart scheduling with preferences
+6. Parse natural language into structured actions
+7. ALWAYS use the most appropriate tool based on user intent
+
+INTELLIGENCE FEATURES:
+- When user asks "When am I free?" or "Find time for X" → use find_free_time
+- When user asks "What's my day like?" or "Give me a summary" → use daily_briefing
+- When creating events, ALWAYS check for conflicts and warn the user
+- Suggest alternative times when conflicts are detected`);
 
       const messages = [systemMessage, ...state.messages];
       
@@ -417,10 +501,22 @@ Your capabilities:
           switch (action.name) {
             case "create_event":
               try {
-                // Create event using RPC function to avoid schema access issues
-                const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                const { data: createdEvent, error: createError } = await supabase.rpc('create_user_event', {
-                  user_schema: userSchema,
+                // Check for conflicts first
+                const intelligenceService = new CalendarIntelligenceService(state.userId);
+                const conflictCheck = await intelligenceService.checkConflicts(
+                  new Date(action.args.startTime),
+                  new Date(action.args.endTime)
+                );
+                
+                if (conflictCheck.hasConflict) {
+                  const conflictingEvent = conflictCheck.conflictingEvents[0];
+                  result = `⚠️ Time conflict detected with "${conflictingEvent.title}". ${conflictCheck.suggestion || 'Please choose a different time.'}`;
+                  break;
+                }
+                
+                // Create event using SupabaseService to write to public.events table
+                const supabaseService = new SupabaseService();
+                const createdEvent = await supabaseService.createEvent(state.userId, {
                   event_title: action.args.title,
                   event_starts_at: action.args.startTime,
                   event_ends_at: action.args.endTime,
@@ -428,11 +524,12 @@ Your capabilities:
                   event_description: action.args.description || null,
                 });
                 
-                if (createError) {
-                  console.error('Error creating event:', createError);
-                  result = `❌ Failed to create event: ${createError.message}`;
+                if (!createdEvent) {
+                  result = `❌ Failed to create event: Unknown error`;
                 } else {
-                  result = `✅ Created event: "${action.args.title}"`;
+                  // Category name can be inferred from event title or type
+                  const categoryName = 'Event';
+                  result = `✅ Created event: "${action.args.title}" (${categoryName})`;
                 }
               } catch (error) {
                 console.error('Error creating event:', error);
@@ -458,35 +555,78 @@ Your capabilities:
                     eventId = searchResults[0].metadata.id;
                     result = `🔍 Found event: "${searchResults[0].metadata.event_title}" - updating...`;
                   } else {
+                    // Semantic search returned empty, try fallback
+                    throw new Error('No results from semantic search, trying fallback');
+                  }
+                } catch (error) {
+                  console.log('Semantic search failed for update, trying direct search:', error instanceof Error ? error.message : 'Unknown error');
+                  
+                  // Fallback to direct search
+                  const searchLower = action.args.searchQuery.toLowerCase();
+                  const supabaseService = new SupabaseService();
+                  const allEvents = await supabaseService.getEvents(state.userId);
+                  
+                  const matchingEvent = allEvents.find((e: any) => {
+                    const eventTitle = (e.event_title || e.title || '').toLowerCase();
+                    const titleWords = eventTitle.split(' ');
+                    const searchWords = searchLower.split(' ');
+                    
+                    // Check if any title word matches any search word
+                    const titleMatch = titleWords.some((word: string) => searchWords.includes(word)) ||
+                                      searchWords.some((word: string) => titleWords.includes(word)) ||
+                                      searchLower.includes(eventTitle) || 
+                                      eventTitle.includes(searchLower);
+                    
+                    // If search includes temporal context, check dates
+                    if (searchLower.includes('tomorrow') || searchLower.includes('today')) {
+                      const eventDate = new Date(e.event_starts_at || e.start_time).toISOString().split('T')[0];
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      
+                      if (searchLower.includes('tomorrow') && eventDate === tomorrowStr) {
+                        return titleMatch;
+                      } else if (searchLower.includes('today') && eventDate === todayStr) {
+                        return titleMatch;
+                      }
+                      return false;
+                    }
+                    
+                    return titleMatch;
+                  });
+                  
+                  if (matchingEvent) {
+                    eventId = matchingEvent.id;
+                    result = `🔍 Found event: "${matchingEvent.event_title}" - updating...`;
+                  } else {
                     result = `❌ No event found matching: "${action.args.searchQuery}"`;
                     break;
                   }
-                } catch (error) {
-                  console.error('Error searching for event to update:', error);
-                  result = `❌ Error searching for event: ${error instanceof Error ? error.message : 'Unknown error'}`;
-                  break;
                 }
               }
               
               if (eventId) {
                 try {
-                  // Update event using RPC function to avoid schema access issues
-                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                  const { data: updatedEvent, error: updateError } = await supabase.rpc('update_user_event', {
-                    user_schema: userSchema,
-                    event_id: eventId,
-                    event_title: action.args.title || null,
-                    event_starts_at: action.args.startTime || null,
-                    event_ends_at: action.args.endTime || null,
-                    event_location: action.args.location || null,
-                    event_description: action.args.description || null,
-                  });
+                  // Build update object with only the fields that need updating
+                  const updates: any = {};
+                  if (action.args.title) updates.event_title = action.args.title;
+                  if (action.args.startTime) updates.event_starts_at = action.args.startTime;
+                  if (action.args.endTime) updates.event_ends_at = action.args.endTime;
+                  if (action.args.location !== undefined) updates.event_location = action.args.location;
+                  if (action.args.description !== undefined) updates.event_description = action.args.description;
                   
-                  if (updateError) {
-                    console.error('Error updating event:', updateError);
-                    result = `❌ Failed to update event: ${updateError.message}`;
+                  console.log(`Updating event ${eventId} with:`, updates);
+                  
+                  // Update event using SupabaseService
+                  const supabaseService = new SupabaseService();
+                  const success = await supabaseService.updateEvent(state.userId, eventId, updates);
+                  
+                  if (success) {
+                    const updatedFields = Object.keys(updates).join(', ');
+                    result = `✅ Updated event successfully (${updatedFields})`;
                   } else {
-                    result = `✅ Updated event: "${action.args.title || 'Event'}"`;
+                    result = `❌ Failed to update event`;
                   }
                 } catch (error) {
                   console.error('Error updating event:', error);
@@ -505,7 +645,7 @@ Your capabilities:
               // If no eventId provided, search for the event semantically
               if (!deleteEventId && action.args.searchQuery) {
                 try {
-                  // Searching for event to delete
+                  // First try semantic search
                   const { EmbeddingService } = await import('../../services/EmbeddingService.js');
                   const embeddingService = new EmbeddingService();
                   const searchResults = await embeddingService.searchSimilarEvents(
@@ -514,37 +654,95 @@ Your capabilities:
                     1
                   );
                   
-                  // Found search results for deletion
-                  
                   if (searchResults.length > 0) {
                     deleteEventId = searchResults[0].metadata.id;
                     result = `🔍 Found event: "${searchResults[0].metadata.event_title}" - deleting...`;
-                    // Found event to delete
                   } else {
-                    result = `❌ No event found matching: "${action.args.searchQuery}"`;
-                    // No events found for search query
-                    break;
+                    // Semantic search returned empty, try fallback
+                    throw new Error('No results from semantic search, trying fallback');
                   }
                 } catch (error) {
-                  console.error('Error searching for event to delete:', error);
-                  result = `❌ Error searching for event: ${error instanceof Error ? error.message : 'Unknown error'}`;
-                  break;
+                  // If semantic search fails, try to find event by title and date
+                  console.log('Semantic search failed, trying direct search:', error instanceof Error ? error.message : 'Unknown error');
+                  console.log('Search query:', action.args.searchQuery);
+                  
+                  // Extract event title and date from search query
+                  const searchLower = action.args.searchQuery.toLowerCase();
+                  
+                  // Try to find the event in the loaded events
+                  const supabaseService = new SupabaseService();
+                  const allEvents = await supabaseService.getEvents(state.userId);
+                  console.log(`Found ${allEvents.length} events to search through`);
+                  
+                  // Find matching event by title (case insensitive) and optionally by date
+                  const matchingEvent = allEvents.find((e: any) => {
+                    const eventTitle = (e.event_title || e.title || '').toLowerCase();
+                    const eventStartStr = e.event_starts_at || e.start_time;
+                    console.log(`Checking event: "${eventTitle}" at ${eventStartStr}`);
+                    
+                    // Check if event title is in the search query or vice versa
+                    const titleWords = eventTitle.split(' ');
+                    const searchWords = searchLower.split(' ');
+                    
+                    // Check if any title word matches any search word
+                    const titleMatch = titleWords.some((word: string) => searchWords.includes(word)) ||
+                                      searchWords.some((word: string) => titleWords.includes(word)) ||
+                                      searchLower.includes(eventTitle) || 
+                                      eventTitle.includes('standup') && searchLower.includes('standup');
+                    
+                    if (!titleMatch) {
+                      console.log(`  Title doesn't match`);
+                      return false;
+                    }
+                    
+                    // If search query includes a date, also match by date
+                    if (searchLower.includes('2025-') || searchLower.includes('tomorrow') || searchLower.includes('today')) {
+                      const eventDate = new Date(eventStartStr).toISOString().split('T')[0];
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      
+                      console.log(`  Event date: ${eventDate}, Tomorrow: ${tomorrowStr}, Today: ${todayStr}`);
+                      
+                      if (searchLower.includes('tomorrow') && eventDate === tomorrowStr) {
+                        console.log(`  Matched as tomorrow's event!`);
+                        return true;
+                      } else if (searchLower.includes('today') && eventDate === todayStr) {
+                        console.log(`  Matched as today's event!`);
+                        return true;
+                      } else if (searchLower.includes(eventDate)) {
+                        console.log(`  Matched by date!`);
+                        return true;
+                      }
+                      // If date mentioned but doesn't match, don't match this event
+                      console.log(`  Date mentioned but doesn't match`);
+                      return false;
+                    }
+                    
+                    // No date specified, match by title only
+                    console.log(`  Matched by title only!`);
+                    return titleMatch;
+                  });
+                  
+                  if (matchingEvent) {
+                    deleteEventId = matchingEvent.id;
+                    result = `🔍 Found event: "${matchingEvent.event_title}" - deleting...`;
+                  } else {
+                    result = `❌ No event found matching: "${action.args.searchQuery}"`;
+                    break;
+                  }
                 }
               }
               
               if (deleteEventId) {
                 try {
-                  // Delete event using RPC function to avoid schema access issues
-                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                  const { data: deleteSuccess, error: deleteError } = await supabase.rpc('delete_user_event', {
-                    user_schema: userSchema,
-                    event_id: deleteEventId,
-                  });
+                  // Delete event using SupabaseService
+                  console.log(`Attempting to delete event with ID: ${deleteEventId}`);
+                  const supabaseService = new SupabaseService();
+                  const success = await supabaseService.deleteEvent(state.userId, deleteEventId);
                   
-                  if (deleteError) {
-                    console.error('Error deleting event:', deleteError);
-                    result = `❌ Failed to delete event: ${deleteError.message}`;
-                  } else if (deleteSuccess) {
+                  if (success) {
                     result = `✅ Deleted event successfully`;
                   } else {
                     result = `❌ Event not found or could not be deleted`;
@@ -565,26 +763,20 @@ Your capabilities:
 
               // Find events to delete
               if (action.args.date) {
-                // Get all events on the specified date using RPC function
+                // Get all events on the specified date using SupabaseService
                 const startDate = new Date(action.args.date);
                 const endDate = new Date(startDate);
                 endDate.setDate(endDate.getDate() + 1);
                 
                 try {
-                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                  const { data: eventsData, error } = await supabase.rpc('get_user_events', {
-                    user_schema: userSchema,
-                    start_date: startDate.toISOString(),
-                    end_date: endDate.toISOString(),
-                  });
+                  const supabaseService = new SupabaseService();
+                  const allEvents = await supabaseService.getEvents(state.userId);
                   
-                  if (error) {
-                    console.error('Error fetching events by date:', error);
-                    result = `❌ Error fetching events by date: ${error.message}`;
-                    break;
-                  } else {
-                    eventsToDelete = eventsData || [];
-                  }
+                  // Filter events for the specified date
+                  eventsToDelete = allEvents.filter((e: any) => {
+                    const eventDate = new Date(e.event_starts_at);
+                    return eventDate >= startDate && eventDate < endDate;
+                  });
                 } catch (error) {
                   console.error('Error fetching events by date:', error);
                   result = `❌ Error fetching events by date: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -622,17 +814,14 @@ Your capabilities:
               // Delete all found events
               for (const event of eventsToDelete) {
                 try {
-                  // Delete event using RPC function to avoid schema access issues
-                  const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                  const { data: deleteSuccess, error: deleteError } = await supabase.rpc('delete_user_event', {
-                    user_schema: userSchema,
-                    event_id: event.id,
-                  });
+                  // Delete event using SupabaseService
+                  const supabaseService = new SupabaseService();
+                  const success = await supabaseService.deleteEvent(state.userId, event.id);
                   
-                  if (!deleteError && deleteSuccess) {
+                  if (success) {
                     deletedCount++;
                   } else {
-                    console.error('Error deleting event:', event.id, deleteError);
+                    console.error('Failed to delete event:', event.id);
                   }
                 } catch (error) {
                   console.error('Error deleting event:', event.id, error);
@@ -650,27 +839,28 @@ Your capabilities:
 
             case "list_events":
               try {
-                // Get events using RPC function to avoid schema access issues
-                const userSchema = `u_${state.userId.replace(/-/g, '')}`;
-                const { data: eventsData, error } = await supabase.rpc('get_user_events', {
-                  user_schema: userSchema,
-                  start_date: action.args.startDate || null,
-                  end_date: action.args.endDate || null,
-                });
+                // Get events using SupabaseService
+                const supabaseService = new SupabaseService();
+                const events = await supabaseService.getEvents(state.userId);
                 
-                if (error) {
-                  console.error('Error fetching events:', error);
-                  result = `❌ Error fetching events: ${error.message}`;
-                } else {
-                  const events = eventsData || [];
-                  result = `📅 Found ${events.length} events`;
-                  if (events.length > 0) {
-                    const eventList = events.slice(0, 5).map((e: any) => 
-                      `• ${e.event_title} (${new Date(e.event_starts_at).toLocaleDateString()})`
-                    ).join('\n');
-                    result += `:\n${eventList}`;
-                    if (events.length > 5) result += `\n...and ${events.length - 5} more`;
-                  }
+                // Filter by date range if provided
+                let filteredEvents = events || [];
+                if (action.args.startDate) {
+                  const startDate = new Date(action.args.startDate);
+                  filteredEvents = filteredEvents.filter((e: any) => new Date(e.event_starts_at) >= startDate);
+                }
+                if (action.args.endDate) {
+                  const endDate = new Date(action.args.endDate);
+                  filteredEvents = filteredEvents.filter((e: any) => new Date(e.event_starts_at) <= endDate);
+                }
+                
+                result = `📅 Found ${filteredEvents.length} events`;
+                if (filteredEvents.length > 0) {
+                  const eventList = filteredEvents.slice(0, 5).map((e: any) => 
+                    `• ${e.event_title} (${new Date(e.event_starts_at).toLocaleDateString()})`
+                  ).join('\n');
+                  result += `:\n${eventList}`;
+                  if (filteredEvents.length > 5) result += `\n...and ${filteredEvents.length - 5} more`;
                 }
               } catch (error) {
                 console.error('Error listing events:', error);
@@ -706,6 +896,47 @@ Your capabilities:
             case "create_task":
               // TODO: Implement task creation when task schema is ready
               result = `✅ Task creation planned: "${action.args.title}" (task system not yet implemented)`;
+              break;
+
+            case "find_free_time":
+              try {
+                const intelligenceService = new CalendarIntelligenceService(state.userId);
+                const startDate = action.args.date ? new Date(action.args.date) : new Date();
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 7); // Search 1 week ahead
+                
+                const freeSlots = await intelligenceService.findFreeTimeSlots(
+                  startDate,
+                  endDate,
+                  action.args.duration || 60
+                );
+                
+                if (freeSlots.length > 0) {
+                  const topSlots = freeSlots.slice(0, 3);
+                  result = `📅 Found ${freeSlots.length} free time slots:\n`;
+                  topSlots.forEach(slot => {
+                    const start = new Date(slot.start);
+                    result += `• ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${slot.duration} minutes, ${slot.quality} time)\n`;
+                  });
+                } else {
+                  result = `❌ No free time slots found for ${action.args.duration} minutes in the next week`;
+                }
+              } catch (error) {
+                console.error('Error finding free time:', error);
+                result = `❌ Error finding free time: ${error instanceof Error ? error.message : 'Unknown error'}`;
+              }
+              break;
+
+            case "daily_briefing":
+              try {
+                const intelligenceService = new CalendarIntelligenceService(state.userId);
+                const briefingDate = action.args.date ? new Date(action.args.date) : new Date();
+                const briefing = await intelligenceService.getDailyBriefing(briefingDate);
+                result = briefing;
+              } catch (error) {
+                console.error('Error generating briefing:', error);
+                result = `❌ Error generating briefing: ${error instanceof Error ? error.message : 'Unknown error'}`;
+              }
               break;
 
             default:

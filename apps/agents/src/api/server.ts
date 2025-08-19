@@ -21,6 +21,9 @@ import { generateEventEmbedding, generateChatEmbedding, searchSimilarContent } f
 import { handleChatMessage, getChatHistory, handleStreamingChat } from './chat.js';
 import { createUserSchema } from './user.js';
 import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent } from './events.js';
+import { getPendingInteractions, respondToInteraction, triggerTestScenario, clearUserInteractions } from './interactions.js';
+import { processAgentMessage, getSystemPrompt, getAgentCapabilities, getSystemOverview, getUserProfile, addStartTime } from './agent.js';
+import { analyzeWeek, generateInteractionFromChat } from './weekly-analysis.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -52,6 +55,23 @@ app.post('/api/events', getUserEvents);
 app.post('/api/events/create', createUserEvent);
 app.post('/api/events/update', updateUserEvent);
 app.post('/api/events/delete', deleteUserEvent);
+
+// Interaction endpoints
+app.post('/api/interactions/pending', getPendingInteractions);
+app.post('/api/interactions/respond', respondToInteraction);
+app.post('/api/interactions/trigger-test', triggerTestScenario);
+app.post('/api/interactions/clear', clearUserInteractions);
+
+// Weekly analysis and intelligent interactions
+app.post('/api/analysis/week', analyzeWeek);
+app.post('/api/interactions/from-chat', generateInteractionFromChat);
+
+// Agent endpoints - for LangGraph agent system
+app.post('/api/agent/process', addStartTime, processAgentMessage);
+app.post('/api/agent/system-prompt', getSystemPrompt);
+app.post('/api/agent/capabilities', getAgentCapabilities);
+app.post('/api/agent/overview', getSystemOverview);
+app.post('/api/user/profile', getUserProfile);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -12,7 +12,7 @@ export async function createUserSchema(req: Request, res: Response): Promise<voi
 
     // For now, we'll skip user table creation since it may not exist
     // This is handled by Supabase Auth automatically
-    console.log(`Processing user schema for: ${user_id} (${user_email})`);
+    console.log(`🔧 [USER SCHEMA] Processing: ${user_email}`);
     
     // Create user-specific schema tables using RPC function
     const { error: schemaError } = await supabase.rpc('create_user_schema_rpc', {
@@ -24,12 +24,12 @@ export async function createUserSchema(req: Request, res: Response): Promise<voi
       console.error('Error creating user schema:', schemaError);
       // Continue anyway - schema might already exist
     } else {
-      console.log(`Created user schema for: ${user_id}`);
+      console.log(`✅ [USER SCHEMA] Created for: ${user_email}`);
     }
 
     // For now, we'll skip profile table operations since they may not exist
     // The user schema creation RPC function should handle this
-    console.log(`User schema processing completed for: ${user_id}`);
+    console.log(`🎉 [USER SCHEMA] Completed for: ${user_email}`);
     
     // Try to create user profile, but don't fail if table doesn't exist
     try {

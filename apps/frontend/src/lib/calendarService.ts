@@ -10,6 +10,7 @@ export interface CalendarEvent {
   event_description?: string
   event_created_at?: string
   event_updated_at?: string
+  color?: string
 }
 
 /**
@@ -181,19 +182,31 @@ export async function deleteEvent(
       return { success: false, error: 'User not authenticated' };
     }
 
-    const schemaName = getUserSchemaName(user);
-
-    const { data, error } = await supabase.rpc('delete_user_event', {
-      user_schema: schemaName,
-      event_id: eventId,
+    // Use the backend API instead of direct RPC calls
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+    const response = await fetch(`${agentServiceUrl}/api/events/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        event_id: eventId
+      })
     });
 
-    if (error) {
-      console.error('Error deleting event:', error);
-      return { success: false, error: error.message };
+    if (!response.ok) {
+      const errorText = await response.text()
+      return { success: false, error: `Backend error: ${errorText}` };
     }
 
-    return { success: data, error: null };
+    const data = await response.json();
+
+    if (data.success) {
+      return { success: true, error: null };
+    } else {
+      return { success: false, error: data.error || 'Unknown error' };
+    }
   } catch (err: any) {
     console.error('Unexpected error in deleteEvent:', err);
     return { success: false, error: err.message || 'An unexpected error occurred' };

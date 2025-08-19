@@ -49,44 +49,34 @@ export async function handleChatMessage(req: Request, res: Response): Promise<vo
     const embedding = await getEmbeddingService().generateEmbedding(message);
     console.log('Step 1: Embedding generated');
 
-    console.log('Step 2: Storing user message directly to database...');
-    // Store user message directly to database to avoid circular dependency
-    const userSchema = `u_${user_id.replace(/-/g, '')}`;
-    const userMessageData = {
-      id: Date.now().toString(),
-      session_id,
-      user_id,
-      content: message,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-      embedding
-    };
-    
-    const { data: userMessage, error: userMessageError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .insert([userMessageData])
-      .select()
-      .single();
+    console.log('Step 2: Storing user message via RPC...');
+    // Store user message using RPC function to avoid schema access issues
+    const { data: userMessageId, error: userMessageError } = await supabase
+      .rpc('add_user_chat_message', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_content: message,
+        p_sender: 'user',
+        p_embedding: embedding
+      });
       
     if (userMessageError) {
-      console.error('Error storing user message:', userMessageError);
+      console.error('Error storing user message via RPC:', userMessageError);
       // Continue anyway - we can still process the message
     } else {
-      console.log('Step 2: User message stored successfully');
+      console.log('Step 2: User message stored successfully via RPC, ID:', userMessageId);
     }
 
-    console.log('Step 3: Getting conversation history directly from database...');
-    // Get conversation history directly from database
+    console.log('Step 3: Getting conversation history via RPC...');
+    // Get conversation history using RPC function
     const { data: chatHistory, error: historyError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', session_id)
-      .order('timestamp', { ascending: true })
-      .limit(50);
+      .rpc('get_user_chat_messages', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_limit: 50
+      });
       
-    const conversationHistory = chatHistory?.map(msg => 
+    const conversationHistory = chatHistory?.map((msg: any) => 
       msg.sender === 'user' 
         ? new HumanMessage(msg.content)
         : new AIMessage(msg.content)
@@ -108,39 +98,31 @@ export async function handleChatMessage(req: Request, res: Response): Promise<vo
     const agentResponse = await getConversationAgent().processMessage(agentContext, message);
     console.log('Step 5: Agent response received:', agentResponse.content.substring(0, 100) + '...');
 
-    console.log('Step 6: Storing agent response directly to database...');
+    console.log('Step 6: Storing agent response via RPC...');
     // Generate embedding for the agent response
     const responseEmbedding = await getEmbeddingService().generateEmbedding(agentResponse.content);
 
-    // Store agent response directly to database to avoid circular dependency
-    const aiMessageData = {
-      id: (Date.now() + 1).toString(),
-      session_id,
-      user_id,
-      content: agentResponse.content,
-      sender: 'assistant',
-      timestamp: new Date().toISOString(),
-      embedding: responseEmbedding
-    };
-    
-    const { data: aiMessage, error: aiMessageError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .insert([aiMessageData])
-      .select()
-      .single();
+    // Store agent response using RPC function
+    const { data: aiMessageId, error: aiMessageError } = await supabase
+      .rpc('add_user_chat_message', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_content: agentResponse.content,
+        p_sender: 'assistant',
+        p_embedding: responseEmbedding
+      });
       
     if (aiMessageError) {
-      console.error('Error storing AI message:', aiMessageError);
+      console.error('Error storing AI message via RPC:', aiMessageError);
       // Continue anyway - we can still return the response
     } else {
-      console.log('Step 6: Agent response stored successfully');
+      console.log('Step 6: Agent response stored successfully via RPC, ID:', aiMessageId);
     }
 
     res.json({
       success: true,
       response: agentResponse.content,
-      id: aiMessage?.id || Date.now().toString()
+      id: aiMessageId || Date.now().toString()
     });
 
   } catch (error) {
@@ -151,46 +133,40 @@ export async function handleChatMessage(req: Request, res: Response): Promise<vo
 
 export async function getChatHistory(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, session_id } = req.body;
+    const { user_id, session_id, limit = 50 } = req.body;
     
     if (!user_id || !session_id) {
+      console.log('❌ [CHAT HISTORY] Missing required fields');
       res.status(400).json({ error: 'Missing required fields: user_id, session_id' });
       return;
     }
 
-    console.log('Getting chat history for:', { user_id, session_id });
+    console.log('🔍 [CHAT HISTORY] Getting chat history for:', { user_id, session_id, limit });
 
-    // Get chat history directly from database to avoid circular dependency
-    const userSchema = `u_${user_id.replace(/-/g, '')}`;
-    const { data: messages, error } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', session_id)
-      .order('timestamp', { ascending: true })
-      .limit(50);
+    // Use RPC function to access user schema (bypasses PostgREST schema restrictions)
+    const { data: chatHistory, error: historyError } = await supabase
+      .rpc('get_user_chat_messages', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_limit: limit
+      });
       
-    if (error) {
-      console.error('Error fetching chat history:', error);
-      res.status(500).json({ error: 'Failed to get chat history' });
+    if (historyError) {
+      console.error('❌ [CHAT HISTORY] Error fetching chat history via RPC:', historyError);
+      console.error('❌ [CHAT HISTORY] Error details:', JSON.stringify(historyError, null, 2));
+      res.status(500).json({ error: 'Failed to get chat history', details: historyError.message });
       return;
     }
-    
-    // Transform messages to match frontend format
-    const formattedMessages = (messages || []).map(msg => ({
-      id: msg.id,
-      content: msg.content,
-      sender: msg.sender,
-      timestamp: msg.timestamp
-    }));
 
+    console.log('✅ [CHAT HISTORY] Retrieved', chatHistory?.length || 0, 'messages via RPC');
+    
     res.json({
       success: true,
-      messages: formattedMessages
+      messages: chatHistory || []
     });
 
   } catch (error) {
-    console.error('Error getting chat history:', error);
+    console.error('❌ [CHAT HISTORY] Error getting chat history:', error);
     res.status(500).json({ error: 'Failed to get chat history' });
   }
 }
@@ -216,42 +192,32 @@ export async function handleStreamingChat(req: Request, res: Response): Promise<
     // Generate embedding for the message
     const embedding = await getEmbeddingService().generateEmbedding(message);
 
-    // Store user message directly to database to avoid circular dependency
-    const userSchema = `u_${user_id.replace(/-/g, '')}`;
-    const userMessageData = {
-      id: Date.now().toString(),
-      session_id,
-      user_id,
-      content: message,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
-      embedding
-    };
-    
-    const { data: userMessage, error: userMessageError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .insert([userMessageData])
-      .select()
-      .single();
+    // Store user message using RPC function
+    const { data: userMessageId, error: userMessageError } = await supabase
+      .rpc('add_user_chat_message', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_content: message,
+        p_sender: 'user',
+        p_embedding: embedding
+      });
 
     if (userMessageError) {
-      console.error('Error storing user message:', userMessageError);
+      console.error('Error storing user message via RPC:', userMessageError);
       res.write('error: Failed to store user message\n');
       res.end();
       return;
     }
 
-    // Get conversation history directly from database
+    // Get conversation history using RPC function
     const { data: chatHistory, error: historyError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', session_id)
-      .order('timestamp', { ascending: true })
-      .limit(50);
+      .rpc('get_user_chat_messages', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_limit: 50
+      });
       
-    const conversationHistory = chatHistory?.map(msg => 
+    const conversationHistory = chatHistory?.map((msg: any) => 
       msg.sender === 'user' 
         ? new HumanMessage(msg.content)
         : new AIMessage(msg.content)
@@ -287,21 +253,15 @@ export async function handleStreamingChat(req: Request, res: Response): Promise<
     // Generate embedding for the agent response
     const responseEmbedding = await getEmbeddingService().generateEmbedding(agentResponse.content);
 
-    // Store agent response directly to database to avoid circular dependency
-    const aiMessageData = {
-      id: (Date.now() + 1).toString(),
-      session_id,
-      user_id,
-      content: agentResponse.content,
-      sender: 'assistant',
-      timestamp: new Date().toISOString(),
-      embedding: responseEmbedding
-    };
-    
+    // Store agent response using RPC function
     await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .insert([aiMessageData]);
+      .rpc('add_user_chat_message', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_content: agentResponse.content,
+        p_sender: 'assistant',
+        p_embedding: responseEmbedding
+      });
 
     res.end();
 
