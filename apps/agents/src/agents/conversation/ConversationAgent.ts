@@ -514,6 +514,28 @@ INTELLIGENCE FEATURES:
                   break;
                 }
                 
+                // Determine category from event details
+                const title = action.args.title.toLowerCase();
+                const description = (action.args.description || '').toLowerCase();
+                const combined = title + ' ' + description;
+                
+                let category = 'personal';
+                if (combined.match(/\b(meeting|standup|sync|call|interview|work|project|deadline|task)\b/)) {
+                  category = 'work';
+                } else if (combined.match(/\b(gym|workout|exercise|doctor|health|medical|wellness)\b/)) {
+                  category = 'health';
+                } else if (combined.match(/\b(friend|social|party|dinner|lunch|coffee|date)\b/)) {
+                  category = 'social';
+                } else if (combined.match(/\b(course|class|study|learn|training|education)\b/)) {
+                  category = 'learning';
+                } else if (combined.match(/\b(budget|payment|bill|finance|money|tax)\b/)) {
+                  category = 'finance';
+                } else if (combined.match(/\b(travel|trip|flight|vacation|holiday)\b/)) {
+                  category = 'travel';
+                } else if (combined.match(/\b(routine|daily|morning|evening|habit)\b/)) {
+                  category = 'routine';
+                }
+                
                 // Create event using SupabaseService to write to public.events table
                 const supabaseService = new SupabaseService();
                 const createdEvent = await supabaseService.createEvent(state.userId, {
@@ -522,14 +544,13 @@ INTELLIGENCE FEATURES:
                   event_ends_at: action.args.endTime,
                   event_location: action.args.location || null,
                   event_description: action.args.description || null,
-                });
+                  category: category,
+                } as any);
                 
                 if (!createdEvent) {
                   result = `❌ Failed to create event: Unknown error`;
                 } else {
-                  // Category name can be inferred from event title or type
-                  const categoryName = 'Event';
-                  result = `✅ Created event: "${action.args.title}" (${categoryName})`;
+                  result = `✅ Created ${category} event: "${action.args.title}"`;
                 }
               } catch (error) {
                 console.error('Error creating event:', error);

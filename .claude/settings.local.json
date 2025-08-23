@@ -27,7 +27,9 @@
       "Bash(node:*)",
       "Bash(timeout:*)",
       "Bash(npx supabase migration:*)",
-      "Bash(start http://localhost:5173)"
+      "Bash(start http://localhost:5173)",
+      "Bash(npx supabase:*)",
+      "Bash(echo $SUPABASE_URL)"
     ],
     "deny": [],
     "additionalDirectories": [

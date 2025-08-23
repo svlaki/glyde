@@ -98,119 +98,47 @@ export class SupabaseService {
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
       console.log('🔍 [SUPABASE SERVICE] User ID:', userId);
       
-      // Determine event color based on comprehensive category system
-      const title = ((event.event_title || event.title || '')).toLowerCase();
-      const description = ((event.event_description || event.description || '')).toLowerCase();
-      const combined = title + ' ' + description;
+      // Use category-based colors
+      const categoryColors: { [key: string]: string } = {
+        work: '#3B82F6',      // Blue
+        health: '#10B981',    // Green
+        personal: '#8B5CF6',  // Purple
+        learning: '#F59E0B',  // Orange
+        finance: '#EF4444',   // Red
+        travel: '#14B8A6',    // Teal
+        routine: '#6366F1',   // Indigo
+        social: '#EC4899'     // Pink
+      };
       
-      let color = '#6B7280'; // Default gray
-      let category = 'Personal'; // Default category
+      // Use provided category or determine from title/description
+      let category = (event as any).category;
       
-      // Work Category - Blue shades
-      if (combined.match(/\b(meeting|standup|sync|call|review|presentation|interview|1:1|one on one|sprint|retro|retrospective|demo|client|customer|stakeholder|team|project|deadline|work|task|development|coding|programming|deploy|release|launch)\b/)) {
-        // Meetings - Light Blue
-        if (combined.match(/\b(meeting|standup|sync|call|interview|1:1|one on one)\b/)) {
-          color = '#60A5FA';
-          category = 'Work/Meeting';
+      if (!category) {
+        // AI can intelligently assign category based on content
+        const title = ((event.event_title || event.title || '')).toLowerCase();
+        const description = ((event.event_description || event.description || '')).toLowerCase();
+        const combined = title + ' ' + description;
+        
+        if (combined.match(/\b(meeting|standup|sync|call|interview|work|project|deadline|task)\b/)) {
+          category = 'work';
+        } else if (combined.match(/\b(gym|workout|exercise|doctor|health|medical|wellness)\b/)) {
+          category = 'health';
+        } else if (combined.match(/\b(friend|social|party|dinner|lunch|coffee|date)\b/)) {
+          category = 'social';
+        } else if (combined.match(/\b(course|class|study|learn|training|education)\b/)) {
+          category = 'learning';
+        } else if (combined.match(/\b(budget|payment|bill|finance|money|tax)\b/)) {
+          category = 'finance';
+        } else if (combined.match(/\b(travel|trip|flight|vacation|holiday)\b/)) {
+          category = 'travel';
+        } else if (combined.match(/\b(routine|daily|morning|evening|habit)\b/)) {
+          category = 'routine';
+        } else {
+          category = 'personal';
         }
-        // Deep Work - Dark Blue
-        else if (combined.match(/\b(deep work|focus|coding|programming|development|design|research|writing|planning)\b/)) {
-          color = '#2563EB';
-          category = 'Work/Deep Work';
-        }
-        // Project/Deadline - Navy Blue
-        else if (combined.match(/\b(project|deadline|milestone|launch|release|sprint|deliver)\b/)) {
-          color = '#1E40AF';
-          category = 'Work/Project';
-        }
-        // General Work - Standard Blue
-        else {
-          color = '#3B82F6';
-          category = 'Work';
-        }
-      }
-      // Health Category - Green shades
-      else if (combined.match(/\b(gym|workout|exercise|run|walk|yoga|training|fitness|doctor|dentist|medical|appointment|checkup|therapy|health|wellness|meditation|mindfulness|nutrition|diet|meal prep)\b/)) {
-        // Exercise - Bright Green
-        if (combined.match(/\b(gym|workout|exercise|run|walk|yoga|training|fitness|sport)\b/)) {
-          color = '#34D399';
-          category = 'Health/Exercise';
-        }
-        // Medical - Dark Green
-        else if (combined.match(/\b(doctor|dentist|medical|appointment|checkup|therapy|hospital|clinic)\b/)) {
-          color = '#059669';
-          category = 'Health/Medical';
-        }
-        // Wellness - Light Green
-        else if (combined.match(/\b(wellness|meditation|mindfulness|spa|massage|relax)\b/)) {
-          color = '#6EE7B7';
-          category = 'Health/Wellness';
-        }
-        // Nutrition - Medium Green
-        else if (combined.match(/\b(nutrition|diet|meal prep|cooking|grocery)\b/)) {
-          color = '#10B981';
-          category = 'Health/Nutrition';
-        }
-        // General Health
-        else {
-          color = '#10B981';
-          category = 'Health';
-        }
-      }
-      // Personal Category - Purple shades
-      else if (combined.match(/\b(family|friend|social|party|birthday|anniversary|date|dinner|lunch|breakfast|brunch|coffee|drinks|personal|home|chores|errands|shopping|hobby|entertainment|movie|concert|game|show|museum|theater|art|music|read|book|club)\b/)) {
-        // Family - Light Purple
-        if (combined.match(/\b(family|parent|mother|father|brother|sister|child|kid|spouse|partner)\b/)) {
-          color = '#A78BFA';
-          category = 'Personal/Family';
-        }
-        // Social - Medium Purple
-        else if (combined.match(/\b(friend|social|party|drinks|dinner|lunch|coffee|date|hangout|meetup)\b/)) {
-          color = '#C084FC';
-          category = 'Personal/Social';
-        }
-        // Hobbies - Dark Purple
-        else if (combined.match(/\b(hobby|art|music|craft|game|read|book|club|photography|painting|drawing)\b/)) {
-          color = '#9333EA';
-          category = 'Personal/Hobbies';
-        }
-        // Entertainment - Violet
-        else if (combined.match(/\b(entertainment|movie|concert|show|theater|museum|event|festival)\b/)) {
-          color = '#7C3AED';
-          category = 'Personal/Entertainment';
-        }
-        // General Personal
-        else {
-          color = '#8B5CF6';
-          category = 'Personal';
-        }
-      }
-      // Learning Category - Orange/Yellow shades
-      else if (combined.match(/\b(course|class|study|learn|training|workshop|seminar|lecture|education|school|university|college|certification|exam|test|quiz|homework|assignment|research|tutorial|lesson)\b/)) {
-        color = '#F59E0B';
-        category = 'Learning';
-      }
-      // Finance Category - Red shades
-      else if (combined.match(/\b(budget|payment|bill|invoice|tax|investment|finance|money|salary|payroll|expense|accounting|bank|loan|mortgage|insurance|savings|retirement)\b/)) {
-        color = '#EF4444';
-        category = 'Finance';
-      }
-      // Travel Category - Teal
-      else if (combined.match(/\b(travel|trip|flight|airport|hotel|vacation|holiday|tour|visit|journey)\b/)) {
-        color = '#14B8A6';
-        category = 'Travel';
-      }
-      // Routine Category - Indigo
-      else if (combined.match(/\b(morning routine|evening routine|daily|routine|habit|prep|ready|wake|sleep|bedtime)\b/)) {
-        color = '#6366F1';
-        category = 'Routine';
-      }
-      // Break/Rest Category - Amber
-      else if (combined.match(/\b(break|rest|pause|relax|nap|downtime|free time|leisure)\b/)) {
-        color = '#F59E0B';
-        category = 'Break';
       }
       
+      const color = categoryColors[category] || '#3B82F6';
       console.log(`📊 [CATEGORY] Event "${event.event_title}" categorized as ${category} with color ${color}`);
       
       // Use RPC function to create event in user schema
@@ -238,7 +166,9 @@ export class SupabaseService {
           event_location: eventLocation,
           event_description: eventDescription,
           archetype: 'generic',
-          archetype_data: { color, category }
+          archetype_data: { color, category },
+          category: category,
+          color: color
         });
 
       if (error) {

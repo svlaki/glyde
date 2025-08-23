@@ -148,32 +148,20 @@ export function CalendarPage() {
       } else {
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
-          // Calculate color based on event title
-          const title = event.event_title.toLowerCase();
-          let color = event.color || '#3B82F6';
+          // Use category-based colors
+          const categoryColors: { [key: string]: string } = {
+            work: '#3B82F6',      // Blue
+            health: '#10B981',    // Green
+            personal: '#8B5CF6',  // Purple
+            learning: '#F59E0B',  // Orange
+            finance: '#EF4444',   // Red
+            travel: '#14B8A6',    // Teal
+            routine: '#6366F1',   // Indigo
+            social: '#EC4899'     // Pink
+          };
           
-          // Only recalculate if color is default blue
-          if (color === '#3b82f6' || color === '#3B82F6') {
-            if (title.includes('meeting') || title.includes('sync') || title.includes('call')) {
-              color = '#60A5FA'; // Light Blue
-            } else if (title.includes('deep work') || title.includes('focus')) {
-              color = '#2563EB'; // Dark Blue
-            } else if (title.includes('planning') || title.includes('review')) {
-              color = '#A78BFA'; // Purple
-            } else if (title.includes('dentist') || title.includes('doctor') || title.includes('appointment')) {
-              color = '#059669'; // Dark Green
-            } else if (title.includes('exercise') || title.includes('gym') || title.includes('workout')) {
-              color = '#34D399'; // Bright Green
-            } else if (title.includes('break') || title.includes('lunch')) {
-              color = '#F59E0B'; // Amber
-            } else if (title.includes('mindfulness') || title.includes('meditation')) {
-              color = '#6EE7B7'; // Light Green
-            } else if (title.includes('dinner') || title.includes('breakfast')) {
-              color = '#FB923C'; // Orange
-            } else if (title.includes('personal') || title.includes('family')) {
-              color = '#F472B6'; // Pink
-            }
-          }
+          const eventCategory = (event as any).category || 'personal';
+          const color = categoryColors[eventCategory] || event.color || '#3B82F6';
           
           return {
             id: event.id,
@@ -531,6 +519,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('personal');
 
   useEffect(() => {
     if (event) {
@@ -541,11 +530,13 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
       setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
       setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
       setDescription(event.event_description || '');
+      setCategory((event as any).category || 'personal');
     } else {
       setTitle('');
       setStartTime('10:00');
       setEndTime('11:00');
       setDescription('');
+      setCategory('personal');
     }
   }, [event]);
 
@@ -564,6 +555,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
       event_starts_at: starts_at.toISOString(),
       event_ends_at: ends_at.toISOString(),
       event_description: description.trim(),
+      category: category,
     };
 
     if (event) {
@@ -635,6 +627,26 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
                 className="w-full bg-white border-gray-300 text-black"
               />
             </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category
+            </label>
+            <select 
+              value={category} 
+              onChange={e => setCategory(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="work">Work</option>
+              <option value="health">Health</option>
+              <option value="personal">Personal</option>
+              <option value="learning">Learning</option>
+              <option value="finance">Finance</option>
+              <option value="travel">Travel</option>
+              <option value="routine">Routine</option>
+              <option value="social">Social</option>
+            </select>
           </div>
           
           <div>

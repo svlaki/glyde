@@ -10,6 +10,7 @@ export interface CalendarEvent {
   event_description?: string
   event_created_at?: string
   event_updated_at?: string
+  category?: string
   color?: string
 }
 
@@ -84,16 +85,16 @@ export async function createEvent(
       return { event: null, error: 'User not authenticated' }
     }
 
-    // Use the agent service for embedding generation
+    // Use the correct endpoint for creating events
     const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-    const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
+    const response = await fetch(`${agentServiceUrl}/api/events/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         user_id: user.id,
-        event: event
+        ...event
       })
     })
     
@@ -135,16 +136,17 @@ export async function updateEvent(
       return { event: null, error: 'User not authenticated' };
     }
 
-    // Use the agent service for embedding generation
+    // Use the correct endpoint for updating events
     const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-    const response = await fetch(`${agentServiceUrl}/api/embeddings/event`, {
+    const response = await fetch(`${agentServiceUrl}/api/events/update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         user_id: user.id,
-        event: { ...event, id: eventId }
+        event_id: eventId,
+        ...event
       })
     })
     
