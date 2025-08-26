@@ -11,6 +11,8 @@ export interface CalendarEvent {
   event_created_at?: string
   event_updated_at?: string
   color?: string
+  archetype?: string
+  archetype_data?: any
 }
 
 /**
@@ -213,56 +215,3 @@ export async function deleteEvent(
   }
 }
 
-/**
- * Generate sample events for development/testing
- * @returns Array of sample calendar events
- */
-function generateSampleEvents(): CalendarEvent[] {
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  
-  const nextWeek = new Date(today)
-  nextWeek.setDate(nextWeek.getDate() + 7)
-  
-  // Create copies to avoid modifying the same date object
-  const todayStart = new Date(today)
-  const todayEnd = new Date(today)
-  const tomorrowStart = new Date(tomorrow)
-  const tomorrowEnd = new Date(tomorrow)
-  const nextWeekStart = new Date(nextWeek)
-  const nextWeekEnd = new Date(nextWeek)
-  
-  return [
-    {
-      id: '1',
-      event_title: 'Sample Meeting',
-      event_starts_at: new Date(todayStart.setHours(10, 0, 0, 0)).toISOString(),
-      event_ends_at: new Date(todayEnd.setHours(11, 30, 0, 0)).toISOString(),
-      event_location: 'Conference Room A',
-      event_description: 'Weekly team sync',
-      event_created_at: new Date().toISOString(),
-      event_updated_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      event_title: 'Lunch with Client',
-      event_starts_at: new Date(tomorrowStart.setHours(12, 0, 0, 0)).toISOString(),
-      event_ends_at: new Date(tomorrowEnd.setHours(13, 30, 0, 0)).toISOString(),
-      event_location: 'Downtown Cafe',
-      event_description: 'Discuss project requirements',
-      event_created_at: new Date().toISOString(),
-      event_updated_at: new Date().toISOString()
-    },
-    {
-      id: '3',
-      event_title: 'Product Demo',
-      event_starts_at: new Date(nextWeekStart.setHours(14, 0, 0, 0)).toISOString(),
-      event_ends_at: new Date(nextWeekEnd.setHours(15, 0, 0, 0)).toISOString(),
-      event_location: 'Virtual',
-      event_description: 'Present new features to stakeholders',
-      event_created_at: new Date().toISOString(),
-      event_updated_at: new Date().toISOString()
-    }
-  ]
-} 

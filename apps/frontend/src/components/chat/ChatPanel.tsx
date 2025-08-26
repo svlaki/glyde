@@ -9,6 +9,18 @@ function generateSessionId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+function getOrCreateSessionId(userId: string): string {
+  const storageKey = `chat_session_${userId}`
+  let sessionId = localStorage.getItem(storageKey)
+  
+  if (!sessionId) {
+    sessionId = generateSessionId()
+    localStorage.setItem(storageKey, sessionId)
+  }
+  
+  return sessionId
+}
+
 interface ChatPanelProps {
   onEventCreated?: () => void;
 }
@@ -18,11 +30,19 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const sessionId = useRef<string>(generateSessionId())
+  const [sessionId, setSessionId] = useState<string>('')
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const lastTimestampRef = useRef<string | null>(null)
   const [isPolling, setIsPolling] = useState(true)
   const { user, session, isAuthenticated } = useAuth()
+
+  // Initialize session ID when user is available
+  useEffect(() => {
+    if (user?.id) {
+      const persistentSessionId = getOrCreateSessionId(user.id)
+      setSessionId(persistentSessionId)
+    }
+  }, [user?.id])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -36,9 +56,56 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [])
 
-  // Show intelligent briefing and weekly analysis when page loads
+  // Load chat history when session is ready
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
+  
   useEffect(() => {
-    if (!user || !session?.access_token) return
+    if (!user || !session?.access_token || !sessionId) return
+    
+    const loadHistory = async () => {
+      console.log('🔄 [CHAT] Loading history for session:', sessionId)
+      try {
+        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            user_id: user.id,
+            session_id: sessionId
+          })
+        })
+        
+        if (res.ok) {
+          const result = await res.json()
+          console.log('📥 [CHAT] History response:', result)
+          if (result.success && Array.isArray(result.messages) && result.messages.length > 0) {
+            console.log('✅ [CHAT] Loaded', result.messages.length, 'messages')
+            setMessages(result.messages)
+            if (result.messages.length > 0) {
+              lastTimestampRef.current = result.messages[result.messages.length - 1].timestamp
+            }
+            setHasLoadedHistory(true)
+            return
+          }
+        }
+        console.log('ℹ️ [CHAT] No history found, will show briefing')
+      } catch (err) {
+        console.error('Error loading chat history:', err)
+      }
+      
+      setHasLoadedHistory(true)
+    }
+    
+    // Always try to load history, don't gate on hasLoadedHistory
+    loadHistory()
+  }, [user, session, sessionId])
+
+  // Show briefing only if no history was loaded
+  useEffect(() => {
+    if (!user || !session?.access_token || !sessionId || !hasLoadedHistory || messages.length > 0) return
     
     const showBriefing = async () => {
       try {
@@ -120,7 +187,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     }
     
     showBriefing()
-  }, [user, session])
+  }, [user, session, sessionId, hasLoadedHistory, messages.length])
 
   useEffect(() => {
     if (!isPolling) {
@@ -128,7 +195,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
       return
     }
     async function fetchMessages() {
-      if (!user || !session?.access_token) return
+      if (!user || !session?.access_token || !sessionId) return
       try {
         const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
         const res = await fetch(url, {
@@ -139,7 +206,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
           },
           body: JSON.stringify({
             user_id: user.id,
-            session_id: sessionId.current
+            session_id: sessionId
           })
         })
         if (!res.ok) {
@@ -170,7 +237,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current)
     }
-  }, [isPolling, user])
+  }, [isPolling, user, sessionId])
 
   async function handleSend() {
     if (!input.trim()) return
@@ -200,7 +267,8 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
         body: JSON.stringify({
           context: {
             userId: user.id,
-            sessionId: sessionId.current,
+            sessionId: sessionId,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             conversationHistory: messages.map(msg => ({
               role: msg.sender === 'user' ? 'user' : 'assistant',
               content: msg.content

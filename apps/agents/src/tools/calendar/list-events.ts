@@ -7,6 +7,8 @@ const supabaseService = new SupabaseService();
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit = 20 }, config) => {
     const userId = config?.configurable?.userId;
+    const userTimezone = config?.configurable?.timezone || 'UTC';
+    
     if (!userId) {
       throw new Error("User ID is required for listing events");
     }
@@ -31,8 +33,23 @@ export const listEventsTool = tool(
     const limitedEvents = events.slice(0, limit);
 
     const eventList = limitedEvents.map(event => {
-      const startTime = new Date(event.event_starts_at).toLocaleString();
-      const endTime = new Date(event.event_ends_at).toLocaleString();
+      // Convert UTC times from database to user's local timezone
+      const startDate = new Date(event.event_starts_at);
+      const endDate = new Date(event.event_ends_at);
+      
+      const startTime = startDate.toLocaleTimeString('en-US', { 
+        timeZone: userTimezone,
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      const endTime = endDate.toLocaleTimeString('en-US', { 
+        timeZone: userTimezone,
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      
       return `📅 ${event.event_title}\n   ⏰ ${startTime} - ${endTime}${event.event_location ? `\n   📍 ${event.event_location}` : ''}`;
     });
 

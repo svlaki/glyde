@@ -301,13 +301,11 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         const today = new Date();
         const baseDate = today.toISOString().split('T')[0];
         
-        // Customize title based on response type
-        let eventTitle = interaction.eventData.title;
-        if (interaction.type === 'multiple_choice' && response !== 'yes') {
-          eventTitle = `${response} Session`; // e.g., "Deep Work Session", "Planning Session"
-        }
-
-        // Create proper ISO timestamps that respect local timezone
+        // Check for conflicts before creating event
+        const supabaseService = new (await import('../services/SupabaseService.js')).SupabaseService();
+        const existingEvents = await supabaseService.getEvents(user_id);
+        
+        // Create proposed time slots
         const [startHour, startMin] = interaction.eventData.startTime.split(':');
         const [endHour, endMin] = interaction.eventData.endTime.split(':');
         
@@ -316,6 +314,29 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         
         const endDate = new Date(today);
         endDate.setHours(parseInt(endHour), parseInt(endMin || '0'), 0, 0);
+        
+        // Check for time conflicts
+        const hasConflict = existingEvents.some(event => {
+          const eventStart = new Date(event.event_starts_at);
+          const eventEnd = new Date(event.event_ends_at);
+          
+          // Check if proposed event overlaps with existing event
+          return (startDate < eventEnd && endDate > eventStart);
+        });
+        
+        if (hasConflict) {
+          console.log(`⚠️ [INTERACTION RESPONSE] Time conflict detected, skipping event creation`);
+          return res.json({
+            success: true,
+            message: 'Time conflict detected - suggestion dismissed'
+          });
+        }
+        
+        // Customize title based on response type
+        let eventTitle = interaction.eventData.title;
+        if (interaction.type === 'multiple_choice' && response !== 'yes') {
+          eventTitle = response; // Use the selected option as the event title
+        }
         
         const eventData = {
           event_title: eventTitle,

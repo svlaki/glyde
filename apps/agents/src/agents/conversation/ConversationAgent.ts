@@ -17,6 +17,14 @@ function createLocalTimeExample(hour: number, minute: number = 0): string {
   return `${date.toISOString()} (which represents ${hour}:${minute.toString().padStart(2, '0')} local time)`;
 }
 
+// Helper function to format date for comparison using local timezone
+function formatDateForComparison(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -24,6 +32,7 @@ const ConversationState = Annotation.Root({
     default: () => [],
   }),
   userId: Annotation<string>(),
+  timezone: Annotation<string>(),
   userEvents: Annotation<any[]>({
     reducer: (existing, update) => update || existing,
     default: () => [],
@@ -84,6 +93,7 @@ export class ConversationAgent extends BaseAgent {
       const result = await this.graph.invoke({
         messages: messages,
         userId: context.userId,
+        timezone: context.timezone,
         userEvents: userEvents || [],
       });
 
@@ -142,8 +152,8 @@ export class ConversationAgent extends BaseAgent {
         description: "Create a new calendar event. Parse natural language into structured event data. Use smart defaults for missing information. Be intelligent about time defaults based on event type.",
         schema: z.object({
           title: z.string().describe("Event title extracted from user input or inferred from context"),
-          startTime: z.string().describe("Start time in ISO format. CRITICAL: Parse user's intended local time (e.g., '2pm tomorrow' means 2pm in USER's timezone). Create ISO timestamp that represents the user's local time, not server time. Use intelligent defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
-          endTime: z.string().describe("End time in ISO format. CRITICAL: Must be in same timezone as startTime. If not specified, add 1 hour to start time"),
+          startTime: z.string().describe("Start time in ISO format WITHOUT Z suffix (e.g., '2025-08-25T17:00:00.000' for 5pm). CRITICAL: When user says '5pm', create timestamp for 5pm LOCAL TIME, NOT UTC. Example: '5pm tomorrow' = '2025-08-26T17:00:00.000' (no Z). Use intelligent defaults: breakfast=8am, lunch=12pm, dinner=6pm, meetings=business hours"),
+          endTime: z.string().describe("End time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format (no Z). If not specified, add 1 hour to start time"),
           location: z.string().nullable().describe("Event location. Leave empty if not specified"),
           description: z.string().nullable().describe("Event description. Leave empty if not specified"),
         }),
@@ -168,8 +178,8 @@ export class ConversationAgent extends BaseAgent {
           eventId: z.string().nullable().describe("Event ID to update (optional - if not provided, search by description)"),
           searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
           title: z.string().nullable().describe("New event title"),
-          startTime: z.string().nullable().describe("New start time in ISO format. CRITICAL: Parse user's intended local time, create ISO timestamp representing user's timezone"),
-          endTime: z.string().nullable().describe("New end time in ISO format. CRITICAL: Must be in same timezone as startTime"),
+          startTime: z.string().nullable().describe("New start time in ISO format WITHOUT Z suffix. CRITICAL: Use local time format (e.g., '2025-08-25T17:00:00.000' for 5pm local)"),
+          endTime: z.string().nullable().describe("New end time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format"),
           location: z.string().nullable().describe("New event location"),
           description: z.string().nullable().describe("New event description"),
         }),
@@ -352,8 +362,6 @@ export class ConversationAgent extends BaseAgent {
       const dayAfterTomorrow = new Date(now);
       dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       
-      // Helper function to format date for comparison
-      const formatDateForComparison = (date: Date) => date.toISOString().split('T')[0];
       
       const systemMessage = new SystemMessage(`You are an intelligent personal calendar assistant. You help users manage their time effectively.
 
@@ -407,11 +415,18 @@ WHEN ANSWERING CALENDAR QUESTIONS:
 
 WHEN CREATING EVENTS:
 - Parse natural language dates/times intelligently
-- "2pm tomorrow" = tomorrow at 14:00
-- "lunch next Tuesday" = next Tuesday at 12:00
+- "2pm tomorrow" = tomorrow at 14:00 LOCAL TIME
+- "lunch next Tuesday" = next Tuesday at 12:00 LOCAL TIME  
+- "5pm" means 5pm in user's timezone, NOT 5pm UTC
 - Use 1 hour duration if not specified
 - Check for conflicts and warn the user
 - Confirm what you scheduled
+
+CRITICAL TIMEZONE HANDLING:
+- User times are ALWAYS local time (e.g., "5pm" = 5pm local)
+- Create ISO timestamps WITHOUT Z suffix: "2025-08-25T17:00:00.000" 
+- NEVER use UTC indicators like .000Z - always use local time format
+- Example: "schedule meeting at 3pm tomorrow" → "2025-08-26T15:00:00.000"
 
 WHEN DELETING/UPDATING:
 - Be careful and confirm the right event
@@ -482,7 +497,12 @@ INTELLIGENCE FEATURES:
     const executeTools = async (state: ConversationStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls && (lastMessage as any).tool_calls.length > 0) {
-        const toolResults = await toolNode.invoke(state);
+        const toolResults = await toolNode.invoke(state, {
+          configurable: {
+            userId: state.userId,
+            timezone: state.timezone
+          }
+        });
         return {
           messages: toolResults.messages,
           pendingActions: (lastMessage as any).tool_calls,
@@ -579,11 +599,12 @@ INTELLIGENCE FEATURES:
                     
                     // If search includes temporal context, check dates
                     if (searchLower.includes('tomorrow') || searchLower.includes('today')) {
-                      const eventDate = new Date(e.event_starts_at || e.start_time).toISOString().split('T')[0];
+                      const eventDate = formatDateForComparison(new Date(e.event_starts_at || e.start_time));
+                      const today = new Date();
                       const tomorrow = new Date();
                       tomorrow.setDate(tomorrow.getDate() + 1);
-                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                      const todayStr = new Date().toISOString().split('T')[0];
+                      const tomorrowStr = formatDateForComparison(tomorrow);
+                      const todayStr = formatDateForComparison(today);
                       
                       if (searchLower.includes('tomorrow') && eventDate === tomorrowStr) {
                         return titleMatch;
@@ -697,11 +718,12 @@ INTELLIGENCE FEATURES:
                     
                     // If search query includes a date, also match by date
                     if (searchLower.includes('2025-') || searchLower.includes('tomorrow') || searchLower.includes('today')) {
-                      const eventDate = new Date(eventStartStr).toISOString().split('T')[0];
+                      const eventDate = formatDateForComparison(new Date(eventStartStr));
+                      const today = new Date();
                       const tomorrow = new Date();
                       tomorrow.setDate(tomorrow.getDate() + 1);
-                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                      const todayStr = new Date().toISOString().split('T')[0];
+                      const tomorrowStr = formatDateForComparison(tomorrow);
+                      const todayStr = formatDateForComparison(today);
                       
                       console.log(`  Event date: ${eventDate}, Tomorrow: ${tomorrowStr}, Today: ${todayStr}`);
                       

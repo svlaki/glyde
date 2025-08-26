@@ -27,7 +27,10 @@
       "Bash(node:*)",
       "Bash(timeout:*)",
       "Bash(npx supabase migration:*)",
-      "Bash(start http://localhost:5173)"
+      "Bash(start http://localhost:5173)",
+      "mcp__code-index__get_file_summary",
+      "mcp__code-index__find_files",
+      "mcp__code-index__search_code_advanced"
     ],
     "deny": [],
     "additionalDirectories": [

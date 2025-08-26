@@ -9,6 +9,7 @@ export interface AgentContext {
   userId: string;
   sessionId: string;
   userSchema: string;
+  timezone?: string;
   conversationHistory: ConversationMessage[];
   userProfile?: UserProfile;
 }

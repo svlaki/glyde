@@ -29,8 +29,27 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
       weekEnd.toISOString()
     );
     
-    // Analyze patterns and generate insights
-    const insights = await calendarIntelligence.analyzeWeekPatterns(events);
+    // Calculate busy days first
+    const busyDays: Record<string, number> = {};
+    events.forEach(event => {
+      const date = new Date(event.event_starts_at).toDateString();
+      busyDays[date] = (busyDays[date] || 0) + 1;
+    });
+    
+    // Generate basic insights (replacing the missing analyzeWeekPatterns method)
+    const insights = {
+      totalEvents: events.length,
+      averageEventsPerDay: Math.round(events.length / 7 * 10) / 10,
+      busiestDay: Object.entries(busyDays).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] || 'No events',
+      patterns: {
+        hasWeekendEvents: events.some(e => {
+          const day = new Date(e.event_starts_at).getDay();
+          return day === 0 || day === 6;
+        }),
+        hasEarlyMeetings: events.some(e => new Date(e.event_starts_at).getHours() < 9),
+        hasLateMeetings: events.some(e => new Date(e.event_starts_at).getHours() > 17)
+      }
+    };
     
     // Generate smart suggestions based on patterns
     const suggestions = [];
@@ -89,14 +108,8 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
     // 2. Key insights based on patterns
     const keyInsights = [];
     
-    // Check for overbooked days
-    const busyDays = {};
-    events.forEach(event => {
-      const date = new Date(event.event_starts_at).toDateString();
-      busyDays[date] = (busyDays[date] || 0) + 1;
-    });
-    
-    const overbooked = Object.entries(busyDays).filter(([_, count]) => count > 6);
+    // Check for overbooked days (busyDays already calculated above)
+    const overbooked = Object.entries(busyDays).filter(([_, count]) => (count as number) > 6);
     if (overbooked.length > 0) {
       keyInsights.push({
         type: 'warning',
@@ -217,7 +230,7 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
           totalEvents: events.length,
           todayEvents: todayEvents.length,
           tomorrowEvents: tomorrowEvents.length,
-          busiestDay: Object.entries(busyDays).sort((a, b) => b[1] - a[1])[0]?.[0],
+          busiestDay: Object.entries(busyDays).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0],
           categories: {
             meetings: events.filter(e => e.event_title.toLowerCase().includes('meeting')).length,
             deepWork: deepWorkEvents.length,

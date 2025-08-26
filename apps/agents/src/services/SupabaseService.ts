@@ -34,6 +34,66 @@ export class SupabaseService {
     return `u_${userId.replace(/-/g, '')}`;
   }
 
+  // Helper method to suggest archetype based on event title/description
+  private async suggestArchetype(title: string, description: string = ''): Promise<string> {
+    try {
+      const { data, error } = await this.client.rpc('suggest_event_archetype', {
+        event_title: title,
+        event_description: description
+      });
+
+      if (error) {
+        console.error('Error suggesting archetype:', error);
+        return 'generic';
+      }
+
+      return data || 'generic';
+    } catch (error) {
+      console.error('Exception suggesting archetype:', error);
+      return 'generic';
+    }
+  }
+
+  // Helper method to get archetype color
+  private async getArchetypeColor(archetype: string, archetypeData: any = {}): Promise<string> {
+    try {
+      const { data, error } = await this.client.rpc('get_event_archetype_color', {
+        archetype_name: archetype,
+        archetype_data: archetypeData
+      });
+
+      if (error) {
+        console.error('Error getting archetype color:', error);
+        return '#6B7280';
+      }
+
+      return data || '#6B7280';
+    } catch (error) {
+      console.error('Exception getting archetype color:', error);
+      return '#6B7280';
+    }
+  }
+
+  // Get all available archetypes
+  async getArchetypes(): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .from('event_archetypes')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching archetypes:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching archetypes:', error);
+      return [];
+    }
+  }
+
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
     const { data, error } = await this.client
       .from('profile')
@@ -50,16 +110,24 @@ export class SupabaseService {
   }
 
   async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    const userSchema = this.getUserSchema(userId);
-    console.log('🔍 [SUPABASE SERVICE] Fetching events from user schema:', userSchema);
+    console.log('🔍 [SUPABASE SERVICE] Fetching events for user:', userId);
     
     try {
-      const { data, error } = await this.client
-        .rpc('get_user_events', {
-          user_schema: userSchema,
-          start_date: startDate || null,
-          end_date: endDate || null
-        });
+      // Query the public events table with user_id filter
+      let query = this.client
+        .from('events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('start_time', { ascending: true });
+
+      if (startDate) {
+        query = query.gte('start_time', startDate);
+      }
+      if (endDate) {
+        query = query.lte('start_time', endDate);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error fetching events:', error);
@@ -67,20 +135,22 @@ export class SupabaseService {
         return [];
       }
 
-      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events from user schema');
+      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
       console.log('🔍 [SUPABASE SERVICE] Raw event data:', JSON.stringify(data, null, 2));
       
-      // Transform RPC response to match DatabaseEvent interface
+      // Transform database response to match DatabaseEvent interface (map column names)
       const transformedEvents = (data || []).map((event: any) => ({
         id: event.id,
-        event_title: event.event_title,
-        event_starts_at: event.event_starts_at,
-        event_ends_at: event.event_ends_at,
-        event_location: event.event_location,
-        event_description: event.event_description,
-        event_created_at: event.event_created_at,
-        event_updated_at: event.event_updated_at,
-        color: event.color || '#3b82f6'
+        event_title: event.title,  // Map title -> event_title
+        event_starts_at: event.start_time,  // Map start_time -> event_starts_at
+        event_ends_at: event.end_time,    // Map end_time -> event_ends_at
+        event_location: event.location,   // Map location -> event_location
+        event_description: event.description,  // Map description -> event_description
+        event_created_at: event.created_at,    // Map created_at -> event_created_at
+        event_updated_at: event.updated_at,    // Map updated_at -> event_updated_at
+        color: event.color || '#3b82f6',
+        archetype: event.archetype || 'generic',
+        archetype_data: event.archetype_data || {}
       }));
       
       console.log('🔄 [SUPABASE SERVICE] Transformed events for frontend:', JSON.stringify(transformedEvents, null, 2));
@@ -93,153 +163,58 @@ export class SupabaseService {
 
   async createEvent(userId: string, event: Partial<DatabaseEvent> & {title?: string; description?: string; start_time?: string; end_time?: string; location?: string}): Promise<DatabaseEvent | null> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🔧 [SUPABASE SERVICE] Creating event in user schema:', userSchema);
+      console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
-      console.log('🔍 [SUPABASE SERVICE] User ID:', userId);
       
-      // Determine event color based on comprehensive category system
-      const title = ((event.event_title || event.title || '')).toLowerCase();
-      const description = ((event.event_description || event.description || '')).toLowerCase();
-      const combined = title + ' ' + description;
+      // Suggest archetype and get color from database
+      const title = event.event_title || event.title || '';
+      const description = event.event_description || event.description || '';
       
-      let color = '#6B7280'; // Default gray
-      let category = 'Personal'; // Default category
+      // Auto-suggest archetype if not provided
+      const suggestedArchetype = event.archetype || await this.suggestArchetype(title, description);
       
-      // Work Category - Blue shades
-      if (combined.match(/\b(meeting|standup|sync|call|review|presentation|interview|1:1|one on one|sprint|retro|retrospective|demo|client|customer|stakeholder|team|project|deadline|work|task|development|coding|programming|deploy|release|launch)\b/)) {
-        // Meetings - Light Blue
-        if (combined.match(/\b(meeting|standup|sync|call|interview|1:1|one on one)\b/)) {
-          color = '#60A5FA';
-          category = 'Work/Meeting';
-        }
-        // Deep Work - Dark Blue
-        else if (combined.match(/\b(deep work|focus|coding|programming|development|design|research|writing|planning)\b/)) {
-          color = '#2563EB';
-          category = 'Work/Deep Work';
-        }
-        // Project/Deadline - Navy Blue
-        else if (combined.match(/\b(project|deadline|milestone|launch|release|sprint|deliver)\b/)) {
-          color = '#1E40AF';
-          category = 'Work/Project';
-        }
-        // General Work - Standard Blue
-        else {
-          color = '#3B82F6';
-          category = 'Work';
-        }
-      }
-      // Health Category - Green shades
-      else if (combined.match(/\b(gym|workout|exercise|run|walk|yoga|training|fitness|doctor|dentist|medical|appointment|checkup|therapy|health|wellness|meditation|mindfulness|nutrition|diet|meal prep)\b/)) {
-        // Exercise - Bright Green
-        if (combined.match(/\b(gym|workout|exercise|run|walk|yoga|training|fitness|sport)\b/)) {
-          color = '#34D399';
-          category = 'Health/Exercise';
-        }
-        // Medical - Dark Green
-        else if (combined.match(/\b(doctor|dentist|medical|appointment|checkup|therapy|hospital|clinic)\b/)) {
-          color = '#059669';
-          category = 'Health/Medical';
-        }
-        // Wellness - Light Green
-        else if (combined.match(/\b(wellness|meditation|mindfulness|spa|massage|relax)\b/)) {
-          color = '#6EE7B7';
-          category = 'Health/Wellness';
-        }
-        // Nutrition - Medium Green
-        else if (combined.match(/\b(nutrition|diet|meal prep|cooking|grocery)\b/)) {
-          color = '#10B981';
-          category = 'Health/Nutrition';
-        }
-        // General Health
-        else {
-          color = '#10B981';
-          category = 'Health';
-        }
-      }
-      // Personal Category - Purple shades
-      else if (combined.match(/\b(family|friend|social|party|birthday|anniversary|date|dinner|lunch|breakfast|brunch|coffee|drinks|personal|home|chores|errands|shopping|hobby|entertainment|movie|concert|game|show|museum|theater|art|music|read|book|club)\b/)) {
-        // Family - Light Purple
-        if (combined.match(/\b(family|parent|mother|father|brother|sister|child|kid|spouse|partner)\b/)) {
-          color = '#A78BFA';
-          category = 'Personal/Family';
-        }
-        // Social - Medium Purple
-        else if (combined.match(/\b(friend|social|party|drinks|dinner|lunch|coffee|date|hangout|meetup)\b/)) {
-          color = '#C084FC';
-          category = 'Personal/Social';
-        }
-        // Hobbies - Dark Purple
-        else if (combined.match(/\b(hobby|art|music|craft|game|read|book|club|photography|painting|drawing)\b/)) {
-          color = '#9333EA';
-          category = 'Personal/Hobbies';
-        }
-        // Entertainment - Violet
-        else if (combined.match(/\b(entertainment|movie|concert|show|theater|museum|event|festival)\b/)) {
-          color = '#7C3AED';
-          category = 'Personal/Entertainment';
-        }
-        // General Personal
-        else {
-          color = '#8B5CF6';
-          category = 'Personal';
-        }
-      }
-      // Learning Category - Orange/Yellow shades
-      else if (combined.match(/\b(course|class|study|learn|training|workshop|seminar|lecture|education|school|university|college|certification|exam|test|quiz|homework|assignment|research|tutorial|lesson)\b/)) {
-        color = '#F59E0B';
-        category = 'Learning';
-      }
-      // Finance Category - Red shades
-      else if (combined.match(/\b(budget|payment|bill|invoice|tax|investment|finance|money|salary|payroll|expense|accounting|bank|loan|mortgage|insurance|savings|retirement)\b/)) {
-        color = '#EF4444';
-        category = 'Finance';
-      }
-      // Travel Category - Teal
-      else if (combined.match(/\b(travel|trip|flight|airport|hotel|vacation|holiday|tour|visit|journey)\b/)) {
-        color = '#14B8A6';
-        category = 'Travel';
-      }
-      // Routine Category - Indigo
-      else if (combined.match(/\b(morning routine|evening routine|daily|routine|habit|prep|ready|wake|sleep|bedtime)\b/)) {
-        color = '#6366F1';
-        category = 'Routine';
-      }
-      // Break/Rest Category - Amber
-      else if (combined.match(/\b(break|rest|pause|relax|nap|downtime|free time|leisure)\b/)) {
-        color = '#F59E0B';
-        category = 'Break';
-      }
+      // Get archetype color from database
+      const color = await this.getArchetypeColor(suggestedArchetype, event.archetype_data || {});
       
-      console.log(`📊 [CATEGORY] Event "${event.event_title}" categorized as ${category} with color ${color}`);
+      console.log(`🎨 [ARCHETYPE] Event "${title}" assigned archetype "${suggestedArchetype}" with color ${color}`);
       
-      // Use RPC function to create event in user schema
-      const eventTitle = event.event_title || (event as any).title || 'Untitled Event';
-      const eventDescription = event.event_description || (event as any).description || null;
-      const eventStartsAt = event.event_starts_at || (event as any).start_time;
-      const eventEndsAt = event.event_ends_at || (event as any).end_time;
-      const eventLocation = event.event_location || (event as any).location || null;
+      // Convert local time strings to proper UTC timestamps for database storage
+      const convertLocalTimeToUTC = (localTimeString: string) => {
+        if (!localTimeString) return localTimeString;
+        
+        // If timestamp already has timezone info, return as-is
+        if (localTimeString.includes('Z') || localTimeString.includes('+') || localTimeString.includes('-', 19)) {
+          return localTimeString;
+        }
+        
+        // Create date object treating input as local time
+        const localDate = new Date(localTimeString);
+        const utcString = localDate.toISOString();
+        console.log(`🌍 [TIMEZONE] Converting "${localTimeString}" (local) → "${utcString}" (UTC)`);
+        // Return as ISO string (which will be UTC)
+        return utcString;
+      };
       
-      console.log('🔍 [SUPABASE SERVICE] Creating event with RPC function:', {
-        user_schema: userSchema,
-        event_title: eventTitle,
-        event_starts_at: eventStartsAt,
-        event_ends_at: eventEndsAt,
-        event_location: eventLocation,
-        event_description: eventDescription
-      });
+      // Create event directly in public events table  
+      const eventData = {
+        user_id: userId,
+        title: event.event_title || (event as any).title || 'Untitled Event',
+        description: event.event_description || (event as any).description || null,
+        start_time: convertLocalTimeToUTC(event.event_starts_at || (event as any).start_time),
+        end_time: convertLocalTimeToUTC(event.event_ends_at || (event as any).end_time),
+        location: event.event_location || (event as any).location || null,
+        color: color,
+        archetype: suggestedArchetype,
+        archetype_data: event.archetype_data || {}
+      };
+      
+      console.log('🔍 [SUPABASE SERVICE] Creating event in public table:', eventData);
 
       const { data, error } = await this.client
-        .rpc('create_user_event', {
-          user_schema: userSchema,
-          event_title: eventTitle,
-          event_starts_at: eventStartsAt,
-          event_ends_at: eventEndsAt,
-          event_location: eventLocation,
-          event_description: eventDescription,
-          archetype: 'generic',
-          archetype_data: { color, category }
-        });
+        .from('events')
+        .insert([eventData])
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error creating event:', error);
@@ -253,14 +228,16 @@ export class SupabaseService {
       if (data) {
         return {
           id: data.id,
-          event_title: data.event_title,
-          event_starts_at: data.event_starts_at,
-          event_ends_at: data.event_ends_at,
-          event_location: data.event_location,
-          event_description: data.event_description,
-          event_created_at: data.event_created_at,
-          event_updated_at: data.event_updated_at,
-          color: data.archetype_data?.color || color
+          event_title: data.title,  // Map title -> event_title
+          event_starts_at: data.start_time,  // Map start_time -> event_starts_at
+          event_ends_at: data.end_time,    // Map end_time -> event_ends_at
+          event_location: data.location,   // Map location -> event_location
+          event_description: data.description,  // Map description -> event_description
+          event_created_at: data.created_at,    // Map created_at -> event_created_at
+          event_updated_at: data.updated_at,    // Map updated_at -> event_updated_at
+          color: data.color || color,
+          archetype: data.archetype || suggestedArchetype,
+          archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
       
@@ -273,23 +250,35 @@ export class SupabaseService {
 
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent>): Promise<DatabaseEvent | null> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🔧 [SUPABASE SERVICE] Updating event in user schema:', userSchema);
+      console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
       
+      // Prepare update data for public events table
+      const updateData: any = {};
+      if (updates.event_title !== undefined) updateData.title = updates.event_title;
+      if (updates.event_description !== undefined) updateData.description = updates.event_description;
+      if (updates.event_starts_at !== undefined) updateData.start_time = updates.event_starts_at;
+      if (updates.event_ends_at !== undefined) updateData.end_time = updates.event_ends_at;
+      if (updates.event_location !== undefined) updateData.location = updates.event_location;
+      if (updates.archetype !== undefined) updateData.archetype = updates.archetype;
+      if (updates.archetype_data !== undefined) updateData.archetype_data = updates.archetype_data;
+      
+      // Update color based on archetype if archetype changed
+      if (updates.archetype !== undefined) {
+        const newColor = await this.getArchetypeColor(updates.archetype, updates.archetype_data || {});
+        updateData.color = newColor;
+      } else if (updates.color !== undefined) {
+        updateData.color = updates.color;
+      }
+      
       const { data, error } = await this.client
-        .rpc('update_user_event', {
-          user_schema: userSchema,
-          event_id: eventId,
-          event_title: updates.event_title || null,
-          event_description: updates.event_description || null,
-          event_starts_at: updates.event_starts_at || null,
-          event_ends_at: updates.event_ends_at || null,
-          event_location: updates.event_location || null,
-          archetype: null,
-          archetype_data: null
-        });
+        .from('events')
+        .update(updateData)
+        .eq('id', eventId)
+        .eq('user_id', userId)
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error updating event:', error);
@@ -303,13 +292,16 @@ export class SupabaseService {
       if (data) {
         return {
           id: data.id,
-          event_title: data.event_title,
-          event_starts_at: data.event_starts_at,
-          event_ends_at: data.event_ends_at,
-          event_location: data.event_location,
-          event_description: data.event_description,
-          event_created_at: data.event_created_at,
-          event_updated_at: data.event_updated_at
+          event_title: data.title,  // Map title -> event_title
+          event_starts_at: data.start_time,  // Map start_time -> event_starts_at
+          event_ends_at: data.end_time,    // Map end_time -> event_ends_at
+          event_location: data.location,   // Map location -> event_location
+          event_description: data.description,  // Map description -> event_description
+          event_created_at: data.created_at,    // Map created_at -> event_created_at
+          event_updated_at: data.updated_at,    // Map updated_at -> event_updated_at
+          color: data.color,
+          archetype: data.archetype || 'generic',
+          archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
       
@@ -322,15 +314,14 @@ export class SupabaseService {
 
   async deleteEvent(userId: string, eventId: string): Promise<{ success: boolean, error: string | null }> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🗑️ [SUPABASE SERVICE] Deleting event from user schema:', userSchema);
+      console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       
-      const { data, error } = await this.client
-        .rpc('delete_user_event', {
-          user_schema: userSchema,
-          event_id: eventId
-        });
+      const { error } = await this.client
+        .from('events')
+        .delete()
+        .eq('id', eventId)
+        .eq('user_id', userId);
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error deleting event:', error);
@@ -338,7 +329,7 @@ export class SupabaseService {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event deleted successfully:', data);
+      console.log('✅ [SUPABASE SERVICE] Event deleted successfully');
       return { success: true, error: null };
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception deleting event:', error);
