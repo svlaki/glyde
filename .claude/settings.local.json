@@ -30,7 +30,11 @@
       "Bash(start http://localhost:5173)",
       "mcp__code-index__get_file_summary",
       "mcp__code-index__find_files",
-      "mcp__code-index__search_code_advanced"
+      "mcp__code-index__search_code_advanced",
+      "mcp__serena__find_symbol",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__find_file",
+      "mcp__serena__write_memory"
     ],
     "deny": [],
     "additionalDirectories": [

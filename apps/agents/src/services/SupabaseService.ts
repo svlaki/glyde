@@ -34,6 +34,18 @@ export class SupabaseService {
     return `u_${userId.replace(/-/g, '')}`;
   }
 
+  // Helper method to convert UTC times to local display times (same as frontend does)
+  private convertUTCToLocalDisplay(utcTimeString: string): string {
+    if (!utcTimeString) return utcTimeString;
+    
+    // Convert UTC time to local time for display (matching frontend behavior)
+    const utcDate = new Date(utcTimeString);
+    const localTime = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
+    
+    console.log(`🕒 [TIMEZONE DISPLAY] Converting "${utcTimeString}" (UTC) → "${localTime.toISOString()}" (local display)`);
+    return localTime.toISOString();
+  }
+
   // Helper method to suggest archetype based on event title/description
   private async suggestArchetype(title: string, description: string = ''): Promise<string> {
     try {
@@ -109,25 +121,65 @@ export class SupabaseService {
     return data;
   }
 
+  // Method for agents - includes timezone conversion for proper local time display
+  async getEventsForAgent(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    console.log('🔍 [SUPABASE SERVICE - AGENT] Fetching events for user:', userId);
+    
+    try {
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE - AGENT] Using user schema:', userSchema);
+      
+      // Use RPC function to get events from user's schema
+      const { data, error } = await this.client.rpc('get_user_events', {
+        user_schema: userSchema,
+        start_date: startDate || null,
+        end_date: endDate || null
+      });
+
+      if (error) {
+        console.error('❌ [SUPABASE SERVICE - AGENT] Error fetching events:', error);
+        return [];
+      }
+
+      console.log('✅ [SUPABASE SERVICE - AGENT] Retrieved', data?.length || 0, 'events for user');
+      
+      // Transform RPC response with timezone conversion for agent display
+      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
+        id: eventJson.id,
+        event_title: eventJson.event_title,
+        event_starts_at: this.convertUTCToLocalDisplay(eventJson.event_starts_at),
+        event_ends_at: this.convertUTCToLocalDisplay(eventJson.event_ends_at),
+        event_location: eventJson.event_location,
+        event_description: eventJson.event_description,
+        event_created_at: eventJson.event_created_at,
+        event_updated_at: eventJson.event_updated_at,
+        color: eventJson.color || '#3b82f6',
+        archetype: eventJson.archetype || 'generic',
+        archetype_data: eventJson.archetype_data || {}
+      }));
+      
+      console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed events with timezone conversion:', JSON.stringify(transformedEvents, null, 2));
+      return transformedEvents;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE - AGENT] Exception fetching events:', error);
+      return [];
+    }
+  }
+
+  // Method for frontend - no timezone conversion (frontend handles it)
   async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     console.log('🔍 [SUPABASE SERVICE] Fetching events for user:', userId);
     
     try {
-      // Query the public events table with user_id filter
-      let query = this.client
-        .from('events')
-        .select('*')
-        .eq('user_id', userId)
-        .order('start_time', { ascending: true });
-
-      if (startDate) {
-        query = query.gte('start_time', startDate);
-      }
-      if (endDate) {
-        query = query.lte('start_time', endDate);
-      }
-
-      const { data, error } = await query;
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
+      
+      // Use RPC function to get events from user's schema
+      const { data, error } = await this.client.rpc('get_user_events', {
+        user_schema: userSchema,
+        start_date: startDate || null,
+        end_date: endDate || null
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error fetching events:', error);
@@ -138,19 +190,19 @@ export class SupabaseService {
       console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
       console.log('🔍 [SUPABASE SERVICE] Raw event data:', JSON.stringify(data, null, 2));
       
-      // Transform database response to match DatabaseEvent interface (map column names)
-      const transformedEvents = (data || []).map((event: any) => ({
-        id: event.id,
-        event_title: event.title,  // Map title -> event_title
-        event_starts_at: event.start_time,  // Map start_time -> event_starts_at
-        event_ends_at: event.end_time,    // Map end_time -> event_ends_at
-        event_location: event.location,   // Map location -> event_location
-        event_description: event.description,  // Map description -> event_description
-        event_created_at: event.created_at,    // Map created_at -> event_created_at
-        event_updated_at: event.updated_at,    // Map updated_at -> event_updated_at
-        color: event.color || '#3b82f6',
-        archetype: event.archetype || 'generic',
-        archetype_data: event.archetype_data || {}
+      // Transform RPC response to match DatabaseEvent interface (no timezone conversion for frontend)
+      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
+        id: eventJson.id,
+        event_title: eventJson.event_title,
+        event_starts_at: eventJson.event_starts_at, // Frontend handles timezone conversion
+        event_ends_at: eventJson.event_ends_at,     // Frontend handles timezone conversion
+        event_location: eventJson.event_location,
+        event_description: eventJson.event_description,
+        event_created_at: eventJson.event_created_at,
+        event_updated_at: eventJson.event_updated_at,
+        color: eventJson.color || '#3b82f6',
+        archetype: eventJson.archetype || 'generic',
+        archetype_data: eventJson.archetype_data || {}
       }));
       
       console.log('🔄 [SUPABASE SERVICE] Transformed events for frontend:', JSON.stringify(transformedEvents, null, 2));
@@ -166,19 +218,17 @@ export class SupabaseService {
       console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
       
-      // Suggest archetype and get color from database
-      const title = event.event_title || event.title || '';
-      const description = event.event_description || event.description || '';
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
       
-      // Auto-suggest archetype if not provided
-      const suggestedArchetype = event.archetype || await this.suggestArchetype(title, description);
+      // Extract event data
+      const title = event.event_title || event.title || 'Untitled Event';
+      const description = event.event_description || event.description || null;
+      const location = event.event_location || event.location || null;
+      const archetype = event.archetype || null; // Let RPC function handle archetype suggestion
+      const archetypeData = event.archetype_data || {};
       
-      // Get archetype color from database
-      const color = await this.getArchetypeColor(suggestedArchetype, event.archetype_data || {});
-      
-      console.log(`🎨 [ARCHETYPE] Event "${title}" assigned archetype "${suggestedArchetype}" with color ${color}`);
-      
-      // Convert local time strings to proper UTC timestamps for database storage
+      // Convert local time strings - handle timezone properly
       const convertLocalTimeToUTC = (localTimeString: string) => {
         if (!localTimeString) return localTimeString;
         
@@ -187,34 +237,38 @@ export class SupabaseService {
           return localTimeString;
         }
         
-        // Create date object treating input as local time
-        const localDate = new Date(localTimeString);
-        const utcString = localDate.toISOString();
-        console.log(`🌍 [TIMEZONE] Converting "${localTimeString}" (local) → "${utcString}" (UTC)`);
-        // Return as ISO string (which will be UTC)
-        return utcString;
+        // Parse the time and treat as local time, then convert properly
+        // This assumes the input is in ISO format like "2025-08-26T10:00:00.000Z"
+        // We want to preserve the intended local time, not convert it again
+        if (localTimeString.includes('T') && localTimeString.endsWith('.000Z')) {
+          // Remove the Z and treat as local time, then format for storage
+          const withoutZ = localTimeString.replace('.000Z', '');
+          const localDate = new Date(withoutZ);
+          // Add your local timezone offset to get the correct UTC time
+          const offsetMinutes = localDate.getTimezoneOffset();
+          const correctedTime = new Date(localDate.getTime() - (offsetMinutes * 60000));
+          const result = correctedTime.toISOString();
+          console.log(`🌍 [TIMEZONE] Converting "${localTimeString}" → "${result}" (offset: ${offsetMinutes}min)`);
+          return result;
+        }
+        
+        return localTimeString;
       };
       
-      // Create event directly in public events table  
-      const eventData = {
-        user_id: userId,
-        title: event.event_title || (event as any).title || 'Untitled Event',
-        description: event.event_description || (event as any).description || null,
-        start_time: convertLocalTimeToUTC(event.event_starts_at || (event as any).start_time),
-        end_time: convertLocalTimeToUTC(event.event_ends_at || (event as any).end_time),
-        location: event.event_location || (event as any).location || null,
-        color: color,
-        archetype: suggestedArchetype,
-        archetype_data: event.archetype_data || {}
-      };
+      const startTime = convertLocalTimeToUTC(event.event_starts_at || (event as any).start_time);
+      const endTime = convertLocalTimeToUTC(event.event_ends_at || (event as any).end_time);
       
-      console.log('🔍 [SUPABASE SERVICE] Creating event in public table:', eventData);
-
-      const { data, error } = await this.client
-        .from('events')
-        .insert([eventData])
-        .select()
-        .single();
+      // Use RPC function to create event in user's schema
+      const { data, error } = await this.client.rpc('create_user_event', {
+        user_schema: userSchema,
+        event_title: title,
+        event_starts_at: startTime,
+        event_ends_at: endTime,
+        event_location: location,
+        event_description: description,
+        archetype: archetype,
+        archetype_data: archetypeData
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error creating event:', error);
@@ -224,19 +278,19 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event created successfully:', JSON.stringify(data, null, 2));
       
-      // Transform the response to match DatabaseEvent interface
+      // Transform RPC response to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
-          event_title: data.title,  // Map title -> event_title
-          event_starts_at: data.start_time,  // Map start_time -> event_starts_at
-          event_ends_at: data.end_time,    // Map end_time -> event_ends_at
-          event_location: data.location,   // Map location -> event_location
-          event_description: data.description,  // Map description -> event_description
-          event_created_at: data.created_at,    // Map created_at -> event_created_at
-          event_updated_at: data.updated_at,    // Map updated_at -> event_updated_at
-          color: data.color || color,
-          archetype: data.archetype || suggestedArchetype,
+          event_title: data.event_title,
+          event_starts_at: data.event_starts_at,
+          event_ends_at: data.event_ends_at,
+          event_location: data.event_location,
+          event_description: data.event_description,
+          event_created_at: data.event_created_at,
+          event_updated_at: data.event_updated_at,
+          color: data.color || '#3b82f6',
+          archetype: data.archetype || 'generic',
           archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
@@ -254,31 +308,21 @@ export class SupabaseService {
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
       
-      // Prepare update data for public events table
-      const updateData: any = {};
-      if (updates.event_title !== undefined) updateData.title = updates.event_title;
-      if (updates.event_description !== undefined) updateData.description = updates.event_description;
-      if (updates.event_starts_at !== undefined) updateData.start_time = updates.event_starts_at;
-      if (updates.event_ends_at !== undefined) updateData.end_time = updates.event_ends_at;
-      if (updates.event_location !== undefined) updateData.location = updates.event_location;
-      if (updates.archetype !== undefined) updateData.archetype = updates.archetype;
-      if (updates.archetype_data !== undefined) updateData.archetype_data = updates.archetype_data;
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
       
-      // Update color based on archetype if archetype changed
-      if (updates.archetype !== undefined) {
-        const newColor = await this.getArchetypeColor(updates.archetype, updates.archetype_data || {});
-        updateData.color = newColor;
-      } else if (updates.color !== undefined) {
-        updateData.color = updates.color;
-      }
-      
-      const { data, error } = await this.client
-        .from('events')
-        .update(updateData)
-        .eq('id', eventId)
-        .eq('user_id', userId)
-        .select()
-        .single();
+      // Use RPC function to update event in user's schema
+      const { data, error } = await this.client.rpc('update_user_event', {
+        user_schema: userSchema,
+        event_id: eventId,
+        event_title: updates.event_title || null,
+        event_starts_at: updates.event_starts_at || null,
+        event_ends_at: updates.event_ends_at || null,
+        event_location: updates.event_location || null,
+        event_description: updates.event_description || null,
+        archetype: updates.archetype || null,
+        archetype_data: updates.archetype_data || null
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error updating event:', error);
@@ -288,18 +332,18 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event updated successfully:', JSON.stringify(data, null, 2));
       
-      // Transform the response to match DatabaseEvent interface
+      // Transform RPC response to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
-          event_title: data.title,  // Map title -> event_title
-          event_starts_at: data.start_time,  // Map start_time -> event_starts_at
-          event_ends_at: data.end_time,    // Map end_time -> event_ends_at
-          event_location: data.location,   // Map location -> event_location
-          event_description: data.description,  // Map description -> event_description
-          event_created_at: data.created_at,    // Map created_at -> event_created_at
-          event_updated_at: data.updated_at,    // Map updated_at -> event_updated_at
-          color: data.color,
+          event_title: data.event_title,
+          event_starts_at: data.event_starts_at,
+          event_ends_at: data.event_ends_at,
+          event_location: data.event_location,
+          event_description: data.event_description,
+          event_created_at: data.event_created_at,
+          event_updated_at: data.event_updated_at,
+          color: data.color || '#3b82f6',
           archetype: data.archetype || 'generic',
           archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
@@ -317,11 +361,14 @@ export class SupabaseService {
       console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       
-      const { error } = await this.client
-        .from('events')
-        .delete()
-        .eq('id', eventId)
-        .eq('user_id', userId);
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
+      
+      // Use RPC function to delete event from user's schema
+      const { data, error } = await this.client.rpc('delete_user_event', {
+        user_schema: userSchema,
+        event_id: eventId
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error deleting event:', error);
@@ -329,8 +376,10 @@ export class SupabaseService {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event deleted successfully');
-      return { success: true, error: null };
+      // RPC function returns boolean indicating success
+      const success = data === true;
+      console.log('✅ [SUPABASE SERVICE] Event deletion result:', success);
+      return { success, error: success ? null : 'Event not found or could not be deleted' };
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception deleting event:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

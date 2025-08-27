@@ -16,9 +16,9 @@ export const listEventsTool = tool(
     let events;
     
     if (startDate && endDate) {
-      events = await supabaseService.getEvents(userId, startDate, endDate);
+      events = await supabaseService.getEventsForAgent(userId, startDate, endDate);
     } else {
-      events = await supabaseService.getEvents(userId);
+      events = await supabaseService.getEventsForAgent(userId);
     }
 
     if (events.length === 0) {

@@ -65,7 +65,7 @@ export class ConversationAgent extends BaseAgent {
     try {
       // Pre-load user events for context
       const supabaseService = new SupabaseService();
-      const userEvents = await supabaseService.getEvents(context.userId);
+      const userEvents = await supabaseService.getEventsForAgent(context.userId);
       console.log(`Loading ${userEvents?.length || 0} events for user ${context.userId}`);
       
       // Build conversation history from context
@@ -311,7 +311,7 @@ export class ConversationAgent extends BaseAgent {
       } else {
         try {
           const supabaseService = new SupabaseService();
-          const eventsData = await supabaseService.getEvents(state.userId);
+          const eventsData = await supabaseService.getEventsForAgent(state.userId);
           
           if (eventsData && eventsData.length > 0) {
             recentEvents = eventsData; // Get all events for better context
@@ -584,7 +584,7 @@ INTELLIGENCE FEATURES:
                   // Fallback to direct search
                   const searchLower = action.args.searchQuery.toLowerCase();
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   
                   const matchingEvent = allEvents.find((e: any) => {
                     const eventTitle = (e.event_title || e.title || '').toLowerCase();
@@ -692,7 +692,7 @@ INTELLIGENCE FEATURES:
                   
                   // Try to find the event in the loaded events
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   console.log(`Found ${allEvents.length} events to search through`);
                   
                   // Find matching event by title (case insensitive) and optionally by date
@@ -792,7 +792,7 @@ INTELLIGENCE FEATURES:
                 
                 try {
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   
                   // Filter events for the specified date
                   eventsToDelete = allEvents.filter((e: any) => {
@@ -863,7 +863,7 @@ INTELLIGENCE FEATURES:
               try {
                 // Get events using SupabaseService
                 const supabaseService = new SupabaseService();
-                const events = await supabaseService.getEvents(state.userId);
+                const events = await supabaseService.getEventsForAgent(state.userId);
                 
                 // Filter by date range if provided
                 let filteredEvents = events || [];
