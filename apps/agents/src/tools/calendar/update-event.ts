@@ -50,7 +50,7 @@ export const updateEventTool = tool(
       throw new Error("Failed to update event");
     }
 
-    return `✅ Updated event: "${title || 'Event'}"`;
+    return `Event updated: "${title || updatedEvent.event_title}"`;
   },
   {
     name: "update_event",

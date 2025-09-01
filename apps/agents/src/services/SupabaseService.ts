@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
+import { convertFromUTC, convertToUTC } from '../utils/timezoneUtils.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
@@ -35,15 +36,11 @@ export class SupabaseService {
   }
 
   // Helper method to convert UTC times to local display times (same as frontend does)
-  private convertUTCToLocalDisplay(utcTimeString: string): string {
+  private convertUTCToLocalDisplay(utcTimeString: string, timezone: string = 'America/New_York'): string {
     if (!utcTimeString) return utcTimeString;
     
-    // Convert UTC time to local time for display (matching frontend behavior)
-    const utcDate = new Date(utcTimeString);
-    const localTime = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
-    
-    console.log(`🕒 [TIMEZONE DISPLAY] Converting "${utcTimeString}" (UTC) → "${localTime.toISOString()}" (local display)`);
-    return localTime.toISOString();
+    // Use the new timezone utilities for proper conversion
+    return convertFromUTC(utcTimeString, timezone);
   }
 
   // Helper method to suggest archetype based on event title/description
@@ -129,6 +126,11 @@ export class SupabaseService {
       const userSchema = this.getUserSchema(userId);
       console.log('🏠 [SUPABASE SERVICE - AGENT] Using user schema:', userSchema);
       
+      // Fetch user profile to get timezone
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+      console.log('🌍 [SUPABASE SERVICE - AGENT] Using user timezone:', userTimezone);
+      
       // Use RPC function to get events from user's schema
       const { data, error } = await this.client.rpc('get_user_events', {
         user_schema: userSchema,
@@ -147,8 +149,8 @@ export class SupabaseService {
       const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
         id: eventJson.id,
         event_title: eventJson.event_title,
-        event_starts_at: this.convertUTCToLocalDisplay(eventJson.event_starts_at),
-        event_ends_at: this.convertUTCToLocalDisplay(eventJson.event_ends_at),
+        event_starts_at: this.convertUTCToLocalDisplay(eventJson.event_starts_at, userTimezone),
+        event_ends_at: this.convertUTCToLocalDisplay(eventJson.event_ends_at, userTimezone),
         event_location: eventJson.event_location,
         event_description: eventJson.event_description,
         event_created_at: eventJson.event_created_at,
@@ -221,42 +223,21 @@ export class SupabaseService {
       const userSchema = this.getUserSchema(userId);
       console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
       
+      // Fetch user profile to get timezone
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+      console.log('🌍 [SUPABASE SERVICE] Using user timezone:', userTimezone);
+      
       // Extract event data
       const title = event.event_title || event.title || 'Untitled Event';
       const description = event.event_description || event.description || null;
       const location = event.event_location || event.location || null;
-      const archetype = event.archetype || null; // Let RPC function handle archetype suggestion
+      const archetype = event.archetype || null;
       const archetypeData = event.archetype_data || {};
       
-      // Convert local time strings - handle timezone properly
-      const convertLocalTimeToUTC = (localTimeString: string) => {
-        if (!localTimeString) return localTimeString;
-        
-        // If timestamp already has timezone info, return as-is
-        if (localTimeString.includes('Z') || localTimeString.includes('+') || localTimeString.includes('-', 19)) {
-          return localTimeString;
-        }
-        
-        // Parse the time and treat as local time, then convert properly
-        // This assumes the input is in ISO format like "2025-08-26T10:00:00.000Z"
-        // We want to preserve the intended local time, not convert it again
-        if (localTimeString.includes('T') && localTimeString.endsWith('.000Z')) {
-          // Remove the Z and treat as local time, then format for storage
-          const withoutZ = localTimeString.replace('.000Z', '');
-          const localDate = new Date(withoutZ);
-          // Add your local timezone offset to get the correct UTC time
-          const offsetMinutes = localDate.getTimezoneOffset();
-          const correctedTime = new Date(localDate.getTime() - (offsetMinutes * 60000));
-          const result = correctedTime.toISOString();
-          console.log(`🌍 [TIMEZONE] Converting "${localTimeString}" → "${result}" (offset: ${offsetMinutes}min)`);
-          return result;
-        }
-        
-        return localTimeString;
-      };
-      
-      const startTime = convertLocalTimeToUTC(event.event_starts_at || (event as any).start_time);
-      const endTime = convertLocalTimeToUTC(event.event_ends_at || (event as any).end_time);
+      // Convert local times to UTC using timezone utilities
+      const startTime = convertToUTC(event.event_starts_at || (event as any).start_time, userTimezone);
+      const endTime = convertToUTC(event.event_ends_at || (event as any).end_time, userTimezone);
       
       // Use RPC function to create event in user's schema
       const { data, error } = await this.client.rpc('create_user_event', {

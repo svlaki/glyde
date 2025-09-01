@@ -59,9 +59,9 @@ export const deleteMultipleEventsTool = tool(
       }
     }
 
-    let result = `✅ Deleted ${deletedCount} event(s)`;
+    let result = `Deleted ${deletedCount} event(s)`;
     if (errors.length > 0) {
-      result += `\n⚠️ Errors: ${errors.join(", ")}`;
+      result += ` (${errors.length} errors occurred)`;
     }
 
     return result;

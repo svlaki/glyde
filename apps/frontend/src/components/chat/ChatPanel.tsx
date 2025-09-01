@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { useAuth } from '../../lib/authContext'
@@ -28,12 +28,10 @@ interface ChatPanelProps {
 export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
+  // Removed isProcessing state
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [sessionId, setSessionId] = useState<string>('')
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
   const lastTimestampRef = useRef<string | null>(null)
-  const [isPolling, setIsPolling] = useState(true)
   const { user, session, isAuthenticated } = useAuth()
 
   // Initialize session ID when user is available
@@ -48,60 +46,96 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  useEffect(() => {
-    function handleVisibility() {
-      setIsPolling(document.visibilityState === 'visible')
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
   // Load chat history when session is ready
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   
-  useEffect(() => {
-    if (!user || !session?.access_token || !sessionId) return
+  const loadChatHistory = useCallback(async () => {
+    if (!user || !sessionId) return
     
-    const loadHistory = async () => {
-      console.log('🔄 [CHAT] Loading history for session:', sessionId)
-      try {
-        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            session_id: sessionId
-          })
-        })
-        
-        if (res.ok) {
-          const result = await res.json()
-          console.log('📥 [CHAT] History response:', result)
-          if (result.success && Array.isArray(result.messages) && result.messages.length > 0) {
-            console.log('✅ [CHAT] Loaded', result.messages.length, 'messages')
-            setMessages(result.messages)
-            if (result.messages.length > 0) {
-              lastTimestampRef.current = result.messages[result.messages.length - 1].timestamp
-            }
-            setHasLoadedHistory(true)
-            return
-          }
+    console.log('🔄 [CHAT] Loading history for session:', sessionId)
+    try {
+      // Load chat history directly from user's schema table
+      const userSchema = `u_${user.id.replace(/-/g, '')}`
+      const { data: chatHistory, error } = await supabase
+        .schema(userSchema)
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('timestamp', { ascending: true })
+        .limit(50)
+      
+      if (error) {
+        console.log('ℹ️ [CHAT] No history found or schema not ready:', error.message)
+      } else if (chatHistory && chatHistory.length > 0) {
+        console.log('✅ [CHAT] Loaded', chatHistory.length, 'messages from realtime')
+        const formattedMessages = chatHistory.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: msg.timestamp
+        }))
+        setMessages(formattedMessages)
+        if (chatHistory.length > 0) {
+          lastTimestampRef.current = chatHistory[chatHistory.length - 1].timestamp
         }
-        console.log('ℹ️ [CHAT] No history found, will show briefing')
-      } catch (err) {
-        console.error('Error loading chat history:', err)
       }
       
       setHasLoadedHistory(true)
+    } catch (err) {
+      console.error('Error loading chat history:', err)
+      setHasLoadedHistory(true)
     }
+  }, [user, sessionId])
+
+  // Realtime will handle persistence automatically, no need for visibility change handlers
+  
+  useEffect(() => {
+    loadChatHistory()
+  }, [loadChatHistory])
+
+  // Set up realtime subscription for new chat messages
+  useEffect(() => {
+    if (!user || !sessionId) return
+
+    console.log('🔄 [CHAT] Setting up realtime subscription for session:', sessionId)
+    const userSchema = `u_${user.id.replace(/-/g, '')}`
     
-    // Always try to load history, don't gate on hasLoadedHistory
-    loadHistory()
-  }, [user, session, sessionId])
+    const channel = supabase
+      .channel(`chat-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: userSchema,
+          table: 'chat_messages',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('📨 [CHAT] New message via realtime:', payload.new)
+          const newMessage = {
+            id: payload.new.id,
+            content: payload.new.content,
+            sender: payload.new.sender,
+            timestamp: payload.new.timestamp
+          }
+          
+          // Only add if it's not already in our messages (avoid duplicates)
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === newMessage.id)
+            if (exists) return prev
+            return [...prev, newMessage]
+          })
+          
+          lastTimestampRef.current = newMessage.timestamp
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('🔄 [CHAT] Cleaning up realtime subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [user, sessionId])
 
   // Show briefing only if no history was loaded
   useEffect(() => {
@@ -109,135 +143,45 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     
     const showBriefing = async () => {
       try {
-        // Get weekly analysis from backend
-        const analysisRes = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/analysis/week`, {
+        // Just send a message to the agent asking for a greeting
+        const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/agent/process`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
           },
           body: JSON.stringify({
-            user_id: user.id
+            context: {
+              userId: user.id,
+              sessionId: sessionId,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              conversationHistory: [],
+              userProfile: null
+            },
+            message: "Please give me a brief greeting with the current time, how many events I have today, and any key insights about my schedule."
           })
         })
         
-        if (analysisRes.ok) {
-          const analysis = await analysisRes.json()
-          
-          if (analysis.success && analysis.analysis) {
-            // Build the briefing message from the analysis
-            let briefingMessage = analysis.analysis.greeting
-            
-            // Add key insights if any
-            if (analysis.analysis.insights && analysis.analysis.insights.length > 0) {
-              briefingMessage += '\n\n📊 Key Insights:\n'
-              analysis.analysis.insights.forEach((insight: any) => {
-                const icon = insight.type === 'warning' ? '⚠️' : 
-                            insight.type === 'health' ? '💪' :
-                            insight.type === 'productivity' ? '🎯' : '💡'
-                briefingMessage += `${icon} ${insight.message}\n`
-              })
-            }
-            
-            // Add quick action suggestions if any
-            if (analysis.analysis.quickActions && analysis.analysis.quickActions.length > 0) {
-              briefingMessage += '\n🚀 Quick Actions:\n'
-              analysis.analysis.quickActions.forEach((action: any, index: number) => {
-                briefingMessage += `${index + 1}. ${action.label}\n`
-              })
-            }
-            
-            briefingMessage += '\nWhat would you like to work on today?'
-            
+        if (response.ok) {
+          const data = await response.json()
+          if (data.response) {
             setMessages([{
               id: 'briefing-' + Date.now(),
-              content: briefingMessage,
+              content: data.response,
               sender: 'assistant',
               timestamp: new Date().toISOString()
             }])
-            
-            return
           }
         }
         
-        // Fallback to simple briefing if analysis fails
-        const today = new Date()
-        const currentHour = today.getHours()
-        const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening'
-        
-        setMessages([{
-          id: 'welcome-' + Date.now(),
-          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
-          sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }])
-        
       } catch (err) {
         console.error('Error showing briefing:', err)
-        // If briefing fails, show a simple time-aware message
-        const hour = new Date().getHours()
-        const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-        setMessages([{
-          id: 'welcome-' + Date.now(),
-          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
-          sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }])
       }
     }
     
     showBriefing()
   }, [user, session, sessionId, hasLoadedHistory, messages.length])
 
-  useEffect(() => {
-    if (!isPolling) {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-      return
-    }
-    async function fetchMessages() {
-      if (!user || !session?.access_token || !sessionId) return
-      try {
-        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            session_id: sessionId
-          })
-        })
-        if (!res.ok) {
-          console.error('Error fetching messages: HTTP', res.status)
-          return
-        }
-        const result = await res.json()
-        if (result.success && Array.isArray(result.messages)) {
-          setMessages(result.messages)
-          if (result.messages.length > 0) {
-            lastTimestampRef.current = result.messages[result.messages.length - 1].timestamp
-          }
-        } else {
-          console.error('Error fetching messages:', result.error)
-        }
-      } catch (err) {
-        console.error('Error fetching messages:', err)
-      }
-    }
-    // Load messages initially, but don't poll since we have streaming
-    fetchMessages()
-    
-    // Only poll if streaming is disabled
-    if (!isPolling) {
-      pollingRef.current = setInterval(fetchMessages, 10000) // Reduced to 10 seconds
-    }
-    
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-    }
-  }, [isPolling, user, sessionId])
 
   async function handleSend() {
     if (!input.trim()) return
@@ -284,13 +228,18 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
         
         // Handle different response formats
         if (result.success && result.response) {
-          if (typeof result.response === 'object' && result.response.content) {
-            responseContent = result.response.content
+          if (typeof result.response === 'object') {
+            // Handle object responses - extract content field
+            responseContent = result.response.content || JSON.stringify(result.response)
           } else if (typeof result.response === 'string') {
             responseContent = result.response
+          } else {
+            responseContent = String(result.response)
           }
         } else if (result.content) {
-          responseContent = result.content
+          responseContent = String(result.content)
+        } else {
+          responseContent = 'No response received'
         }
         
         if (responseContent) {
@@ -362,7 +311,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
                 }}
               >
-                {msg.content}
+                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
               </div>
               <div className={`text-xs mt-1 px-1 ${
                 msg.sender === 'user' ? 'text-right text-gray-500' : 'text-left text-gray-500'

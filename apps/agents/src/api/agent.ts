@@ -38,6 +38,7 @@ export async function processAgentMessage(req: Request, res: Response): Promise<
       userId: context.userId,
       sessionId: context.sessionId || 'default',
       userSchema: context.userSchema || `u_${context.userId.replace(/-/g, '')}`,
+      timezone: context.timezone,
       conversationHistory: context.conversationHistory || [],
       userProfile: context.userProfile
     };

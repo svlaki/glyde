@@ -23,7 +23,7 @@ import { createUserSchema } from './user.js';
 import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent } from './events.js';
 import { getPendingInteractions, respondToInteraction, triggerTestScenario, clearUserInteractions } from './interactions.js';
 import { processAgentMessage, getSystemPrompt, getAgentCapabilities, getSystemOverview, getUserProfile, addStartTime } from './agent.js';
-import { analyzeWeek, generateInteractionFromChat } from './weekly-analysis.js';
+import { generateInteractionFromChat } from './weekly-analysis.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -62,8 +62,7 @@ app.post('/api/interactions/respond', respondToInteraction);
 app.post('/api/interactions/trigger-test', triggerTestScenario);
 app.post('/api/interactions/clear', clearUserInteractions);
 
-// Weekly analysis and intelligent interactions
-app.post('/api/analysis/week', analyzeWeek);
+// Intelligent interactions
 app.post('/api/interactions/from-chat', generateInteractionFromChat);
 
 // Agent endpoints - for LangGraph agent system

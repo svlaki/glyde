@@ -5,11 +5,14 @@ import { SmartInteractionService } from '../services/SmartInteractionService.js'
 
 export async function analyzeWeek(req: Request, res: Response): Promise<Response | void> {
   try {
-    const { user_id } = req.body;
+    const { user_id, timezone } = req.body;
     
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
     }
+
+    const userTimezone = timezone || 'UTC';
+    console.log(`🌍 [WEEKLY-ANALYSIS] Using timezone: ${userTimezone}`);
 
     const supabaseService = new SupabaseService();
     const calendarIntelligence = new CalendarIntelligenceService(user_id);
@@ -29,107 +32,50 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
       weekEnd.toISOString()
     );
     
-    // Calculate busy days first
-    const busyDays: Record<string, number> = {};
-    events.forEach(event => {
-      const date = new Date(event.event_starts_at).toDateString();
-      busyDays[date] = (busyDays[date] || 0) + 1;
-    });
-    
-    // Generate basic insights (replacing the missing analyzeWeekPatterns method)
-    const insights = {
-      totalEvents: events.length,
-      averageEventsPerDay: Math.round(events.length / 7 * 10) / 10,
-      busiestDay: Object.entries(busyDays).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] || 'No events',
-      patterns: {
-        hasWeekendEvents: events.some(e => {
-          const day = new Date(e.event_starts_at).getDay();
-          return day === 0 || day === 6;
-        }),
-        hasEarlyMeetings: events.some(e => new Date(e.event_starts_at).getHours() < 9),
-        hasLateMeetings: events.some(e => new Date(e.event_starts_at).getHours() > 17)
-      }
-    };
-    
-    // Generate smart suggestions based on patterns
-    const suggestions = [];
-    const today = new Date();
-    const currentHour = today.getHours();
-    const dayOfWeek = today.getDay();
-    
-    // Today's events
+    // Get today's events for context
     const todayEvents = events.filter(event => {
       const eventDate = new Date(event.event_starts_at);
-      return eventDate.toDateString() === today.toDateString();
+      return eventDate.toDateString() === now.toDateString();
     });
     
-    // Tomorrow's events
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowEvents = events.filter(event => {
-      const eventDate = new Date(event.event_starts_at);
-      return eventDate.toDateString() === tomorrow.toDateString();
-    });
+    // Use ConversationAgent to generate dynamic greeting
+    const ConversationAgent = (await import('../agents/conversation/ConversationAgent')).ConversationAgent;
+    const agent = new ConversationAgent();
     
-    // 1. Greeting based on time of day and current activity
-    let greeting = '';
-    let currentActivity = null;
+    // Create context for the agent
+    const agentContext = {
+      userId: user_id,
+      sessionId: 'briefing-session',
+      userSchema: `u_${user_id.replace(/-/g, '')}`,
+      timezone: userTimezone,
+      conversationHistory: [],
+      userProfile: undefined
+    };
     
-    // Find current or next event
-    const upcomingEvent = todayEvents.find(event => {
-      const startTime = new Date(event.event_starts_at);
-      const endTime = new Date(event.event_ends_at);
-      return startTime > now || (startTime <= now && endTime > now);
-    });
+    // Generate greeting using the agent
+    const greetingPrompt = `Generate a personalized briefing greeting message. Current context:
+- User timezone: ${userTimezone}
+- Current time: ${now.toISOString()} UTC
+- Today's events: ${todayEvents.length}
+- Event titles: ${todayEvents.map(e => e.event_title).join(', ') || 'None'}
+
+Requirements:
+- Show the correct current time in the user's timezone
+- Use appropriate greeting (Good morning/afternoon/evening)
+- Mention how many events they have today
+- Be concise and friendly
+- Don't include any markdown formatting or special characters beyond basic punctuation
+
+Format: "Good [morning/afternoon/evening]! It's [time]. You have [X] events today."`;
+
+    const greetingResponse = await agent.processMessage(agentContext, greetingPrompt);
     
-    if (currentHour < 12) {
-      greeting = `Good morning! It's ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}.`;
-    } else if (currentHour < 17) {
-      greeting = `Good afternoon! It's ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}.`;
-    } else {
-      greeting = `Good evening! It's ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}.`;
-    }
+    // Extract the greeting from the agent response
+    const greeting = greetingResponse.content || 
+                    `Good day! You have ${todayEvents.length} events today.`;
     
-    if (upcomingEvent) {
-      const startTime = new Date(upcomingEvent.event_starts_at);
-      if (startTime <= now) {
-        greeting += ` You're currently in "${upcomingEvent.event_title}".`;
-        currentActivity = upcomingEvent.event_title;
-      } else {
-        const minutesUntil = Math.round((startTime.getTime() - now.getTime()) / (1000 * 60));
-        if (minutesUntil < 60) {
-          greeting += ` "${upcomingEvent.event_title}" starts in ${minutesUntil} minutes.`;
-        }
-      }
-    }
-    
-    greeting += ` You have ${todayEvents.length} ${todayEvents.length === 1 ? 'event' : 'total events'} today.`;
-    
-    // 2. Key insights based on patterns
+    // Generate key insights based on patterns
     const keyInsights = [];
-    
-    // Check for overbooked days (busyDays already calculated above)
-    const overbooked = Object.entries(busyDays).filter(([_, count]) => (count as number) > 6);
-    if (overbooked.length > 0) {
-      keyInsights.push({
-        type: 'warning',
-        message: `You have ${overbooked.length} overbooked ${overbooked.length === 1 ? 'day' : 'days'} this week. Consider rescheduling some meetings.`
-      });
-    }
-    
-    // Check for no break time today
-    if (todayEvents.length > 3) {
-      const hasBreak = todayEvents.some(e => 
-        e.event_title.toLowerCase().includes('break') || 
-        e.event_title.toLowerCase().includes('lunch')
-      );
-      if (!hasBreak) {
-        keyInsights.push({
-          type: 'suggestion',
-          message: 'No breaks scheduled today. Your productivity will benefit from short breaks.'
-        });
-      }
-    }
     
     // Check for exercise this week
     const exerciseEvents = events.filter(e => 
@@ -154,83 +100,30 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
       });
     }
     
-    // 3. Quick actions based on current context
-    const quickActions = [];
-    
-    // If morning and no events for next 2 hours
-    if (currentHour >= 6 && currentHour < 10) {
-      const nextTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const hasNearEvent = todayEvents.some(e => {
-        const start = new Date(e.event_starts_at);
-        return start > now && start < nextTwoHours;
-      });
-      
-      if (!hasNearEvent) {
-        quickActions.push({
-          label: 'Schedule Morning Focus',
-          action: 'create_event',
-          eventData: {
-            title: 'Morning Focus Session',
-            startTime: `${(currentHour + 1).toString().padStart(2, '0')}:00`,
-            endTime: `${(currentHour + 3).toString().padStart(2, '0')}:00`,
-            description: 'Prime time for your most important work'
-          }
-        });
-      }
-    }
-    
-    // If it's Friday, suggest weekly review
-    if (dayOfWeek === 5 && currentHour >= 15) {
-      const hasReview = todayEvents.some(e => 
-        e.event_title.toLowerCase().includes('review') || 
-        e.event_title.toLowerCase().includes('planning')
+    // Check for no break time today
+    if (todayEvents.length > 3) {
+      const hasBreak = todayEvents.some(e => 
+        e.event_title.toLowerCase().includes('break') || 
+        e.event_title.toLowerCase().includes('lunch')
       );
-      
-      if (!hasReview) {
-        quickActions.push({
-          label: 'Schedule Weekly Review',
-          action: 'create_event',
-          eventData: {
-            title: 'Weekly Review & Planning',
-            startTime: '17:00',
-            endTime: '17:30',
-            description: 'Reflect on this week and plan the next'
-          }
+      if (!hasBreak) {
+        keyInsights.push({
+          type: 'suggestion',
+          message: 'No breaks scheduled today. Your productivity will benefit from short breaks.'
         });
       }
     }
-    
-    // If tomorrow has early meeting, suggest prep time today
-    if (tomorrowEvents.length > 0) {
-      const earlyMeeting = tomorrowEvents.find(e => {
-        const hour = new Date(e.event_starts_at).getHours();
-        return hour < 10 && e.event_title.toLowerCase().includes('meeting');
-      });
-      
-      if (earlyMeeting && currentHour < 20) {
-        quickActions.push({
-          label: `Prep for tomorrow's "${earlyMeeting.event_title}"`,
-          action: 'create_event',
-          eventData: {
-            title: `Prep: ${earlyMeeting.event_title}`,
-            startTime: '20:00',
-            endTime: '20:30',
-            description: 'Review agenda and prepare materials'
-          }
-        });
-      }
-    }
-    
+
     res.json({
       success: true,
       analysis: {
         greeting,
-        currentActivity,
+        currentActivity: null,
         weekSummary: {
           totalEvents: events.length,
           todayEvents: todayEvents.length,
-          tomorrowEvents: tomorrowEvents.length,
-          busiestDay: Object.entries(busyDays).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0],
+          tomorrowEvents: 0,
+          busiestDay: 'Today',
           categories: {
             meetings: events.filter(e => e.event_title.toLowerCase().includes('meeting')).length,
             deepWork: deepWorkEvents.length,
@@ -239,7 +132,7 @@ export async function analyzeWeek(req: Request, res: Response): Promise<Response
           }
         },
         insights: keyInsights,
-        quickActions: quickActions.slice(0, 2) // Limit to 2 suggestions
+        quickActions: []
       }
     });
 

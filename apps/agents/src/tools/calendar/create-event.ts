@@ -23,7 +23,7 @@ export const createEventTool = tool(
       throw new Error("Failed to create event");
     }
 
-    return `✅ Created event: "${title}" scheduled for ${new Date(startTime).toLocaleString()}`;
+    return `Event created: "${title}" at ${new Date(startTime).toLocaleString()}`;
   },
   {
     name: "create_event",

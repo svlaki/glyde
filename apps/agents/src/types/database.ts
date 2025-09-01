@@ -87,6 +87,7 @@ export interface DatabaseProfile {
   email: string;
   display_name?: string;
   avatar_url?: string;
+  timezone?: string;
   created_at: string;
 }
 
