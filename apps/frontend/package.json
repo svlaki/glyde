@@ -5,7 +5,6 @@
     "@fullcalendar/interaction": "^6.1.17",
     "@fullcalendar/react": "^6.1.17",
     "@fullcalendar/timegrid": "^6.1.17",
-    "@llm-ui/code": "^0.13.3",
     "@llm-ui/markdown": "^0.13.3",
     "@llm-ui/react": "^0.13.3",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -23,7 +22,6 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.3",
     "remark-gfm": "^4.0.1",
-    "shiki": "^3.12.2",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {

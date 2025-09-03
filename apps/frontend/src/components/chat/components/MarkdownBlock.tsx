@@ -15,23 +15,15 @@ const MarkdownBlock: React.FC<MarkdownBlockProps> = ({ blockMatch }) => {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Customize code blocks to avoid conflicts with CodeBlock component
+          // Simple inline code styling
           code: ({ node, inline, className, children, ...props }) => {
-            if (inline) {
-              return (
-                <code
-                  className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            // For block code, just render as plain text since CodeBlock handles this
             return (
-              <pre className="bg-gray-50 p-3 rounded-lg text-sm font-mono overflow-x-auto">
-                <code {...props}>{children}</code>
-              </pre>
+              <code
+                className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono"
+                {...props}
+              >
+                {children}
+              </code>
             );
           },
           // Customize links

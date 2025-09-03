@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLLMOutput } from '@llm-ui/react';
-import { findCompleteCodeBlock, findPartialCodeBlock, codeBlockLookBack } from '@llm-ui/code';
 import { markdownLookBack } from '@llm-ui/markdown';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/authContext';
 import { useStreamingChat, ChatMessage } from './hooks/useStreamingChat';
 import MarkdownBlock from './components/MarkdownBlock';
-import CodeBlock from './components/CodeBlock';
 import { Send } from 'lucide-react';
 
 // Generate session ID function
@@ -60,23 +58,16 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     onEventCreated,
   });
 
-  // Setup llm-ui blocks for rich content rendering
-  const codeBlock = {
-    findCompleteMatch: findCompleteCodeBlock(),
-    findPartialMatch: findPartialCodeBlock(),
-    lookBack: codeBlockLookBack(),
-    component: CodeBlock,
-  };
-
+  // Simple fallback block for markdown rendering
   const fallbackBlock = {
     component: MarkdownBlock,
     lookBack: markdownLookBack(),
   };
 
-  // Process the current streaming message with llm-ui
+  // Process the current streaming message with llm-ui (just markdown)
   const { blockMatches: streamingBlockMatches } = useLLMOutput({
     llmOutput: currentStreamingMessage,
-    blocks: [codeBlock],
+    blocks: [],
     fallbackBlock,
     isStreamFinished: isStreamFinished && !isStreaming,
   });
@@ -207,7 +198,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const renderMessage = (message: ChatMessage) => {
     const { blockMatches } = useLLMOutput({
       llmOutput: message.content,
-      blocks: [codeBlock],
+      blocks: [],
       fallbackBlock,
       isStreamFinished: true,
     });
@@ -220,7 +211,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
             : 'bg-gray-100 text-gray-900 mr-4'
         }`}>
           <div className="text-sm">
-            {blockMatches.map((blockMatch, index) => (
+            {blockMatches.map((blockMatch: any, index: number) => (
               <blockMatch.block.component key={index} blockMatch={blockMatch} />
             ))}
           </div>
@@ -252,7 +243,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
           <div className="flex justify-start mb-4">
             <div className="max-w-[85%] rounded-lg px-4 py-3 bg-gray-100 text-gray-900 mr-4">
               <div className="text-sm">
-                {streamingBlockMatches.map((blockMatch, index) => (
+                {streamingBlockMatches.map((blockMatch: any, index: number) => (
                   <blockMatch.block.component key={index} blockMatch={blockMatch} />
                 ))}
                 {/* Typing cursor */}
