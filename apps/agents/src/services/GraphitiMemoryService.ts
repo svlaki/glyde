@@ -179,16 +179,88 @@ export class GraphitiMemoryService {
     assistantResponse: string,
     sessionId?: string
   ): Promise<void> {
+    // Only store meaningful conversations, skip very short or generic exchanges
+    if (userMessage.trim().length < 10 || assistantResponse.trim().length < 20) {
+      return; // Skip trivial exchanges
+    }
+
+    // Extract key topics and intents from the conversation
+    const conversationSummary = this.extractConversationSummary(userMessage, assistantResponse);
+    
     const episode: Episode = {
       user_id: userId,
-      name: `Conversation ${sessionId ? `(${sessionId})` : ''}`,
-      episode_body: `User: ${userMessage}\nAssistant: ${assistantResponse}`,
+      name: `Conversation: ${conversationSummary.topic}`,
+      episode_body: this.formatConversationEpisode(userMessage, assistantResponse, conversationSummary),
       source: 'message',
       reference_time: new Date(),
-      source_description: 'Chat Conversation',
+      source_description: `Chat Session${sessionId ? ` (${sessionId})` : ''}`,
     };
 
     await this.addEpisode(episode);
+  }
+
+  private extractConversationSummary(userMessage: string, assistantResponse: string): {
+    topic: string;
+    intent: string;
+    keyEntities: string[];
+  } {
+    // Simple extraction logic - could be enhanced with NLP
+    const userLower = userMessage.toLowerCase();
+    const responseLower = assistantResponse.toLowerCase();
+    
+    let topic = 'General';
+    let intent = 'question';
+    const keyEntities: string[] = [];
+    
+    // Detect topic
+    if (userLower.includes('calendar') || userLower.includes('schedule') || userLower.includes('meeting')) {
+      topic = 'Calendar Management';
+    } else if (userLower.includes('task') || userLower.includes('todo') || userLower.includes('work')) {
+      topic = 'Task Planning';
+    } else if (userLower.includes('goal') || userLower.includes('plan') || userLower.includes('habit')) {
+      topic = 'Goal Setting';
+    } else if (userLower.includes('help') || userLower.includes('how')) {
+      topic = 'Help Request';
+    }
+    
+    // Detect intent
+    if (userLower.includes('create') || userLower.includes('add') || userLower.includes('new')) {
+      intent = 'create';
+    } else if (userLower.includes('delete') || userLower.includes('remove') || userLower.includes('cancel')) {
+      intent = 'delete';
+    } else if (userLower.includes('update') || userLower.includes('change') || userLower.includes('edit')) {
+      intent = 'update';
+    } else if (userLower.includes('find') || userLower.includes('search') || userLower.includes('show')) {
+      intent = 'search';
+    }
+    
+    // Extract entities (simple regex patterns)
+    const timePattern = /\b(?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}:\d{2}|\d{1,2}pm|\d{1,2}am)\b/gi;
+    const namePattern = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g;
+    
+    const timeMatches = userMessage.match(timePattern);
+    const nameMatches = userMessage.match(namePattern);
+    
+    if (timeMatches) keyEntities.push(...timeMatches);
+    if (nameMatches) keyEntities.push(...nameMatches);
+    
+    return { topic, intent, keyEntities };
+  }
+
+  private formatConversationEpisode(userMessage: string, assistantResponse: string, summary: any): string {
+    let episode = `User Intent: ${summary.intent} (${summary.topic})\n`;
+    episode += `User Request: ${userMessage}\n`;
+    
+    if (summary.keyEntities.length > 0) {
+      episode += `Key Details: ${summary.keyEntities.join(', ')}\n`;
+    }
+    
+    // Summarize assistant response rather than storing full text
+    const responseLines = assistantResponse.split('\n').filter(line => line.trim().length > 0);
+    const responseSummary = responseLines.slice(0, 2).join(' ').substring(0, 200) + '...';
+    episode += `Assistant Response: ${responseSummary}`;
+    
+    return episode;
   }
 
   /**

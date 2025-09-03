@@ -1,4 +1,4 @@
-graphiti-core==0.3.0
+graphiti-core==0.3.5
 fastapi==0.115.0
 uvicorn==0.30.0
 python-dotenv==1.0.0

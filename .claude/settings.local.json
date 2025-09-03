@@ -40,7 +40,8 @@
       "mcp__context7__get-library-docs",
       "Bash(docker-compose up:*)",
       "Bash(docker-compose logs:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "mcp__code-index__set_project_path"
     ],
     "deny": [],
     "additionalDirectories": [

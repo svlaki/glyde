@@ -127,6 +127,7 @@ async def health_check():
     return {"status": "healthy", "service": "graphiti-memory"}
 
 
+
 @app.post("/episodes", response_model=Dict[str, str])
 async def add_episode(
     request: AddEpisodeRequest,
@@ -137,7 +138,7 @@ async def add_episode(
         # Map source string to EpisodeType
         source_mapping = {
             'message': EpisodeType.message,
-            'event': EpisodeType.event,
+            'event': EpisodeType.text,  # No event type available, use text
             'task': EpisodeType.text,
             'goal': EpisodeType.text,
             'text': EpisodeType.text,
@@ -153,13 +154,16 @@ async def add_episode(
             episode_body=request.episode_body,
             source=episode_type,
             reference_time=reference_time,
-            source_description=request.source_description,
+            source_description=request.source_description or f"{request.source} episode",
         )
         
         return {"status": "success", "message": "Episode added successfully"}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to add episode: {str(e)}")
+        import traceback
+        error_detail = f"Failed to add episode: {str(e)}\n{traceback.format_exc()}"
+        print(f"Episode creation error: {error_detail}")  # Log to container stdout
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/search", response_model=SearchResponse)
@@ -209,26 +213,34 @@ async def ensure_user_node(
 ):
     """Ensure a user node exists in the graph and return its UUID"""
     try:
-        # Create an episode that mentions the user to ensure they have a node
-        await client.add_episode(
-            name=f"User {user_id} Profile",
-            episode_body=f"User {user_id} is using the personal intelligence system",
-            source=EpisodeType.text,
-            reference_time=datetime.now(timezone.utc),
-            source_description="User Profile Creation",
-        )
-        
-        # Search for the user's node
+        # Search for existing user node first to avoid creating redundant episodes
         from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_EPISODE_MENTIONS
         
         search_result = await client._search(user_id, NODE_HYBRID_SEARCH_EPISODE_MENTIONS)
         
         if search_result.nodes:
+            # User node already exists, return it
             user_node_uuid = search_result.nodes[0].uuid
             return UserNodeResponse(user_node_uuid=user_node_uuid, created=False)
         else:
-            raise HTTPException(status_code=404, detail=f"Could not find or create user node for {user_id}")
+            # Only create a minimal episode if no user node exists
+            await client.add_episode(
+                name=f"User Profile: {user_id}",
+                episode_body=f"New user {user_id} joined the personal intelligence system",
+                source=EpisodeType.text,
+                reference_time=datetime.now(timezone.utc),
+                source_description="User Registration",
+            )
             
+            # Search again to get the created user node
+            search_result = await client._search(user_id, NODE_HYBRID_SEARCH_EPISODE_MENTIONS)
+            
+            if search_result.nodes:
+                user_node_uuid = search_result.nodes[0].uuid
+                return UserNodeResponse(user_node_uuid=user_node_uuid, created=True)
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to create user node for {user_id}")
+                
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to ensure user node: {str(e)}")
 
