@@ -50,14 +50,15 @@ export async function processAgentMessage(req: Request, res: Response): Promise<
     
     res.json({
       success: true,
-      response: {
-        content: response.content,
+      response: response.content, // Return just the content string, not the whole object
+      processingTime: Date.now() - (req as any).startTime,
+      // Keep additional data separate if needed
+      metadata: {
         type: response.type,
         data: response.data,
         needsUserInput: response.needsUserInput,
         suggestedActions: response.suggestedActions,
-        agentType: targetAgent,
-        processingTime: Date.now() - (req as any).startTime
+        agentType: targetAgent
       }
     });
     

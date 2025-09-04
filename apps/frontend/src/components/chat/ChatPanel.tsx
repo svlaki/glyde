@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/authContext';
 import { useStreamingChat, ChatMessage } from './hooks/useStreamingChat';
+import { useStreamExample } from '@llm-ui/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send } from 'lucide-react';
@@ -181,6 +182,44 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     }
   };
 
+  // Streaming message component using llm-ui
+  const StreamingMessage = ({ content }: { content: string }) => {
+    const { output } = useStreamExample(content, {
+      autoStart: true,
+      delayMultiplier: 0.5,
+      startIndex: 0,
+    });
+
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="max-w-[85%] rounded-lg px-4 py-3 bg-gray-100 text-gray-900 mr-4">
+          <div className="text-sm prose prose-sm max-w-none text-gray-900">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                code: ({ children }) => <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                li: ({ children }) => <li className="mb-1">{children}</li>,
+                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+              }}
+            >
+              {output}
+            </ReactMarkdown>
+            {/* Typing cursor */}
+            <span className="inline-block w-2 h-5 bg-gray-600 ml-1 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Simple message rendering component  
   const MessageComponent = ({ message }: { message: ChatMessage }) => {
     return (
@@ -239,34 +278,9 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map(message => <MessageComponent key={message.id} message={message} />)}
         
-        {/* Current streaming message */}
+        {/* Current streaming message with llm-ui */}
         {isStreaming && currentStreamingMessage && (
-          <div className="flex justify-start mb-4">
-            <div className="max-w-[85%] rounded-lg px-4 py-3 bg-gray-100 text-gray-900 mr-4">
-              <div className="text-sm prose prose-sm max-w-none text-gray-900">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                    em: ({ children }) => <em className="italic">{children}</em>,
-                    code: ({ children }) => <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
-                    ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
-                  }}
-                >
-                  {currentStreamingMessage}
-                </ReactMarkdown>
-                {/* Typing cursor */}
-                <span className="inline-block w-2 h-5 bg-gray-600 ml-1 animate-pulse" />
-              </div>
-            </div>
-          </div>
+          <StreamingMessage content={currentStreamingMessage} />
         )}
         
         {/* Typing indicator when starting */}

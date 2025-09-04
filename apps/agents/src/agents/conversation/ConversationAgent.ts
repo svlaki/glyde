@@ -345,22 +345,6 @@ export class ConversationAgent extends BaseAgent {
         }
       }
       
-      // Pre-filter events to show only future events (from now to 30 days ahead)
-      // This prevents the agent from seeing old events and getting confused about "upcoming"
-      const currentTime = new Date();
-      const thirtyDaysFromNow = new Date(currentTime);
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      
-      const upcomingEvents = recentEvents.filter(e => {
-        const startStr = e.event_starts_at || e.start_time;
-        const eventStart = new Date(startStr);
-        return eventStart >= currentTime && eventStart <= thirtyDaysFromNow;
-      });
-      
-      console.log(`Filtered to ${upcomingEvents.length} upcoming events (from ${recentEvents.length} total)`);
-      recentEvents = upcomingEvents;
-      
-      
       const eventContext = recentEvents.length > 0 
         ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
             // Parse the UTC time string correctly

@@ -22,51 +22,12 @@ interface StreamingChatState {
 
 export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChatProps) => {
   const { user, session } = useAuth();
-  const [state, setState] = useState<StreamingChatState>({
-    messages: [],
-    isStreaming: false,
-    currentStreamingMessage: '',
-    isStreamFinished: false,
-  });
-
-  const setMessages = useCallback((messages: ChatMessage[]) => {
-    setState(prev => ({ ...prev, messages }));
-  }, []);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentResponse, setCurrentResponse] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const addMessage = useCallback((message: ChatMessage) => {
-    setState(prev => ({ ...prev, messages: [...prev.messages, message] }));
-  }, []);
-
-  const startStreaming = useCallback(() => {
-    setState(prev => ({ 
-      ...prev, 
-      isStreaming: true, 
-      currentStreamingMessage: '', 
-      isStreamFinished: false 
-    }));
-  }, []);
-
-  const updateStreamingMessage = useCallback((content: string) => {
-    setState(prev => ({ ...prev, currentStreamingMessage: content }));
-  }, []);
-
-  const finishStreaming = useCallback(() => {
-    setState(prev => {
-      const finalMessage: ChatMessage = {
-        id: `${Date.now()}-ai`,
-        content: prev.currentStreamingMessage,
-        sender: 'assistant',
-        timestamp: new Date().toISOString(),
-      };
-
-      return {
-        ...prev,
-        isStreaming: false,
-        isStreamFinished: true,
-        currentStreamingMessage: '',
-        messages: [...prev.messages, finalMessage],
-      };
-    });
+    setMessages(prev => [...prev, message]);
   }, []);
 
   const sendMessage = useCallback(async (content: string) => {
@@ -81,7 +42,8 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
     };
     
     addMessage(userMessage);
-    startStreaming();
+    setIsStreaming(true);
+    setCurrentResponse('');
 
     try {
       const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/agent/process`;
@@ -96,7 +58,7 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
             userId: user.id,
             sessionId: sessionId,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            conversationHistory: state.messages.map(msg => ({
+            conversationHistory: messages.map(msg => ({
               role: msg.sender === 'user' ? 'user' : 'assistant',
               content: msg.content
             }))
@@ -109,71 +71,98 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
         const result = await response.json();
         let responseContent = '';
         
-        // Handle different response formats
         if (result.success && result.response) {
-          if (typeof result.response === 'object') {
-            responseContent = result.response.content || JSON.stringify(result.response);
-          } else if (typeof result.response === 'string') {
-            responseContent = result.response;
-          } else {
-            responseContent = String(result.response);
-          }
-        } else if (result.content) {
-          responseContent = String(result.content);
+          responseContent = String(result.response);
         } else {
           responseContent = 'No response received';
         }
 
-        // Simulate streaming by updating the message gradually
-        const words = responseContent.split(' ');
-        let currentContent = '';
+        // Set the complete response - llm-ui useStreamExample will handle the character-by-character streaming
+        setCurrentResponse(responseContent);
+
+        // Wait for the streaming to complete before adding to messages
+        // The streaming duration depends on content length and delayMultiplier (0.5)
+        const streamingDuration = Math.max(responseContent.length * 0.5 * 50, 1000); // 50ms per char with 0.5 multiplier, minimum 1s
         
-        for (let i = 0; i < words.length; i++) {
-          currentContent += (i > 0 ? ' ' : '') + words[i];
-          updateStreamingMessage(currentContent);
+        setTimeout(() => {
+          const assistantMessage: ChatMessage = {
+            id: `${Date.now()}-ai`,
+            content: responseContent,
+            sender: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
           
-          // Add delay to simulate streaming
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
+          addMessage(assistantMessage);
+          setIsStreaming(false);
+          setCurrentResponse('');
 
-        finishStreaming();
-
-        // Check if the response indicates an event was created
-        const eventIndicators = [
-          'scheduled', 'created', 'added to your calendar', 
-          'event has been', 'booked', 'meeting set',
-          'appointment made', 'added the event'
-        ];
-        
-        const lowerResponse = responseContent.toLowerCase();
-        const eventWasCreated = eventIndicators.some(indicator => 
-          lowerResponse.includes(indicator)
-        );
-        
-        if (eventWasCreated && onEventCreated) {
-          setTimeout(() => {
-            onEventCreated();
-          }, 1000);
-        }
+          // Check if event was created
+          const eventIndicators = [
+            'scheduled', 'created', 'added to your calendar', 
+            'event has been', 'booked', 'meeting set',
+            'appointment made', 'added the event'
+          ];
+          
+          const lowerResponse = responseContent.toLowerCase();
+          const eventWasCreated = eventIndicators.some(indicator => 
+            lowerResponse.includes(indicator)
+          );
+          
+          if (eventWasCreated && onEventCreated) {
+            setTimeout(() => {
+              onEventCreated();
+            }, 1000);
+          }
+        }, streamingDuration);
 
       } else {
-        updateStreamingMessage('Sorry, I encountered an error processing your request.');
-        setTimeout(finishStreaming, 1000);
+        const errorMessage = 'Sorry, I encountered an error processing your request.';
+        setCurrentResponse(errorMessage);
+        
+        // Show error with streaming effect
+        setTimeout(() => {
+          const assistantMessage: ChatMessage = {
+            id: `${Date.now()}-ai`,
+            content: errorMessage,
+            sender: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+          
+          addMessage(assistantMessage);
+          setIsStreaming(false);
+          setCurrentResponse('');
+        }, errorMessage.length * 0.5 * 50);
+        
         console.error('Chat response failed:', response.status, response.statusText);
       }
     } catch (error) {
-      updateStreamingMessage('Sorry, I encountered a network error. Please try again.');
-      setTimeout(finishStreaming, 1000);
+      const errorMessage = 'Sorry, I encountered a network error. Please try again.';
+      setCurrentResponse(errorMessage);
+      
+      // Show error with streaming effect
+      setTimeout(() => {
+        const assistantMessage: ChatMessage = {
+          id: `${Date.now()}-ai`,
+          content: errorMessage,
+          sender: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+        
+        addMessage(assistantMessage);
+        setIsStreaming(false);
+        setCurrentResponse('');
+      }, errorMessage.length * 0.5 * 50);
+      
       console.error('Failed to send message:', error);
     }
-  }, [user, session, sessionId, state.messages, addMessage, startStreaming, updateStreamingMessage, finishStreaming, onEventCreated]);
+  }, [user, session, sessionId, messages, addMessage, onEventCreated]);
 
   return {
-    messages: state.messages,
-    isStreaming: state.isStreaming,
-    currentStreamingMessage: state.currentStreamingMessage,
-    isStreamFinished: state.isStreamFinished,
+    messages,
+    isStreaming,
+    currentStreamingMessage: currentResponse,
+    isStreamFinished: !isStreaming && currentResponse === '',
     setMessages,
     sendMessage,
   };
-};
+};;;

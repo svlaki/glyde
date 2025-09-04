@@ -52,7 +52,7 @@ function isDST(date: Date, timezone: string): boolean {
 /**
  * Get the current offset for a timezone (accounting for DST)
  */
-function getTimezoneOffset(timezone: string, date: Date = new Date()): number {
+export function getTimezoneOffset(timezone: string, date: Date = new Date()): number {
   const tzInfo = TIMEZONE_OFFSETS[timezone];
   if (!tzInfo) {
     console.warn(`Unknown timezone: ${timezone}, defaulting to UTC`);
