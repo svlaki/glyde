@@ -3,13 +3,13 @@ import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { EmbeddingService } from "../../services/EmbeddingService.js";
-import { GraphitiMemoryService } from "../../services/GraphitiMemoryService.js";
+import { ZepMemoryService } from "../../services/ZepMemoryService.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
   protected supabaseService: SupabaseService;
   protected embeddingService: EmbeddingService;
-  protected graphitiService: GraphitiMemoryService;
+  protected zepService: ZepMemoryService;
   protected agentType: AgentType;
   protected tools: any[] = [];
   protected userNodeCache: Map<string, string> = new Map(); // Cache user node UUIDs
@@ -23,7 +23,7 @@ export abstract class BaseAgent {
     });
     this.supabaseService = new SupabaseService();
     this.embeddingService = new EmbeddingService();
-    this.graphitiService = new GraphitiMemoryService();
+    this.zepService = new ZepMemoryService();
   }
 
   // Abstract methods that each agent must implement
@@ -32,98 +32,16 @@ export abstract class BaseAgent {
   abstract getSystemPrompt(): string;
   abstract getCapabilities(): string[];
 
-  // Shared utility methods using Graphiti for memory
+  // Shared utility methods using Zep for memory
   protected async loadMemoryContext(context: AgentContext, contextType: 'conversation' | 'task_planning' | 'goal_coaching' = 'conversation'): Promise<MemoryContext> {
     try {
-      // Get or cache user node UUID
-      let userNodeUuid = this.userNodeCache.get(context.userId);
-      if (!userNodeUuid) {
-        const userNode = await this.graphitiService.ensureUserNode(context.userId);
-        userNodeUuid = userNode.user_node_uuid;
-        this.userNodeCache.set(context.userId, userNodeUuid);
-      }
-
-      // Get contextual memory from Graphiti
-      const memoryContext = await this.graphitiService.getMemoryContext(
-        context.userId,
-        contextType,
-        undefined, // Let Graphiti generate context-appropriate query
-        15 // Get more facts for richer context
-      );
-
-      // Load recent events for immediate context (still useful for current session)
-      const recentEvents = await this.supabaseService.getEvents(context.userId);
-      const recentEventEmbeddings = recentEvents.slice(0, 5).map(event => ({
-        content: `${event.event_title} - ${event.event_description || ''}`,
-        embedding: event.embedding || [],
-        timestamp: event.event_starts_at
-      }));
-
-      // Convert conversation history to BaseMessage format
-      const baseMessages: BaseMessage[] = context.conversationHistory.map(msg => {
-        if (msg.role === 'user') {
-          return new HumanMessage(msg.content);
-        } else if (msg.role === 'assistant') {
-          return new AIMessage(msg.content);
-        } else {
-          return new SystemMessage(msg.content);
-        }
-      });
-
-      // Build rich context from Graphiti facts
-      const graphitiContext = memoryContext.facts.map(fact => fact.fact).join('\n- ');
-
-      return {
-        shortTerm: {
-          sessionId: context.sessionId,
-          messages: baseMessages,
-          context: this.buildConversationContext(context.conversationHistory),
-          lastUpdated: new Date().toISOString()
-        },
-        longTerm: {
-          userId: context.userId,
-          profile: context.userProfile || {
-            id: context.userId,
-            email: '',
-            preferences: {},
-            goals: [],
-            insights: []
-          },
-          preferences: context.userProfile?.preferences || {},
-          goals: context.userProfile?.goals || [],
-          insights: context.userProfile?.insights || [],
-          lastUpdated: new Date().toISOString()
-        },
-        entity: {
-          entities: {
-            userNode: {
-              id: userNodeUuid,
-              type: 'person' as const,
-              name: context.userId,
-              attributes: { graphitiNodeUuid: userNodeUuid },
-              lastMentioned: new Date().toISOString(),
-              importance: 1.0
-            }
-          },
-          relationships: {} // Could be expanded with more graph relationships
-        },
-        vector: {
-          recentEvents: recentEventEmbeddings,
-          recentChats: [], // Now handled by Graphiti
-          semanticContext: graphitiContext
-        },
-        // New Graphiti-specific context
-        graphiti: {
-          userNodeUuid,
-          contextType,
-          totalFacts: memoryContext.total_facts,
-          relevantFacts: memoryContext.facts
-        }
-      };
-    } catch (error) {
-      console.warn('Failed to load Graphiti memory context, falling back to basic context:', error);
+      // Use Zep for memory context loading
+      const zepContext = await this.zepService.getMemoryContext(context.userId);
+      console.log(`Loaded memory context from Zep for user ${context.userId}`);
+      return zepContext;
       
-      // Fallback to basic context if Graphiti fails
+    } catch (error) {
+      console.warn('Failed to load memory context from Zep, falling back to basic context:', error);
       return this.loadBasicMemoryContext(context);
     }
   }
@@ -216,14 +134,18 @@ export abstract class BaseAgent {
     assistantResponse: string
   ): Promise<void> {
     try {
-      await this.graphitiService.addConversationEpisode(
+      await this.zepService.addConversation(
         context.userId,
         userMessage,
         assistantResponse,
-        context.sessionId
+        {
+          agentType: this.agentType,
+          timestamp: new Date().toISOString()
+        }
       );
+      console.log(`Persisted conversation to Zep for user ${context.userId}`);
     } catch (error) {
-      console.warn('Failed to persist conversation to Graphiti:', error);
+      console.error('Failed to persist conversation to Zep:', error);
     }
   }
 
@@ -237,17 +159,16 @@ export abstract class BaseAgent {
     completionNotes?: string
   ): Promise<void> {
     try {
-      await this.graphitiService.addTaskCompletionEpisode(
-        userId,
-        taskTitle,
-        taskDescription,
-        completionTime,
-        energyUsed,
-        actualDuration,
-        completionNotes
-      );
+      await this.zepService.addTaskCompletion(userId, {
+        task: taskTitle,
+        completedAt: completionTime,
+        notes: taskDescription || completionNotes,
+        energyLevel: energyUsed,
+        category: 'task_completion'
+      });
+      console.log(`Persisted task completion to Zep for user ${userId}: ${taskTitle}`);
     } catch (error) {
-      console.warn('Failed to persist task completion to Graphiti:', error);
+      console.error('Failed to persist task completion to Zep:', error);
     }
   }
 
@@ -260,16 +181,15 @@ export abstract class BaseAgent {
     confidenceLevel?: number
   ): Promise<void> {
     try {
-      await this.graphitiService.addGoalProgressEpisode(
-        userId,
+      await this.zepService.addGoalProgress(userId, {
         goalTitle,
-        progressUpdate,
-        currentProgress,
-        moodRating,
-        confidenceLevel
-      );
+        progress: currentProgress,
+        notes: progressUpdate,
+        milestones: moodRating ? [`Mood: ${moodRating}/10`] : undefined
+      });
+      console.log(`Persisted goal progress to Zep for user ${userId}: ${goalTitle} (${currentProgress}%)`);
     } catch (error) {
-      console.warn('Failed to persist goal progress to Graphiti:', error);
+      console.error('Failed to persist goal progress to Zep:', error);
     }
   }
 
@@ -278,22 +198,24 @@ export abstract class BaseAgent {
     eventTitle: string,
     eventDescription: string | null,
     startTime: Date,
-    endTime: Date,
-    location?: string | null,
-    archetype?: string
+    endTime?: Date,
+    attendees?: string[],
+    location?: string,
+    energy_level?: 'low' | 'medium' | 'high'
   ): Promise<void> {
     try {
-      await this.graphitiService.addCalendarEventEpisode(
-        userId,
-        eventTitle,
-        eventDescription,
+      await this.zepService.addCalendarEvent(userId, {
+        title: eventTitle,
+        description: eventDescription || undefined,
         startTime,
         endTime,
+        participants: attendees,
         location,
-        archetype
-      );
+        energyLevel: energy_level
+      });
+      console.log(`Persisted calendar event to Zep for user ${userId}: ${eventTitle}`);
     } catch (error) {
-      console.warn('Failed to persist calendar event to Graphiti:', error);
+      console.error('Failed to persist calendar event to Zep:', error);
     }
   }
 

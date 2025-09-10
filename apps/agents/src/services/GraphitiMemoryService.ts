@@ -12,6 +12,91 @@ export interface Episode {
   source_description?: string;
 }
 
+// New simplified node types for the graph
+export interface GraphNode {
+  id: string;
+  type: 'user' | 'event' | 'goal' | 'person' | 'topic';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface UserNode extends GraphNode {
+  type: 'user';
+  user_id: string;
+  name?: string;
+}
+
+export interface EventNode extends GraphNode {
+  type: 'event';
+  title: string;
+  description?: string;
+  start_time?: Date;
+  end_time?: Date;
+  location?: string;
+  energy_level?: 'low' | 'medium' | 'high';
+  completion_status?: 'planned' | 'completed' | 'cancelled';
+}
+
+export interface GoalNode extends GraphNode {
+  type: 'goal';
+  title: string;
+  description?: string;
+  target_date?: Date;
+  status: 'active' | 'completed' | 'paused' | 'cancelled';
+  priority?: 'low' | 'medium' | 'high';
+}
+
+export interface PersonNode extends GraphNode {
+  type: 'person';
+  name: string;
+  relationship?: string;
+  contact_info?: string;
+}
+
+export interface TopicNode extends GraphNode {
+  type: 'topic';
+  name: string;
+  category?: string;
+  description?: string;
+}
+
+// Relationship types for the graph
+export interface GraphRelationship {
+  id: string;
+  from_node_id: string;
+  to_node_id: string;
+  type: 'PARTICIPATED' | 'INVOLVES' | 'ABOUT' | 'CONTRIBUTES_TO' | 'RELATED';
+  created_at: Date;
+  strength?: number; // 0-1, for relationship importance
+  metadata?: Record<string, any>;
+}
+
+export interface CreateEventRequest {
+  title: string;
+  description?: string;
+  start_time?: Date;
+  end_time?: Date;
+  location?: string;
+  participants?: string[]; // Person names
+  topics?: string[]; // Topic names
+  goal_id?: string; // Goal this event contributes to
+  energy_level?: 'low' | 'medium' | 'high';
+}
+
+export interface CreateGoalRequest {
+  title: string;
+  description?: string;
+  target_date?: Date;
+  priority?: 'low' | 'medium' | 'high';
+}
+
+export interface ExtractedEntities {
+  people: string[];
+  topics: string[];
+  locations: string[];
+  goals?: string[];
+}
+
 export interface SearchResult {
   fact: string;
   uuid?: string;
@@ -109,6 +194,304 @@ export class GraphitiMemoryService {
       console.error('Failed to search Graphiti:', error);
       throw new Error(`Graphiti search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  // === New Simplified Graph Node Methods ===
+  
+  async createEvent(
+    userId: string,
+    eventRequest: CreateEventRequest
+  ): Promise<{ eventId: string; relationships: string[] }> {
+    try {
+      // First ensure user node exists
+      await this.ensureUserNode(userId);
+      
+      // DO NOT extract entities from description - this was causing the problem
+      // Only use explicitly provided entities
+      const entities = {
+        people: eventRequest.participants || [],
+        topics: eventRequest.topics || [],
+        locations: eventRequest.location ? [eventRequest.location] : []
+      };
+      
+      // Create the event episode with structured data (no automatic entity extraction)
+      const eventEpisode = {
+        user_id: userId,
+        name: `Event: ${eventRequest.title}`,
+        episode_body: JSON.stringify({
+          type: 'event',
+          title: eventRequest.title,
+          description: eventRequest.description,
+          start_time: eventRequest.start_time?.toISOString(),
+          end_time: eventRequest.end_time?.toISOString(),
+          location: eventRequest.location,
+          energy_level: eventRequest.energy_level,
+          completion_status: 'planned',
+          // Only include explicitly provided entities
+          participants: entities.people,
+          topics: entities.topics,
+          locations: entities.locations
+        }),
+        source: 'event' as const,
+        reference_time: eventRequest.start_time || new Date(),
+        source_description: `Calendar event: ${eventRequest.title}`
+      };
+      
+      await this.addEpisode(eventEpisode);
+      
+      // Create relationships by adding follow-up episodes
+      const relationships: string[] = [];
+      
+      // Link to goal if specified
+      if (eventRequest.goal_id) {
+        await this.linkEventToGoal(userId, eventRequest.title, eventRequest.goal_id);
+        relationships.push(`CONTRIBUTES_TO:${eventRequest.goal_id}`);
+      }
+      
+      return {
+        eventId: eventRequest.title, // Using title as ID for simplicity
+        relationships
+      };
+      
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+  }
+  
+  async createGoal(
+    userId: string,
+    goalRequest: CreateGoalRequest
+  ): Promise<{ goalId: string }> {
+    try {
+      await this.ensureUserNode(userId);
+      
+      const goalEpisode = {
+        user_id: userId,
+        name: `Goal: ${goalRequest.title}`,
+        episode_body: JSON.stringify({
+          type: 'goal',
+          title: goalRequest.title,
+          description: goalRequest.description,
+          target_date: goalRequest.target_date?.toISOString(),
+          status: 'active',
+          priority: goalRequest.priority || 'medium'
+        }),
+        source: 'goal' as const,
+        reference_time: new Date(),
+        source_description: `Personal goal: ${goalRequest.title}`
+      };
+      
+      await this.addEpisode(goalEpisode);
+      
+      return { goalId: goalRequest.title };
+      
+    } catch (error) {
+      console.error('Error creating goal:', error);
+      throw error;
+    }
+  }
+  
+  async createPerson(
+    userId: string,
+    name: string,
+    relationship?: string
+  ): Promise<{ personId: string }> {
+    try {
+      await this.ensureUserNode(userId);
+      
+      const personEpisode = {
+        user_id: userId,
+        name: `Person: ${name}`,
+        episode_body: JSON.stringify({
+          type: 'person',
+          name: name,
+          relationship: relationship,
+          first_mentioned: new Date().toISOString()
+        }),
+        source: 'text' as const,
+        reference_time: new Date(),
+        source_description: `Person reference: ${name}`
+      };
+      
+      await this.addEpisode(personEpisode);
+      
+      return { personId: name };
+      
+    } catch (error) {
+      console.error('Error creating person:', error);
+      throw error;
+    }
+  }
+  
+  async createTopic(
+    userId: string,
+    name: string,
+    category?: string
+  ): Promise<{ topicId: string }> {
+    try {
+      await this.ensureUserNode(userId);
+      
+      const topicEpisode = {
+        user_id: userId,
+        name: `Topic: ${name}`,
+        episode_body: JSON.stringify({
+          type: 'topic',
+          name: name,
+          category: category,
+          first_mentioned: new Date().toISOString()
+        }),
+        source: 'text' as const,
+        reference_time: new Date(),
+        source_description: `Topic reference: ${name}`
+      };
+      
+      await this.addEpisode(topicEpisode);
+      
+      return { topicId: name };
+      
+    } catch (error) {
+      console.error('Error creating topic:', error);
+      throw error;
+    }
+  }
+  
+  async linkEventToGoal(
+    userId: string,
+    eventTitle: string,
+    goalTitle: string,
+    contribution?: string
+  ): Promise<void> {
+    try {
+      const relationshipEpisode = {
+        user_id: userId,
+        name: `Link: ${eventTitle} → ${goalTitle}`,
+        episode_body: JSON.stringify({
+          type: 'relationship',
+          relationship_type: 'CONTRIBUTES_TO',
+          from_entity: { type: 'event', title: eventTitle },
+          to_entity: { type: 'goal', title: goalTitle },
+          contribution: contribution,
+          created_at: new Date().toISOString()
+        }),
+        source: 'text' as const,
+        reference_time: new Date(),
+        source_description: `Event-Goal relationship: ${eventTitle} contributes to ${goalTitle}`
+      };
+      
+      await this.addEpisode(relationshipEpisode);
+      
+    } catch (error) {
+      console.error('Error linking event to goal:', error);
+      throw error;
+    }
+  }
+  
+  async searchByTimeRange(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    nodeTypes?: ('event' | 'goal' | 'person' | 'topic')[]
+  ): Promise<SearchResult[]> {
+    try {
+      const query = `Events and activities for ${userId} between ${startDate.toISOString()} and ${endDate.toISOString()}`;
+      const searchResponse = await this.search(userId, query, undefined, 20);
+      
+      // Filter by node types if specified and by time range
+      return searchResponse.results.filter((result: any) => {
+        try {
+          const content = JSON.parse(result.content);
+          if (nodeTypes && !nodeTypes.includes(content.type)) {
+            return false;
+          }
+          
+          // Check if event falls within time range
+          if (content.start_time) {
+            const eventTime = new Date(content.start_time);
+            return eventTime >= startDate && eventTime <= endDate;
+          }
+          
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error searching by time range:', error);
+      throw error;
+    }
+  }
+  
+  async searchByPerson(
+    userId: string,
+    personName: string,
+    limit: number = 10
+  ): Promise<SearchResult[]> {
+    try {
+      const query = `Events and interactions involving ${personName}`;
+      const searchResponse = await this.search(userId, query, undefined, limit);
+      
+      // Filter to only include events that mention this person
+      return searchResponse.results.filter((result: any) => {
+        return result.content.toLowerCase().includes(personName.toLowerCase());
+      });
+      
+    } catch (error) {
+      console.error('Error searching by person:', error);
+      throw error;
+    }
+  }
+  
+  async searchByTopic(
+    userId: string,
+    topicName: string,
+    limit: number = 10
+  ): Promise<SearchResult[]> {
+    try {
+      const query = `Events and content related to ${topicName}`;
+      const searchResponse = await this.search(userId, query, undefined, limit);
+      
+      // Filter to only include events related to this topic
+      return searchResponse.results.filter((result: any) => {
+        return result.content.toLowerCase().includes(topicName.toLowerCase());
+      });
+      
+    } catch (error) {
+      console.error('Error searching by topic:', error);
+      throw error;
+    }
+  }
+  
+  public async extractEntitiesFromText(
+    text: string,
+    knownPeople: string[] = [],
+    knownTopics: string[] = []
+  ): Promise<ExtractedEntities> {
+    // VERY conservative entity extraction - only use explicitly provided entities
+    // This prevents automatic creation of spurious person/topic nodes
+    const entities: ExtractedEntities = {
+      people: knownPeople, // Only use explicitly provided people
+      topics: knownTopics, // Only use explicitly provided topics
+      locations: []
+    };
+    
+    // Only extract locations when there are clear location indicators
+    // This is much more conservative than before
+    const locationKeywords = ['location:', 'venue:', 'office:', 'address:'];
+    for (const keyword of locationKeywords) {
+      const index = text.toLowerCase().indexOf(keyword);
+      if (index !== -1) {
+        const afterKeyword = text.substring(index + keyword.length).trim();
+        const location = afterKeyword.split(/[,.;\n]/)[0].trim();
+        // Only extract if it looks like a real location (multiple words, reasonable length)
+        if (location && location.includes(' ') && location.length > 3 && location.length < 100) {
+          entities.locations.push(location);
+        }
+      }
+    }
+    
+    return entities;
   }
 
   /**
@@ -415,6 +798,30 @@ export class GraphitiMemoryService {
     } catch (error) {
       console.error('Failed to clear Graphiti graph:', error);
       throw error;
+    }
+  }
+
+  async cleanupInvalidNodes(): Promise<{ success: boolean; details: any }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/graph/cleanup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`HTTP ${response.status}: ${error}`);
+      }
+
+      const result = await response.json();
+      console.log('Graph cleanup completed:', result);
+      return { success: true, details: result };
+
+    } catch (error) {
+      console.error('Failed to cleanup invalid nodes:', error);
+      return { success: false, details: { error: error instanceof Error ? error.message : 'Unknown error' } };
     }
   }
 }

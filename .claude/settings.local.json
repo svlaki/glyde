@@ -41,7 +41,8 @@
       "Bash(docker-compose up:*)",
       "Bash(docker-compose logs:*)",
       "Bash(docker-compose:*)",
-      "mcp__code-index__set_project_path"
+      "mcp__code-index__set_project_path",
+      "mcp__serena__replace_symbol_body"
     ],
     "deny": [],
     "additionalDirectories": [

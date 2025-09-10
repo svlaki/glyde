@@ -303,7 +303,7 @@ export class ConversationAgent extends BaseAgent {
       },
       {
         name: "search_memory",
-        description: "Search user's long-term memory and behavioral patterns using Graphiti knowledge graph. Use this to understand user preferences, habits, goals, and past experiences relevant to current conversation.",
+        description: "Search user's long-term memory and behavioral patterns using Zep memory service. Use this to understand user preferences, habits, goals, and past experiences relevant to current conversation.",
         schema: z.object({
           query: z.string().describe("Search query for user's memory (e.g., 'work habits', 'meeting preferences', 'productivity patterns', 'goal progress')"),
           contextType: z.enum(["conversation", "task_planning", "goal_coaching"]).nullable().describe("Type of context to search (defaults to 'conversation')"),
@@ -996,23 +996,27 @@ INTELLIGENCE FEATURES:
 
             case "search_memory":
               try {
-                // Use Graphiti service to search user's memory
-                const searchResult = await this.graphitiService.search(
+                const searchResults = await this.zepService.searchMemory(
                   state.userId,
-                  action.args.query,
-                  undefined, // Let Graphiti determine center node
-                  10 // Get up to 10 results
+                  action.query,
+                  10 // limit to 10 results
                 );
                 
-                if (searchResult.results && searchResult.results.length > 0) {
-                  const memoryFacts = searchResult.results.slice(0, 5).map(r => r.fact).join('\n• ');
-                  result = `🧠 Found ${searchResult.results.length} memory insights:\n• ${memoryFacts}`;
+                if (searchResults.length > 0) {
+                  const formattedResults = searchResults
+                    .slice(0, 5) // Take top 5 results
+                    .map((item, index) => `${index + 1}. ${JSON.stringify(item)}`)
+                    .join('\n');
+                  
+                  result = `🧠 Memory search results for "${action.query}":\n${formattedResults}`;
                 } else {
-                  result = `🧠 No relevant memory found for: "${action.args.query}"`;
+                  result = `🧠 No relevant memories found for "${action.query}". This might be the first time this topic has come up.`;
                 }
+                
+                console.log(`Zep memory search completed for user ${state.userId}: "${action.query}"`);
               } catch (error) {
-                console.error('Error searching memory:', error);
-                result = `❌ Error searching memory: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                console.error('Failed to search Zep memory:', error);
+                result = `🧠 Memory search temporarily unavailable. Using conversation context instead.`;
               }
               break;
 
