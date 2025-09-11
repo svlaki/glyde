@@ -12,7 +12,6 @@ import { InteractionBox, Interaction } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
-import { DevTestPanel } from '../components/DevTestPanel';
 import { supabase } from '../lib/supabase';
 
 // Extended CalendarEvent interface for UI display
@@ -159,9 +158,6 @@ export function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* Development Test Panel */}
-      <DevTestPanel />
-      
       <div className="flex h-screen">
         {/* Left Side - Calendar */}
         <div className="flex-1 flex flex-col border-r-4 border-black">

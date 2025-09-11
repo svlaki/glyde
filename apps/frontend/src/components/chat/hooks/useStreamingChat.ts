@@ -18,9 +18,12 @@ interface StreamingChatState {
   isStreaming: boolean;
   currentStreamingMessage: string;
   isStreamFinished: boolean;
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  sendMessage: (content: string) => Promise<void>;
+  sendInternalMessage: (content: string) => Promise<void>;
 }
 
-export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChatProps) => {
+export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChatProps): StreamingChatState => {
   const { user, session } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string>('');
@@ -157,6 +160,122 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
     }
   }, [user, session, sessionId, messages, addMessage, onEventCreated]);
 
+  // Send internal message without adding user message to chat
+  const sendInternalMessage = useCallback(async (content: string) => {
+    if (!user || !session?.access_token || !content.trim()) return;
+
+    setIsStreaming(true);
+    setCurrentResponse('');
+
+    try {
+      const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/agent/process`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          context: {
+            userId: user.id,
+            sessionId: sessionId,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            conversationHistory: messages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            }))
+          },
+          message: content,
+          isInternal: true // Flag to indicate this shouldn't be persisted
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        let responseContent = '';
+        
+        if (result.success && result.response) {
+          responseContent = String(result.response);
+        } else {
+          responseContent = 'No response received';
+        }
+
+        // Set the complete response for streaming
+        setCurrentResponse(responseContent);
+
+        const streamingDuration = Math.max(responseContent.length * 0.5 * 50, 1000);
+        
+        setTimeout(() => {
+          const assistantMessage: ChatMessage = {
+            id: `${Date.now()}-ai`,
+            content: responseContent,
+            sender: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+          
+          addMessage(assistantMessage);
+          setIsStreaming(false);
+          setCurrentResponse('');
+
+          // Check if event was created
+          const eventIndicators = [
+            'scheduled', 'created', 'added to your calendar', 
+            'event has been', 'booked', 'meeting set',
+            'appointment made', 'added the event'
+          ];
+          
+          const lowerResponse = responseContent.toLowerCase();
+          const eventWasCreated = eventIndicators.some(indicator => 
+            lowerResponse.includes(indicator)
+          );
+          
+          if (eventWasCreated && onEventCreated) {
+            setTimeout(() => {
+              onEventCreated();
+            }, 1000);
+          }
+        }, streamingDuration);
+
+      } else {
+        const errorMessage = 'Sorry, I encountered an error processing your request.';
+        setCurrentResponse(errorMessage);
+        
+        setTimeout(() => {
+          const assistantMessage: ChatMessage = {
+            id: `${Date.now()}-ai`,
+            content: errorMessage,
+            sender: 'assistant',
+            timestamp: new Date().toISOString(),
+          };
+          
+          addMessage(assistantMessage);
+          setIsStreaming(false);
+          setCurrentResponse('');
+        }, errorMessage.length * 0.5 * 50);
+        
+        console.error('Chat response failed:', response.status, response.statusText);
+      }
+    } catch (error) {
+      const errorMessage = 'Sorry, I encountered a network error. Please try again.';
+      setCurrentResponse(errorMessage);
+      
+      setTimeout(() => {
+        const assistantMessage: ChatMessage = {
+          id: `${Date.now()}-ai`,
+          content: errorMessage,
+          sender: 'assistant',
+          timestamp: new Date().toISOString(),
+        };
+        
+        addMessage(assistantMessage);
+        setIsStreaming(false);
+        setCurrentResponse('');
+      }, errorMessage.length * 0.5 * 50);
+      
+      console.error('Failed to send internal message:', error);
+    }
+  }, [user, session, sessionId, messages, addMessage, onEventCreated]);
+
   return {
     messages,
     isStreaming,
@@ -164,5 +283,6 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
     isStreamFinished: !isStreaming && currentResponse === '',
     setMessages,
     sendMessage,
+    sendInternalMessage,
   };
-};;;
+};;;;

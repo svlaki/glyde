@@ -12,6 +12,7 @@ export interface AgentContext {
   timezone?: string;
   conversationHistory: ConversationMessage[];
   userProfile?: UserProfile;
+  isInternal?: boolean; // Flag for internal messages that shouldn't be persisted
 }
 
 export interface UserProfile {

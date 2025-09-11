@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/authContext';
 import { useStreamingChat, ChatMessage } from './hooks/useStreamingChat';
 import { useStreamExample } from '@llm-ui/react';
@@ -35,7 +34,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const lastTimestampRef = useRef<string | null>(null);
-  const { user, session, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   // Initialize session ID when user is available
   useEffect(() => {
@@ -64,43 +63,71 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentStreamingMessage]);
 
-  // Load chat history when session is ready
-  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
+  // Load chat history when session is ready using backend API
   
   const loadChatHistory = useCallback(async () => {
     if (!user || !sessionId) return;
     
     console.log('🔄 [CHAT] Loading history for session:', sessionId);
     try {
-      const userSchema = `u_${user.id.replace(/-/g, '')}`;
-      const { data: chatHistory, error } = await supabase
-        .schema(userSchema)
-        .from('chat_messages')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('timestamp', { ascending: true })
-        .limit(50);
+      const agentServiceUrl = (import.meta as any).env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+      const response = await fetch(`${agentServiceUrl}/api/chat/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.id,
+          session_id: sessionId,
+          limit: 50
+        })
+      });
+
+      if (!response.ok) {
+        console.log('ℹ️ [CHAT] No history found or error loading:', response.status);
+        return;
+      }
+
+      const result = await response.json();
       
-      if (error) {
-        console.log('ℹ️ [CHAT] No history found or schema not ready:', error.message);
-      } else if (chatHistory && chatHistory.length > 0) {
-        console.log('✅ [CHAT] Loaded', chatHistory.length, 'messages from realtime');
-        const formattedMessages = chatHistory.map((msg: any) => ({
+      if (result.success && result.messages && result.messages.length > 0) {
+        console.log('✅ [CHAT] Loaded', result.messages.length, 'messages from backend');
+        
+        // Filter out internal greeting messages - check for multiple variations
+        const filteredHistory = result.messages.filter((msg: any) => {
+          if (msg.sender !== 'user') return true; // Keep all assistant messages
+          
+          const content = msg.content.toLowerCase();
+          const isGreetingMessage = 
+            content.includes('please give me a brief greeting') ||
+            content.includes('brief greeting') ||
+            content.includes('current time') && content.includes('events') && content.includes('schedule');
+          
+          if (isGreetingMessage) {
+            console.log('🚫 [CHAT] Filtering out greeting message:', msg.content);
+          }
+          
+          return !isGreetingMessage;
+        });
+        
+        const formattedMessages = filteredHistory.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           sender: msg.sender,
           timestamp: msg.timestamp
         }));
+        
         setMessages(formattedMessages);
-        if (chatHistory.length > 0) {
-          lastTimestampRef.current = chatHistory[chatHistory.length - 1].timestamp;
+        if (filteredHistory.length > 0) {
+          lastTimestampRef.current = filteredHistory[filteredHistory.length - 1].timestamp;
         }
+        
+        console.log('✅ [CHAT] After filtering:', formattedMessages.length, 'messages remain');
+      } else {
+        console.log('ℹ️ [CHAT] No messages found in response');
       }
-      
-      setHasLoadedHistory(true);
     } catch (err) {
       console.error('Error loading chat history:', err);
-      setHasLoadedHistory(true);
     }
   }, [user, sessionId, setMessages]);
   
@@ -108,64 +135,23 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     loadChatHistory();
   }, [loadChatHistory]);
 
-  // Set up realtime subscription for new chat messages
-  useEffect(() => {
-    if (!user || !sessionId) return;
+  // Note: Removed realtime subscription since we're using backend API
+  // Messages will be handled via local state in useStreamingChat hook
 
-    console.log('🔄 [CHAT] Setting up realtime subscription for session:', sessionId);
-    const userSchema = `u_${user.id.replace(/-/g, '')}`;
-    
-    const channel = supabase
-      .channel(`chat-${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: userSchema,
-          table: 'chat_messages',
-          filter: `session_id=eq.${sessionId}`
-        },
-        (payload) => {
-          console.log('📨 [CHAT] New message via realtime:', payload.new);
-          const newMessage = {
-            id: payload.new.id,
-            content: payload.new.content,
-            sender: payload.new.sender,
-            timestamp: payload.new.timestamp
-          };
-          
-          // Only add if it's not already in our messages (avoid duplicates)
-          setMessages(prev => {
-            const exists = prev.some(msg => msg.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
-          });
-          
-          lastTimestampRef.current = newMessage.timestamp;
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('🔄 [CHAT] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [user, sessionId, setMessages]);
-
-  // Show briefing only if no history was loaded
-  useEffect(() => {
-    if (!user || !session?.access_token || !sessionId || !hasLoadedHistory || messages.length > 0) return;
-    
-    const showBriefing = async () => {
-      try {
-        await sendMessage("Please give me a brief greeting with the current time, how many events I have today, and any key insights about my schedule.");
-      } catch (err) {
-        console.error('Error showing briefing:', err);
-      }
-    };
-    
-    showBriefing();
-  }, [user, session, sessionId, hasLoadedHistory, messages.length, sendMessage]);
+  // Auto-greeting disabled - users can start conversations manually
+  // useEffect(() => {
+  //   if (!user || !session?.access_token || !sessionId || !hasLoadedHistory || messages.length > 0) return;
+  //   
+  //   const showBriefing = async () => {
+  //     try {
+  //       await sendInternalMessage("Please give me a brief greeting with the current time, how many events I have today, and any key insights about my schedule.");
+  //     } catch (err) {
+  //       console.error('Error showing briefing:', err);
+  //     }
+  //   };
+  //   
+  //   showBriefing();
+  // }, [user, session, sessionId, hasLoadedHistory, messages.length, sendInternalMessage]);
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;

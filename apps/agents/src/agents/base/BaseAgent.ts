@@ -133,6 +133,12 @@ export abstract class BaseAgent {
     userMessage: string, 
     assistantResponse: string
   ): Promise<void> {
+    // Skip persistence for internal messages
+    if (context.isInternal) {
+      console.log(`Skipping persistence for internal message from user ${context.userId}`);
+      return;
+    }
+    
     try {
       await this.zepService.addConversation(
         context.userId,
