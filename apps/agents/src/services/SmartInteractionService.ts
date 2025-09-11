@@ -45,7 +45,7 @@ export class SmartInteractionService {
     const currentMinute = now.getMinutes();
     
     // Get user's events and patterns
-    const events = await this.supabaseService.getEvents(userId);
+    const events = await this.supabaseService.getEventsForAgent(userId);
     const todayEvents = events.filter(event => {
       const eventDate = new Date(event.event_starts_at);
       return eventDate.toDateString() === now.toDateString();
@@ -130,7 +130,7 @@ export class SmartInteractionService {
       // Check for conflicts on Saturday
       const saturday = new Date(today);
       saturday.setDate(saturday.getDate() + 1);
-      const saturdayEvents = await this.supabaseService.getEvents(
+      const saturdayEvents = await this.supabaseService.getEventsForAgent(
         userId, 
         saturday.toISOString().split('T')[0] + 'T00:00:00Z', 
         saturday.toISOString().split('T')[0] + 'T23:59:59Z'

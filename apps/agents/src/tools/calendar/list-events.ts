@@ -7,6 +7,7 @@ const supabaseService = new SupabaseService();
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit = 20 }, config) => {
     const userId = config?.configurable?.userId;
+    
     if (!userId) {
       throw new Error("User ID is required for listing events");
     }
@@ -14,9 +15,9 @@ export const listEventsTool = tool(
     let events;
     
     if (startDate && endDate) {
-      events = await supabaseService.getEvents(userId, startDate, endDate);
+      events = await supabaseService.getEventsForAgent(userId, startDate, endDate);
     } else {
-      events = await supabaseService.getEvents(userId);
+      events = await supabaseService.getEventsForAgent(userId);
     }
 
     if (events.length === 0) {
@@ -31,8 +32,21 @@ export const listEventsTool = tool(
     const limitedEvents = events.slice(0, limit);
 
     const eventList = limitedEvents.map(event => {
-      const startTime = new Date(event.event_starts_at).toLocaleString();
-      const endTime = new Date(event.event_ends_at).toLocaleString();
+      // Events are already converted to local timezone by SupabaseService.getEventsForAgent
+      const startDate = new Date(event.event_starts_at);
+      const endDate = new Date(event.event_ends_at);
+      
+      const startTime = startDate.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      const endTime = endDate.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      
       return `📅 ${event.event_title}\n   ⏰ ${startTime} - ${endTime}${event.event_location ? `\n   📍 ${event.event_location}` : ''}`;
     });
 

@@ -1,20 +1,23 @@
 import { StateGraph, Annotation } from "@langchain/langgraph";
-import { ChatOpenAI } from "@langchain/openai";
+// ChatOpenAI is imported by BaseAgent
 import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { SupabaseService, supabase } from '../../services/SupabaseService.js';
+import { SupabaseService } from '../../services/SupabaseService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
-import { AgentContext, AgentResponse, AgentType } from '../../types/agents.js';
+import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { CalendarIntelligenceService } from '../../services/CalendarIntelligenceService.js';
+import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
 
-// Utility function to create a local time example for the prompt
-function createLocalTimeExample(hour: number, minute: number = 0): string {
-  const date = new Date();
-  date.setHours(hour, minute, 0, 0);
-  // Return both local time representation and ISO for clarity
-  return `${date.toISOString()} (which represents ${hour}:${minute.toString().padStart(2, '0')} local time)`;
+// Utility functions
+
+// Helper function to format date for comparison using local timezone
+function formatDateForComparison(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Define the state structure for our conversation agent
@@ -24,16 +27,17 @@ const ConversationState = Annotation.Root({
     default: () => [],
   }),
   userId: Annotation<string>(),
+  timezone: Annotation<string>(),
   userEvents: Annotation<any[]>({
-    reducer: (existing, update) => update || existing,
+    reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
   pendingActions: Annotation<any[]>({
-    reducer: (existing, update) => update,
+    reducer: (_existing, update) => update,
     default: () => [],
   }),
   lastResult: Annotation<string>({
-    reducer: (existing, update) => update,
+    reducer: (_existing, update) => update,
     default: () => "",
   }),
 });
@@ -54,9 +58,18 @@ export class ConversationAgent extends BaseAgent {
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
     try {
-      // Pre-load user events for context
+      // Load memory context using Graphiti
+      const memoryContext = await this.loadMemoryContext(context, 'conversation');
+      
+      // Pre-load user events for LangGraph context (still needed for immediate calendar operations)
       const supabaseService = new SupabaseService();
-      const userEvents = await supabaseService.getEvents(context.userId);
+      
+      // Get user profile to fetch timezone
+      const userProfile = await supabaseService.getProfile(context.userId);
+      const userTimezone = userProfile?.timezone || 'America/New_York';
+      console.log(`🌍 [CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
+      
+      const userEvents = await supabaseService.getEventsForAgent(context.userId);
       console.log(`Loading ${userEvents?.length || 0} events for user ${context.userId}`);
       
       // Build conversation history from context
@@ -81,20 +94,35 @@ export class ConversationAgent extends BaseAgent {
       // Add the current message
       messages.push(new HumanMessage(message));
       
+      // Invoke LangGraph with enhanced context including proper timezone
       const result = await this.graph.invoke({
         messages: messages,
         userId: context.userId,
+        timezone: userTimezone, // Use timezone from user profile instead of context
         userEvents: userEvents || [],
+        // Add Graphiti memory context
+        memoryContext: memoryContext.graphiti ? {
+          userNodeUuid: memoryContext.graphiti.userNodeUuid,
+          relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
+          totalFacts: memoryContext.graphiti.totalFacts
+        } : null
       });
 
       // Get the last AI message and any execution results
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
       
-      let response = lastAiMessage?.content || "I processed your request.";
+      let response = lastAiMessage?.content || "I'm here to help! What would you like me to do?";
       
       if (result.lastResult) {
         response += `\n\n${result.lastResult}`;
+      }
+
+      // Persist conversation to Graphiti memory
+      try {
+        await this.persistConversationToMemory(context, message, response);
+      } catch (error) {
+        console.warn('Failed to persist conversation to memory:', error);
       }
 
       return {
@@ -142,8 +170,8 @@ export class ConversationAgent extends BaseAgent {
         description: "Create a new calendar event. Parse natural language into structured event data. Use smart defaults for missing information. Be intelligent about time defaults based on event type.",
         schema: z.object({
           title: z.string().describe("Event title extracted from user input or inferred from context"),
-          startTime: z.string().describe("Start time in ISO format. CRITICAL: Parse user's intended local time (e.g., '2pm tomorrow' means 2pm in USER's timezone). Create ISO timestamp that represents the user's local time, not server time. Use intelligent defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
-          endTime: z.string().describe("End time in ISO format. CRITICAL: Must be in same timezone as startTime. If not specified, add 1 hour to start time"),
+          startTime: z.string().describe("Start time in ISO format WITHOUT Z suffix (e.g., '2025-08-25T17:00:00.000' for 5pm). CRITICAL: When user says '5pm', create timestamp for 5pm LOCAL TIME, NOT UTC. Example: '5pm tomorrow' = '2025-08-26T17:00:00.000' (no Z). Use intelligent defaults: breakfast=8am, lunch=12pm, dinner=6pm, meetings=business hours"),
+          endTime: z.string().describe("End time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format (no Z). If not specified, add 1 hour to start time"),
           location: z.string().nullable().describe("Event location. Leave empty if not specified"),
           description: z.string().nullable().describe("Event description. Leave empty if not specified"),
         }),
@@ -168,8 +196,8 @@ export class ConversationAgent extends BaseAgent {
           eventId: z.string().nullable().describe("Event ID to update (optional - if not provided, search by description)"),
           searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
           title: z.string().nullable().describe("New event title"),
-          startTime: z.string().nullable().describe("New start time in ISO format. CRITICAL: Parse user's intended local time, create ISO timestamp representing user's timezone"),
-          endTime: z.string().nullable().describe("New end time in ISO format. CRITICAL: Must be in same timezone as startTime"),
+          startTime: z.string().nullable().describe("New start time in ISO format WITHOUT Z suffix. CRITICAL: Use local time format (e.g., '2025-08-25T17:00:00.000' for 5pm local)"),
+          endTime: z.string().nullable().describe("New end time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format"),
           location: z.string().nullable().describe("New event location"),
           description: z.string().nullable().describe("New event description"),
         }),
@@ -267,20 +295,23 @@ export class ConversationAgent extends BaseAgent {
       }
     );
 
-    const getDailyBriefingTool = tool(
-      async ({ date }) => {
-        return `Get daily briefing for: ${date || 'today'}`;
+    // REMOVED - using natural agent responses instead of hardcoded briefing
+    const removedDailyBriefingTool = null;
+    const searchMemoryTool = tool(
+      async ({ query, contextType }) => {
+        return `Memory search parameters: ${JSON.stringify({ query, contextType })}`;
       },
       {
-        name: "daily_briefing",
-        description: "Get a summary of the day's events and insights",
+        name: "search_memory",
+        description: "Search user's long-term memory and behavioral patterns using Zep memory service. Use this to understand user preferences, habits, goals, and past experiences relevant to current conversation.",
         schema: z.object({
-          date: z.string().nullable().describe("Date for briefing (ISO format). If null, uses today"),
+          query: z.string().describe("Search query for user's memory (e.g., 'work habits', 'meeting preferences', 'productivity patterns', 'goal progress')"),
+          contextType: z.enum(["conversation", "task_planning", "goal_coaching"]).nullable().describe("Type of context to search (defaults to 'conversation')"),
         }),
       }
     );
 
-    const tools = [createEventTool, updateEventTool, deleteEventTool, deleteMultipleEventsTool, listEventsTool, searchEventsTool, createTaskTool, findFreeTimeTool, getDailyBriefingTool];
+    const tools = [createEventTool, updateEventTool, deleteEventTool, deleteMultipleEventsTool, listEventsTool, searchEventsTool, createTaskTool, findFreeTimeTool, searchMemoryTool];
     const toolNode = new ToolNode(tools);
 
     // Bind tools to the model
@@ -301,10 +332,10 @@ export class ConversationAgent extends BaseAgent {
       } else {
         try {
           const supabaseService = new SupabaseService();
-          const eventsData = await supabaseService.getEvents(state.userId);
+          const eventsData = await supabaseService.getEventsForAgent(state.userId);
           
           if (eventsData && eventsData.length > 0) {
-            recentEvents = eventsData; // Get all events for better context
+            recentEvents = eventsData;
             console.log(`Found ${recentEvents.length} events for user context`);
           } else {
             console.log('No events found for user context');
@@ -313,15 +344,6 @@ export class ConversationAgent extends BaseAgent {
           console.error('Error loading recent events for context:', error);
         }
       }
-      
-      // Get recent chat messages for conversation context
-      const recentMessages = state.messages.slice(-5); // Last 5 messages
-      const conversationContext = recentMessages.length > 0 
-        ? `\n\nRECENT CONVERSATION:\n${recentMessages.map(msg => {
-            const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-            return `${msg._getType()}: ${content.substring(0, 100)}`;
-          }).join('\n')}`
-        : '';
       
       const eventContext = recentEvents.length > 0 
         ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
@@ -352,26 +374,53 @@ export class ConversationAgent extends BaseAgent {
       const dayAfterTomorrow = new Date(now);
       dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       
-      // Helper function to format date for comparison
-      const formatDateForComparison = (date: Date) => date.toISOString().split('T')[0];
       
-      const systemMessage = new SystemMessage(`You are an intelligent personal calendar assistant. You help users manage their time effectively.
+      const systemMessage = new SystemMessage(`You are an intelligent personal calendar assistant with a warm, conversational personality. You help users manage their time effectively while communicating naturally and helpfully.
 
 CRITICAL: Your user's complete calendar (ALL EVENTS):${eventContext}
 
 CURRENT TIME CONTEXT:
-- Right now: ${now.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+- Right now: ${getCurrentTimeInTimezone(state.timezone || 'America/New_York')}
 - Today's date: ${formatDateForComparison(now)}
-- Tomorrow's date: ${formatDateForComparison(tomorrow)} (${tomorrow.toLocaleDateString('en-US', { weekday: 'long' })})
-- Day after tomorrow: ${formatDateForComparison(dayAfterTomorrow)} (${dayAfterTomorrow.toLocaleDateString('en-US', { weekday: 'long' })})
+- Tomorrow's date: ${formatDateForComparison(tomorrow)} (${tomorrow.toLocaleDateString('en-US', { weekday: 'long', timeZone: state.timezone || 'America/New_York' })})
+- Day after tomorrow: ${formatDateForComparison(dayAfterTomorrow)} (${dayAfterTomorrow.toLocaleDateString('en-US', { weekday: 'long', timeZone: state.timezone || 'America/New_York' })})
+
+COMMUNICATION STYLE - Be Natural & Conversational:
+- Respond like a helpful friend, not a robot
+- Use casual, warm language: "Sure thing!", "Got it!", "Let me check...", "Here's what I found..."
+- NEVER say "I processed your request" or "Event created successfully" - that's robotic
+- When you create something, just confirm naturally: "Added your meeting with John for Tuesday at 2pm"
+- Be concise but friendly - don't over-explain unless asked
+- Show personality: use appropriate enthusiasm, understanding, or gentle suggestions
+
+CALENDAR INTERACTION RESPONSES:
+- When creating events, say things like: "I went ahead and put that in your schedule", "I've added that to your calendar", "Got it scheduled for you"
+- Ask helpful follow-up questions: "Would you like me to set a reminder?", "Should I block time for preparation?", "Want me to add a location?"
+- Be conversational about time conflicts: "Heads up, you already have something at 2pm. Want me to move it to 3pm instead?"
+- When updating/deleting: "I've moved that meeting", "Removed that from your schedule", "Updated with the new time"
+- Don't just confirm actions - engage: "Perfect! That gives you time for lunch before your 3pm call"
+
+INTELLIGENT EVENT FILTERING - Context Matters:
+When users ask about their schedule, be smart about what you show:
+
+- "What do I have coming up?" = Next 7 days only (filter out past events and events more than 1 week away)
+- "What's my day like?" = Today's events only  
+- "What's this week?" = Current week (Monday-Sunday)
+- "Upcoming events" = Next 7 days, grouped by day
+- "My schedule today" = Today only
+- "Tomorrow's schedule" = Tomorrow only
+- "Next week" = Following week (7-14 days from now)
+
+ALWAYS filter and present events logically based on the user's question. Don't dump everything!
 
 YOUR CAPABILITIES:
-1. Answer calendar questions using the events listed above
+1. Answer calendar questions using intelligent filtering based on context
 2. Create new events with natural language understanding
 3. Update and delete events
 4. Find scheduling conflicts
 5. Suggest optimal meeting times
-6. Provide daily briefings and summaries
+6. Provide daily briefings and summaries  
+7. Search user's long-term memory and behavioral patterns using Graphiti knowledge graph
 
 IMPORTANT - When User Requests Multiple Events:
 - If user says "schedule multiple events", "create several events", "add a bunch of events", "schedule a week of events", etc.
@@ -407,11 +456,18 @@ WHEN ANSWERING CALENDAR QUESTIONS:
 
 WHEN CREATING EVENTS:
 - Parse natural language dates/times intelligently
-- "2pm tomorrow" = tomorrow at 14:00
-- "lunch next Tuesday" = next Tuesday at 12:00
+- "2pm tomorrow" = tomorrow at 14:00 LOCAL TIME
+- "lunch next Tuesday" = next Tuesday at 12:00 LOCAL TIME  
+- "5pm" means 5pm in user's timezone, NOT 5pm UTC
 - Use 1 hour duration if not specified
 - Check for conflicts and warn the user
 - Confirm what you scheduled
+
+CRITICAL TIMEZONE HANDLING:
+- User times are ALWAYS local time (e.g., "5pm" = 5pm local)
+- Create ISO timestamps WITHOUT Z suffix: "2025-08-25T17:00:00.000" 
+- NEVER use UTC indicators like .000Z - always use local time format
+- Example: "schedule meeting at 3pm tomorrow" → "2025-08-26T15:00:00.000"
 
 WHEN DELETING/UPDATING:
 - Be careful and confirm the right event
@@ -466,7 +522,9 @@ Your capabilities:
 
 INTELLIGENCE FEATURES:
 - When user asks "When am I free?" or "Find time for X" → use find_free_time
-- When user asks "What's my day like?" or "Give me a summary" → use daily_briefing
+- When user asks "What's my day like?" or "Give me a summary" → provide natural response using calendar context
+- When user mentions preferences, habits, goals, or past experiences → use search_memory
+- When you need context about user's work patterns, meeting preferences, or behavioral insights → use search_memory
 - When creating events, ALWAYS check for conflicts and warn the user
 - Suggest alternative times when conflicts are detected`);
 
@@ -482,7 +540,12 @@ INTELLIGENCE FEATURES:
     const executeTools = async (state: ConversationStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls && (lastMessage as any).tool_calls.length > 0) {
-        const toolResults = await toolNode.invoke(state);
+        const toolResults = await toolNode.invoke(state, {
+          configurable: {
+            userId: state.userId,
+            timezone: state.timezone
+          }
+        });
         return {
           messages: toolResults.messages,
           pendingActions: (lastMessage as any).tool_calls,
@@ -514,28 +577,6 @@ INTELLIGENCE FEATURES:
                   break;
                 }
                 
-                // Determine category from event details
-                const title = action.args.title.toLowerCase();
-                const description = (action.args.description || '').toLowerCase();
-                const combined = title + ' ' + description;
-                
-                let category = 'personal';
-                if (combined.match(/\b(meeting|standup|sync|call|interview|work|project|deadline|task)\b/)) {
-                  category = 'work';
-                } else if (combined.match(/\b(gym|workout|exercise|doctor|health|medical|wellness)\b/)) {
-                  category = 'health';
-                } else if (combined.match(/\b(friend|social|party|dinner|lunch|coffee|date)\b/)) {
-                  category = 'social';
-                } else if (combined.match(/\b(course|class|study|learn|training|education)\b/)) {
-                  category = 'learning';
-                } else if (combined.match(/\b(budget|payment|bill|finance|money|tax)\b/)) {
-                  category = 'finance';
-                } else if (combined.match(/\b(travel|trip|flight|vacation|holiday)\b/)) {
-                  category = 'travel';
-                } else if (combined.match(/\b(routine|daily|morning|evening|habit)\b/)) {
-                  category = 'routine';
-                }
-                
                 // Create event using SupabaseService to write to public.events table
                 const supabaseService = new SupabaseService();
                 const createdEvent = await supabaseService.createEvent(state.userId, {
@@ -544,13 +585,14 @@ INTELLIGENCE FEATURES:
                   event_ends_at: action.args.endTime,
                   event_location: action.args.location || null,
                   event_description: action.args.description || null,
-                  category: category,
-                } as any);
+                });
                 
                 if (!createdEvent) {
                   result = `❌ Failed to create event: Unknown error`;
                 } else {
-                  result = `✅ Created ${category} event: "${action.args.title}"`;
+                  // Category name can be inferred from event title or type
+                  const categoryName = 'Event';
+                  result = `Created event: "${action.args.title}"`;
                 }
               } catch (error) {
                 console.error('Error creating event:', error);
@@ -585,7 +627,7 @@ INTELLIGENCE FEATURES:
                   // Fallback to direct search
                   const searchLower = action.args.searchQuery.toLowerCase();
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   
                   const matchingEvent = allEvents.find((e: any) => {
                     const eventTitle = (e.event_title || e.title || '').toLowerCase();
@@ -600,11 +642,12 @@ INTELLIGENCE FEATURES:
                     
                     // If search includes temporal context, check dates
                     if (searchLower.includes('tomorrow') || searchLower.includes('today')) {
-                      const eventDate = new Date(e.event_starts_at || e.start_time).toISOString().split('T')[0];
+                      const eventDate = formatDateForComparison(new Date(e.event_starts_at || e.start_time));
+                      const today = new Date();
                       const tomorrow = new Date();
                       tomorrow.setDate(tomorrow.getDate() + 1);
-                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                      const todayStr = new Date().toISOString().split('T')[0];
+                      const tomorrowStr = formatDateForComparison(tomorrow);
+                      const todayStr = formatDateForComparison(today);
                       
                       if (searchLower.includes('tomorrow') && eventDate === tomorrowStr) {
                         return titleMatch;
@@ -645,7 +688,7 @@ INTELLIGENCE FEATURES:
                   
                   if (success) {
                     const updatedFields = Object.keys(updates).join(', ');
-                    result = `✅ Updated event successfully (${updatedFields})`;
+                    result = `Event updated successfully`;
                   } else {
                     result = `❌ Failed to update event`;
                   }
@@ -692,7 +735,7 @@ INTELLIGENCE FEATURES:
                   
                   // Try to find the event in the loaded events
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   console.log(`Found ${allEvents.length} events to search through`);
                   
                   // Find matching event by title (case insensitive) and optionally by date
@@ -718,11 +761,12 @@ INTELLIGENCE FEATURES:
                     
                     // If search query includes a date, also match by date
                     if (searchLower.includes('2025-') || searchLower.includes('tomorrow') || searchLower.includes('today')) {
-                      const eventDate = new Date(eventStartStr).toISOString().split('T')[0];
+                      const eventDate = formatDateForComparison(new Date(eventStartStr));
+                      const today = new Date();
                       const tomorrow = new Date();
                       tomorrow.setDate(tomorrow.getDate() + 1);
-                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                      const todayStr = new Date().toISOString().split('T')[0];
+                      const tomorrowStr = formatDateForComparison(tomorrow);
+                      const todayStr = formatDateForComparison(today);
                       
                       console.log(`  Event date: ${eventDate}, Tomorrow: ${tomorrowStr}, Today: ${todayStr}`);
                       
@@ -764,7 +808,7 @@ INTELLIGENCE FEATURES:
                   const success = await supabaseService.deleteEvent(state.userId, deleteEventId);
                   
                   if (success) {
-                    result = `✅ Deleted event successfully`;
+                    result = `Event deleted successfully`;
                   } else {
                     result = `❌ Event not found or could not be deleted`;
                   }
@@ -791,7 +835,7 @@ INTELLIGENCE FEATURES:
                 
                 try {
                   const supabaseService = new SupabaseService();
-                  const allEvents = await supabaseService.getEvents(state.userId);
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
                   
                   // Filter events for the specified date
                   eventsToDelete = allEvents.filter((e: any) => {
@@ -850,7 +894,7 @@ INTELLIGENCE FEATURES:
               }
 
               if (deletedCount > 0) {
-                result = `✅ Deleted ${deletedCount} event(s) successfully`;
+                result = `Deleted ${deletedCount} event(s) successfully`;
               } else if (eventsToDelete.length === 0) {
                 result = `ℹ️ No events found to delete`;
               } else {
@@ -862,7 +906,7 @@ INTELLIGENCE FEATURES:
               try {
                 // Get events using SupabaseService
                 const supabaseService = new SupabaseService();
-                const events = await supabaseService.getEvents(state.userId);
+                const events = await supabaseService.getEventsForAgent(state.userId);
                 
                 // Filter by date range if provided
                 let filteredEvents = events || [];
@@ -948,15 +992,31 @@ INTELLIGENCE FEATURES:
               }
               break;
 
-            case "daily_briefing":
+            // REMOVED daily_briefing - using natural agent responses instead
+
+            case "search_memory":
               try {
-                const intelligenceService = new CalendarIntelligenceService(state.userId);
-                const briefingDate = action.args.date ? new Date(action.args.date) : new Date();
-                const briefing = await intelligenceService.getDailyBriefing(briefingDate);
-                result = briefing;
+                const searchResults = await this.zepService.searchMemory(
+                  state.userId,
+                  action.query,
+                  10 // limit to 10 results
+                );
+                
+                if (searchResults.length > 0) {
+                  const formattedResults = searchResults
+                    .slice(0, 5) // Take top 5 results
+                    .map((item, index) => `${index + 1}. ${JSON.stringify(item)}`)
+                    .join('\n');
+                  
+                  result = `🧠 Memory search results for "${action.query}":\n${formattedResults}`;
+                } else {
+                  result = `🧠 No relevant memories found for "${action.query}". This might be the first time this topic has come up.`;
+                }
+                
+                console.log(`Zep memory search completed for user ${state.userId}: "${action.query}"`);
               } catch (error) {
-                console.error('Error generating briefing:', error);
-                result = `❌ Error generating briefing: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                console.error('Failed to search Zep memory:', error);
+                result = `🧠 Memory search temporarily unavailable. Using conversation context instead.`;
               }
               break;
 

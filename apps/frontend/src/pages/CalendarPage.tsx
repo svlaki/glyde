@@ -12,7 +12,6 @@ import { InteractionBox, Interaction } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
-import { DevTestPanel } from '../components/DevTestPanel';
 import { supabase } from '../lib/supabase';
 
 // Extended CalendarEvent interface for UI display
@@ -20,87 +19,19 @@ interface ExtendedCalendarEvent extends CalendarEvent {
   backgroundColor?: string;
   borderColor?: string;
   textColor?: string;
+  title?: string; // For FullCalendar compatibility
+  start?: string;  // For FullCalendar compatibility
+  end?: string;    // For FullCalendar compatibility
 }
 
-// Generate rich sample data for the calendar
-function generateRichSampleData(): ExtendedCalendarEvent[] {
-  const today = new Date();
-  const events: ExtendedCalendarEvent[] = [];
-  
-  // Define event types with colors
-  const eventTypes = [
-    { type: 'meeting', color: 'rgba(147, 197, 253, 0.8)', textColor: '#1F2937' }, // Pastel blue
-    { type: 'personal', color: 'rgba(167, 243, 208, 0.8)', textColor: '#1F2937' }, // Pastel green
-    { type: 'work', color: 'rgba(253, 230, 138, 0.8)', textColor: '#1F2937' }, // Pastel yellow
-    { type: 'appointment', color: 'rgba(252, 165, 165, 0.8)', textColor: '#1F2937' }, // Pastel red
-    { type: 'event', color: 'rgba(196, 181, 253, 0.8)', textColor: '#1F2937' }, // Pastel purple
-    { type: 'deadline', color: 'rgba(249, 168, 212, 0.8)', textColor: '#1F2937' }, // Pastel pink
-  ];
-
-  // Sample events for the next 2 weeks
-  const sampleEvents = [
-    { title: 'Team Standup', type: 'meeting', duration: 1, day: 0, hour: 9, description: 'Quick daily check-in to align on tasks.' },
-    { title: 'Project Review', type: 'work', duration: 2, day: 0, hour: 14, description: 'Review progress on the new feature branch.' },
-    { title: 'Doctor Appointment', type: 'appointment', duration: 1, day: 1, hour: 10, description: 'Annual check-up. Remember to bring ID.' },
-    { title: 'Lunch with Sarah', type: 'personal', duration: 1.5, day: 1, hour: 12, description: '' },
-    { title: 'Client Call', type: 'meeting', duration: 1, day: 2, hour: 15, description: 'Discuss Q3 results and plan for Q4.' },
-    { title: 'Gym Session', type: 'personal', duration: 1.5, day: 2, hour: 18, description: 'Leg day.' },
-    { title: 'Design Workshop', type: 'work', duration: 3, day: 3, hour: 10, description: 'Brainstorming session for the new UI.' },
-    { title: 'Coffee Chat', type: 'personal', duration: 1, day: 3, hour: 16, description: '' },
-    { title: 'Sprint Planning', type: 'meeting', duration: 2, day: 4, hour: 9, description: 'Plan tasks for the upcoming sprint.' },
-    { title: 'Product Demo', type: 'work', duration: 1, day: 4, hour: 14, description: 'Showcase the new features to stakeholders.' },
-    { title: 'Weekend Brunch', type: 'personal', duration: 2, day: 5, hour: 11, description: '' },
-    { title: 'Movie Night', type: 'event', duration: 3, day: 5, hour: 19, description: 'Watch the new sci-fi movie.' },
-    { title: 'Yoga Class', type: 'personal', duration: 1, day: 6, hour: 8, description: '' },
-    { title: 'Family Dinner', type: 'personal', duration: 2, day: 6, hour: 18, description: '' },
-    { title: 'Code Review', type: 'work', duration: 1, day: 7, hour: 10, description: 'Review pull request #123.' },
-    { title: 'All Hands Meeting', type: 'meeting', duration: 1, day: 7, hour: 15, description: 'Company-wide updates.' },
-    { title: 'Dentist', type: 'appointment', duration: 1, day: 8, hour: 9, description: 'Routine cleaning.' },
-    { title: 'Project Deadline', type: 'deadline', duration: 0.5, day: 8, hour: 17, description: 'Final submission for Project Phoenix.' },
-    { title: 'Team Lunch', type: 'personal', duration: 1.5, day: 9, hour: 12, description: '' },
-    { title: 'Client Presentation', type: 'work', duration: 2, day: 9, hour: 14, description: 'Present the final product to the client.' },
-    { title: 'Book Club', type: 'event', duration: 2, day: 10, hour: 19, description: '' },
-    { title: 'Morning Run', type: 'personal', duration: 1, day: 11, hour: 7, description: '' },
-    { title: 'Strategy Session', type: 'meeting', duration: 3, day: 11, hour: 13, description: 'Long-term planning for the next fiscal year.' },
-    { title: 'Concert', type: 'event', duration: 4, day: 12, hour: 20, description: '' },
-    { title: 'Grocery Shopping', type: 'personal', duration: 1, day: 13, hour: 10, description: 'Don\'t forget to buy milk.' },
-    { title: 'Board Game Night', type: 'event', duration: 3, day: 13, hour: 18, description: '' },
-  ];
-
-  sampleEvents.forEach((event, index) => {
-    const eventDate = new Date(today);
-    eventDate.setDate(today.getDate() + event.day);
-    eventDate.setHours(event.hour, 0, 0, 0);
-    
-    const endDate = new Date(eventDate);
-    endDate.setHours(eventDate.getHours() + Math.floor(event.duration), (event.duration % 1) * 60, 0, 0);
-    
-    const eventTypeData = eventTypes.find(t => t.type === event.type) || eventTypes[0];
-    
-    events.push({
-      id: `sample-${index + 1}`,
-      event_title: event.title,
-      event_starts_at: eventDate.toISOString(),
-      event_ends_at: endDate.toISOString(),
-      event_description: event.description || `${event.type.charAt(0).toUpperCase() + event.type.slice(1)} event`,
-      backgroundColor: eventTypeData.color,
-      textColor: eventTypeData.textColor,
-      borderColor: eventTypeData.color,
-    });
-  });
-
-  return events;
-}
 
 export function CalendarPage() {
   const { user, session } = useAuth();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const { interactions, addInteraction, removeInteraction } = useInteractions();
+  const { interactions, removeInteraction } = useInteractions();
   
   // Connect to agent system for interactions
   useAgentInteractions();
@@ -146,22 +77,16 @@ export function CalendarPage() {
         // Show empty calendar if there's an error
         setEvents([]);
       } else {
+        // Debug log the events we received
+        console.log('📅 [CALENDAR DEBUG] Raw events from backend:', userEvents);
+        
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
-          // Use category-based colors
-          const categoryColors: { [key: string]: string } = {
-            work: '#3B82F6',      // Blue
-            health: '#10B981',    // Green
-            personal: '#8B5CF6',  // Purple
-            learning: '#F59E0B',  // Orange
-            finance: '#EF4444',   // Red
-            travel: '#14B8A6',    // Teal
-            routine: '#6366F1',   // Indigo
-            social: '#EC4899'     // Pink
-          };
+          // Use archetype-based color from backend
+          const color = event.color || '#6B7280'; // Default gray if no color
+          const archetype = event.archetype || 'generic';
           
-          const eventCategory = (event as any).category || 'personal';
-          const color = categoryColors[eventCategory] || event.color || '#3B82F6';
+          console.log(`📅 [ARCHETYPE] Event "${event.event_title}" has archetype "${archetype}" with color ${color}`);
           
           return {
             id: event.id,
@@ -178,9 +103,14 @@ export function CalendarPage() {
             backgroundColor: color,
             borderColor: color,
             textColor: '#FFFFFF',
-            color: color
+            color: color,
+            archetype: archetype,
+            archetype_data: event.archetype_data || {}
           };
         });
+        
+        // Debug log the formatted events for FullCalendar
+        console.log('📅 [CALENDAR DEBUG] Formatted events for FullCalendar:', formattedEvents);
         
         // Show user events (empty array if no events)
         setEvents(formattedEvents);
@@ -213,29 +143,6 @@ export function CalendarPage() {
     setSelectedDate(null);
   }
 
-  async function handleCreateEventFromInteraction(eventData: { title: string; startTime: string; endTime: string; description?: string }) {
-    if (!user) return;
-
-    const today = new Date();
-    const baseDate = today.toISOString().split('T')[0];
-    
-    const starts_at = new Date(`${baseDate}T${eventData.startTime}:00`);
-    const ends_at = new Date(`${baseDate}T${eventData.endTime}:00`);
-
-    const newEvent = {
-      event_title: eventData.title,
-      event_starts_at: starts_at.toISOString(),
-      event_ends_at: ends_at.toISOString(),
-      event_description: eventData.description || '',
-    };
-
-    const { event, error } = await createEvent(user, newEvent);
-    if (!error && event) {
-      await loadUserEvents(); // Refresh calendar
-    } else {
-      console.error('Failed to create event from interaction:', error);
-    }
-  }
 
   function handleInteractionResponse(interactionId: string, response: string) {
     removeInteraction(interactionId);
@@ -251,9 +158,6 @@ export function CalendarPage() {
 
   return (
     <div className="min-h-screen bg-white text-black">
-      {/* Development Test Panel */}
-      <DevTestPanel />
-      
       <div className="flex h-screen">
         {/* Left Side - Calendar */}
         <div className="flex-1 flex flex-col border-r-4 border-black">
@@ -358,10 +262,10 @@ export function CalendarPage() {
                 }}
                 height="100%"
                 themeSystem="standard"
-                timeZone="UTC"
+                timeZone="local"
                 eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
-                slotMinTime="06:00:00"
-                slotMaxTime="23:00:00"
+                slotMinTime="00:00:00"
+                slotMaxTime="24:00:00"
                 allDaySlot={false}
                 dayHeaderFormat={{ weekday: 'short', month: 'numeric', day: 'numeric' }}
                 eventDisplay="block"
@@ -505,6 +409,112 @@ export function CalendarPage() {
   );
 }
 
+// Helper function to render archetype-specific data
+function renderArchetypeData(archetype: string, data: any): React.ReactNode {
+  if (!data || typeof data !== 'object') return 'No additional data';
+
+  switch (archetype) {
+    case 'workout':
+      if (data.exercises && Array.isArray(data.exercises)) {
+        return (
+          <div>
+            <strong>Exercises:</strong>
+            <ul className="list-disc list-inside mt-1">
+              {data.exercises.map((exercise: any, index: number) => (
+                <li key={index}>
+                  {exercise.name} - {exercise.sets} sets × {exercise.reps} reps
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }
+      break;
+    
+    case 'grocery':
+      if (data.items && Array.isArray(data.items)) {
+        return (
+          <div>
+            <strong>Shopping List:</strong>
+            <ul className="list-disc list-inside mt-1">
+              {data.items.map((item: any, index: number) => (
+                <li key={index} className={item.completed ? 'line-through text-gray-500' : ''}>
+                  {item.item} ({item.quantity})
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }
+      break;
+
+    case 'meeting':
+      return (
+        <div className="space-y-1">
+          {data.attendees && Array.isArray(data.attendees) && <div><strong>Attendees:</strong> {data.attendees.join(', ')}</div>}
+          {data.agenda && <div><strong>Agenda:</strong> {data.agenda}</div>}
+          {data.meeting_link && <div><strong>Link:</strong> <a href={data.meeting_link} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Join Meeting</a></div>}
+        </div>
+      );
+
+    case 'travel':
+      return (
+        <div className="space-y-1">
+          {data.destination && <div><strong>Destination:</strong> {data.destination}</div>}
+          {data.departure_time && <div><strong>Departure:</strong> {data.departure_time}</div>}
+          {data.transport && <div><strong>Transport:</strong> {data.transport}</div>}
+        </div>
+      );
+
+    case 'appointment':
+      return (
+        <div className="space-y-1">
+          {data.provider && <div><strong>Provider:</strong> {data.provider}</div>}
+          {data.type && <div><strong>Type:</strong> {data.type}</div>}
+          {data.location && <div><strong>Location:</strong> {data.location}</div>}
+        </div>
+      );
+
+    case 'work_focus':
+      if (data.tasks && Array.isArray(data.tasks)) {
+        return (
+          <div>
+            <strong>Tasks:</strong>
+            <ul className="list-disc list-inside mt-1">
+              {data.tasks.map((task: any, index: number) => (
+                <li key={index} className={task.completed ? 'line-through text-gray-500' : ''}>
+                  {task.task}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }
+      break;
+
+    case 'personal':
+      return (
+        <div className="space-y-1">
+          {data.notes && <div><strong>Notes:</strong> {data.notes}</div>}
+        </div>
+      );
+
+    default:
+      // For generic or unknown archetypes, display all data fields
+      return (
+        <div className="space-y-1">
+          {Object.entries(data).map(([key, value]) => (
+            <div key={key}>
+              <strong className="capitalize">{key.replace(/_/g, ' ')}:</strong> {String(value)}
+            </div>
+          ))}
+        </div>
+      );
+  }
+
+  return 'No additional data';
+}
+
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -519,7 +529,8 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('personal');
+  const [archetype, setArchetype] = useState('generic');
+  const [archetypeData, setArchetypeData] = useState<any>({});
 
   useEffect(() => {
     if (event) {
@@ -530,13 +541,15 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
       setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
       setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
       setDescription(event.event_description || '');
-      setCategory((event as any).category || 'personal');
+      setArchetype(event.archetype || 'generic');
+      setArchetypeData(event.archetype_data || {});
     } else {
       setTitle('');
       setStartTime('10:00');
       setEndTime('11:00');
       setDescription('');
-      setCategory('personal');
+      setArchetype('generic');
+      setArchetypeData({});
     }
   }, [event]);
 
@@ -555,7 +568,8 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
       event_starts_at: starts_at.toISOString(),
       event_ends_at: ends_at.toISOString(),
       event_description: description.trim(),
-      category: category,
+      archetype: archetype,
+      archetype_data: archetypeData,
     };
 
     if (event) {
@@ -631,26 +645,6 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select 
-              value={category} 
-              onChange={e => setCategory(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="work">Work</option>
-              <option value="health">Health</option>
-              <option value="personal">Personal</option>
-              <option value="learning">Learning</option>
-              <option value="finance">Finance</option>
-              <option value="travel">Travel</option>
-              <option value="routine">Routine</option>
-              <option value="social">Social</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
             </label>
             <textarea 
@@ -661,6 +655,246 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
               rows={3}
             />
           </div>
+
+          {/* Event Type Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+            <select 
+              value={archetype} 
+              onChange={e => setArchetype(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="generic">Generic</option>
+              <option value="workout">Workout</option>
+              <option value="grocery">Grocery</option>
+              <option value="meeting">Meeting</option>
+              <option value="appointment">Appointment</option>
+              <option value="travel">Travel</option>
+              <option value="work_focus">Work Focus</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+
+          {/* Archetype-specific forms */}
+          {archetype === 'workout' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Workout Details</h3>
+              <div className="space-y-2">
+                <textarea
+                  placeholder="Enter exercises (one per line, format: Exercise Name - Sets x Reps)"
+                  value={(archetypeData.exercises || []).map((ex: any) => `${ex.name} - ${ex.sets} x ${ex.reps}`).join('\n')}
+                  onChange={e => {
+                    const exercises = e.target.value.split('\n').filter(line => line.trim()).map(line => {
+                      const match = line.match(/^(.+?)\s*-\s*(\d+)\s*x\s*(\d+)$/);
+                      if (match) {
+                        return { name: match[1].trim(), sets: parseInt(match[2]), reps: parseInt(match[3]) };
+                      }
+                      return { name: line.trim(), sets: 1, reps: 1 };
+                    });
+                    setArchetypeData({...archetypeData, exercises});
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {archetype === 'grocery' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Shopping List</h3>
+              <div className="space-y-2">
+                <textarea
+                  placeholder="Enter items (one per line, format: Item Name - Quantity)"
+                  value={(archetypeData.items || []).map((item: any) => `${item.item} - ${item.quantity}`).join('\n')}
+                  onChange={e => {
+                    const items = e.target.value.split('\n').filter(line => line.trim()).map(line => {
+                      const parts = line.split(' - ');
+                      return { 
+                        item: parts[0]?.trim() || line.trim(), 
+                        quantity: parts[1]?.trim() || '1',
+                        completed: false 
+                      };
+                    });
+                    setArchetypeData({...archetypeData, items});
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {archetype === 'meeting' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Meeting Details</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Attendees</label>
+                  <input
+                    placeholder="Enter attendees (comma-separated)"
+                    value={(archetypeData.attendees || []).join(', ')}
+                    onChange={e => setArchetypeData({...archetypeData, attendees: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Agenda</label>
+                  <textarea
+                    placeholder="Meeting agenda..."
+                    value={archetypeData.agenda || ''}
+                    onChange={e => setArchetypeData({...archetypeData, agenda: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Meeting Link</label>
+                  <input
+                    placeholder="Zoom/Teams/Meet URL"
+                    value={archetypeData.meeting_link || ''}
+                    onChange={e => setArchetypeData({...archetypeData, meeting_link: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {archetype === 'appointment' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Appointment Details</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Provider</label>
+                  <input
+                    placeholder="Doctor, dentist, etc."
+                    value={archetypeData.provider || ''}
+                    onChange={e => setArchetypeData({...archetypeData, provider: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                  <input
+                    placeholder="Checkup, consultation, etc."
+                    value={archetypeData.type || ''}
+                    onChange={e => setArchetypeData({...archetypeData, type: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Location</label>
+                  <input
+                    placeholder="Address or clinic name"
+                    value={archetypeData.location || ''}
+                    onChange={e => setArchetypeData({...archetypeData, location: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {archetype === 'travel' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Travel Details</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Destination</label>
+                  <input
+                    placeholder="Where are you going?"
+                    value={archetypeData.destination || ''}
+                    onChange={e => setArchetypeData({...archetypeData, destination: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Departure Time</label>
+                  <input
+                    placeholder="When do you leave?"
+                    value={archetypeData.departure_time || ''}
+                    onChange={e => setArchetypeData({...archetypeData, departure_time: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Transport</label>
+                  <input
+                    placeholder="Flight, car, train, etc."
+                    value={archetypeData.transport || ''}
+                    onChange={e => setArchetypeData({...archetypeData, transport: e.target.value})}
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {archetype === 'work_focus' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Work Tasks</h3>
+              <div className="space-y-2">
+                <textarea
+                  placeholder="Enter tasks (one per line)"
+                  value={(archetypeData.tasks || []).map((task: any) => task.task).join('\n')}
+                  onChange={e => {
+                    const tasks = e.target.value.split('\n').filter(line => line.trim()).map(line => ({
+                      task: line.trim(),
+                      completed: false
+                    }));
+                    setArchetypeData({...archetypeData, tasks});
+                  }}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {archetype === 'personal' && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Personal Notes</h3>
+              <div className="space-y-2">
+                <textarea
+                  placeholder="Add personal notes..."
+                  value={archetypeData.notes || ''}
+                  onChange={e => setArchetypeData({...archetypeData, notes: e.target.value})}
+                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Display archetype information if viewing an existing event */}
+          {event && (
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type Information</h3>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-xs font-medium text-gray-600">Archetype: </span>
+                  <span className="text-xs text-gray-800 capitalize">{event.archetype || 'generic'}</span>
+                  {event.color && (
+                    <div 
+                      className="inline-block w-3 h-3 rounded-full ml-2" 
+                      style={{ backgroundColor: event.color }}
+                    />
+                  )}
+                </div>
+                
+                {/* Display archetype-specific data */}
+                {event.archetype_data && Object.keys(event.archetype_data).length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-600">Additional Data:</span>
+                    <div className="mt-1 text-xs text-gray-700 bg-gray-50 p-2 rounded">
+                      {renderArchetypeData(event.archetype || 'generic', event.archetype_data)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter className="flex justify-between">
           <div>

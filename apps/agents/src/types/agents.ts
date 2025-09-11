@@ -9,8 +9,10 @@ export interface AgentContext {
   userId: string;
   sessionId: string;
   userSchema: string;
+  timezone?: string;
   conversationHistory: ConversationMessage[];
   userProfile?: UserProfile;
+  isInternal?: boolean; // Flag for internal messages that shouldn't be persisted
 }
 
 export interface UserProfile {
@@ -18,6 +20,7 @@ export interface UserProfile {
   email: string;
   displayName?: string;
   avatarUrl?: string;
+  timezone?: string;
   preferences?: Record<string, any>;
   goals?: Goal[];
   insights?: BehaviorInsight[];
@@ -81,6 +84,18 @@ export interface MemoryContext {
   longTerm: UserProfileMemory;
   entity: EntityMemory;
   vector: VectorMemory;
+  graphiti?: GraphitiMemory; // Optional for backward compatibility
+}
+
+export interface GraphitiMemory {
+  userNodeUuid: string;
+  contextType: 'conversation' | 'task_planning' | 'goal_coaching';
+  totalFacts: number;
+  relevantFacts: Array<{
+    fact: string;
+    relevance: string;
+    timestamp?: string;
+  }>;
 }
 
 export interface ConversationMemory {

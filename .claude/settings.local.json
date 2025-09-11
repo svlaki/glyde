@@ -28,8 +28,21 @@
       "Bash(timeout:*)",
       "Bash(npx supabase migration:*)",
       "Bash(start http://localhost:5173)",
-      "Bash(npx supabase:*)",
-      "Bash(echo $SUPABASE_URL)"
+      "mcp__code-index__get_file_summary",
+      "mcp__code-index__find_files",
+      "mcp__code-index__search_code_advanced",
+      "mcp__serena__find_symbol",
+      "mcp__serena__search_for_pattern",
+      "mcp__serena__find_file",
+      "mcp__serena__write_memory",
+      "mcp__serena__get_symbols_overview",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose:*)",
+      "mcp__code-index__set_project_path",
+      "mcp__serena__replace_symbol_body"
     ],
     "deny": [],
     "additionalDirectories": [

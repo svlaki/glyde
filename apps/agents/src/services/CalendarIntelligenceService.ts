@@ -45,8 +45,8 @@ export class CalendarIntelligenceService {
         .from('events')
         .select('*')
         .eq('user_id', this.userId)
-        .lte('start_time', endTime.toISOString())
-        .gte('end_time', startTime.toISOString());
+        .lt('start_time', endTime.toISOString())
+        .gt('end_time', startTime.toISOString());
 
       if (error) {
         console.error('Error checking conflicts:', error);

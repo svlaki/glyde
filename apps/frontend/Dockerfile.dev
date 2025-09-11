@@ -1,0 +1,20 @@
+# Development Dockerfile for React app with hot reloading
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies with legacy peer deps to handle React version conflicts
+RUN npm install --legacy-peer-deps
+RUN npm install @tailwindcss/postcss --legacy-peer-deps
+
+# Copy the rest of the application
+COPY . .
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Start development server with host binding for Docker
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

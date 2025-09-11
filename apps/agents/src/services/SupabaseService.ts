@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
+import { convertFromUTC, convertToUTC } from '../utils/timezoneUtils.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
@@ -34,6 +35,74 @@ export class SupabaseService {
     return `u_${userId.replace(/-/g, '')}`;
   }
 
+  // Helper method to convert UTC times to local display times (same as frontend does)
+  private convertUTCToLocalDisplay(utcTimeString: string, timezone: string = 'America/New_York'): string {
+    if (!utcTimeString) return utcTimeString;
+    
+    // Use the new timezone utilities for proper conversion
+    return convertFromUTC(utcTimeString, timezone);
+  }
+
+  // Helper method to suggest archetype based on event title/description
+  private async suggestArchetype(title: string, description: string = ''): Promise<string> {
+    try {
+      const { data, error } = await this.client.rpc('suggest_event_archetype', {
+        event_title: title,
+        event_description: description
+      });
+
+      if (error) {
+        console.error('Error suggesting archetype:', error);
+        return 'generic';
+      }
+
+      return data || 'generic';
+    } catch (error) {
+      console.error('Exception suggesting archetype:', error);
+      return 'generic';
+    }
+  }
+
+  // Helper method to get archetype color
+  private async getArchetypeColor(archetype: string, archetypeData: any = {}): Promise<string> {
+    try {
+      const { data, error } = await this.client.rpc('get_event_archetype_color', {
+        archetype_name: archetype,
+        archetype_data: archetypeData
+      });
+
+      if (error) {
+        console.error('Error getting archetype color:', error);
+        return '#6B7280';
+      }
+
+      return data || '#6B7280';
+    } catch (error) {
+      console.error('Exception getting archetype color:', error);
+      return '#6B7280';
+    }
+  }
+
+  // Get all available archetypes
+  async getArchetypes(): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .from('event_archetypes')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching archetypes:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching archetypes:', error);
+      return [];
+    }
+  }
+
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
     const { data, error } = await this.client
       .from('profile')
@@ -49,17 +118,70 @@ export class SupabaseService {
     return data;
   }
 
-  async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    const userSchema = this.getUserSchema(userId);
-    console.log('🔍 [SUPABASE SERVICE] Fetching events from user schema:', userSchema);
+  // Method for agents - includes timezone conversion for proper local time display
+  async getEventsForAgent(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    console.log('🔍 [SUPABASE SERVICE - AGENT] Fetching events for user:', userId);
     
     try {
-      const { data, error } = await this.client
-        .rpc('get_user_events', {
-          user_schema: userSchema,
-          start_date: startDate || null,
-          end_date: endDate || null
-        });
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE - AGENT] Using user schema:', userSchema);
+      
+      // Fetch user profile to get timezone
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+      console.log('🌍 [SUPABASE SERVICE - AGENT] Using user timezone:', userTimezone);
+      
+      // Use RPC function to get events from user's schema
+      const { data, error } = await this.client.rpc('get_user_events', {
+        user_schema: userSchema,
+        start_date: startDate || null,
+        end_date: endDate || null
+      });
+
+      if (error) {
+        console.error('❌ [SUPABASE SERVICE - AGENT] Error fetching events:', error);
+        return [];
+      }
+
+      console.log('✅ [SUPABASE SERVICE - AGENT] Retrieved', data?.length || 0, 'events for user');
+      
+      // Transform RPC response with timezone conversion for agent display
+      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
+        id: eventJson.id,
+        event_title: eventJson.event_title,
+        event_starts_at: this.convertUTCToLocalDisplay(eventJson.event_starts_at, userTimezone),
+        event_ends_at: this.convertUTCToLocalDisplay(eventJson.event_ends_at, userTimezone),
+        event_location: eventJson.event_location,
+        event_description: eventJson.event_description,
+        event_created_at: eventJson.event_created_at,
+        event_updated_at: eventJson.event_updated_at,
+        color: eventJson.color || '#3b82f6',
+        archetype: eventJson.archetype || 'generic',
+        archetype_data: eventJson.archetype_data || {}
+      }));
+      
+      console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed events with timezone conversion:', JSON.stringify(transformedEvents, null, 2));
+      return transformedEvents;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE - AGENT] Exception fetching events:', error);
+      return [];
+    }
+  }
+
+  // Method for frontend - no timezone conversion (frontend handles it)
+  async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    console.log('🔍 [SUPABASE SERVICE] Fetching events for user:', userId);
+    
+    try {
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
+      
+      // Use RPC function to get events from user's schema
+      const { data, error } = await this.client.rpc('get_user_events', {
+        user_schema: userSchema,
+        start_date: startDate || null,
+        end_date: endDate || null
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error fetching events:', error);
@@ -67,20 +189,22 @@ export class SupabaseService {
         return [];
       }
 
-      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events from user schema');
+      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
       console.log('🔍 [SUPABASE SERVICE] Raw event data:', JSON.stringify(data, null, 2));
       
-      // Transform RPC response to match DatabaseEvent interface
-      const transformedEvents = (data || []).map((event: any) => ({
-        id: event.id,
-        event_title: event.event_title,
-        event_starts_at: event.event_starts_at,
-        event_ends_at: event.event_ends_at,
-        event_location: event.event_location,
-        event_description: event.event_description,
-        event_created_at: event.event_created_at,
-        event_updated_at: event.event_updated_at,
-        color: event.color || '#3b82f6'
+      // Transform RPC response to match DatabaseEvent interface (no timezone conversion for frontend)
+      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
+        id: eventJson.id,
+        event_title: eventJson.event_title,
+        event_starts_at: eventJson.event_starts_at, // Frontend handles timezone conversion
+        event_ends_at: eventJson.event_ends_at,     // Frontend handles timezone conversion
+        event_location: eventJson.event_location,
+        event_description: eventJson.event_description,
+        event_created_at: eventJson.event_created_at,
+        event_updated_at: eventJson.event_updated_at,
+        color: eventJson.color || '#3b82f6',
+        archetype: eventJson.archetype || 'generic',
+        archetype_data: eventJson.archetype_data || {}
       }));
       
       console.log('🔄 [SUPABASE SERVICE] Transformed events for frontend:', JSON.stringify(transformedEvents, null, 2));
@@ -93,83 +217,39 @@ export class SupabaseService {
 
   async createEvent(userId: string, event: Partial<DatabaseEvent> & {title?: string; description?: string; start_time?: string; end_time?: string; location?: string}): Promise<DatabaseEvent | null> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🔧 [SUPABASE SERVICE] Creating event in user schema:', userSchema);
+      console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
-      console.log('🔍 [SUPABASE SERVICE] User ID:', userId);
       
-      // Use category-based colors
-      const categoryColors: { [key: string]: string } = {
-        work: '#3B82F6',      // Blue
-        health: '#10B981',    // Green
-        personal: '#8B5CF6',  // Purple
-        learning: '#F59E0B',  // Orange
-        finance: '#EF4444',   // Red
-        travel: '#14B8A6',    // Teal
-        routine: '#6366F1',   // Indigo
-        social: '#EC4899'     // Pink
-      };
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
       
-      // Use provided category or determine from title/description
-      let category = (event as any).category;
+      // Fetch user profile to get timezone
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+      console.log('🌍 [SUPABASE SERVICE] Using user timezone:', userTimezone);
       
-      if (!category) {
-        // AI can intelligently assign category based on content
-        const title = ((event.event_title || event.title || '')).toLowerCase();
-        const description = ((event.event_description || event.description || '')).toLowerCase();
-        const combined = title + ' ' + description;
-        
-        if (combined.match(/\b(meeting|standup|sync|call|interview|work|project|deadline|task)\b/)) {
-          category = 'work';
-        } else if (combined.match(/\b(gym|workout|exercise|doctor|health|medical|wellness)\b/)) {
-          category = 'health';
-        } else if (combined.match(/\b(friend|social|party|dinner|lunch|coffee|date)\b/)) {
-          category = 'social';
-        } else if (combined.match(/\b(course|class|study|learn|training|education)\b/)) {
-          category = 'learning';
-        } else if (combined.match(/\b(budget|payment|bill|finance|money|tax)\b/)) {
-          category = 'finance';
-        } else if (combined.match(/\b(travel|trip|flight|vacation|holiday)\b/)) {
-          category = 'travel';
-        } else if (combined.match(/\b(routine|daily|morning|evening|habit)\b/)) {
-          category = 'routine';
-        } else {
-          category = 'personal';
-        }
-      }
+      // Extract event data
+      const title = event.event_title || event.title || 'Untitled Event';
+      const description = event.event_description || event.description || null;
+      const location = event.event_location || event.location || null;
+      const archetype = event.archetype || null;
+      const archetypeData = event.archetype_data || {};
       
-      const color = categoryColors[category] || '#3B82F6';
-      console.log(`📊 [CATEGORY] Event "${event.event_title}" categorized as ${category} with color ${color}`);
+      // Convert local times to UTC using timezone utilities
+      const startTime = convertToUTC(event.event_starts_at || (event as any).start_time, userTimezone);
+      const endTime = convertToUTC(event.event_ends_at || (event as any).end_time, userTimezone);
       
-      // Use RPC function to create event in user schema
-      const eventTitle = event.event_title || (event as any).title || 'Untitled Event';
-      const eventDescription = event.event_description || (event as any).description || null;
-      const eventStartsAt = event.event_starts_at || (event as any).start_time;
-      const eventEndsAt = event.event_ends_at || (event as any).end_time;
-      const eventLocation = event.event_location || (event as any).location || null;
-      
-      console.log('🔍 [SUPABASE SERVICE] Creating event with RPC function:', {
+      // Use RPC function to create event in user's schema
+      const { data, error } = await this.client.rpc('create_user_event', {
         user_schema: userSchema,
-        event_title: eventTitle,
-        event_starts_at: eventStartsAt,
-        event_ends_at: eventEndsAt,
-        event_location: eventLocation,
-        event_description: eventDescription
+        event_title: title,
+        event_starts_at: startTime,
+        event_ends_at: endTime,
+        event_location: location,
+        event_description: description,
+        archetype: archetype,
+        archetype_data: archetypeData
       });
-
-      const { data, error } = await this.client
-        .rpc('create_user_event', {
-          user_schema: userSchema,
-          event_title: eventTitle,
-          event_starts_at: eventStartsAt,
-          event_ends_at: eventEndsAt,
-          event_location: eventLocation,
-          event_description: eventDescription,
-          archetype: 'generic',
-          archetype_data: { color, category },
-          category: category,
-          color: color
-        });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error creating event:', error);
@@ -179,7 +259,7 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event created successfully:', JSON.stringify(data, null, 2));
       
-      // Transform the response to match DatabaseEvent interface
+      // Transform RPC response to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
@@ -190,7 +270,9 @@ export class SupabaseService {
           event_description: data.event_description,
           event_created_at: data.event_created_at,
           event_updated_at: data.event_updated_at,
-          color: data.archetype_data?.color || color
+          color: data.color || '#3b82f6',
+          archetype: data.archetype || 'generic',
+          archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
       
@@ -203,23 +285,25 @@ export class SupabaseService {
 
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent>): Promise<DatabaseEvent | null> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🔧 [SUPABASE SERVICE] Updating event in user schema:', userSchema);
+      console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
       
-      const { data, error } = await this.client
-        .rpc('update_user_event', {
-          user_schema: userSchema,
-          event_id: eventId,
-          event_title: updates.event_title || null,
-          event_description: updates.event_description || null,
-          event_starts_at: updates.event_starts_at || null,
-          event_ends_at: updates.event_ends_at || null,
-          event_location: updates.event_location || null,
-          archetype: null,
-          archetype_data: null
-        });
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
+      
+      // Use RPC function to update event in user's schema
+      const { data, error } = await this.client.rpc('update_user_event', {
+        user_schema: userSchema,
+        event_id: eventId,
+        event_title: updates.event_title || null,
+        event_starts_at: updates.event_starts_at || null,
+        event_ends_at: updates.event_ends_at || null,
+        event_location: updates.event_location || null,
+        event_description: updates.event_description || null,
+        archetype: updates.archetype || null,
+        archetype_data: updates.archetype_data || null
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error updating event:', error);
@@ -229,7 +313,7 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event updated successfully:', JSON.stringify(data, null, 2));
       
-      // Transform the response to match DatabaseEvent interface
+      // Transform RPC response to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
@@ -239,7 +323,10 @@ export class SupabaseService {
           event_location: data.event_location,
           event_description: data.event_description,
           event_created_at: data.event_created_at,
-          event_updated_at: data.event_updated_at
+          event_updated_at: data.event_updated_at,
+          color: data.color || '#3b82f6',
+          archetype: data.archetype || 'generic',
+          archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
       
@@ -252,15 +339,17 @@ export class SupabaseService {
 
   async deleteEvent(userId: string, eventId: string): Promise<{ success: boolean, error: string | null }> {
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🗑️ [SUPABASE SERVICE] Deleting event from user schema:', userSchema);
+      console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       
-      const { data, error } = await this.client
-        .rpc('delete_user_event', {
-          user_schema: userSchema,
-          event_id: eventId
-        });
+      const userSchema = this.getUserSchema(userId);
+      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
+      
+      // Use RPC function to delete event from user's schema
+      const { data, error } = await this.client.rpc('delete_user_event', {
+        user_schema: userSchema,
+        event_id: eventId
+      });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error deleting event:', error);
@@ -268,8 +357,10 @@ export class SupabaseService {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event deleted successfully:', data);
-      return { success: true, error: null };
+      // RPC function returns boolean indicating success
+      const success = data === true;
+      console.log('✅ [SUPABASE SERVICE] Event deletion result:', success);
+      return { success, error: success ? null : 'Event not found or could not be deleted' };
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception deleting event:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };

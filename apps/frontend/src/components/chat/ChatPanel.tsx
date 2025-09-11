@@ -1,12 +1,28 @@
-/// <reference types="vite/client" />
-import React, { useRef, useState, useEffect } from 'react'
-import { Input } from '../ui/input'
-import { Button } from '../ui/button'
-import { useAuth } from '../../lib/authContext'
-import { supabase } from '../../lib/supabase'
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '../../lib/authContext';
+import { useStreamingChat, ChatMessage } from './hooks/useStreamingChat';
+import { useStreamExample } from '@llm-ui/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Send } from 'lucide-react';
 
-function generateSessionId(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+// Generate session ID function
+function generateSessionId(userId: string): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 15);
+  return `${userId.substring(0, 8)}_${timestamp}_${random}`;
+}
+
+function getOrCreateSessionId(userId: string): string {
+  const storageKey = `glyde_chat_session_${userId}`;
+  let sessionId = localStorage.getItem(storageKey);
+  
+  if (!sessionId) {
+    sessionId = generateSessionId(userId);
+    localStorage.setItem(storageKey, sessionId);
+  }
+  
+  return sessionId;
 }
 
 interface ChatPanelProps {
@@ -14,335 +30,287 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const sessionId = useRef<string>(generateSessionId())
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
-  const lastTimestampRef = useRef<string | null>(null)
-  const [isPolling, setIsPolling] = useState(true)
-  const { user, session, isAuthenticated } = useAuth()
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sessionId, setSessionId] = useState<string>('');
+  const lastTimestampRef = useRef<string | null>(null);
+  const { user, isAuthenticated } = useAuth();
+
+  // Initialize session ID when user is available
+  useEffect(() => {
+    if (user?.id) {
+      const persistentSessionId = getOrCreateSessionId(user.id);
+      setSessionId(persistentSessionId);
+    }
+  }, [user?.id]);
+
+  // Use the streaming chat hook
+  const {
+    messages,
+    isStreaming,
+    currentStreamingMessage,
+    isStreamFinished,
+    setMessages,
+    sendMessage,
+  } = useStreamingChat({
+    sessionId,
+    onEventCreated,
+  });
+
+  // Direct markdown rendering - no need for complex llm-ui processing
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, currentStreamingMessage]);
 
-  useEffect(() => {
-    function handleVisibility() {
-      setIsPolling(document.visibilityState === 'visible')
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
-  // Show intelligent briefing and weekly analysis when page loads
-  useEffect(() => {
-    if (!user || !session?.access_token) return
+  // Load chat history when session is ready using backend API
+  
+  const loadChatHistory = useCallback(async () => {
+    if (!user || !sessionId) return;
     
-    const showBriefing = async () => {
-      try {
-        // Get weekly analysis from backend
-        const analysisRes = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/analysis/week`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: user.id
-          })
-        })
-        
-        if (analysisRes.ok) {
-          const analysis = await analysisRes.json()
-          
-          if (analysis.success && analysis.analysis) {
-            // Build the briefing message from the analysis
-            let briefingMessage = analysis.analysis.greeting
-            
-            // Add key insights if any
-            if (analysis.analysis.insights && analysis.analysis.insights.length > 0) {
-              briefingMessage += '\n\n📊 Key Insights:\n'
-              analysis.analysis.insights.forEach((insight: any) => {
-                const icon = insight.type === 'warning' ? '⚠️' : 
-                            insight.type === 'health' ? '💪' :
-                            insight.type === 'productivity' ? '🎯' : '💡'
-                briefingMessage += `${icon} ${insight.message}\n`
-              })
-            }
-            
-            // Add quick action suggestions if any
-            if (analysis.analysis.quickActions && analysis.analysis.quickActions.length > 0) {
-              briefingMessage += '\n🚀 Quick Actions:\n'
-              analysis.analysis.quickActions.forEach((action: any, index: number) => {
-                briefingMessage += `${index + 1}. ${action.label}\n`
-              })
-            }
-            
-            briefingMessage += '\nWhat would you like to work on today?'
-            
-            setMessages([{
-              id: 'briefing-' + Date.now(),
-              content: briefingMessage,
-              sender: 'assistant',
-              timestamp: new Date().toISOString()
-            }])
-            
-            return
-          }
-        }
-        
-        // Fallback to simple briefing if analysis fails
-        const today = new Date()
-        const currentHour = today.getHours()
-        const greeting = currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening'
-        
-        setMessages([{
-          id: 'welcome-' + Date.now(),
-          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
-          sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }])
-        
-      } catch (err) {
-        console.error('Error showing briefing:', err)
-        // If briefing fails, show a simple time-aware message
-        const hour = new Date().getHours()
-        const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-        setMessages([{
-          id: 'welcome-' + Date.now(),
-          content: `${greeting}! I'm your personal assistant. How can I help you manage your day?`,
-          sender: 'assistant',
-          timestamp: new Date().toISOString()
-        }])
-      }
-    }
-    
-    showBriefing()
-  }, [user, session])
-
-  useEffect(() => {
-    if (!isPolling) {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-      return
-    }
-    async function fetchMessages() {
-      if (!user || !session?.access_token) return
-      try {
-        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/chat/history`
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            session_id: sessionId.current
-          })
-        })
-        if (!res.ok) {
-          console.error('Error fetching messages: HTTP', res.status)
-          return
-        }
-        const result = await res.json()
-        if (result.success && Array.isArray(result.messages)) {
-          setMessages(result.messages)
-          if (result.messages.length > 0) {
-            lastTimestampRef.current = result.messages[result.messages.length - 1].timestamp
-          }
-        } else {
-          console.error('Error fetching messages:', result.error)
-        }
-      } catch (err) {
-        console.error('Error fetching messages:', err)
-      }
-    }
-    // Load messages initially, but don't poll since we have streaming
-    fetchMessages()
-    
-    // Only poll if streaming is disabled
-    if (!isPolling) {
-      pollingRef.current = setInterval(fetchMessages, 10000) // Reduced to 10 seconds
-    }
-    
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-    }
-  }, [isPolling, user])
-
-  async function handleSend() {
-    if (!input.trim()) return
-    if (!user || !session?.access_token) {
-      console.error('User not authenticated or missing session token')
-      return
-    }
-    // Embedding generation will be handled by the agent service
-    const msg: ChatMessage = {
-      id: `${Date.now()}`,
-      content: input,
-      sender: 'user',
-      timestamp: new Date().toISOString()
-    }
-    setMessages(prev => [...prev, msg])
-    lastTimestampRef.current = msg.timestamp
-    setInput('')
-    // Use agent/process endpoint for better context awareness
+    console.log('🔄 [CHAT] Loading history for session:', sessionId);
     try {
-      const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/agent/process`
-      const response = await fetch(url, {
+      const agentServiceUrl = (import.meta as any).env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+      const response = await fetch(`${agentServiceUrl}/api/chat/history`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          context: {
-            userId: user.id,
-            sessionId: sessionId.current,
-            conversationHistory: messages.map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'assistant',
-              content: msg.content
-            }))
-          },
-          message: input
+          user_id: user.id,
+          session_id: sessionId,
+          limit: 50
         })
-      })
+      });
 
-      if (response.ok) {
-        const result = await response.json()
-        let responseContent = ''
+      if (!response.ok) {
+        console.log('ℹ️ [CHAT] No history found or error loading:', response.status);
+        return;
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.messages && result.messages.length > 0) {
+        console.log('✅ [CHAT] Loaded', result.messages.length, 'messages from backend');
         
-        // Handle different response formats
-        if (result.success && result.response) {
-          if (typeof result.response === 'object' && result.response.content) {
-            responseContent = result.response.content
-          } else if (typeof result.response === 'string') {
-            responseContent = result.response
+        // Filter out internal greeting messages - check for multiple variations
+        const filteredHistory = result.messages.filter((msg: any) => {
+          if (msg.sender !== 'user') return true; // Keep all assistant messages
+          
+          const content = msg.content.toLowerCase();
+          const isGreetingMessage = 
+            content.includes('please give me a brief greeting') ||
+            content.includes('brief greeting') ||
+            content.includes('current time') && content.includes('events') && content.includes('schedule');
+          
+          if (isGreetingMessage) {
+            console.log('🚫 [CHAT] Filtering out greeting message:', msg.content);
           }
-        } else if (result.content) {
-          responseContent = result.content
+          
+          return !isGreetingMessage;
+        });
+        
+        const formattedMessages = filteredHistory.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: msg.timestamp
+        }));
+        
+        setMessages(formattedMessages);
+        if (filteredHistory.length > 0) {
+          lastTimestampRef.current = filteredHistory[filteredHistory.length - 1].timestamp;
         }
         
-        if (responseContent) {
-          const aiMsg: ChatMessage = {
-            id: `${Date.now()}-ai`,
-            content: responseContent,
-            sender: 'assistant',
-            timestamp: new Date().toISOString()
-          }
-          setMessages(prev => [...prev, aiMsg])
-          lastTimestampRef.current = aiMsg.timestamp
-          
-          // Check if the response indicates an event was created
-          // Look for common indicators in the response
-          const eventIndicators = [
-            'scheduled', 'created', 'added to your calendar', 
-            'event has been', 'booked', 'meeting set',
-            'appointment made', 'added the event'
-          ];
-          
-          const lowerResponse = responseContent.toLowerCase();
-          const eventWasCreated = eventIndicators.some(indicator => 
-            lowerResponse.includes(indicator)
-          );
-          
-          if (eventWasCreated && onEventCreated) {
-            // Give the backend a moment to process
-            setTimeout(() => {
-              onEventCreated();
-            }, 1000);
-          }
-        }
+        console.log('✅ [CHAT] After filtering:', formattedMessages.length, 'messages remain');
       } else {
-        console.error('Chat response failed:', response.status, response.statusText)
+        console.log('ℹ️ [CHAT] No messages found in response');
       }
     } catch (err) {
-      console.error('Failed to send message', err)
+      console.error('Error loading chat history:', err);
     }
-  }
+  }, [user, sessionId, setMessages]);
+  
+  useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
 
-  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') handleSend()
-  }
+  // Note: Removed realtime subscription since we're using backend API
+  // Messages will be handled via local state in useStreamingChat hook
+
+  // Auto-greeting disabled - users can start conversations manually
+  // useEffect(() => {
+  //   if (!user || !session?.access_token || !sessionId || !hasLoadedHistory || messages.length > 0) return;
+  //   
+  //   const showBriefing = async () => {
+  //     try {
+  //       await sendInternalMessage("Please give me a brief greeting with the current time, how many events I have today, and any key insights about my schedule.");
+  //     } catch (err) {
+  //       console.error('Error showing briefing:', err);
+  //     }
+  //   };
+  //   
+  //   showBriefing();
+  // }, [user, session, sessionId, hasLoadedHistory, messages.length, sendInternalMessage]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming) return;
+    
+    const messageContent = input.trim();
+    setInput('');
+    await sendMessage(messageContent);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Streaming message component using llm-ui
+  const StreamingMessage = ({ content }: { content: string }) => {
+    const { output } = useStreamExample(content, {
+      autoStart: true,
+      delayMultiplier: 0.5,
+      startIndex: 0,
+    });
+
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="max-w-[85%] rounded-lg px-4 py-3 bg-gray-100 text-gray-900 mr-4">
+          <div className="text-sm prose prose-sm max-w-none text-gray-900">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                code: ({ children }) => <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                li: ({ children }) => <li className="mb-1">{children}</li>,
+                h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+              }}
+            >
+              {output}
+            </ReactMarkdown>
+            {/* Typing cursor */}
+            <span className="inline-block w-2 h-5 bg-gray-600 ml-1 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Simple message rendering component  
+  const MessageComponent = ({ message }: { message: ChatMessage }) => {
+    return (
+      <div className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+        <div className={`max-w-[85%] rounded-lg px-4 py-3 ${
+          message.sender === 'user' 
+            ? 'bg-blue-600 text-white ml-4' 
+            : 'bg-gray-100 text-gray-900 mr-4'
+        }`}>
+          <div className="text-sm prose prose-sm max-w-none">
+            {message.sender === 'user' ? (
+              <div className="text-white">{message.content}</div>
+            ) : (
+              <div className="text-gray-900">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                    code: ({ children }) => <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+          <div className="text-xs opacity-70 mt-2">
+            {new Date(message.timestamp).toLocaleTimeString([], { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden" style={{ width: '100%', maxWidth: '100%' }}>
-      {/* Messages Area with fixed height */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ maxWidth: '100%' }}>
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[70%]`}>
-              <div
-                className={`inline-block px-4 py-3 rounded-2xl shadow-sm ${
-                  msg.sender === 'user' 
-                    ? 'rounded-br-md' 
-                    : 'rounded-bl-md'
-                }`}
-                style={{
-                  wordBreak: 'break-word',
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  backgroundColor: msg.sender === 'user' 
-                    ? '#2563EB' // Nice blue for user messages
-                    : '#10B981', // Nice green for assistant messages
-                  color: '#FFFFFF',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-                }}
-              >
-                {msg.content}
-              </div>
-              <div className={`text-xs mt-1 px-1 ${
-                msg.sender === 'user' ? 'text-right text-gray-500' : 'text-left text-gray-500'
-              }`}>
-                {new Date(msg.timestamp).toLocaleTimeString([], { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
+      {/* Header */}
+      <div className="bg-white p-4 border-b border-gray-200 rounded-t-lg">
+        <h2 className="text-lg font-medium text-gray-900">AI Assistant</h2>
+        <p className="text-sm text-gray-500">Your intelligent calendar companion</p>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map(message => <MessageComponent key={message.id} message={message} />)}
+        
+        {/* Current streaming message with llm-ui */}
+        {isStreaming && currentStreamingMessage && (
+          <StreamingMessage content={currentStreamingMessage} />
+        )}
+        
+        {/* Typing indicator when starting */}
+        {isStreaming && !currentStreamingMessage && (
+          <div className="flex justify-start mb-4">
+            <div className="max-w-[85%] rounded-lg px-4 py-3 bg-gray-100 text-gray-900 mr-4">
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-sm text-gray-500">AI is thinking...</span>
               </div>
             </div>
           </div>
-        ))}
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
-      
-      {/* Input Area */}
-      <div className="p-3 bg-white border-t border-gray-200">
-        <div className="flex gap-2 items-center">
-          <div className="flex-1">
-            <Input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleInputKeyDown}
-              placeholder="Type a message..."
-              className="bg-gray-100 border-0 text-gray-800 placeholder-gray-500 rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              autoFocus
-            />
-          </div>
-          <Button
+
+      {/* Input */}
+      <div className="bg-white p-4 border-t border-gray-200 rounded-b-lg">
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleInputKeyDown}
+            disabled={isStreaming}
+            placeholder={isStreaming ? "AI is responding..." : "Type your message..."}
+            className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <button
             onClick={handleSend}
-            disabled={!input.trim()}
-            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-2.5 min-w-[40px] h-[40px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!input.trim() || isStreaming}
+            className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-          </Button>
+            <Send size={20} />
+          </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-// --- Types and static content ---
-
-interface ChatMessage {
-  id: string
-  content: string
-  sender: 'user' | 'assistant'
-  timestamp: string
-} 
+ 

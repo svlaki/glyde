@@ -5,218 +5,7 @@ import { createUserEvent } from './events.js';
 // Store pending interactions in memory (in production, use Redis or database)
 const pendingInteractions = new Map();
 
-// Test scenarios for development - Context-aware and intelligent suggestions
-const TEST_SCENARIOS = {
-  'morning-routine': {
-    question: 'Start your day right - schedule your morning routine at 8:00 AM?',
-    type: 'yes_no',
-    eventData: {
-      title: 'Morning Routine',
-      startTime: '08:00',
-      endTime: '08:30',
-      description: 'Coffee, planning, and mindful start to the day'
-    }
-  },
-  'deep-work-block': {
-    question: 'You have a 3-hour free block this afternoon. What type of focused work?',
-    type: 'multiple_choice',
-    options: ['Strategic Planning', 'Creative Work', 'Learning & Development'],
-    eventData: {
-      title: 'Deep Work Session',
-      startTime: (() => {
-        const hour = Math.max(new Date().getHours() + 1, 14);
-        return `${String(hour).padStart(2, '0')}:00`;
-      })(),
-      endTime: (() => {
-        const hour = Math.max(new Date().getHours() + 4, 17);
-        return `${String(hour).padStart(2, '0')}:00`;
-      })(),
-      description: 'Uninterrupted focused work time'
-    }
-  },
-  'evening-reflection': {
-    question: 'End your day with 30 minutes of reflection and tomorrow\'s planning?',
-    type: 'yes_no',
-    eventData: {
-      title: 'Daily Reflection',
-      startTime: '20:00',
-      endTime: '20:30',
-      description: 'Review today\'s accomplishments and plan tomorrow'
-    }
-  },
-  'health-break': {
-    question: 'You\'ve been at your computer for 4 hours. Time for a health break?',
-    type: 'multiple_choice',
-    options: ['Walk Outside', 'Quick Workout', 'Stretching'],
-    eventData: {
-      title: 'Health Break',
-      startTime: '15:30',
-      endTime: '16:00',
-      description: 'Take care of your physical and mental health'
-    }
-  },
-  'skill-development': {
-    question: 'Friday afternoon is perfect for learning. What skill do you want to develop?',
-    type: 'multiple_choice',
-    options: ['Technical Skills', 'Leadership', 'Creative Skills'],
-    eventData: {
-      title: 'Skill Development',
-      startTime: '15:00',
-      endTime: '16:30',
-      description: 'Invest in your personal and professional growth'
-    }
-  },
-  'weekly-review': {
-    question: 'Sunday is ideal for weekly review and next week\'s planning. Schedule it?',
-    type: 'yes_no',
-    eventData: {
-      title: 'Weekly Review & Planning',
-      startTime: '19:00',
-      endTime: '20:00',
-      description: 'Reflect on the week and plan ahead strategically'
-    }
-  },
-  'social-connection': {
-    question: 'You haven\'t scheduled social time this week. Coffee with a friend?',
-    type: 'yes_no',
-    eventData: {
-      title: 'Social Connection',
-      startTime: '11:00',
-      endTime: '12:00',
-      description: 'Nurture relationships and recharge socially'
-    }
-  },
-  'urgent-task-focus': {
-    question: 'You have urgent tasks due tomorrow. Schedule a dedicated focus session?',
-    type: 'yes_no',
-    eventData: {
-      title: 'Urgent Task Focus',
-      startTime: '09:00',
-      endTime: '11:00',
-      description: 'Tackle high-priority urgent tasks with full attention'
-    }
-  }
-};
 
-// Analyze user's calendar and generate intelligent interactions
-async function generateContextualInteractions(userId: string): Promise<any[]> {
-  try {
-    const supabaseService = new (await import('../services/SupabaseService.js')).SupabaseService();
-    const calendarIntelligence = new (await import('../services/CalendarIntelligenceService.js')).CalendarIntelligenceService(userId);
-    const events = await supabaseService.getEvents(userId);
-    
-    const now = new Date();
-    const todayEvents = events.filter(event => {
-      const eventDate = new Date(event.event_starts_at);
-      return eventDate.toDateString() === now.toDateString();
-    });
-    
-    const interactions = [];
-    
-    // Get the week's events for better context
-    const weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    
-    const weekEvents = events.filter(event => {
-      const eventDate = new Date(event.event_starts_at);
-      return eventDate >= weekStart && eventDate <= weekEnd;
-    });
-    
-    // Analyze the user's week patterns (we'll use this context but keep interactions simple for now)
-    // const insights = await calendarIntelligence.analyzePatterns(weekEvents);
-    
-    // Only generate interactions if we don't already have pending ones
-    const currentHour = new Date().getHours();
-    
-    // Priority 1: If today looks empty and it's still early, suggest planning
-    if (todayEvents.length === 0 && currentHour < 14) {
-      // Suggest morning routine if it's early in the day, afternoon planning if it's later
-      if (currentHour < 12) {
-        // Schedule for next available hour if it's morning
-        const nextHour = Math.max(currentHour + 1, 9); // At least 9 AM
-        interactions.push({
-          id: `empty-day-${userId}-${Date.now()}`,
-          question: 'Your day looks open! Start with a productive morning routine?',
-          type: 'yes_no',
-          eventData: {
-            title: 'Productive Morning Start',
-            startTime: `${String(nextHour).padStart(2, '0')}:00`,
-            endTime: `${String(nextHour).padStart(2, '0')}:30`,
-            description: 'Set intentions and priorities for a successful day'
-          }
-        });
-      } else if (currentHour < 18) {
-        // Schedule for an hour from now in the afternoon
-        const nextHour = Math.min(currentHour + 1, 16); // Latest at 4 PM
-        interactions.push({
-          id: `afternoon-planning-${userId}-${Date.now()}`,
-          question: 'Your afternoon is wide open! Schedule some focused work time?',
-          type: 'multiple_choice',
-          options: ['Deep Work', 'Planning', 'Creative Time'],
-          eventData: {
-            title: 'Focused Afternoon',
-            startTime: `${String(nextHour).padStart(2, '0')}:00`,
-            endTime: `${String(nextHour + 2).padStart(2, '0')}:00`,
-            description: 'Make the most of your open afternoon'
-          }
-        });
-      }
-    } else if (todayEvents.length > 5) {
-      interactions.push({
-        id: `busy-day-${userId}-${Date.now()}`,
-        question: 'Your schedule is packed! Block 15 minutes for a breathing break?',
-        type: 'yes_no',
-        eventData: {
-          title: 'Mindfulness Break',
-          startTime: '15:00',
-          endTime: '15:15',
-          description: 'Reset and recharge with mindful breathing'
-        }
-      });
-    }
-    
-    // Check for meaningful gaps between meetings (only during reasonable hours)
-    for (let i = 0; i < todayEvents.length - 1; i++) {
-      const currentEnd = new Date(todayEvents[i].event_ends_at);
-      const nextStart = new Date(todayEvents[i + 1].event_starts_at);
-      const gapHours = (nextStart.getTime() - currentEnd.getTime()) / (1000 * 60 * 60);
-      
-      // Only suggest gap filling for 2+ hour gaps during reasonable hours (9 AM - 9 PM local)
-      if (gapHours >= 2) {
-        const currentEndHour = currentEnd.getHours(); // Use local hours
-        const nextStartHour = nextStart.getHours(); // Use local hours
-        
-        // Skip if the gap is outside reasonable working hours
-        if (currentEndHour >= 9 && nextStartHour <= 21) {
-          const gapStartTime = String(currentEnd.getHours()).padStart(2, '0') + ':' + String(currentEnd.getMinutes()).padStart(2, '0');
-          const gapEndTime = String(nextStart.getHours()).padStart(2, '0') + ':' + String(nextStart.getMinutes()).padStart(2, '0');
-          
-          interactions.push({
-            id: `gap-fill-${userId}-${Date.now()}-${i}`,
-            question: `You have ${Math.round(gapHours)} hours free from ${gapStartTime} to ${gapEndTime}. What would be most valuable?`,
-            type: 'multiple_choice',
-            options: ['Deep Work', 'Planning', 'Exercise'],
-            eventData: {
-              title: 'Productive Gap Time',
-              startTime: gapStartTime,
-              endTime: gapEndTime,
-              description: 'Make the most of your free time'
-            }
-          });
-          break; // Only suggest one gap fill per request
-        }
-      }
-    }
-    
-    // Only return 1 interaction at a time to avoid overwhelming the user
-    return interactions.slice(0, 1);
-  } catch (error) {
-    console.error('Error generating contextual interactions:', error);
-    return [];
-  }
-}
 
 // Generate sample interactions for testing
 export async function getPendingInteractions(req: Request, res: Response): Promise<Response | void> {
@@ -301,13 +90,11 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         const today = new Date();
         const baseDate = today.toISOString().split('T')[0];
         
-        // Customize title based on response type
-        let eventTitle = interaction.eventData.title;
-        if (interaction.type === 'multiple_choice' && response !== 'yes') {
-          eventTitle = `${response} Session`; // e.g., "Deep Work Session", "Planning Session"
-        }
-
-        // Create proper ISO timestamps that respect local timezone
+        // Check for conflicts before creating event
+        const supabaseService = new (await import('../services/SupabaseService.js')).SupabaseService();
+        const existingEvents = await supabaseService.getEvents(user_id);
+        
+        // Create proposed time slots
         const [startHour, startMin] = interaction.eventData.startTime.split(':');
         const [endHour, endMin] = interaction.eventData.endTime.split(':');
         
@@ -316,6 +103,29 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         
         const endDate = new Date(today);
         endDate.setHours(parseInt(endHour), parseInt(endMin || '0'), 0, 0);
+        
+        // Check for time conflicts
+        const hasConflict = existingEvents.some(event => {
+          const eventStart = new Date(event.event_starts_at);
+          const eventEnd = new Date(event.event_ends_at);
+          
+          // Check if proposed event overlaps with existing event
+          return (startDate < eventEnd && endDate > eventStart);
+        });
+        
+        if (hasConflict) {
+          console.log(`⚠️ [INTERACTION RESPONSE] Time conflict detected, skipping event creation`);
+          return res.json({
+            success: true,
+            message: 'Time conflict detected - suggestion dismissed'
+          });
+        }
+        
+        // Customize title based on response type
+        let eventTitle = interaction.eventData.title;
+        if (interaction.type === 'multiple_choice' && response !== 'yes') {
+          eventTitle = response; // Use the selected option as the event title
+        }
         
         const eventData = {
           event_title: eventTitle,
@@ -368,59 +178,6 @@ export async function respondToInteraction(req: Request, res: Response): Promise
   }
 }
 
-// Trigger a specific test scenario for development
-export async function triggerTestScenario(req: Request, res: Response) {
-  try {
-    const { user_id, scenario_id } = req.body;
-    console.log(`🧪 [TEST TRIGGER] Received: user_id=${user_id}, scenario_id=${scenario_id}`);
-
-    if (!user_id || !scenario_id) {
-      console.log('❌ [TEST TRIGGER] Missing required fields');
-      return res.status(400).json({ error: 'user_id and scenario_id are required' });
-    }
-
-    const scenario = TEST_SCENARIOS[scenario_id as keyof typeof TEST_SCENARIOS];
-    if (!scenario) {
-      console.log(`❌ [TEST TRIGGER] Invalid scenario_id: ${scenario_id}`);
-      return res.status(400).json({ error: 'Invalid scenario_id' });
-    }
-
-    console.log(`✅ [TEST TRIGGER] Found scenario: ${scenario.question}`);
-
-    // Clear any existing interactions for this user
-    const keysToDelete = Array.from(pendingInteractions.keys())
-      .filter(key => pendingInteractions.get(key)?.user_id === user_id);
-    keysToDelete.forEach(key => pendingInteractions.delete(key));
-    console.log(`🗑️ [TEST TRIGGER] Cleared ${keysToDelete.length} existing interactions`);
-
-    // Create new interaction
-    const interaction = {
-      id: `test-${scenario_id}-${user_id}-${Date.now()}`,
-      question: scenario.question,
-      type: scenario.type,
-      options: 'options' in scenario ? (scenario as any).options : undefined,
-      eventData: scenario.eventData
-    };
-
-    pendingInteractions.set(interaction.id, {
-      ...interaction,
-      user_id,
-      created_at: new Date().toISOString()
-    });
-
-    console.log(`✅ [TEST TRIGGER] Created interaction: ${interaction.id}`);
-
-    return res.json({
-      success: true,
-      message: `Test scenario "${scenario_id}" triggered`,
-      interaction
-    });
-
-  } catch (error) {
-    console.error('❌ [TEST TRIGGER] Error triggering test scenario:', error);
-    return res.status(500).json({ error: 'Failed to trigger test scenario' });
-  }
-}
 
 // Clear all interactions for a user (dev utility)
 export async function clearUserInteractions(req: Request, res: Response): Promise<Response | void> {

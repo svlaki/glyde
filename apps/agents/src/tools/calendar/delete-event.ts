@@ -40,7 +40,7 @@ export const deleteEventTool = tool(
       throw new Error(`Failed to delete event: ${deleteResult.error}`);
     }
 
-    return `✅ Deleted event successfully`;
+    return `Event deleted successfully`;
   },
   {
     name: "delete_event",

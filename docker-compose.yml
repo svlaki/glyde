@@ -1,32 +1,47 @@
 services:
-  frontend:
-    build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_OPENAI_API_KEY: ${OPENAI_API_KEY}
-        VITE_AGENT_SERVICE_URL: http://agent:8000
-    ports:
-      - "3000:80"
-    environment:
-      - VITE_SUPABASE_URL=${SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - VITE_API_URL=http://localhost:8000
-      - VITE_AGENT_SERVICE_URL=http://agent:8000
-    depends_on:
-      - agent
-
+  # Node.js Agents Service
   agent:
     build:
       context: ./apps/agents
       dockerfile: Dockerfile
+    container_name: glydeeee-agents
     ports:
       - "8000:8000"
     environment:
       - PORT=8000
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ZEP_API_KEY=${ZEP_API_KEY}
+      - ZEP_BASE_URL=${ZEP_BASE_URL}
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 30s
+
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile.dev
+    container_name: glydeeee-frontend
+    ports:
+      - "3000:5173"
+    environment:
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - VITE_AGENT_SERVICE_URL=http://localhost:8000
+    depends_on:
+      agent:
+        condition: service_started
 
 volumes:
   db_data:
+
+networks:
+  default:
+    driver: bridge

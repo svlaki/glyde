@@ -15,6 +15,7 @@ create or replace function match_events (
   metadata jsonb,
   similarity float
 )
+
 language plpgsql
 as $$
 #variable_conflict use_column
@@ -25,20 +26,20 @@ begin
   user_schema := filter->>'user_schema';
   
   if user_schema is not null then
-    -- Search in user-specific schema
+    -- Search in user-specific schema (user schema uses different column names)
     return query execute format('
       select
         e.id,
-        concat(e.event_title, '' '', coalesce(e.event_description, ''''), '' '', coalesce(e.event_location, '''')) as content,
+        concat(e.title, '' '', coalesce(e.description, ''''), '' '', coalesce(e.location, '''')) as content,
         jsonb_build_object(
           ''id'', e.id,
-          ''event_title'', e.event_title,
-          ''event_starts_at'', e.event_starts_at,
-          ''event_ends_at'', e.event_ends_at,
-          ''event_location'', e.event_location,
-          ''event_description'', e.event_description,
-          ''event_created_at'', e.event_created_at,
-          ''event_updated_at'', e.event_updated_at
+          ''event_title'', e.title,
+          ''event_starts_at'', e.start_time,
+          ''event_ends_at'', e.end_time,
+          ''event_location'', e.location,
+          ''event_description'', e.description,
+          ''event_created_at'', e.created_at,
+          ''event_updated_at'', e.updated_at
         ) as metadata,
         1 - (e.embedding <=> $1) as similarity
       from %I.events e
@@ -48,22 +49,22 @@ begin
     ', user_schema)
     using query_embedding, match_count;
   else
-    -- Fallback to public schema (shouldn't happen normally)
+    -- Fallback to public schema (public schema column names)
     return query
     select
       e.id,
-      concat(e.event_title, ' ', coalesce(e.event_description, ''), ' ', coalesce(e.event_location, '')) as content,
+      concat(e.title, ' ', coalesce(e.description, ''), ' ', coalesce(e.location, '')) as content,
       jsonb_build_object(
         'id', e.id,
-        'event_title', e.event_title,
-        'event_starts_at', e.event_starts_at,
-        'event_ends_at', e.event_ends_at,
-        'event_location', e.event_location,
-        'event_description', e.event_description,
-        'event_created_at', e.event_created_at,
-        'event_updated_at', e.event_updated_at
+        'event_title', e.title,
+        'event_starts_at', e.start_time,
+        'event_ends_at', e.end_time,
+        'event_location', e.location,
+        'event_description', e.description,
+        'event_created_at', e.created_at,
+        'event_updated_at', e.updated_at
       ) as metadata,
-      1 - (events.embedding <=> query_embedding) as similarity
+      1 - (e.embedding <=> query_embedding) as similarity
     from public.events e
     where e.embedding is not null
     order by e.embedding <=> query_embedding

@@ -49,38 +49,43 @@ export async function handleChatMessage(req: Request, res: Response): Promise<vo
     const embedding = await getEmbeddingService().generateEmbedding(message);
     console.log('Step 1: Embedding generated');
 
-    console.log('Step 2: Storing user message via RPC...');
-    // Store user message using RPC function to avoid schema access issues
-    const { data: userMessageId, error: userMessageError } = await supabase
-      .rpc('add_user_chat_message', {
-        p_user_id: user_id,
-        p_session_id: session_id,
-        p_content: message,
-        p_sender: 'user',
-        p_embedding: embedding
-      });
+    console.log('Step 2: Storing user message directly...');
+    // Store user message directly in user schema table
+    const userSchema = `u_${user_id.replace(/-/g, '')}`;
+    const { data: userMessageData, error: userMessageError } = await supabase
+      .schema(userSchema)
+      .from('chat_messages')
+      .insert({
+        session_id: session_id,
+        user_id: user_id,
+        content: message,
+        sender: 'user',
+        embedding: embedding
+      })
+      .select('id')
+      .single();
       
     if (userMessageError) {
-      console.error('Error storing user message via RPC:', userMessageError);
+      console.error('Error storing user message:', userMessageError);
       // Continue anyway - we can still process the message
     } else {
-      console.log('Step 2: User message stored successfully via RPC, ID:', userMessageId);
+      console.log('Step 2: User message stored successfully, ID:', userMessageData?.id);
     }
 
-    console.log('Step 3: Getting conversation history via RPC...');
-    // Get conversation history using RPC function
+    console.log('Step 3: Getting conversation history directly...');
+    // Get conversation history directly from user schema table
     const { data: chatHistory, error: historyError } = await supabase
-      .rpc('get_user_chat_messages', {
-        p_user_id: user_id,
-        p_session_id: session_id,
-        p_limit: 50
-      });
+      .schema(userSchema)
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', session_id)
+      .order('timestamp', { ascending: true })
+      .limit(50);
       
-    const conversationHistory = chatHistory?.map((msg: any) => 
-      msg.sender === 'user' 
-        ? new HumanMessage(msg.content)
-        : new AIMessage(msg.content)
-    ) || [];
+    const conversationHistory = chatHistory?.map((msg: any) => ({
+      role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+      content: msg.content
+    })) || [];
     
     console.log('Step 3: Conversation history retrieved:', conversationHistory.length, 'messages');
     
@@ -98,31 +103,35 @@ export async function handleChatMessage(req: Request, res: Response): Promise<vo
     const agentResponse = await getConversationAgent().processMessage(agentContext, message);
     console.log('Step 5: Agent response received:', agentResponse.content.substring(0, 100) + '...');
 
-    console.log('Step 6: Storing agent response via RPC...');
+    console.log('Step 6: Storing agent response directly...');
     // Generate embedding for the agent response
     const responseEmbedding = await getEmbeddingService().generateEmbedding(agentResponse.content);
 
-    // Store agent response using RPC function
-    const { data: aiMessageId, error: aiMessageError } = await supabase
-      .rpc('add_user_chat_message', {
-        p_user_id: user_id,
-        p_session_id: session_id,
-        p_content: agentResponse.content,
-        p_sender: 'assistant',
-        p_embedding: responseEmbedding
-      });
+    // Store agent response directly in user schema table
+    const { data: aiMessageData, error: aiMessageError } = await supabase
+      .schema(userSchema)
+      .from('chat_messages')
+      .insert({
+        session_id: session_id,
+        user_id: user_id,
+        content: agentResponse.content,
+        sender: 'assistant',
+        embedding: responseEmbedding
+      })
+      .select('id')
+      .single();
       
     if (aiMessageError) {
-      console.error('Error storing AI message via RPC:', aiMessageError);
+      console.error('Error storing AI message:', aiMessageError);
       // Continue anyway - we can still return the response
     } else {
-      console.log('Step 6: Agent response stored successfully via RPC, ID:', aiMessageId);
+      console.log('Step 6: Agent response stored successfully, ID:', aiMessageData?.id);
     }
 
     res.json({
       success: true,
       response: agentResponse.content,
-      id: aiMessageId || Date.now().toString()
+      id: aiMessageData?.id || Date.now().toString()
     });
 
   } catch (error) {
@@ -143,22 +152,24 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
 
     console.log('🔍 [CHAT HISTORY] Getting chat history for:', { user_id, session_id, limit });
 
-    // Use RPC function to access user schema (bypasses PostgREST schema restrictions)
+    // Get chat history directly from user schema table
+    const userSchema = `u_${user_id.replace(/-/g, '')}`;
     const { data: chatHistory, error: historyError } = await supabase
-      .rpc('get_user_chat_messages', {
-        p_user_id: user_id,
-        p_session_id: session_id,
-        p_limit: limit
-      });
+      .schema(userSchema)
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', session_id)
+      .order('timestamp', { ascending: true })
+      .limit(limit);
       
     if (historyError) {
-      console.error('❌ [CHAT HISTORY] Error fetching chat history via RPC:', historyError);
+      console.error('❌ [CHAT HISTORY] Error fetching chat history:', historyError);
       console.error('❌ [CHAT HISTORY] Error details:', JSON.stringify(historyError, null, 2));
       res.status(500).json({ error: 'Failed to get chat history', details: historyError.message });
       return;
     }
 
-    console.log('✅ [CHAT HISTORY] Retrieved', chatHistory?.length || 0, 'messages via RPC');
+    console.log('✅ [CHAT HISTORY] Retrieved', chatHistory?.length || 0, 'messages directly');
     
     res.json({
       success: true,
@@ -217,11 +228,10 @@ export async function handleStreamingChat(req: Request, res: Response): Promise<
         p_limit: 50
       });
       
-    const conversationHistory = chatHistory?.map((msg: any) => 
-      msg.sender === 'user' 
-        ? new HumanMessage(msg.content)
-        : new AIMessage(msg.content)
-    ) || [];
+    const conversationHistory = chatHistory?.map((msg: any) => ({
+      role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+      content: msg.content
+    })) || [];
     
     // Create agent context
     const agentContext: AgentContext = {
