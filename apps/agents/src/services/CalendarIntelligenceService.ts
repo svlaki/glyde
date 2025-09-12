@@ -40,7 +40,7 @@ export class CalendarIntelligenceService {
     excludeEventId?: string
   ): Promise<ConflictCheckResult> {
     try {
-      // Fetch events that might conflict
+      // Fetch events that might conflict using correct column names
       const { data: events, error } = await supabase
         .from('events')
         .select('*')
@@ -62,7 +62,13 @@ export class CalendarIntelligenceService {
         
         return {
           hasConflict: true,
-          conflictingEvents,
+          conflictingEvents: conflictingEvents.map(event => ({
+            id: event.id,
+            title: event.title,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location
+          })),
           suggestion
         };
       }

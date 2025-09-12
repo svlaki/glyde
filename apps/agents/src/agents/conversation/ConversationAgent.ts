@@ -9,6 +9,7 @@ import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { CalendarIntelligenceService } from '../../services/CalendarIntelligenceService.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { createEventTool } from '../../tools/calendar/create-event.js';
 
 // Utility functions
 
@@ -112,7 +113,7 @@ export class ConversationAgent extends BaseAgent {
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
       
-      let response = lastAiMessage?.content || "I'm here to help! What would you like me to do?";
+      let response = lastAiMessage?.content || "Processing your request...";
       
       if (result.lastResult) {
         response += `\n\n${result.lastResult}`;
@@ -154,29 +155,7 @@ export class ConversationAgent extends BaseAgent {
 
   private createGraph(): any {
     // Define tools for calendar and task operations
-    const createEventTool = tool(
-      async ({ title, startTime, endTime, location, description }) => {
-        const event = {
-          event_title: title,
-          event_starts_at: startTime,
-          event_ends_at: endTime,
-          event_location: location || "",
-          event_description: description || "",
-        };
-        return `Event creation parameters: ${JSON.stringify(event)}`;
-      },
-      {
-        name: "create_event",
-        description: "Create a new calendar event. Parse natural language into structured event data. Use smart defaults for missing information. Be intelligent about time defaults based on event type.",
-        schema: z.object({
-          title: z.string().describe("Event title extracted from user input or inferred from context"),
-          startTime: z.string().describe("Start time in ISO format WITHOUT Z suffix (e.g., '2025-08-25T17:00:00.000' for 5pm). CRITICAL: When user says '5pm', create timestamp for 5pm LOCAL TIME, NOT UTC. Example: '5pm tomorrow' = '2025-08-26T17:00:00.000' (no Z). Use intelligent defaults: breakfast=8am, lunch=12pm, dinner=6pm, meetings=business hours"),
-          endTime: z.string().describe("End time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format (no Z). If not specified, add 1 hour to start time"),
-          location: z.string().nullable().describe("Event location. Leave empty if not specified"),
-          description: z.string().nullable().describe("Event description. Leave empty if not specified"),
-        }),
-      }
-    );
+    // Using imported createEventTool from tools/calendar/create-event.js
 
     const updateEventTool = tool(
       async ({ eventId, title, startTime, endTime, location, description }) => {
@@ -563,41 +542,9 @@ INTELLIGENCE FEATURES:
           
           switch (action.name) {
             case "create_event":
-              try {
-                // Check for conflicts first
-                const intelligenceService = new CalendarIntelligenceService(state.userId);
-                const conflictCheck = await intelligenceService.checkConflicts(
-                  new Date(action.args.startTime),
-                  new Date(action.args.endTime)
-                );
-                
-                if (conflictCheck.hasConflict) {
-                  const conflictingEvent = conflictCheck.conflictingEvents[0];
-                  result = `⚠️ Time conflict detected with "${conflictingEvent.title}". ${conflictCheck.suggestion || 'Please choose a different time.'}`;
-                  break;
-                }
-                
-                // Create event using SupabaseService to write to public.events table
-                const supabaseService = new SupabaseService();
-                const createdEvent = await supabaseService.createEvent(state.userId, {
-                  event_title: action.args.title,
-                  event_starts_at: action.args.startTime,
-                  event_ends_at: action.args.endTime,
-                  event_location: action.args.location || null,
-                  event_description: action.args.description || null,
-                });
-                
-                if (!createdEvent) {
-                  result = `❌ Failed to create event: Unknown error`;
-                } else {
-                  // Category name can be inferred from event title or type
-                  const categoryName = 'Event';
-                  result = `Created event: "${action.args.title}"`;
-                }
-              } catch (error) {
-                console.error('Error creating event:', error);
-                result = `❌ Error creating event: ${error instanceof Error ? error.message : 'Unknown error'}`;
-              }
+              // Event creation and conflict detection is handled by the tool
+              // Tool has already been executed, just acknowledge completion
+              result = "Event creation completed";
               break;
 
             case "update_event":

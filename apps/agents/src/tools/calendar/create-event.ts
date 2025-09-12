@@ -11,6 +11,37 @@ export const createEventTool = tool(
       throw new Error("User ID is required for creating events");
     }
 
+    // Check for conflicts BEFORE creating the event
+    const { CalendarIntelligenceService } = await import('../../services/CalendarIntelligenceService.js');
+    const intelligenceService = new CalendarIntelligenceService(userId);
+    
+    try {
+      const conflictCheck = await intelligenceService.checkConflicts(
+        new Date(startTime),
+        new Date(endTime)
+      );
+      
+      if (conflictCheck.hasConflict && conflictCheck.conflictingEvents.length > 0) {
+        const conflictingEvent = conflictCheck.conflictingEvents[0];
+        const conflictStartTime = new Date(conflictingEvent.start_time).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true 
+        });
+        const conflictEndTime = new Date(conflictingEvent.end_time).toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true 
+        });
+        
+        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. ${conflictCheck.suggestion || 'Please choose a different time or let me know if you\'d like to reschedule the existing event.'}`;
+      }
+    } catch (error) {
+      console.error('Error checking for conflicts:', error);
+      // Continue with event creation if conflict check fails
+    }
+
+    // Create the event if no conflicts
     const event = await supabaseService.createEvent(userId, {
       event_title: title,
       event_starts_at: startTime,
@@ -36,4 +67,4 @@ export const createEventTool = tool(
       description: z.string().nullable().describe("Event description. Leave empty if not specified"),
     }),
   }
-);
+);;
