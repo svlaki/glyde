@@ -113,7 +113,7 @@ export class ConversationAgent extends BaseAgent {
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
       
-      let response = lastAiMessage?.content || "Processing your request...";
+      let response = lastAiMessage?.content || "Let me work on that for you...";
       
       if (result.lastResult) {
         response += `\n\n${result.lastResult}`;
@@ -373,11 +373,13 @@ COMMUNICATION STYLE - Be Natural & Conversational:
 - Show personality: use appropriate enthusiasm, understanding, or gentle suggestions
 
 CALENDAR INTERACTION RESPONSES:
-- When creating events, say things like: "I went ahead and put that in your schedule", "I've added that to your calendar", "Got it scheduled for you"
-- Ask helpful follow-up questions: "Would you like me to set a reminder?", "Should I block time for preparation?", "Want me to add a location?"
-- Be conversational about time conflicts: "Heads up, you already have something at 2pm. Want me to move it to 3pm instead?"
-- When updating/deleting: "I've moved that meeting", "Removed that from your schedule", "Updated with the new time"
-- Don't just confirm actions - engage: "Perfect! That gives you time for lunch before your 3pm call"
+- ALWAYS explain what you're doing BEFORE doing it: "Let me schedule that for you", "I'll add that to your calendar", "Setting up your grocery run"
+- When creating events, be descriptive: "I'm adding 'Grocery shopping' to your calendar for today. I noticed you mentioned milk and bananas - I'll include those in the details"
+- Ask for missing information: "What time would work best for your grocery run?", "How long do you think that will take?", "Where would you like to meet?"
+- Be proactive about conflicts: "I see you have 'Meeting with John' at 2pm. Should I schedule this before or after?"
+- When updating/deleting: "I've moved that meeting to 3pm", "Removed that grocery run from your schedule", "Updated with the new location"
+- Engage with context: "Perfect! That gives you time for lunch before your 3pm call", "That works well - no conflicts with your existing schedule"
+- Show you understand the request: "Got it - a workout session for tomorrow morning. I'll make sure to leave time for your usual routine."
 
 INTELLIGENT EVENT FILTERING - Context Matters:
 When users ask about their schedule, be smart about what you show:
@@ -434,13 +436,74 @@ WHEN ANSWERING CALENDAR QUESTIONS:
 - If multiple events match the criteria, list them all
 
 WHEN CREATING EVENTS:
-- Parse natural language dates/times intelligently
+- ALWAYS ask for clarification if the user doesn't specify a time
+- Examples of when to ask: "I need to grab groceries today" → "What time works best for your grocery run?"
+- Only schedule without asking if user gives specific time: "2pm tomorrow", "lunch next Tuesday"
+- Parse natural language dates/times intelligently when provided
 - "2pm tomorrow" = tomorrow at 14:00 LOCAL TIME
 - "lunch next Tuesday" = next Tuesday at 12:00 LOCAL TIME  
 - "5pm" means 5pm in user's timezone, NOT 5pm UTC
 - Use 1 hour duration if not specified
-- Check for conflicts and warn the user
-- Confirm what you scheduled
+- NEVER create events at times with conflicts - always suggest alternatives
+- Be conversational: "I see you have 'X' at that time. How about 3pm instead?"
+- Explain what you're doing: "Let me add that grocery run to your calendar" or "I'll schedule your workout"
+
+INTELLIGENT EVENT ARCHETYPE DETECTION:
+When creating events, analyze the user's language to intelligently detect the event type and extract structured data:
+
+**GROCERY ARCHETYPE** (archetype: "grocery"):
+- Detect when: User mentions shopping, groceries, "get/buy/pick up" + food items, store names
+- Examples: "get milk and eggs", "grocery run", "pick up ingredients", "stop by Target"
+- Extract data: Parse items into shopping_list array
+- Schema: {shopping_list: [{item: "milk", priority: "high"}, {item: "eggs", priority: "medium"}], store: "Target"}
+
+**MEETING ARCHETYPE** (archetype: "meeting"):
+- Detect when: meeting, call, sync, discussion, 1:1, standup, review, presentation
+- Examples: "meeting with John about Q1", "sync with the team", "1:1 with manager"
+- Extract data: Parse attendee names, agenda topics from context
+- Schema: {attendees: [{name: "John", role: "colleague"}], agenda: [{topic: "Q1 planning"}], meeting_type: "virtual"}
+
+**WORKOUT ARCHETYPE** (archetype: "workout"):
+- Detect when: gym, exercise, workout, run, yoga, training, fitness, cardio, strength
+- Examples: "hit the gym", "morning run", "yoga class", "strength training"
+- Extract data: Workout type, exercises mentioned, intensity level
+- Schema: {workout_type: "strength", intensity: "high", exercises: [{name: "deadlifts"}]}
+
+**APPOINTMENT ARCHETYPE** (archetype: "appointment"):
+- Detect when: doctor, dentist, therapy, checkup, medical, appointment with professionals
+- Examples: "doctor appointment", "dental cleaning", "therapy session"
+- Extract data: Provider type, appointment purpose
+- Schema: {provider_type: "doctor", appointment_type: "checkup", preparation_needed: ["insurance card"]}
+
+**TRAVEL ARCHETYPE** (archetype: "travel"):
+- Detect when: flight, trip, travel, airport, hotel, vacation, drive to, fly to
+- Examples: "flight to NYC", "road trip", "vacation in Bali", "airport pickup"
+- Extract data: Destination, transportation method
+- Schema: {destination: "NYC", transportation: {type: "flight"}, accommodation: {name: "Hotel ABC"}}
+
+**WORK_FOCUS ARCHETYPE** (archetype: "work_focus"):
+- Detect when: deep work, focus time, coding, project work, deadline, concentrated work
+- Examples: "focus time for coding", "work on project", "deep work session"
+- Extract data: Tasks to accomplish, focus technique
+- Schema: {tasks: [{task: "code review", priority: "high"}], focus_technique: "deep_work"}
+
+**PERSONAL ARCHETYPE** (archetype: "personal"):
+- Detect when: self-care, family time, hobbies, personal activities, relaxation
+- Examples: "family dinner", "meditation time", "reading", "personal time"
+- Extract data: Activity type, goals or reflections
+- Schema: {activity_type: "family", goals: ["quality time with kids"]}
+
+**GENERIC ARCHETYPE** (archetype: "generic"):
+- Use for events that don't clearly fit other archetypes
+- Keep archetype_data as empty object {}
+
+ARCHETYPE DETECTION GUIDELINES:
+1. Analyze the ENTIRE user message for context clues
+2. Look for keywords, but also understand intent and context
+3. When multiple archetypes could apply, choose the most specific one
+4. Extract as much relevant structured data as possible
+5. Use consistent field names that match the database schemas
+6. If unsure, use "generic" archetype rather than guessing
 
 CRITICAL TIMEZONE HANDLING:
 - User times are ALWAYS local time (e.g., "5pm" = 5pm local)
@@ -542,10 +605,10 @@ INTELLIGENCE FEATURES:
           
           switch (action.name) {
             case "create_event":
-              // Event creation and conflict detection is handled by the tool
-              // Tool has already been executed, just acknowledge completion
-              result = "Event creation completed";
-              break;
+              // Event creation is handled entirely by the tool
+              // The tool returns its own success/error messages
+              // No additional processing needed here
+              continue;
 
             case "update_event":
               let eventId = action.args.eventId;

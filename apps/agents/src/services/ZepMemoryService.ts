@@ -33,6 +33,8 @@ export interface CalendarEvent {
   topics?: string[];
   location?: string;
   energyLevel?: 'low' | 'medium' | 'high';
+  archetype?: string;
+  archetypeData?: Record<string, any>;
 }
 
 export interface TaskCompletion {
@@ -197,25 +199,110 @@ export class ZepMemoryService {
         participants: event.participants || [],
         topics: event.topics || [],
         energy_level: event.energyLevel,
+        archetype: event.archetype || 'generic',
+        archetype_data: event.archetypeData || {},
         created_at: new Date().toISOString()
       };
+
+      // Create rich context content based on archetype for better AI understanding
+      let contextContent = `Calendar event: ${event.title} scheduled for ${event.startTime.toISOString()}. Location: ${event.location || 'Not specified'}. Participants: ${event.participants?.join(', ') || 'None'}`;
+      
+      // Add archetype-specific context for pattern learning
+      if (event.archetype && event.archetype !== 'generic' && event.archetypeData) {
+        contextContent += `. Event type: ${event.archetype}`;
+        
+        switch (event.archetype) {
+          case 'grocery':
+            if (event.archetypeData.shopping_list) {
+              const items = event.archetypeData.shopping_list.map((item: any) => item.item || item).join(', ');
+              contextContent += `. Shopping for: ${items}`;
+              if (event.archetypeData.store) {
+                contextContent += ` at ${event.archetypeData.store}`;
+              }
+            }
+            break;
+            
+          case 'meeting':
+            if (event.archetypeData.attendees) {
+              const attendees = event.archetypeData.attendees.map((a: any) => a.name || a).join(', ');
+              contextContent += `. Meeting with: ${attendees}`;
+            }
+            if (event.archetypeData.agenda) {
+              const topics = event.archetypeData.agenda.map((a: any) => a.topic || a).join(', ');
+              contextContent += `. Topics: ${topics}`;
+            }
+            break;
+            
+          case 'workout':
+            if (event.archetypeData.workout_type) {
+              contextContent += `. Workout type: ${event.archetypeData.workout_type}`;
+            }
+            if (event.archetypeData.intensity) {
+              contextContent += `. Intensity: ${event.archetypeData.intensity}`;
+            }
+            if (event.archetypeData.exercises) {
+              const exercises = event.archetypeData.exercises.map((e: any) => e.name || e).join(', ');
+              contextContent += `. Exercises: ${exercises}`;
+            }
+            break;
+            
+          case 'appointment':
+            if (event.archetypeData.provider_type) {
+              contextContent += `. Provider: ${event.archetypeData.provider_type}`;
+            }
+            if (event.archetypeData.appointment_type) {
+              contextContent += `. Type: ${event.archetypeData.appointment_type}`;
+            }
+            break;
+            
+          case 'travel':
+            if (event.archetypeData.destination) {
+              contextContent += `. Destination: ${event.archetypeData.destination}`;
+            }
+            if (event.archetypeData.transportation?.type) {
+              contextContent += `. Transportation: ${event.archetypeData.transportation.type}`;
+            }
+            break;
+            
+          case 'work_focus':
+            if (event.archetypeData.focus_technique) {
+              contextContent += `. Focus technique: ${event.archetypeData.focus_technique}`;
+            }
+            if (event.archetypeData.tasks) {
+              const tasks = event.archetypeData.tasks.map((t: any) => t.task || t).join(', ');
+              contextContent += `. Tasks: ${tasks}`;
+            }
+            break;
+            
+          case 'personal':
+            if (event.archetypeData.activity_type) {
+              contextContent += `. Activity: ${event.archetypeData.activity_type}`;
+            }
+            if (event.archetypeData.goals) {
+              contextContent += `. Goals: ${event.archetypeData.goals.join(', ')}`;
+            }
+            break;
+        }
+      }
 
       // Add as a conversation message instead of deprecated facts
       await this.client.memory.add(sessionId, {
         messages: [{
           role: 'system',
           roleType: 'system',
-          content: `Calendar event: ${event.title} scheduled for ${event.startTime.toISOString()}. Location: ${event.location || 'Not specified'}. Participants: ${event.participants?.join(', ') || 'None'}`,
+          content: contextContent,
           metadata: {
             type: 'calendar_event',
             event_title: event.title,
             start_time: event.startTime.toISOString(),
+            archetype: event.archetype || 'generic',
+            archetype_data: event.archetypeData || {},
             timestamp: new Date().toISOString()
           }
         }]
       });
 
-      console.log(`Added calendar event "${event.title}" to Zep for user ${userId}`);
+      console.log(`Added calendar event "${event.title}" with archetype "${event.archetype}" to Zep for user ${userId}`);
     } catch (error) {
       console.error('Failed to add calendar event:', error);
       throw error;

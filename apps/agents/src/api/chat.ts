@@ -152,15 +152,13 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
 
     console.log('🔍 [CHAT HISTORY] Getting chat history for:', { user_id, session_id, limit });
 
-    // Get chat history directly from user schema table
-    const userSchema = `u_${user_id.replace(/-/g, '')}`;
+    // Get chat history using RPC function
     const { data: chatHistory, error: historyError } = await supabase
-      .schema(userSchema)
-      .from('chat_messages')
-      .select('*')
-      .eq('session_id', session_id)
-      .order('timestamp', { ascending: true })
-      .limit(limit);
+      .rpc('get_user_chat_messages', {
+        p_user_id: user_id,
+        p_session_id: session_id,
+        p_limit: limit
+      });
       
     if (historyError) {
       console.error('❌ [CHAT HISTORY] Error fetching chat history:', historyError);
