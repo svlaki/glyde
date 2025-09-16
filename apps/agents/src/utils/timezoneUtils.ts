@@ -77,7 +77,6 @@ export function convertFromUTC(utcTimeString: string, timezone: string = 'Americ
   // Convert to local time by adding the timezone offset
   const localDate = new Date(utcDate.getTime() + (offsetHours * 60 * 60 * 1000));
   
-  console.log(`🌍 [TIMEZONE UTILS] Converting UTC "${utcTimeString}" → Local "${localDate.toISOString()}" (${timezone}, offset: ${offsetHours}h)`);
   return localDate.toISOString();
 }
 

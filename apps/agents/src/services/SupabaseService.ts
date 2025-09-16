@@ -160,7 +160,7 @@ export class SupabaseService {
         archetype_data: eventJson.archetype_data || {}
       }));
       
-      console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed events with timezone conversion:', JSON.stringify(transformedEvents, null, 2));
+      console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed', transformedEvents.length, 'events with timezone conversion');
       return transformedEvents;
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE - AGENT] Exception fetching events:', error);
@@ -190,7 +190,6 @@ export class SupabaseService {
       }
 
       console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
-      console.log('🔍 [SUPABASE SERVICE] Raw event data:', JSON.stringify(data, null, 2));
       
       // Transform RPC response to match DatabaseEvent interface (no timezone conversion for frontend)
       const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
@@ -207,7 +206,7 @@ export class SupabaseService {
         archetype_data: eventJson.archetype_data || {}
       }));
       
-      console.log('🔄 [SUPABASE SERVICE] Transformed events for frontend:', JSON.stringify(transformedEvents, null, 2));
+      console.log('🔄 [SUPABASE SERVICE] Transformed', transformedEvents.length, 'events for frontend');
       return transformedEvents;
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception fetching events:', error);
