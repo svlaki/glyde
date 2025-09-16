@@ -130,8 +130,8 @@ export interface EntityInfo {
 }
 
 export interface VectorMemory {
-  recentEvents: Array<{ content: string; embedding: number[]; timestamp: string }>;
-  recentChats: Array<{ content: string; embedding: number[]; timestamp: string }>;
+  recentEvents: Array<{ content: string; embedding?: number[]; timestamp: string }>;
+  recentChats: Array<{ content: string; embedding?: number[]; timestamp: string }>;
   semanticContext: string;
 }
 

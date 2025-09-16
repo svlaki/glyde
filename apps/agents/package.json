@@ -10,8 +10,7 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
-    "@getzep/zep-cloud": "^1.0.12",
-    "@langchain/community": "^0.2.28",
+    "@getzep/zep-cloud": "^3.4.1",
     "@langchain/core": "^0.2.27",
     "@langchain/langgraph": "^0.0.34",
     "@langchain/openai": "^0.2.7",

@@ -2,8 +2,6 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 
-const supabaseService = new SupabaseService();
-
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit = 20 }, config) => {
     const userId = config?.configurable?.userId;
@@ -12,8 +10,11 @@ export const listEventsTool = tool(
       throw new Error("User ID is required for listing events");
     }
 
+    // Initialize service
+    const supabaseService = new SupabaseService();
+
     let events;
-    
+
     if (startDate && endDate) {
       events = await supabaseService.getEventsForAgent(userId, startDate, endDate);
     } else {

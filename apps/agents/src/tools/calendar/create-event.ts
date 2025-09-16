@@ -1,8 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-
-const supabaseService = new SupabaseService();
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createEventTool = tool(
   async ({ title, startTime, endTime, location, description, archetype, archetype_data }, config) => {
@@ -13,30 +12,41 @@ export const createEventTool = tool(
 
     console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, archetype });
 
-    // Check for conflicts BEFORE creating the event
-    const { CalendarIntelligenceService } = await import('../../services/CalendarIntelligenceService.js');
-    const intelligenceService = new CalendarIntelligenceService(userId);
-    
+    // Initialize services
+    const supabaseService = new SupabaseService();
+    const zepGraphService = new ZepGraphService();
+
+    // Check for conflicts BEFORE creating the event using simple overlap detection
     try {
-      const conflictCheck = await intelligenceService.checkConflicts(
-        new Date(startTime),
-        new Date(endTime)
-      );
-      
-      if (conflictCheck.hasConflict && conflictCheck.conflictingEvents.length > 0) {
-        const conflictingEvent = conflictCheck.conflictingEvents[0];
-        const conflictStartTime = new Date(conflictingEvent.start_time).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit', 
-          hour12: true 
+      const existingEvents = await supabaseService.getEventsForAgent(userId);
+      const startDateTime = new Date(startTime);
+      const endDateTime = new Date(endTime);
+
+      const conflictingEvents = existingEvents.filter(event => {
+        const eventStart = new Date(event.event_starts_at);
+        const eventEnd = new Date(event.event_ends_at);
+
+        return (
+          (startDateTime >= eventStart && startDateTime < eventEnd) ||
+          (endDateTime > eventStart && endDateTime <= eventEnd) ||
+          (startDateTime <= eventStart && endDateTime >= eventEnd)
+        );
+      });
+
+      if (conflictingEvents.length > 0) {
+        const conflictingEvent = conflictingEvents[0];
+        const conflictStartTime = new Date(conflictingEvent.event_starts_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
         });
-        const conflictEndTime = new Date(conflictingEvent.end_time).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit', 
-          hour12: true 
+        const conflictEndTime = new Date(conflictingEvent.event_ends_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
         });
-        
-        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. ${conflictCheck.suggestion || 'Please choose a different time or let me know if you\'d like to reschedule the existing event.'}`;
+
+        return `⚠️ Time conflict detected! You already have "${conflictingEvent.event_title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
       }
     } catch (error) {
       console.error('🚨 [CREATE-EVENT TOOL] Error checking for conflicts:', error);
@@ -64,31 +74,34 @@ export const createEventTool = tool(
 
     console.log('✅ [CREATE-EVENT TOOL] Event created successfully:', event.id);
 
-    // Persist to Zep memory asynchronously (fire-and-forget for speed)
-    const persistToZep = async () => {
+    // Add to knowledge graph asynchronously (fire-and-forget for speed)
+    const addToGraph = async () => {
       try {
-        console.log('🧠 [CREATE-EVENT TOOL] Persisting to Zep (async)...');
-        const { ZepMemoryService } = await import('../../services/ZepMemoryService.js');
-        const zepService = new ZepMemoryService();
-        
-        await zepService.addCalendarEvent(userId, {
+        console.log('🧠 [CREATE-EVENT TOOL] Adding to knowledge graph (async)...');
+
+        await zepGraphService.addCalendarEvent(userId, {
+          type: 'CalendarEvent',
+          eventId: event.id,
           title,
-          description: description || undefined,
-          startTime: new Date(startTime),
-          endTime: new Date(endTime),
+          startTime,
+          endTime,
           location: location || undefined,
+          description: description || undefined,
           archetype: archetype || 'generic',
-          archetypeData: archetype_data || {}
+          archetypeData: archetype_data || {},
+          participants: [],
+          topics: [],
+          createdAt: new Date().toISOString()
         });
-        
-        console.log(`✅ [CREATE-EVENT TOOL] Event persisted to Zep with archetype: ${archetype}`);
+
+        console.log(`✅ [CREATE-EVENT TOOL] Event added to knowledge graph with archetype: ${archetype}`);
       } catch (error) {
-        console.error('⚠️ [CREATE-EVENT TOOL] Failed to persist event to Zep (non-critical):', error);
+        console.error('⚠️ [CREATE-EVENT TOOL] Failed to add event to knowledge graph (non-critical):', error);
       }
     };
 
     // Fire and forget - don't await this
-    persistToZep();
+    addToGraph();
 
     // Add context about detected archetype in response
     const archetypeContext = archetype && archetype !== 'generic' 
@@ -107,9 +120,27 @@ export const createEventTool = tool(
       location: z.string().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().nullable().describe("Event description. Leave empty if not specified"),
       archetype: z.enum(['grocery', 'meeting', 'workout', 'appointment', 'travel', 'work_focus', 'personal', 'generic']).nullable()
-        .describe("Intelligently detect the event type based on context clues in the user's message. Use 'generic' if no specific type is detected."),
+        .describe("Intelligently detect the event type based on context clues. Examples: 'get milk' → grocery, 'meet with John' → meeting, 'gym time' → workout, 'doctor appointment' → appointment, 'flight to NYC' → travel, 'focus time for coding' → work_focus, 'family dinner' → personal. Use 'generic' if no specific type matches."),
       archetype_data: z.record(z.any()).nullable()
-        .describe("Extract and structure relevant data based on the detected archetype. For grocery: shopping_list with items. For meeting: attendees and agenda. For workout: exercises and intensity. For appointment: provider details. For travel: destination and transportation. Leave empty if generic.")
+        .describe(`Extract structured data based on archetype. Examples:
+
+GROCERY: {items: [{item: "milk", quantity: "1 gallon", completed: false}, {item: "bread", quantity: "1 loaf", completed: false}]}
+
+MEETING: {attendees: ["John", "Sarah"], agenda: "Q4 planning discussion", meeting_link: null}
+
+WORKOUT: {exercises: [{name: "squats", sets: 3, reps: 10}, {name: "deadlifts", sets: 3, reps: 8}]}
+
+APPOINTMENT: {provider: "Dr. Smith", type: "checkup", location: "Medical Center"}
+
+TRAVEL: {destination: "New York", departure_time: "2:00 PM", transport: "flight"}
+
+WORK_FOCUS: {tasks: [{task: "code review", completed: false}, {task: "write documentation", completed: false}]}
+
+PERSONAL: {notes: "Quality time with family, practice mindfulness"}
+
+GENERIC: {} (empty object)
+
+Extract as much relevant data as possible from the user's input. Use the exact field names shown above.`)
     }),
   }
 );;;;;;
