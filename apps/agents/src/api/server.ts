@@ -17,8 +17,6 @@ initializeSupabase();
 
 import express from 'express';
 import cors from 'cors';
-import { generateEventEmbedding, generateChatEmbedding, searchSimilarContent } from './embedding.js';
-import { handleChatMessage, getChatHistory, handleStreamingChat } from './chat.js';
 import { createUserSchema } from './user.js';
 import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent } from './events.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
@@ -37,15 +35,8 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Embedding endpoints
-app.post('/api/embeddings/event', generateEventEmbedding);
-app.post('/api/embeddings/chat', generateChatEmbedding);
-app.post('/api/embeddings/search', searchSimilarContent);
-
-// Chat endpoints
-app.post('/api/chat', handleChatMessage);
-app.post('/api/chat/stream', handleStreamingChat);
-app.post('/api/chat/history', getChatHistory);
+// Note: Embedding and chat endpoints have been deprecated
+// Use the agent endpoint for AI interactions
 
 // User endpoints
 app.post('/api/user/create-schema', createUserSchema);

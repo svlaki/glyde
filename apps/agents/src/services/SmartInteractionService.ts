@@ -1,5 +1,4 @@
 import { SupabaseService } from './SupabaseService.js';
-import { CalendarIntelligenceService } from './CalendarIntelligenceService.js';
 
 interface SmartInteraction {
   id: string;
@@ -17,7 +16,6 @@ export class SmartInteractionService {
 
   constructor() {
     this.supabaseService = new SupabaseService();
-    // CalendarIntelligence will be initialized per user when needed
   }
 
   private hasTimeConflict(events: any[], startTime: string, endTime: string, date?: Date): boolean {

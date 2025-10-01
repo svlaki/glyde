@@ -7,8 +7,13 @@ import { z } from "zod";
 import { SupabaseService } from '../../services/SupabaseService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
-import { CalendarIntelligenceService } from '../../services/CalendarIntelligenceService.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { createEventTool } from '../../tools/calendar/create-event.js';
+import { updateEventTool } from '../../tools/calendar/update-event.js';
+import { deleteEventTool } from '../../tools/calendar/delete-event.js';
+import { deleteMultipleEventsTool } from '../../tools/calendar/delete-multiple-events.js';
+import { searchEventsTool } from '../../tools/calendar/search-events.js';
+import { listEventsTool } from '../../tools/calendar/list-events.js';
 
 // Utility functions
 
@@ -112,7 +117,7 @@ export class ConversationAgent extends BaseAgent {
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
       
-      let response = lastAiMessage?.content || "I'm here to help! What would you like me to do?";
+      let response = lastAiMessage?.content || "Let me work on that for you...";
       
       if (result.lastResult) {
         response += `\n\n${result.lastResult}`;
@@ -154,110 +159,7 @@ export class ConversationAgent extends BaseAgent {
 
   private createGraph(): any {
     // Define tools for calendar and task operations
-    const createEventTool = tool(
-      async ({ title, startTime, endTime, location, description }) => {
-        const event = {
-          event_title: title,
-          event_starts_at: startTime,
-          event_ends_at: endTime,
-          event_location: location || "",
-          event_description: description || "",
-        };
-        return `Event creation parameters: ${JSON.stringify(event)}`;
-      },
-      {
-        name: "create_event",
-        description: "Create a new calendar event. Parse natural language into structured event data. Use smart defaults for missing information. Be intelligent about time defaults based on event type.",
-        schema: z.object({
-          title: z.string().describe("Event title extracted from user input or inferred from context"),
-          startTime: z.string().describe("Start time in ISO format WITHOUT Z suffix (e.g., '2025-08-25T17:00:00.000' for 5pm). CRITICAL: When user says '5pm', create timestamp for 5pm LOCAL TIME, NOT UTC. Example: '5pm tomorrow' = '2025-08-26T17:00:00.000' (no Z). Use intelligent defaults: breakfast=8am, lunch=12pm, dinner=6pm, meetings=business hours"),
-          endTime: z.string().describe("End time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format (no Z). If not specified, add 1 hour to start time"),
-          location: z.string().nullable().describe("Event location. Leave empty if not specified"),
-          description: z.string().nullable().describe("Event description. Leave empty if not specified"),
-        }),
-      }
-    );
-
-    const updateEventTool = tool(
-      async ({ eventId, title, startTime, endTime, location, description }) => {
-        const updates = {
-          event_title: title,
-          event_starts_at: startTime,
-          event_ends_at: endTime,
-          event_location: location,
-          event_description: description,
-        };
-        return `Event update parameters: ${JSON.stringify({ eventId, updates })}`;
-      },
-      {
-        name: "update_event",
-        description: "Update an existing calendar event. If eventId is not provided, use semantic search to find the event by description.",
-        schema: z.object({
-          eventId: z.string().nullable().describe("Event ID to update (optional - if not provided, search by description)"),
-          searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
-          title: z.string().nullable().describe("New event title"),
-          startTime: z.string().nullable().describe("New start time in ISO format WITHOUT Z suffix. CRITICAL: Use local time format (e.g., '2025-08-25T17:00:00.000' for 5pm local)"),
-          endTime: z.string().nullable().describe("New end time in ISO format WITHOUT Z suffix. CRITICAL: Must match startTime format"),
-          location: z.string().nullable().describe("New event location"),
-          description: z.string().nullable().describe("New event description"),
-        }),
-      }
-    );
-
-    const listEventsTool = tool(
-      async ({ startDate, endDate }) => {
-        return `List events parameters: ${JSON.stringify({ startDate, endDate })}`;
-      },
-      {
-        name: "list_events",
-        description: "List calendar events in a date range",
-        schema: z.object({
-          startDate: z.string().nullable().describe("Start date in ISO format"),
-          endDate: z.string().nullable().describe("End date in ISO format"),
-        }),
-      }
-    );
-
-    const searchEventsTool = tool(
-      async ({ query }) => {
-        return `Search events parameters: ${JSON.stringify({ query })}`;
-      },
-      {
-        name: "search_events",
-        description: "Search calendar events by text query",
-        schema: z.object({
-          query: z.string().describe("Search query"),
-        }),
-      }
-    );
-
-    const deleteEventTool = tool(
-      async ({ eventId, searchQuery }) => {
-        return `Delete event parameters: ${JSON.stringify({ eventId, searchQuery })}`;
-      },
-      {
-        name: "delete_event",
-        description: "Delete an existing calendar event. If eventId is not provided, use semantic search to find the event by description.",
-        schema: z.object({
-          eventId: z.string().nullable().describe("Event ID to delete (optional - if not provided, search by description)"),
-          searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
-        }),
-      }
-    );
-
-    const deleteMultipleEventsTool = tool(
-      async ({ date, searchQuery }) => {
-        return `Delete multiple events parameters: ${JSON.stringify({ date, searchQuery })}`;
-      },
-      {
-        name: "delete_multiple_events",
-        description: "Delete multiple events based on date or search criteria. Use this when user wants to delete 'all events on a day' or multiple events matching criteria.",
-        schema: z.object({
-          date: z.string().nullable().describe("Date to delete all events from (ISO format)"),
-          searchQuery: z.string().nullable().describe("Search query to find multiple events to delete"),
-        }),
-      }
-    );
+    // Calendar tools are imported from tools/calendar/ directory
 
     const createTaskTool = tool(
       async ({ title, description, dueDate, priority }) => {
@@ -281,22 +183,7 @@ export class ConversationAgent extends BaseAgent {
       }
     );
 
-    const findFreeTimeTool = tool(
-      async ({ duration, date }) => {
-        return `Find free time parameters: ${JSON.stringify({ duration, date })}`;
-      },
-      {
-        name: "find_free_time",
-        description: "Find available time slots in the calendar",
-        schema: z.object({
-          duration: z.number().describe("Duration needed in minutes"),
-          date: z.string().nullable().describe("Date to search (ISO format). If null, searches from today"),
-        }),
-      }
-    );
 
-    // REMOVED - using natural agent responses instead of hardcoded briefing
-    const removedDailyBriefingTool = null;
     const searchMemoryTool = tool(
       async ({ query, contextType }) => {
         return `Memory search parameters: ${JSON.stringify({ query, contextType })}`;
@@ -311,7 +198,19 @@ export class ConversationAgent extends BaseAgent {
       }
     );
 
-    const tools = [createEventTool, updateEventTool, deleteEventTool, deleteMultipleEventsTool, listEventsTool, searchEventsTool, createTaskTool, findFreeTimeTool, searchMemoryTool];
+    const tools = [
+      // Core calendar operations
+      createEventTool,
+      updateEventTool,
+      deleteEventTool,
+      deleteMultipleEventsTool,
+      searchEventsTool,
+      listEventsTool,
+
+      // Other tools
+      createTaskTool,
+      searchMemoryTool
+    ];
     const toolNode = new ToolNode(tools);
 
     // Bind tools to the model
@@ -394,11 +293,13 @@ COMMUNICATION STYLE - Be Natural & Conversational:
 - Show personality: use appropriate enthusiasm, understanding, or gentle suggestions
 
 CALENDAR INTERACTION RESPONSES:
-- When creating events, say things like: "I went ahead and put that in your schedule", "I've added that to your calendar", "Got it scheduled for you"
-- Ask helpful follow-up questions: "Would you like me to set a reminder?", "Should I block time for preparation?", "Want me to add a location?"
-- Be conversational about time conflicts: "Heads up, you already have something at 2pm. Want me to move it to 3pm instead?"
-- When updating/deleting: "I've moved that meeting", "Removed that from your schedule", "Updated with the new time"
-- Don't just confirm actions - engage: "Perfect! That gives you time for lunch before your 3pm call"
+- ALWAYS explain what you're doing BEFORE doing it: "Let me schedule that for you", "I'll add that to your calendar", "Setting up your grocery run"
+- When creating events, be descriptive: "I'm adding 'Grocery shopping' to your calendar for today. I noticed you mentioned milk and bananas - I'll include those in the details"
+- Ask for missing information: "What time would work best for your grocery run?", "How long do you think that will take?", "Where would you like to meet?"
+- Be proactive about conflicts: "I see you have 'Meeting with John' at 2pm. Should I schedule this before or after?"
+- When updating/deleting: "I've moved that meeting to 3pm", "Removed that grocery run from your schedule", "Updated with the new location"
+- Engage with context: "Perfect! That gives you time for lunch before your 3pm call", "That works well - no conflicts with your existing schedule"
+- Show you understand the request: "Got it - a workout session for tomorrow morning. I'll make sure to leave time for your usual routine."
 
 INTELLIGENT EVENT FILTERING - Context Matters:
 When users ask about their schedule, be smart about what you show:
@@ -415,12 +316,12 @@ ALWAYS filter and present events logically based on the user's question. Don't d
 
 YOUR CAPABILITIES:
 1. Answer calendar questions using intelligent filtering based on context
-2. Create new events with natural language understanding
-3. Update and delete events
-4. Find scheduling conflicts
-5. Suggest optimal meeting times
-6. Provide daily briefings and summaries  
-7. Search user's long-term memory and behavioral patterns using Graphiti knowledge graph
+2. Create new events with natural language understanding and intelligent archetype detection
+3. Update and delete events (including archetype and structured data updates)
+4. Find scheduling conflicts automatically during event creation
+5. Search events by text, archetype type, or within structured data
+6. Create and manage tasks
+7. Search user's long-term memory and behavioral patterns using Zep memory service
 
 IMPORTANT - When User Requests Multiple Events:
 - If user says "schedule multiple events", "create several events", "add a bunch of events", "schedule a week of events", etc.
@@ -455,13 +356,74 @@ WHEN ANSWERING CALENDAR QUESTIONS:
 - If multiple events match the criteria, list them all
 
 WHEN CREATING EVENTS:
-- Parse natural language dates/times intelligently
+- ALWAYS ask for clarification if the user doesn't specify a time
+- Examples of when to ask: "I need to grab groceries today" → "What time works best for your grocery run?"
+- Only schedule without asking if user gives specific time: "2pm tomorrow", "lunch next Tuesday"
+- Parse natural language dates/times intelligently when provided
 - "2pm tomorrow" = tomorrow at 14:00 LOCAL TIME
 - "lunch next Tuesday" = next Tuesday at 12:00 LOCAL TIME  
 - "5pm" means 5pm in user's timezone, NOT 5pm UTC
 - Use 1 hour duration if not specified
-- Check for conflicts and warn the user
-- Confirm what you scheduled
+- NEVER create events at times with conflicts - always suggest alternatives
+- Be conversational: "I see you have 'X' at that time. How about 3pm instead?"
+- Explain what you're doing: "Let me add that grocery run to your calendar" or "I'll schedule your workout"
+
+INTELLIGENT EVENT ARCHETYPE DETECTION:
+When creating events, analyze the user's language to intelligently detect the event type and extract structured data:
+
+**GROCERY ARCHETYPE** (archetype: "grocery"):
+- Detect when: User mentions shopping, groceries, "get/buy/pick up" + food items, store names
+- Examples: "get milk and eggs", "grocery run", "pick up ingredients", "stop by Target"
+- Extract data: Parse items into items array
+- Schema: {items: [{item: "milk", quantity: "1", completed: false}, {item: "eggs", quantity: "1", completed: false}]}
+
+**MEETING ARCHETYPE** (archetype: "meeting"):
+- Detect when: meeting, call, sync, discussion, 1:1, standup, review, presentation
+- Examples: "meeting with John about Q1", "sync with the team", "1:1 with manager"
+- Extract data: Parse attendee names, agenda topics from context
+- Schema: {attendees: ["John", "Sarah"], agenda: "Q1 planning discussion", meeting_link: null}
+
+**WORKOUT ARCHETYPE** (archetype: "workout"):
+- Detect when: gym, exercise, workout, run, yoga, training, fitness, cardio, strength
+- Examples: "hit the gym", "morning run", "yoga class", "strength training"
+- Extract data: Workout type, exercises mentioned, intensity level
+- Schema: {exercises: [{name: "deadlifts", sets: 3, reps: 8}, {name: "squats", sets: 3, reps: 10}]}
+
+**APPOINTMENT ARCHETYPE** (archetype: "appointment"):
+- Detect when: doctor, dentist, therapy, checkup, medical, appointment with professionals
+- Examples: "doctor appointment", "dental cleaning", "therapy session"
+- Extract data: Provider type, appointment purpose
+- Schema: {provider: "Dr. Smith", type: "checkup", location: "Medical Center"}
+
+**TRAVEL ARCHETYPE** (archetype: "travel"):
+- Detect when: flight, trip, travel, airport, hotel, vacation, drive to, fly to
+- Examples: "flight to NYC", "road trip", "vacation in Bali", "airport pickup"
+- Extract data: Destination, transportation method
+- Schema: {destination: "NYC", departure_time: "2:00 PM", transport: "flight"}
+
+**WORK_FOCUS ARCHETYPE** (archetype: "work_focus"):
+- Detect when: deep work, focus time, coding, project work, deadline, concentrated work
+- Examples: "focus time for coding", "work on project", "deep work session"
+- Extract data: Tasks to accomplish, focus technique
+- Schema: {tasks: [{task: "code review", completed: false}, {task: "API documentation", completed: false}]}
+
+**PERSONAL ARCHETYPE** (archetype: "personal"):
+- Detect when: self-care, family time, hobbies, personal activities, relaxation
+- Examples: "family dinner", "meditation time", "reading", "personal time"
+- Extract data: Activity type, goals or reflections
+- Schema: {notes: "Quality time with family, practice mindfulness"}
+
+**GENERIC ARCHETYPE** (archetype: "generic"):
+- Use for events that don't clearly fit other archetypes
+- Keep archetype_data as empty object {}
+
+ARCHETYPE DETECTION GUIDELINES:
+1. Analyze the ENTIRE user message for context clues
+2. Look for keywords, but also understand intent and context
+3. When multiple archetypes could apply, choose the most specific one
+4. Extract as much relevant structured data as possible
+5. Use consistent field names that match the database schemas
+6. If unsure, use "generic" archetype rather than guessing
 
 CRITICAL TIMEZONE HANDLING:
 - User times are ALWAYS local time (e.g., "5pm" = 5pm local)
@@ -512,21 +474,35 @@ IMPORTANT: NEVER use partial UUIDs or truncated IDs. Only use full event IDs whe
 For contextual references, use semantic search or date-based search instead of guessing IDs.
 
 Your capabilities:
-1. Create, update, delete, and search calendar events
+1. Create, update, delete, and search calendar events with intelligent archetype detection
 2. Detect and warn about scheduling conflicts
-3. Find free time slots in the calendar
-4. Generate daily briefings and weekly summaries
-5. Smart scheduling with preferences
-6. Parse natural language into structured actions
+3. Extract structured data from natural language (grocery items, meeting attendees, etc.)
+4. Parse natural language into structured actions
+5. Create and manage tasks
+6. Search through user memory and context
 7. ALWAYS use the most appropriate tool based on user intent
 
-INTELLIGENCE FEATURES:
-- When user asks "When am I free?" or "Find time for X" → use find_free_time
-- When user asks "What's my day like?" or "Give me a summary" → provide natural response using calendar context
-- When user mentions preferences, habits, goals, or past experiences → use search_memory
-- When you need context about user's work patterns, meeting preferences, or behavioral insights → use search_memory
-- When creating events, ALWAYS check for conflicts and warn the user
-- Suggest alternative times when conflicts are detected`);
+AVAILABLE TOOLS - Use These Tools Based on User Intent:
+
+📅 CALENDAR MANAGEMENT:
+- create_event: Create new calendar events with intelligent archetype detection
+- update_event: Modify existing events (supports archetype and structured data updates)
+- delete_event: Remove a specific event
+- delete_multiple_events: Remove multiple events by date or search criteria
+- search_events: Find events by text, archetype, or within structured data
+- list_events: List events in a specific date range
+
+📋 TASK MANAGEMENT:
+- create_task: Create new tasks and to-do items
+
+🧠 MEMORY & CONTEXT:
+- search_memory: Access user preferences, habits, goals, and past experiences
+- Use when understanding user's scheduling patterns or behavioral insights
+
+🚨 CONFLICT MANAGEMENT:
+- When creating events, the create_event tool automatically checks for conflicts
+- If conflicts are detected, suggest alternative times to the user
+- Be conversational: "I see you have 'X' at that time. How about 3pm instead?"`);
 
       const messages = [systemMessage, ...state.messages];
       
@@ -563,63 +539,39 @@ INTELLIGENCE FEATURES:
           
           switch (action.name) {
             case "create_event":
-              try {
-                // Check for conflicts first
-                const intelligenceService = new CalendarIntelligenceService(state.userId);
-                const conflictCheck = await intelligenceService.checkConflicts(
-                  new Date(action.args.startTime),
-                  new Date(action.args.endTime)
-                );
-                
-                if (conflictCheck.hasConflict) {
-                  const conflictingEvent = conflictCheck.conflictingEvents[0];
-                  result = `⚠️ Time conflict detected with "${conflictingEvent.title}". ${conflictCheck.suggestion || 'Please choose a different time.'}`;
-                  break;
-                }
-                
-                // Create event using SupabaseService to write to public.events table
-                const supabaseService = new SupabaseService();
-                const createdEvent = await supabaseService.createEvent(state.userId, {
-                  event_title: action.args.title,
-                  event_starts_at: action.args.startTime,
-                  event_ends_at: action.args.endTime,
-                  event_location: action.args.location || null,
-                  event_description: action.args.description || null,
-                });
-                
-                if (!createdEvent) {
-                  result = `❌ Failed to create event: Unknown error`;
-                } else {
-                  // Category name can be inferred from event title or type
-                  const categoryName = 'Event';
-                  result = `Created event: "${action.args.title}"`;
-                }
-              } catch (error) {
-                console.error('Error creating event:', error);
-                result = `❌ Error creating event: ${error instanceof Error ? error.message : 'Unknown error'}`;
-              }
-              break;
+              // Event creation is handled entirely by the tool
+              // The tool returns its own success/error messages
+              // No additional processing needed here
+              continue;
 
             case "update_event":
               let eventId = action.args.eventId;
               
-              // If no eventId provided, search for the event semantically
+              // If no eventId provided, search for the event using Zep
               if (!eventId && action.args.searchQuery) {
                 try {
-                  const { EmbeddingService } = await import('../../services/EmbeddingService.js');
-                  const embeddingService = new EmbeddingService();
-                  const searchResults = await embeddingService.searchSimilarEvents(
+                  // Use Zep memory service for intelligent event search
+                  const searchMemoryResults = await this.zepService.searchMemory(
                     state.userId,
-                    action.args.searchQuery,
-                    1
+                    `calendar event ${action.args.searchQuery}`,
+                    5
                   );
-                  
-                  if (searchResults.length > 0) {
-                    eventId = searchResults[0].metadata.id;
-                    result = `🔍 Found event: "${searchResults[0].metadata.event_title}" - updating...`;
+
+                  // Also search directly in database as fallback
+                  const { SupabaseService } = await import('../../services/SupabaseService.js');
+                  const supabaseService = new SupabaseService();
+                  const events = await supabaseService.getEventsForAgent(state.userId);
+                  const matchingEvents = events.filter((event: any) => {
+                    const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+                    return searchText.includes(action.args.searchQuery.toLowerCase());
+                  });
+
+                  if (matchingEvents.length > 0) {
+                    eventId = matchingEvents[0].id;
+                    result = `🔍 Found event: "${matchingEvents[0].event_title}" - updating...`;
                   } else {
-                    // Semantic search returned empty, try fallback
-                    throw new Error('No results from semantic search, trying fallback');
+                    // No matching events found
+                    throw new Error('No matching events found');
                   }
                 } catch (error) {
                   console.log('Semantic search failed for update, trying direct search:', error instanceof Error ? error.message : 'Unknown error');
@@ -706,24 +658,31 @@ INTELLIGENCE FEATURES:
               
               // Debug: Log delete event parameters if needed
               
-              // If no eventId provided, search for the event semantically
+              // If no eventId provided, search for the event using Zep
               if (!deleteEventId && action.args.searchQuery) {
                 try {
-                  // First try semantic search
-                  const { EmbeddingService } = await import('../../services/EmbeddingService.js');
-                  const embeddingService = new EmbeddingService();
-                  const searchResults = await embeddingService.searchSimilarEvents(
+                  // Use Zep memory service for intelligent event search
+                  const searchMemoryResults = await this.zepService.searchMemory(
                     state.userId,
-                    action.args.searchQuery,
-                    1
+                    `calendar event ${action.args.searchQuery}`,
+                    5
                   );
-                  
-                  if (searchResults.length > 0) {
-                    deleteEventId = searchResults[0].metadata.id;
-                    result = `🔍 Found event: "${searchResults[0].metadata.event_title}" - deleting...`;
+
+                  // Also search directly in database
+                  const { SupabaseService } = await import('../../services/SupabaseService.js');
+                  const supabaseService = new SupabaseService();
+                  const events = await supabaseService.getEventsForAgent(state.userId);
+                  const matchingEvents = events.filter((event: any) => {
+                    const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+                    return searchText.includes(action.args.searchQuery.toLowerCase());
+                  });
+
+                  if (matchingEvents.length > 0) {
+                    deleteEventId = matchingEvents[0].id;
+                    result = `🔍 Found event: "${matchingEvents[0].event_title}" - deleting...`;
                   } else {
-                    // Semantic search returned empty, try fallback
-                    throw new Error('No results from semantic search, trying fallback');
+                    // No matching events found
+                    throw new Error('No matching events found');
                   }
                 } catch (error) {
                   // If semantic search fails, try to find event by title and date
@@ -848,27 +807,25 @@ INTELLIGENCE FEATURES:
                   break;
                 }
               } else if (action.args.searchQuery) {
-                // Use semantic search to find events
+                // Use Zep to search for events
                 try {
-                  // Searching events by query
-                  
-                  const { EmbeddingService } = await import('../../services/EmbeddingService.js');
-                  const embeddingService = new EmbeddingService();
-                  const searchResults = await embeddingService.searchSimilarEvents(
+                  // Use Zep memory service for intelligent event search
+                  const searchMemoryResults = await this.zepService.searchMemory(
                     state.userId,
-                    action.args.searchQuery,
-                    10
+                    `calendar events ${action.args.searchQuery}`,
+                    50
                   );
-                  
-                  // Found events by search
-                  // Search results retrieved
-                  
-                  eventsToDelete = searchResults.map(doc => ({
-                    id: doc.metadata.id,
-                    event_title: doc.metadata.event_title,
-                    event_starts_at: doc.metadata.event_starts_at,
-                    event_ends_at: doc.metadata.event_ends_at
-                  }));
+
+                  // Also search directly in database
+                  const { SupabaseService } = await import('../../services/SupabaseService.js');
+                  const supabaseService = new SupabaseService();
+                  const allEvents = await supabaseService.getEventsForAgent(state.userId);
+                  const matchingEvents = allEvents.filter((event: any) => {
+                    const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+                    return searchText.includes(action.args.searchQuery.toLowerCase());
+                  });
+
+                  console.log(`🔍 Found ${matchingEvents.length} events matching search query`);
                 } catch (error) {
                   console.error('Error searching for events to delete:', error);
                   result = `❌ Error searching for events: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -935,22 +892,30 @@ INTELLIGENCE FEATURES:
 
             case "search_events":
               try {
-                const { EmbeddingService } = await import('../../services/EmbeddingService.js');
-                const embeddingService = new EmbeddingService();
-                const searchResults = await embeddingService.searchSimilarEvents(
-                  state.userId, 
-                  action.args.query, 
-                  5
+                // Use Zep memory service for intelligent event search
+                const searchMemoryResults = await this.zepService.searchMemory(
+                  state.userId,
+                  `calendar events ${action.args.query}`,
+                  10
                 );
-                
-                if (searchResults.length > 0) {
-                  const eventList = searchResults.map(doc => {
-                    const metadata = doc.metadata;
-                    return `• ${metadata.event_title} (${new Date(metadata.event_starts_at).toLocaleDateString()})`;
+
+                // Also search directly in database
+                const { SupabaseService } = await import('../../services/SupabaseService.js');
+                const supabaseService = new SupabaseService();
+                const allEvents = await supabaseService.getEventsForAgent(state.userId);
+                const matchingEvents = allEvents.filter((event: any) => {
+                  const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+                  return searchText.includes(action.args.query.toLowerCase());
+                });
+
+                if (matchingEvents.length > 0) {
+                  const eventList = matchingEvents.slice(0, 5).map((event: any) => {
+                    return `• ${event.event_title} (${new Date(event.event_starts_at).toLocaleDateString()})`;
                   }).join('\n');
-                  result = `🔍 Found ${searchResults.length} similar events:\n${eventList}`;
+                  result = `🔍 Found ${matchingEvents.length} events:\n${eventList}`;
+                  if (matchingEvents.length > 5) result += `\n...and ${matchingEvents.length - 5} more`;
                 } else {
-                  result = `🔍 No similar events found for: "${action.args.query}"`;
+                  result = `🔍 No events found matching: "${action.args.query}"`;
                 }
               } catch (error) {
                 console.error('Error searching events:', error);
@@ -963,34 +928,7 @@ INTELLIGENCE FEATURES:
               result = `✅ Task creation planned: "${action.args.title}" (task system not yet implemented)`;
               break;
 
-            case "find_free_time":
-              try {
-                const intelligenceService = new CalendarIntelligenceService(state.userId);
-                const startDate = action.args.date ? new Date(action.args.date) : new Date();
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + 7); // Search 1 week ahead
-                
-                const freeSlots = await intelligenceService.findFreeTimeSlots(
-                  startDate,
-                  endDate,
-                  action.args.duration || 60
-                );
-                
-                if (freeSlots.length > 0) {
-                  const topSlots = freeSlots.slice(0, 3);
-                  result = `📅 Found ${freeSlots.length} free time slots:\n`;
-                  topSlots.forEach(slot => {
-                    const start = new Date(slot.start);
-                    result += `• ${start.toLocaleDateString()} at ${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${slot.duration} minutes, ${slot.quality} time)\n`;
-                  });
-                } else {
-                  result = `❌ No free time slots found for ${action.args.duration} minutes in the next week`;
-                }
-              } catch (error) {
-                console.error('Error finding free time:', error);
-                result = `❌ Error finding free time: ${error instanceof Error ? error.message : 'Unknown error'}`;
-              }
-              break;
+            // REMOVED find_free_time - tool removed per cleanup
 
             // REMOVED daily_briefing - using natural agent responses instead
 

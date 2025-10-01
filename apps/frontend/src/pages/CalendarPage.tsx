@@ -77,8 +77,8 @@ export function CalendarPage() {
         // Show empty calendar if there's an error
         setEvents([]);
       } else {
-        // Debug log the events we received
-        console.log('📅 [CALENDAR DEBUG] Raw events from backend:', userEvents);
+        // Log event count instead of full data
+        console.log(`📅 [CALENDAR] Loaded ${userEvents.length} events`);
         
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
@@ -109,8 +109,8 @@ export function CalendarPage() {
           };
         });
         
-        // Debug log the formatted events for FullCalendar
-        console.log('📅 [CALENDAR DEBUG] Formatted events for FullCalendar:', formattedEvents);
+        // Log formatted event count instead of full data
+        console.log(`📅 [CALENDAR] Formatted ${formattedEvents.length} events for display`);
         
         // Show user events (empty array if no events)
         setEvents(formattedEvents);

@@ -1,10 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { EmbeddingService } from "../../services/EmbeddingService.js";
-
-const supabaseService = new SupabaseService();
-const embeddingService = new EmbeddingService();
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const deleteMultipleEventsTool = tool(
   async ({ date, searchQuery }, config) => {
@@ -13,14 +10,20 @@ export const deleteMultipleEventsTool = tool(
       throw new Error("User ID is required for deleting events");
     }
 
+    // Initialize services
+    const supabaseService = new SupabaseService();
+    const zepGraphService = new ZepGraphService();
+
     let eventsToDelete: any[] = [];
+
+    console.log('🗑️ [DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, searchQuery });
 
     if (date) {
       // Delete events on a specific date
       const startDate = new Date(date);
       const endDate = new Date(date);
       endDate.setDate(endDate.getDate() + 1);
-      
+
       eventsToDelete = await supabaseService.getEvents(
         userId,
         startDate.toISOString(),
@@ -31,13 +34,28 @@ export const deleteMultipleEventsTool = tool(
         // Delete ALL events - use with caution!
         eventsToDelete = await supabaseService.getEvents(userId);
       } else {
-        // Search for events matching the query
-        const searchResults = await embeddingService.searchSimilarEvents(
-          userId,
-          searchQuery,
-          50 // Get more results for bulk deletion
-        );
-        eventsToDelete = searchResults.map(r => r.metadata);
+        // Search for events using Zep graph and direct search
+        try {
+          // Search knowledge graph for relevant events
+          const graphResults = await zepGraphService.searchEntities(userId,
+            `calendar events ${searchQuery}`,
+            undefined, // entityType
+            50 // limit
+          );
+
+          // Also search directly in database
+          const allEvents = await supabaseService.getEventsForAgent(userId);
+          const matchingEvents = allEvents.filter((event: any) => {
+            const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+            return searchText.includes(searchQuery.toLowerCase());
+          });
+
+          eventsToDelete = matchingEvents;
+          console.log(`🔍 [DELETE-MULTIPLE-EVENTS TOOL] Found ${eventsToDelete.length} events matching: ${searchQuery}`);
+        } catch (error) {
+          console.error('❌ [DELETE-MULTIPLE-EVENTS TOOL] Search error:', error);
+          throw new Error(`Failed to search for events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
       }
     } else {
       throw new Error("Either date or searchQuery must be provided");

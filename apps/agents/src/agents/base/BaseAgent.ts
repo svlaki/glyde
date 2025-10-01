@@ -2,14 +2,14 @@ import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/
 import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { EmbeddingService } from "../../services/EmbeddingService.js";
 import { ZepMemoryService } from "../../services/ZepMemoryService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
   protected supabaseService: SupabaseService;
-  protected embeddingService: EmbeddingService;
   protected zepService: ZepMemoryService;
+  protected zepGraphService: ZepGraphService;
   protected agentType: AgentType;
   protected tools: any[] = [];
   protected userNodeCache: Map<string, string> = new Map(); // Cache user node UUIDs
@@ -22,8 +22,8 @@ export abstract class BaseAgent {
       apiKey: process.env.OPENAI_API_KEY,
     });
     this.supabaseService = new SupabaseService();
-    this.embeddingService = new EmbeddingService();
     this.zepService = new ZepMemoryService();
+    this.zepGraphService = new ZepGraphService();
   }
 
   // Abstract methods that each agent must implement
@@ -46,12 +46,11 @@ export abstract class BaseAgent {
     }
   }
 
-  // Fallback memory loading for when Graphiti is unavailable
+  // Fallback memory loading for when Zep is unavailable
   private async loadBasicMemoryContext(context: AgentContext): Promise<MemoryContext> {
     const recentEvents = await this.supabaseService.getEvents(context.userId);
-    const recentEventEmbeddings = recentEvents.slice(0, 10).map(event => ({
+    const recentEventSummaries = recentEvents.slice(0, 10).map(event => ({
       content: `${event.event_title} - ${event.event_description || ''}`,
-      embedding: event.embedding || [],
       timestamp: event.event_starts_at
     }));
 
@@ -91,9 +90,9 @@ export abstract class BaseAgent {
         relationships: {}
       },
       vector: {
-        recentEvents: recentEventEmbeddings,
+        recentEvents: recentEventSummaries,
         recentChats: [],
-        semanticContext: this.buildSemanticContext(recentEventEmbeddings, [])
+        semanticContext: this.buildSemanticContext(recentEventSummaries, [])
       }
     };
   }
@@ -165,16 +164,19 @@ export abstract class BaseAgent {
     completionNotes?: string
   ): Promise<void> {
     try {
-      await this.zepService.addTaskCompletion(userId, {
-        task: taskTitle,
-        completedAt: completionTime,
-        notes: taskDescription || completionNotes,
-        energyLevel: energyUsed,
-        category: 'task_completion'
+      await this.zepGraphService.addTask(userId, {
+        type: 'Task',
+        taskId: `task-${Date.now()}`,
+        title: taskTitle,
+        description: taskDescription || completionNotes || '',
+        status: 'completed',
+        priority: 'medium',
+        dueDate: completionTime.toISOString(),
+        createdAt: new Date().toISOString()
       });
-      console.log(`Persisted task completion to Zep for user ${userId}: ${taskTitle}`);
+      console.log(`Persisted task completion to Zep Graph for user ${userId}: ${taskTitle}`);
     } catch (error) {
-      console.error('Failed to persist task completion to Zep:', error);
+      console.error('Failed to persist task completion to Zep Graph:', error);
     }
   }
 
@@ -187,15 +189,11 @@ export abstract class BaseAgent {
     confidenceLevel?: number
   ): Promise<void> {
     try {
-      await this.zepService.addGoalProgress(userId, {
-        goalTitle,
-        progress: currentProgress,
-        notes: progressUpdate,
-        milestones: moodRating ? [`Mood: ${moodRating}/10`] : undefined
-      });
-      console.log(`Persisted goal progress to Zep for user ${userId}: ${goalTitle} (${currentProgress}%)`);
+      // Note: ZepGraphService doesn't have addGoal method yet, so we'll skip this for now
+      // This should be implemented when goal tracking is added to ZepGraphService
+      console.log(`Goal progress tracking not yet implemented in ZepGraphService for user ${userId}: ${goalTitle} (${currentProgress}%)`);
     } catch (error) {
-      console.error('Failed to persist goal progress to Zep:', error);
+      console.error('Failed to persist goal progress to Zep Graph:', error);
     }
   }
 
@@ -207,21 +205,28 @@ export abstract class BaseAgent {
     endTime?: Date,
     attendees?: string[],
     location?: string,
-    energy_level?: 'low' | 'medium' | 'high'
+    energy_level?: 'low' | 'medium' | 'high',
+    archetype?: string,
+    archetypeData?: Record<string, any>
   ): Promise<void> {
     try {
-      await this.zepService.addCalendarEvent(userId, {
+      await this.zepGraphService.addCalendarEvent(userId, {
+        type: 'CalendarEvent',
+        eventId: `event-${Date.now()}`,
         title: eventTitle,
-        description: eventDescription || undefined,
-        startTime,
-        endTime,
-        participants: attendees,
+        startTime: startTime.toISOString(),
+        endTime: endTime?.toISOString(),
         location,
-        energyLevel: energy_level
+        description: eventDescription || undefined,
+        archetype: archetype || 'generic',
+        archetypeData: archetypeData || {},
+        participants: attendees || [],
+        topics: [],
+        createdAt: new Date().toISOString()
       });
-      console.log(`Persisted calendar event to Zep for user ${userId}: ${eventTitle}`);
+      console.log(`Persisted calendar event to Zep Graph for user ${userId}: ${eventTitle} (${archetype})`);
     } catch (error) {
-      console.error('Failed to persist calendar event to Zep:', error);
+      console.error('Failed to persist calendar event to Zep Graph:', error);
     }
   }
 

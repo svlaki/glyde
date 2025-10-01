@@ -1,3 +1,16 @@
+/**
+ * ZepMemoryService - Manages conversation threads and chat memory
+ *
+ * RESPONSIBILITIES:
+ * - Thread/conversation management (create, add messages, search)
+ * - User context from conversational history
+ * - Message-based memory operations
+ *
+ * DOES NOT HANDLE:
+ * - Structured entities (calendar events, tasks, goals) - use ZepGraphService
+ * - Knowledge graph operations - use ZepGraphService
+ * - Entity lifecycle management - use ZepGraphService
+ */
 import { ZepClient } from '@getzep/zep-cloud';
 import type { 
   MemoryContext, 
@@ -24,31 +37,9 @@ export interface ZepMessage {
   metadata?: Record<string, any>;
 }
 
-export interface CalendarEvent {
-  title: string;
-  description?: string;
-  startTime: Date;
-  endTime?: Date;
-  participants?: string[];
-  topics?: string[];
-  location?: string;
-  energyLevel?: 'low' | 'medium' | 'high';
-}
+// REMOVED: Use CalendarEventEntity from ZepGraphService instead
 
-export interface TaskCompletion {
-  task: string;
-  completedAt: Date;
-  notes?: string;
-  energyLevel?: 'low' | 'medium' | 'high';
-  category?: string;
-}
-
-export interface GoalProgress {
-  goalTitle: string;
-  progress: number;
-  notes?: string;
-  milestones?: string[];
-}
+// REMOVED: Use TaskEntity and GoalEntity from ZepGraphService instead
 
 export class ZepMemoryService {
   private client: ZepClient;
@@ -100,32 +91,28 @@ export class ZepMemoryService {
   }
 
   /**
-   * Get or create a session for a user
+   * Get or create a thread for a user
    */
   private async getOrCreateSession(userId: string): Promise<string> {
-    const existingSessionId = this.userSessions.get(userId);
-    if (existingSessionId) {
-      return existingSessionId;
+    const existingThreadId = this.userSessions.get(userId);
+    if (existingThreadId) {
+      return existingThreadId;
     }
 
-    // Create new session ID
-    const sessionId = `${userId}-session-${Date.now()}`;
-    
+    // Create new thread ID
+    const threadId = `thread-${userId}-${Date.now()}`;
+
     try {
-      await this.client.memory.addSession({
-        sessionId,
-        userId,
-        metadata: {
-          created_at: new Date().toISOString(),
-          type: 'conversation'
-        }
+      await this.client.thread.create({
+        threadId: threadId,
+        userId: userId
       });
 
-      this.userSessions.set(userId, sessionId);
-      console.log(`Created new session: ${sessionId} for user ${userId}`);
-      return sessionId;
+      this.userSessions.set(userId, threadId);
+      console.log(`Created new thread: ${threadId} for user ${userId}`);
+      return threadId;
     } catch (error) {
-      console.error('Failed to create session:', error);
+      console.error('Failed to create thread:', error);
       throw error;
     }
   }
@@ -165,8 +152,13 @@ export class ZepMemoryService {
         }
       ];
 
-      await this.client.memory.add(sessionId, {
-        messages
+      // Add messages to thread using correct API
+      await this.client.thread.addMessages(sessionId, {
+        messages: messages.map(msg => ({
+          content: msg.content,
+          role: msg.role as any, // Cast to satisfy RoleType requirement
+          metadata: msg.metadata
+        }))
       });
 
       console.log(`Added conversation to Zep session ${sessionId} for user ${userId}`);
@@ -179,113 +171,25 @@ export class ZepMemoryService {
   /**
    * Add calendar event as structured business data
    */
-  async addCalendarEvent(userId: string, event: CalendarEvent): Promise<void> {
-    try {
-      await this.initUser(userId);
-
-      // Note: Using graph.add requires checking if it exists in the client
-      // For now, we'll add it as a session fact
-      const sessionId = await this.getOrCreateSession(userId);
-      
-      const eventData = {
-        type: 'calendar_event',
-        title: event.title,
-        description: event.description,
-        start_time: event.startTime.toISOString(),
-        end_time: event.endTime?.toISOString(),
-        location: event.location,
-        participants: event.participants || [],
-        topics: event.topics || [],
-        energy_level: event.energyLevel,
-        created_at: new Date().toISOString()
-      };
-
-      // Add as a conversation message instead of deprecated facts
-      await this.client.memory.add(sessionId, {
-        messages: [{
-          role: 'system',
-          roleType: 'system',
-          content: `Calendar event: ${event.title} scheduled for ${event.startTime.toISOString()}. Location: ${event.location || 'Not specified'}. Participants: ${event.participants?.join(', ') || 'None'}`,
-          metadata: {
-            type: 'calendar_event',
-            event_title: event.title,
-            start_time: event.startTime.toISOString(),
-            timestamp: new Date().toISOString()
-          }
-        }]
-      });
-
-      console.log(`Added calendar event "${event.title}" to Zep for user ${userId}`);
-    } catch (error) {
-      console.error('Failed to add calendar event:', error);
-      throw error;
-    }
+  async addCalendarEvent(userId: string, event: any): Promise<void> {
+    // REMOVED: Calendar events are now handled by ZepGraphService
+    throw new Error('addCalendarEvent is deprecated. Use ZepGraphService.addCalendarEvent() instead.');
   }
 
   /**
    * Add task completion as structured data
    */
-  async addTaskCompletion(userId: string, task: TaskCompletion): Promise<void> {
-    try {
-      await this.initUser(userId);
-      const sessionId = await this.getOrCreateSession(userId);
-
-      // Add as a conversation message instead of deprecated facts
-      const taskText = `Task completed: "${task.task}" on ${task.completedAt.toISOString()}${task.notes ? ` - ${task.notes}` : ''}`;
-      
-      await this.client.memory.add(sessionId, {
-        messages: [{
-          role: 'system',
-          roleType: 'system',
-          content: taskText,
-          metadata: {
-            type: 'task_completion',
-            task_name: task.task,
-            completed_at: task.completedAt.toISOString(),
-            energy_level: task.energyLevel,
-            category: task.category,
-            timestamp: new Date().toISOString()
-          }
-        }]
-      });
-
-      console.log(`Added task completion "${task.task}" to Zep for user ${userId}`);
-    } catch (error) {
-      console.error('Failed to add task completion:', error);
-      throw error;
-    }
+  async addTaskCompletion(userId: string, task: any): Promise<void> {
+    // REMOVED: Task completions are now handled by ZepGraphService
+    throw new Error('addTaskCompletion is deprecated. Use ZepGraphService.addTask() instead.');
   }
 
   /**
    * Add goal progress as a fact
    */
-  async addGoalProgress(userId: string, goalProgress: GoalProgress): Promise<void> {
-    try {
-      await this.initUser(userId);
-      const sessionId = await this.getOrCreateSession(userId);
-
-      const goalText = `Goal progress: "${goalProgress.goalTitle}" is ${goalProgress.progress}% complete${goalProgress.notes ? ` - ${goalProgress.notes}` : ''}`;
-      
-      await this.client.memory.add(sessionId, {
-        messages: [{
-          role: 'system',
-          roleType: 'system',
-          content: goalText,
-          metadata: {
-            type: 'goal_progress',
-            goal_title: goalProgress.goalTitle,
-            progress_percentage: goalProgress.progress,
-            milestones: goalProgress.milestones,
-            timestamp: new Date().toISOString()
-          }
-        }]
-      });
-
-      console.log(`Added goal progress for "${goalProgress.goalTitle}" to Zep for user ${userId}`);
-    } catch (error) {
-      console.error('Failed to add goal progress:', error);
-      throw error;
-    }
+  async addGoalProgress(userId: string, goalProgress: any): Promise<void> {
+    // REMOVED: Goal progress is now handled by ZepGraphService
+    throw new Error('addGoalProgress is deprecated. Use ZepGraphService.addGoal() instead.');
   }
 
   /**
@@ -296,13 +200,9 @@ export class ZepMemoryService {
       await this.initUser(userId);
       const sessionId = await this.getOrCreateSession(userId);
 
-      const memory = await this.client.memory.get(sessionId);
-      
-      // Return combined context from facts and summaries
-      const facts = memory.facts?.join('\n') || '';
-      const summary = memory.summary?.content || '';
-      
-      return [facts, summary].filter(Boolean).join('\n\n');
+      // Get user context from thread
+      const context = await this.client.thread.getUserContext(sessionId);
+      return context.context || '';
     } catch (error) {
       console.error('Failed to get user context:', error);
       return '';
@@ -310,24 +210,36 @@ export class ZepMemoryService {
   }
 
   /**
-   * Search memory for relevant information
+   * Search memory for relevant conversational information
+   * Note: For structured entity search, use ZepGraphService.searchEntities() instead
    */
   async searchMemory(userId: string, query: string, limit: number = 10): Promise<any[]> {
     try {
       await this.initUser(userId);
-      const sessionId = await this.getOrCreateSession(userId);
 
-      const results = await this.client.memory.search(sessionId, {
-        text: query,
-        metadata: {},
-        limit
+      // For now, use graph search for memory content since the thread search API
+      // may have different patterns in v3.x. This should be revisited.
+      const searchResponse = await this.client.graph.search({
+        query: query,
+        userId: userId,
+        limit: limit
       });
 
-      return results.map(result => ({
-        content: result.message?.content || result.summary?.content || '',
-        relevance: result.score || 1.0,
-        timestamp: result.message?.createdAt || result.summary?.createdAt
-      }));
+      // Filter for conversation-related content from episodes
+      const episodes = searchResponse.episodes || [];
+      const results = episodes
+        .filter((episode: any) =>
+          episode.content?.includes('conversation') ||
+          episode.content?.includes('message') ||
+          episode.metadata?.type === 'conversation'
+        )
+        .map((episode: any) => ({
+          content: episode.content || '',
+          relevance: 1.0, // Episodes don't have scores directly
+          timestamp: episode.createdAt || new Date().toISOString()
+        }));
+
+      return results;
     } catch (error) {
       console.error('Failed to search memory:', error);
       return [];
