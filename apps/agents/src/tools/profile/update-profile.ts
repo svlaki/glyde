@@ -10,7 +10,18 @@ export const updateProfileTool = tool(
     }
 
     try {
-      await profileService.updateField(userId, field, value);
+      // Parse field path (e.g., "productivity.peakFocusHours" -> column: "work_patterns", field: "peakFocusHours")
+      const pathParts = field.split('.');
+      const column = pathParts[0];
+      const fieldName = pathParts.slice(1).join('.');
+      
+      if (!fieldName) {
+        // Direct column update
+        await profileService.updateProfile(userId, { [column]: value });
+      } else {
+        // Nested field update
+        await profileService.updateField(userId, column, fieldName, value);
+      }
       return `✅ Profile updated: ${field} = ${typeof value === 'object' ? JSON.stringify(value) : value}`;
     } catch (error) {
       console.error('❌ [update-profile] Error:', error);

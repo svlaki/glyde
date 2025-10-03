@@ -9,7 +9,6 @@ export interface Category {
   icon?: string;
   description?: string;
   context: CategoryContext;
-  applies_to: ('events' | 'tasks' | 'goals')[];
   display_order: number;
   created_at: string;
   updated_at: string;
@@ -30,7 +29,6 @@ export interface CategoryCreateInput {
   icon?: string;
   description?: string;
   context?: Partial<CategoryContext>;
-  applies_to?: ('events' | 'tasks' | 'goals')[];
 }
 
 export class CategoryService {
@@ -43,7 +41,7 @@ export class CategoryService {
   /**
    * Get all categories for a user
    */
-  async getCategories(userId: string, type?: 'events' | 'tasks' | 'goals'): Promise<Category[]> {
+  async getCategories(userId: string): Promise<Category[]> {
     try {
       let query = this.supabase
         .from('categories')
@@ -56,11 +54,6 @@ export class CategoryService {
       if (error) {
         console.error('❌ [CategoryService] Error fetching categories:', error);
         return [];
-      }
-
-      // Filter by type if specified
-      if (type && data) {
-        return data.filter((cat: Category) => cat.applies_to.includes(type));
       }
 
       return data as Category[];
@@ -99,30 +92,46 @@ export class CategoryService {
    */
   async createCategory(userId: string, input: CategoryCreateInput): Promise<Category | null> {
     try {
+      // Validate input
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+      
+      if (!input.name || typeof input.name !== 'string' || input.name.trim().length === 0) {
+        throw new Error('Category name is required and must be a non-empty string');
+      }
+      
+      if (!input.color || typeof input.color !== 'string' || !input.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+        throw new Error('Valid hex color is required (e.g., #3b82f6)');
+      }
+
       const { data, error } = await this.supabase
         .from('categories')
         .insert({
           user_id: userId,
-          name: input.name,
-          color: input.color,
-          icon: input.icon,
-          description: input.description,
+          name: input.name.trim(),
+          color: input.color.trim(),
+          icon: input.icon?.trim(),
+          description: input.description?.trim(),
           context: input.context || {},
-          applies_to: input.applies_to || ['events', 'tasks', 'goals'],
         })
         .select()
         .single();
 
       if (error) {
         console.error('❌ [CategoryService] Error creating category:', error);
-        return null;
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('No data returned from database');
       }
 
       console.log(`✅ [CategoryService] Created category: ${input.name}`);
       return data as Category;
     } catch (error) {
       console.error('❌ [CategoryService] Exception creating category:', error);
-      return null;
+      throw error; // Re-throw to let API handle it
     }
   }
 
@@ -135,9 +144,35 @@ export class CategoryService {
     updates: Partial<CategoryCreateInput>
   ): Promise<Category | null> {
     try {
+      // Validate input
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+      
+      if (!categoryId || typeof categoryId !== 'string') {
+        throw new Error('Invalid category ID');
+      }
+
+      // Validate updates if provided
+      if (updates.name !== undefined && (typeof updates.name !== 'string' || updates.name.trim().length === 0)) {
+        throw new Error('Category name must be a non-empty string');
+      }
+      
+      if (updates.color !== undefined && (typeof updates.color !== 'string' || !updates.color.match(/^#[0-9A-Fa-f]{6}$/))) {
+        throw new Error('Valid hex color is required (e.g., #3b82f6)');
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+      if (updates.name !== undefined) updateData.name = updates.name.trim();
+      if (updates.color !== undefined) updateData.color = updates.color.trim();
+      if (updates.icon !== undefined) updateData.icon = updates.icon?.trim();
+      if (updates.description !== undefined) updateData.description = updates.description?.trim();
+      if (updates.context !== undefined) updateData.context = updates.context;
+
       const { data, error } = await this.supabase
         .from('categories')
-        .update(updates)
+        .update(updateData)
         .eq('id', categoryId)
         .eq('user_id', userId)
         .select()
@@ -145,14 +180,21 @@ export class CategoryService {
 
       if (error) {
         console.error('❌ [CategoryService] Error updating category:', error);
-        return null;
+        if (error.code === 'PGRST116') {
+          throw new Error('Category not found');
+        }
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('Category not found or no data returned');
       }
 
       console.log(`✅ [CategoryService] Updated category: ${categoryId}`);
       return data as Category;
     } catch (error) {
       console.error('❌ [CategoryService] Exception updating category:', error);
-      return null;
+      throw error; // Re-throw to let API handle it
     }
   }
 
@@ -194,6 +236,15 @@ export class CategoryService {
    */
   async deleteCategory(userId: string, categoryId: string): Promise<void> {
     try {
+      // Validate input
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+      
+      if (!categoryId || typeof categoryId !== 'string') {
+        throw new Error('Invalid category ID');
+      }
+
       const { error } = await this.supabase
         .from('categories')
         .delete()
@@ -201,7 +252,11 @@ export class CategoryService {
         .eq('user_id', userId);
 
       if (error) {
-        throw error;
+        console.error('❌ [CategoryService] Error deleting category:', error);
+        if (error.code === 'PGRST116') {
+          throw new Error('Category not found');
+        }
+        throw new Error(`Database error: ${error.message}`);
       }
 
       console.log(`✅ [CategoryService] Deleted category: ${categoryId}`);

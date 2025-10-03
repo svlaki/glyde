@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
+import { supabase } from '../lib/supabase'
 import { fetchUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, Category } from '../lib/categoryService'
 
 export default function CategoriesPage() {
@@ -13,6 +14,26 @@ export default function CategoriesPage() {
   useEffect(() => {
     if (user) {
       loadCategories()
+    }
+  }, [user])
+
+  // Real-time subscription for categories
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel(`categories-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'categories',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        loadCategories()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [user])
 
@@ -30,34 +51,55 @@ export default function CategoriesPage() {
 
   async function handleCreateCategory(categoryData: Partial<Category>) {
     if (!user) return
-    const { error } = await createUserCategory(user, categoryData as any)
-    if (error) {
-      setError(error)
-    } else {
-      await loadCategories()
-      setShowCreateModal(false)
+    
+    try {
+      setError(null) // Clear previous errors
+      const { category, error } = await createUserCategory(user, categoryData as any)
+      if (error) {
+        setError(error)
+      } else {
+        await loadCategories()
+        setShowCreateModal(false)
+      }
+    } catch (err) {
+      console.error('Error creating category:', err)
+      setError('Failed to create category. Please try again.')
     }
   }
 
   async function handleUpdateCategory(categoryId: string, updates: Partial<Category>) {
     if (!user) return
-    const { error } = await updateUserCategory(user, categoryId, updates)
-    if (error) {
-      setError(error)
-    } else {
-      await loadCategories()
-      setEditingCategory(null)
+    
+    try {
+      setError(null) // Clear previous errors
+      const { category, error } = await updateUserCategory(user, categoryId, updates)
+      if (error) {
+        setError(error)
+      } else {
+        await loadCategories()
+        setEditingCategory(null)
+      }
+    } catch (err) {
+      console.error('Error updating category:', err)
+      setError('Failed to update category. Please try again.')
     }
   }
 
   async function handleDeleteCategory(categoryId: string) {
     if (!user) return
     if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) return
-    const { error } = await deleteUserCategory(user, categoryId)
-    if (error) {
-      setError(error)
-    } else {
-      await loadCategories()
+    
+    try {
+      setError(null) // Clear previous errors
+      const { success, error } = await deleteUserCategory(user, categoryId)
+      if (error) {
+        setError(error)
+      } else {
+        await loadCategories()
+      }
+    } catch (err) {
+      console.error('Error deleting category:', err)
+      setError('Failed to delete category. Please try again.')
     }
   }
 
@@ -206,17 +248,34 @@ function CategoryModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    
+    // Validate required fields
+    if (!formData.name.trim()) {
+      alert('Category name is required')
+      return
+    }
+    
+    if (!formData.color.trim()) {
+      alert('Category color is required')
+      return
+    }
+    
     try {
-      const contextParsed = JSON.parse(formData.context)
+      let contextParsed = {}
+      if (formData.context.trim()) {
+        contextParsed = JSON.parse(formData.context)
+      }
+      
       onSave({
-        name: formData.name,
-        color: formData.color,
-        icon: formData.icon || undefined,
-        description: formData.description || undefined,
+        name: formData.name.trim(),
+        color: formData.color.trim(),
+        icon: formData.icon.trim() || undefined,
+        description: formData.description.trim() || undefined,
         context: Object.keys(contextParsed).length > 0 ? contextParsed : undefined
       })
     } catch (e) {
-      alert('Invalid JSON in context field')
+      console.error('JSON parsing error:', e)
+      alert('Invalid JSON in context field. Please check your syntax.')
     }
   }
 

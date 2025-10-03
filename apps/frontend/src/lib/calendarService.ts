@@ -15,15 +15,6 @@ export interface CalendarEvent {
 }
 
 /**
- * Get the schema name for a user
- * @param user The authenticated user
- * @returns The schema name in the format u_<userId>
- */
-export function getUserSchemaName(user: User): string {
-  return `u_${user.id.replace(/-/g, '')}`
-}
-
-/**
  * Fetch events from the user's personal schema
  * @param user The authenticated user
  * @param startDate Optional start date to filter events

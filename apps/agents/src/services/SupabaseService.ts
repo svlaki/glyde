@@ -32,7 +32,9 @@ export class SupabaseService {
   }
 
   private getUserSchema(userId: string): string {
-    return `u_${userId.replace(/-/g, '')}`;
+    // DEPRECATED: Now using public schema with RLS
+    // All tables are in public schema, filtered by user_id via RLS policies
+    return 'public';
   }
 
   // Helper method to convert UTC times to local display times (same as frontend does)
@@ -123,20 +125,26 @@ export class SupabaseService {
     console.log('🔍 [SUPABASE SERVICE - AGENT] Fetching events for user:', userId);
     
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🏠 [SUPABASE SERVICE - AGENT] Using user schema:', userSchema);
-      
       // Fetch user profile to get timezone
       const profile = await this.getProfile(userId);
       const userTimezone = profile?.timezone || 'America/New_York';
       console.log('🌍 [SUPABASE SERVICE - AGENT] Using user timezone:', userTimezone);
       
-      // Use RPC function to get events from user's schema
-      const { data, error } = await this.client.rpc('get_user_events', {
-        user_schema: userSchema,
-        start_date: startDate || null,
-        end_date: endDate || null
-      });
+      // Query public schema with RLS filtering
+      let query = this.client
+        .from('events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('start_time', { ascending: true });
+
+      if (startDate) {
+        query = query.gte('start_time', startDate);
+      }
+      if (endDate) {
+        query = query.lte('end_time', endDate);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE - AGENT] Error fetching events:', error);
@@ -145,19 +153,20 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE - AGENT] Retrieved', data?.length || 0, 'events for user');
       
-      // Transform RPC response with timezone conversion for agent display
-      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
-        id: eventJson.id,
-        event_title: eventJson.event_title,
-        event_starts_at: this.convertUTCToLocalDisplay(eventJson.event_starts_at, userTimezone),
-        event_ends_at: this.convertUTCToLocalDisplay(eventJson.event_ends_at, userTimezone),
-        event_location: eventJson.event_location,
-        event_description: eventJson.event_description,
-        event_created_at: eventJson.event_created_at,
-        event_updated_at: eventJson.event_updated_at,
-        color: eventJson.color || '#3b82f6',
-        archetype: eventJson.archetype || 'generic',
-        archetype_data: eventJson.archetype_data || {}
+      // Transform with timezone conversion for agent display
+      const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
+        id: event.id,
+        event_title: event.title,
+        event_starts_at: this.convertUTCToLocalDisplay(event.start_time, userTimezone),
+        event_ends_at: this.convertUTCToLocalDisplay(event.end_time, userTimezone),
+        event_location: event.location,
+        event_description: event.description,
+        event_created_at: event.created_at,
+        event_updated_at: event.updated_at,
+        category: event.category || 'Personal',
+        color: event.color || '#3b82f6',
+        archetype: event.archetype || 'generic',
+        archetype_data: event.archetype_data || {}
       }));
       
       console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed', transformedEvents.length, 'events with timezone conversion');
@@ -173,15 +182,21 @@ export class SupabaseService {
     console.log('🔍 [SUPABASE SERVICE] Fetching events for user:', userId);
     
     try {
-      const userSchema = this.getUserSchema(userId);
-      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
-      
-      // Use RPC function to get events from user's schema
-      const { data, error } = await this.client.rpc('get_user_events', {
-        user_schema: userSchema,
-        start_date: startDate || null,
-        end_date: endDate || null
-      });
+      // Query public schema with RLS filtering
+      let query = this.client
+        .from('events')
+        .select('*')
+        .eq('user_id', userId)
+        .order('start_time', { ascending: true });
+
+      if (startDate) {
+        query = query.gte('start_time', startDate);
+      }
+      if (endDate) {
+        query = query.lte('end_time', endDate);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error fetching events:', error);
@@ -191,19 +206,20 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
       
-      // Transform RPC response to match DatabaseEvent interface (no timezone conversion for frontend)
-      const transformedEvents: DatabaseEvent[] = (data || []).map((eventJson: any) => ({
-        id: eventJson.id,
-        event_title: eventJson.event_title,
-        event_starts_at: eventJson.event_starts_at, // Frontend handles timezone conversion
-        event_ends_at: eventJson.event_ends_at,     // Frontend handles timezone conversion
-        event_location: eventJson.event_location,
-        event_description: eventJson.event_description,
-        event_created_at: eventJson.event_created_at,
-        event_updated_at: eventJson.event_updated_at,
-        color: eventJson.color || '#3b82f6',
-        archetype: eventJson.archetype || 'generic',
-        archetype_data: eventJson.archetype_data || {}
+      // Transform to match DatabaseEvent interface (no timezone conversion for frontend)
+      const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
+        id: event.id,
+        event_title: event.title,
+        event_starts_at: event.start_time, // Frontend handles timezone conversion
+        event_ends_at: event.end_time,     // Frontend handles timezone conversion
+        event_location: event.location,
+        event_description: event.description,
+        event_created_at: event.created_at,
+        event_updated_at: event.updated_at,
+        category: event.category || 'Personal',
+        color: event.color || '#3b82f6',
+        archetype: event.archetype || 'generic',
+        archetype_data: event.archetype_data || {}
       }));
       
       console.log('🔄 [SUPABASE SERVICE] Transformed', transformedEvents.length, 'events for frontend');
@@ -218,9 +234,6 @@ export class SupabaseService {
     try {
       console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
-      
-      const userSchema = this.getUserSchema(userId);
-      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
       
       // Fetch user profile to get timezone
       const profile = await this.getProfile(userId);
@@ -237,16 +250,22 @@ export class SupabaseService {
       const startTime = convertToUTC(event.event_starts_at || (event as any).start_time, userTimezone);
       const endTime = convertToUTC(event.event_ends_at || (event as any).end_time, userTimezone);
       
-      // Use RPC function to create event in user's schema
-      const { data, error } = await this.client.rpc('create_user_event', {
-        user_schema: userSchema,
-        event_title: title,
-        event_starts_at: startTime,
-        event_ends_at: endTime,
-        event_location: location,
-        event_description: description,
-        category: category
-      });
+      // Insert into public schema (RLS handles user filtering)
+      const { data, error } = await this.client
+        .from('events')
+        .insert({
+          user_id: userId,
+          title: title,
+          start_time: startTime,
+          end_time: endTime,
+          location: location,
+          description: description,
+          category: category,
+          archetype: 'generic',
+          archetype_data: {}
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error creating event:', error);
@@ -256,19 +275,19 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event created successfully:', JSON.stringify(data, null, 2));
 
-      // Transform RPC response to match DatabaseEvent interface
+      // Transform to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
-          event_title: data.event_title,
-          event_starts_at: data.event_starts_at,
-          event_ends_at: data.event_ends_at,
-          event_location: data.event_location,
-          event_description: data.event_description,
-          event_created_at: data.event_created_at,
-          event_updated_at: data.event_updated_at,
-          color: data.color || '#3b82f6',
-          category: data.category || 'Personal'
+          event_title: data.title,
+          event_starts_at: data.start_time,
+          event_ends_at: data.end_time,
+          event_location: data.location,
+          event_description: data.description,
+          event_created_at: data.created_at,
+          event_updated_at: data.updated_at,
+          category: data.category || 'Personal',
+          color: data.color || '#3b82f6'
         } as DatabaseEvent;
       }
       
@@ -285,20 +304,26 @@ export class SupabaseService {
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
       
-      const userSchema = this.getUserSchema(userId);
-      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
-      
-      // Use RPC function to update event in user's schema
-      const { data, error } = await this.client.rpc('update_user_event', {
-        user_schema: userSchema,
-        event_id: eventId,
-        event_title: updates.event_title || null,
-        event_starts_at: updates.event_starts_at || null,
-        event_ends_at: updates.event_ends_at || null,
-        event_location: updates.event_location || null,
-        event_description: updates.event_description || null,
-        category: updates.category || null
-      });
+      // Build update object with only provided fields
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.event_title !== undefined) updateData.title = updates.event_title;
+      if (updates.event_starts_at !== undefined) updateData.start_time = updates.event_starts_at;
+      if (updates.event_ends_at !== undefined) updateData.end_time = updates.event_ends_at;
+      if (updates.event_location !== undefined) updateData.location = updates.event_location;
+      if (updates.event_description !== undefined) updateData.description = updates.event_description;
+      if (updates.category !== undefined) updateData.category = updates.category;
+
+      // Update in public schema (RLS handles user filtering)
+      const { data, error } = await this.client
+        .from('events')
+        .update(updateData)
+        .eq('id', eventId)
+        .eq('user_id', userId)
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error updating event:', error);
@@ -308,17 +333,18 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event updated successfully:', JSON.stringify(data, null, 2));
       
-      // Transform RPC response to match DatabaseEvent interface
+      // Transform to match DatabaseEvent interface
       if (data) {
         return {
           id: data.id,
-          event_title: data.event_title,
-          event_starts_at: data.event_starts_at,
-          event_ends_at: data.event_ends_at,
-          event_location: data.event_location,
-          event_description: data.event_description,
-          event_created_at: data.event_created_at,
-          event_updated_at: data.event_updated_at,
+          event_title: data.title,
+          event_starts_at: data.start_time,
+          event_ends_at: data.end_time,
+          event_location: data.location,
+          event_description: data.description,
+          event_created_at: data.created_at,
+          event_updated_at: data.updated_at,
+          category: data.category || 'Personal',
           color: data.color || '#3b82f6',
           archetype: data.archetype || 'generic',
           archetype_data: data.archetype_data || {}
@@ -337,14 +363,12 @@ export class SupabaseService {
       console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       
-      const userSchema = this.getUserSchema(userId);
-      console.log('🏠 [SUPABASE SERVICE] Using user schema:', userSchema);
-      
-      // Use RPC function to delete event from user's schema
-      const { data, error } = await this.client.rpc('delete_user_event', {
-        user_schema: userSchema,
-        event_id: eventId
-      });
+      // Delete from public schema (RLS handles user filtering)
+      const { error } = await this.client
+        .from('events')
+        .delete()
+        .eq('id', eventId)
+        .eq('user_id', userId);
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error deleting event:', error);
@@ -352,10 +376,8 @@ export class SupabaseService {
         return { success: false, error: error.message };
       }
 
-      // RPC function returns boolean indicating success
-      const success = data === true;
-      console.log('✅ [SUPABASE SERVICE] Event deletion result:', success);
-      return { success, error: success ? null : 'Event not found or could not be deleted' };
+      console.log('✅ [SUPABASE SERVICE] Event deleted successfully');
+      return { success: true, error: null };
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception deleting event:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -386,10 +408,7 @@ export class SupabaseService {
   }): Promise<any> {
     try {
       console.log('📝 [SUPABASE SERVICE] Creating task for user:', userId);
-      const userSchema = this.getUserSchema(userId);
-
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('tasks')
         .insert({
           user_id: userId,
@@ -436,10 +455,8 @@ export class SupabaseService {
   }): Promise<any[]> {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting tasks for user:', userId);
-      const userSchema = this.getUserSchema(userId);
 
       let query = this.client
-        .schema(userSchema)
         .from('tasks')
         .select('*')
         .eq('user_id', userId)
@@ -501,7 +518,6 @@ export class SupabaseService {
   }): Promise<any> {
     try {
       console.log('🔄 [SUPABASE SERVICE] Updating task:', taskId);
-      const userSchema = this.getUserSchema(userId);
 
       const updateData: any = {
         updated_at: new Date().toISOString()
@@ -529,7 +545,6 @@ export class SupabaseService {
       if (updates.taskMetadata !== undefined) updateData.task_metadata = updates.taskMetadata;
 
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('tasks')
         .update(updateData)
         .eq('id', taskId)
@@ -556,10 +571,8 @@ export class SupabaseService {
   async deleteTask(userId: string, taskId: string): Promise<{ success: boolean, error: string | null }> {
     try {
       console.log('🗑️ [SUPABASE SERVICE] Deleting task:', taskId);
-      const userSchema = this.getUserSchema(userId);
 
       const { error } = await this.client
-        .schema(userSchema)
         .from('tasks')
         .delete()
         .eq('id', taskId)
@@ -584,7 +597,6 @@ export class SupabaseService {
   async completeTask(userId: string, taskId: string, notes?: string, actualDuration?: number): Promise<any> {
     try {
       console.log('✅ [SUPABASE SERVICE] Completing task:', taskId);
-      const userSchema = this.getUserSchema(userId);
 
       const updateData: any = {
         status: 'completed',
@@ -596,7 +608,6 @@ export class SupabaseService {
       if (actualDuration !== undefined) updateData.actual_duration = actualDuration;
 
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('tasks')
         .update(updateData)
         .eq('id', taskId)
@@ -644,10 +655,8 @@ export class SupabaseService {
   }): Promise<any> {
     try {
       console.log('🎯 [SUPABASE SERVICE] Creating goal for user:', userId);
-      const userSchema = this.getUserSchema(userId);
 
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('goals')
         .insert({
           user_id: userId,
@@ -697,10 +706,8 @@ export class SupabaseService {
   }): Promise<any[]> {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting goals for user:', userId);
-      const userSchema = this.getUserSchema(userId);
 
       let query = this.client
-        .schema(userSchema)
         .from('goals')
         .select('*')
         .eq('user_id', userId)
@@ -763,7 +770,6 @@ export class SupabaseService {
   }): Promise<any> {
     try {
       console.log('🔄 [SUPABASE SERVICE] Updating goal:', goalId);
-      const userSchema = this.getUserSchema(userId);
 
       const updateData: any = {
         updated_at: new Date().toISOString()
@@ -787,7 +793,6 @@ export class SupabaseService {
       if (updates.reviewFrequency !== undefined) updateData.review_frequency = updates.reviewFrequency;
 
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('goals')
         .update(updateData)
         .eq('id', goalId)
@@ -814,10 +819,8 @@ export class SupabaseService {
   async deleteGoal(userId: string, goalId: string): Promise<{ success: boolean, error: string | null }> {
     try {
       console.log('🗑️ [SUPABASE SERVICE] Deleting goal:', goalId);
-      const userSchema = this.getUserSchema(userId);
 
       const { error } = await this.client
-        .schema(userSchema)
         .from('goals')
         .delete()
         .eq('id', goalId)
@@ -851,10 +854,8 @@ export class SupabaseService {
   }): Promise<any> {
     try {
       console.log('📝 [SUPABASE SERVICE] Adding goal check-in for goal:', goalId);
-      const userSchema = this.getUserSchema(userId);
 
       const { data, error } = await this.client
-        .schema(userSchema)
         .from('goal_check_ins')
         .insert({
           goal_id: goalId,
@@ -891,10 +892,8 @@ export class SupabaseService {
   async getGoalCheckIns(userId: string, goalId: string, limit?: number): Promise<any[]> {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting check-ins for goal:', goalId);
-      const userSchema = this.getUserSchema(userId);
 
       let query = this.client
-        .schema(userSchema)
         .from('goal_check_ins')
         .select('*')
         .eq('goal_id', goalId)
@@ -987,10 +986,8 @@ export class SupabaseService {
   }
 
   async searchSimilarEvents(userId: string, queryEmbedding: number[], limit: number = 10): Promise<VectorSearchResult<DatabaseEvent>[]> {
-    const schema = this.getUserSchema(userId);
-    
-    console.log('🔍 DEBUG: Calling match_events with:', { 
-      schema, 
+    console.log('🔍 DEBUG: Calling match_events with:', {
+      user_id: userId, 
       embedding_length: queryEmbedding.length, 
       match_count: limit 
     });
@@ -999,7 +996,7 @@ export class SupabaseService {
       .rpc('match_events', {
         query_embedding: queryEmbedding,
         match_count: limit,
-        filter: { user_schema: schema }
+        filter: { user_id: userId }
       });
 
     if (error) {
@@ -1011,13 +1008,11 @@ export class SupabaseService {
   }
 
   async searchSimilarChats(userId: string, queryEmbedding: number[], limit: number = 10): Promise<VectorSearchResult<DatabaseChatMessage>[]> {
-    const schema = this.getUserSchema(userId);
-    
     const { data, error } = await this.client
       .rpc('match_chat_messages', {
         query_embedding: queryEmbedding,
         match_count: limit,
-        filter: { user_schema: schema }
+        filter: { user_id: userId }
       });
 
     if (error) {
@@ -1029,10 +1024,7 @@ export class SupabaseService {
   }
 
   async getUserSettings(userId: string): Promise<Record<string, any>> {
-    const schema = this.getUserSchema(userId);
-    
     const { data, error } = await this.client
-      .schema(schema)
       .from('settings')
       .select('*');
 
@@ -1050,10 +1042,7 @@ export class SupabaseService {
   }
 
   async updateUserSetting(userId: string, key: string, value: any): Promise<boolean> {
-    const schema = this.getUserSchema(userId);
-    
     const { error } = await this.client
-      .schema(schema)
       .from('settings')
       .upsert([{ key, value }]);
 
@@ -1066,19 +1055,19 @@ export class SupabaseService {
   }
 
   async subscribeToUserChanges(userId: string, callback: (payload: any) => void) {
-    const schema = this.getUserSchema(userId);
-
     return this.client
       .channel(`user_changes_${userId}`)
       .on('postgres_changes', {
         event: '*',
-        schema: schema,
-        table: 'events'
+        schema: 'public',
+        table: 'events',
+        filter: `user_id=eq.${userId}`
       }, callback)
       .on('postgres_changes', {
         event: '*',
-        schema: schema,
-        table: 'chat_messages'
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `user_id=eq.${userId}`
       }, callback)
       .subscribe();
   }

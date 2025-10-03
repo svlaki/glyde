@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
+import { supabase } from '../lib/supabase'
 import { fetchUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask, Task } from '../lib/taskService'
 import { fetchUserCategories, Category } from '../lib/categoryService'
 
@@ -20,6 +21,26 @@ export default function TasksPage() {
     }
   }, [user, filter])
 
+  // Real-time subscription for tasks
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel(`tasks-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        loadTasks()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
   async function loadTasks() {
     if (!user) return
     setLoading(true)
@@ -35,13 +56,13 @@ export default function TasksPage() {
 
   async function loadCategories() {
     if (!user) return
-    const { categories: fetchedCategories } = await fetchUserCategories(user, 'tasks')
+    const { categories: fetchedCategories } = await fetchUserCategories(user)
     setCategories(fetchedCategories)
   }
 
   async function handleCreateTask(taskData: Partial<Task>) {
     if (!user) return
-    const { task, error } = await createUserTask(user, taskData as any)
+    const { task, error } = await createUserTask(user, taskData as Required<Pick<Task, 'title'>> & Partial<Task>)
     if (error) {
       setError(error)
     } else {
@@ -340,7 +361,7 @@ function TaskModal({
             <label className="block text-sm font-medium mb-1">Priority</label>
             <select
               value={formData.priority}
-              onChange={e => setFormData({ ...formData, priority: e.target.value as any })}
+              onChange={e => setFormData({ ...formData, priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent' })}
               className="w-full border rounded px-3 py-2"
             >
               <option value="low">Low</option>
@@ -354,7 +375,7 @@ function TaskModal({
             <label className="block text-sm font-medium mb-1">Energy Required</label>
             <select
               value={formData.energy_required}
-              onChange={e => setFormData({ ...formData, energy_required: e.target.value as any })}
+              onChange={e => setFormData({ ...formData, energy_required: e.target.value as 'low' | 'medium' | 'high' })}
               className="w-full border rounded px-3 py-2"
             >
               <option value="low">Low</option>

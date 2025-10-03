@@ -3,7 +3,7 @@ import categoryService from '../services/CategoryService.js';
 
 export async function getUserCategories(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, type } = req.body;
+    const { user_id } = req.body;
 
     if (!user_id) {
       res.status(400).json({ error: 'user_id is required' });
@@ -12,13 +12,13 @@ export async function getUserCategories(req: Request, res: Response): Promise<vo
 
     console.log('Fetching categories for user:', user_id);
 
-    let categories = await categoryService.getCategories(user_id, type);
+    let categories = await categoryService.getCategories(user_id);
 
     // Auto-create default categories if user has none
     if (categories.length === 0) {
       console.log('No categories found for user, creating defaults...');
       await categoryService.createDefaultCategories(user_id);
-      categories = await categoryService.getCategories(user_id, type);
+      categories = await categoryService.getCategories(user_id);
     }
 
     res.json({
@@ -46,16 +46,31 @@ export async function createUserCategory(req: Request, res: Response): Promise<v
       return;
     }
 
+    // Validate category data
+    if (typeof categoryData.name !== 'string' || categoryData.name.trim().length === 0) {
+      res.status(400).json({ error: 'Category name must be a non-empty string' });
+      return;
+    }
+
+    if (typeof categoryData.color !== 'string' || !categoryData.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+      res.status(400).json({ error: 'Color must be a valid hex color (e.g., #3b82f6)' });
+      return;
+    }
+
     console.log('Creating category for user:', user_id);
 
     const category = await categoryService.createCategory(user_id, {
-      name: categoryData.name,
-      color: categoryData.color,
-      icon: categoryData.icon,
-      description: categoryData.description,
-      context: categoryData.context,
-      applies_to: categoryData.applies_to
+      name: categoryData.name.trim(),
+      color: categoryData.color.trim(),
+      icon: categoryData.icon?.trim(),
+      description: categoryData.description?.trim(),
+      context: categoryData.context || {}
     });
+
+    if (!category) {
+      res.status(500).json({ error: 'Failed to create category - service returned null' });
+      return;
+    }
 
     res.json({
       success: true,
@@ -77,16 +92,31 @@ export async function updateUserCategory(req: Request, res: Response): Promise<v
       return;
     }
 
+    // Validate updates
+    if (updates.name !== undefined && (typeof updates.name !== 'string' || updates.name.trim().length === 0)) {
+      res.status(400).json({ error: 'Category name must be a non-empty string' });
+      return;
+    }
+
+    if (updates.color !== undefined && (typeof updates.color !== 'string' || !updates.color.match(/^#[0-9A-Fa-f]{6}$/))) {
+      res.status(400).json({ error: 'Color must be a valid hex color (e.g., #3b82f6)' });
+      return;
+    }
+
     console.log('Updating category:', category_id, 'for user:', user_id);
 
     const category = await categoryService.updateCategory(user_id, category_id, {
-      name: updates.name,
-      color: updates.color,
-      icon: updates.icon,
-      description: updates.description,
-      context: updates.context,
-      applies_to: updates.applies_to
+      name: updates.name?.trim(),
+      color: updates.color?.trim(),
+      icon: updates.icon?.trim(),
+      description: updates.description?.trim(),
+      context: updates.context
     });
+
+    if (!category) {
+      res.status(404).json({ error: 'Category not found or failed to update' });
+      return;
+    }
 
     res.json({
       success: true,

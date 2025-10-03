@@ -1,6 +1,21 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { AIContextProfile, ProfileSection, ProfileFieldUpdate } from '../types/profile.js';
 import { getSupabaseClient } from './SupabaseService.js';
+
+// Schema-aligned profile structure
+export interface UserProfile {
+  id: string;
+  email?: string;
+  display_name?: string;
+  avatar_url?: string;
+  values?: Record<string, any>;
+  preferences?: Record<string, any>;
+  work_patterns?: Record<string, any>;
+  goals_summary?: string;
+  personality_traits?: Record<string, any>;
+  context_data?: Record<string, any>;
+  timezone?: string;
+  created_at?: string;
+}
 
 export class ProfileService {
   private supabase: SupabaseClient;
@@ -10,22 +25,45 @@ export class ProfileService {
   }
 
   /**
-   * Get the complete AI context profile for a user
+   * Get the complete user profile
    */
-  async getProfile(userId: string): Promise<AIContextProfile | null> {
+  async getProfile(userId: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await this.supabase
         .from('profile')
-        .select('ai_context_profile')
+        .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ [ProfileService] Error fetching profile:', error);
         return null;
       }
 
-      return data?.ai_context_profile as AIContextProfile;
+      // If no profile exists, create one
+      if (!data) {
+        const { data: newProfile, error: createError } = await this.supabase
+          .from('profile')
+          .insert({
+            id: userId,
+            values: {},
+            preferences: {},
+            work_patterns: {},
+            personality_traits: {},
+            context_data: {}
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('❌ [ProfileService] Error creating profile:', createError);
+          return null;
+        }
+
+        return newProfile as UserProfile;
+      }
+
+      return data as UserProfile;
     } catch (error) {
       console.error('❌ [ProfileService] Exception fetching profile:', error);
       return null;
@@ -33,16 +71,13 @@ export class ProfileService {
   }
 
   /**
-   * Update the entire AI context profile
+   * Update the entire user profile
    */
-  async updateProfile(userId: string, profile: AIContextProfile): Promise<void> {
+  async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<void> {
     try {
-      // Set lastUpdated timestamp
-      profile.lastUpdated = new Date().toISOString();
-
       const { error } = await this.supabase
         .from('profile')
-        .update({ ai_context_profile: profile })
+        .update(updates)
         .eq('id', userId);
 
       if (error) {
@@ -58,24 +93,16 @@ export class ProfileService {
   }
 
   /**
-   * Update a specific section of the profile
+   * Update a specific section of the profile (values, preferences, work_patterns, etc.)
    */
   async updateProfileSection(
     userId: string,
-    section: ProfileSection,
-    data: any
+    section: keyof Pick<UserProfile, 'values' | 'preferences' | 'work_patterns' | 'personality_traits' | 'context_data'>,
+    data: Record<string, any>
   ): Promise<void> {
     try {
-      const profile = await this.getProfile(userId);
-      if (!profile) {
-        throw new Error('Profile not found');
-      }
-
-      // Update the specific section
-      profile[section] = data;
-      profile.lastUpdated = new Date().toISOString();
-
-      await this.updateProfile(userId, profile);
+      const updates = { [section]: data };
+      await this.updateProfile(userId, updates);
     } catch (error) {
       console.error(`❌ [ProfileService] Error updating section ${section}:`, error);
       throw error;
@@ -85,10 +112,23 @@ export class ProfileService {
   /**
    * Get a specific section of the profile
    */
-  async getProfileSection(userId: string, section: ProfileSection): Promise<any> {
+  async getProfileSection(
+    userId: string,
+    section: keyof UserProfile
+  ): Promise<any> {
     try {
-      const profile = await this.getProfile(userId);
-      return profile?.[section] || null;
+      const { data, error} = await this.supabase
+        .from('profile')
+        .select(section)
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error(`❌ [ProfileService] Error getting section ${section}:`, error);
+        return null;
+      }
+
+      return (data as any)?.[section] || null;
     } catch (error) {
       console.error(`❌ [ProfileService] Error getting section ${section}:`, error);
       return null;
@@ -96,116 +136,58 @@ export class ProfileService {
   }
 
   /**
-   * Update a specific field in the profile using JSON path
-   * Example: updateField(userId, "productivity.peakFocusHours", [9, 10, 11])
+   * Update a specific field in a JSONB column
+   * Example: updateField(userId, "values", "coreValues", ["Growth", "Impact"])
    */
-  async updateField(userId: string, path: string, value: any): Promise<void> {
+  async updateField(
+    userId: string,
+    column: string,
+    field: string,
+    value: any
+  ): Promise<void> {
     try {
       const profile = await this.getProfile(userId);
       if (!profile) {
         throw new Error('Profile not found');
       }
 
-      // Navigate to the nested field and update it
-      const pathParts = path.split('.');
-      let current: any = profile;
+      const columnData = (profile as any)[column] || {};
+      columnData[field] = value;
 
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        if (!(pathParts[i] in current)) {
-          current[pathParts[i]] = {};
-        }
-        current = current[pathParts[i]];
-      }
-
-      // Set the final value
-      current[pathParts[pathParts.length - 1]] = value;
-
-      await this.updateProfile(userId, profile);
+      await this.updateProfile(userId, { [column]: columnData });
     } catch (error) {
-      console.error(`❌ [ProfileService] Error updating field ${path}:`, error);
+      console.error(`❌ [ProfileService] Error updating field ${column}.${field}:`, error);
       throw error;
-    }
-  }
-
-  /**
-   * Get a specific field value from the profile
-   */
-  async getField(userId: string, path: string): Promise<any> {
-    try {
-      const profile = await this.getProfile(userId);
-      if (!profile) {
-        return null;
-      }
-
-      // Navigate to the nested field
-      const pathParts = path.split('.');
-      let current: any = profile;
-
-      for (const part of pathParts) {
-        if (!(part in current)) {
-          return null;
-        }
-        current = current[part];
-      }
-
-      return current;
-    } catch (error) {
-      console.error(`❌ [ProfileService] Error getting field ${path}:`, error);
-      return null;
     }
   }
 
   /**
    * Batch update multiple fields
    */
-  async batchUpdateFields(userId: string, updates: ProfileFieldUpdate[]): Promise<void> {
+  async batchUpdateFields(
+    userId: string,
+    updates: Array<{ column: string; field: string; value: any }>
+  ): Promise<void> {
     try {
       const profile = await this.getProfile(userId);
       if (!profile) {
         throw new Error('Profile not found');
       }
 
-      // Apply all updates
+      const changes: Record<string, any> = {};
+
       for (const update of updates) {
-        const pathParts = update.path.split('.');
-        let current: any = profile;
-
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          if (!(pathParts[i] in current)) {
-            current[pathParts[i]] = {};
-          }
-          current = current[pathParts[i]];
+        if (!changes[update.column]) {
+          changes[update.column] = (profile as any)[update.column] || {};
         }
-
-        current[pathParts[pathParts.length - 1]] = update.value;
+        changes[update.column][update.field] = update.value;
       }
 
-      await this.updateProfile(userId, profile);
+      await this.updateProfile(userId, changes);
     } catch (error) {
       console.error('❌ [ProfileService] Error batch updating fields:', error);
       throw error;
     }
-  }
-
-  /**
-   * Check if a profile field has been set (not null/empty)
-   */
-  async isFieldSet(userId: string, path: string): Promise<boolean> {
-    const value = await this.getField(userId, path);
-
-    if (value === null || value === undefined) {
-      return false;
-    }
-
-    if (Array.isArray(value)) {
-      return value.length > 0;
-    }
-
-    if (typeof value === 'object') {
-      return Object.keys(value).length > 0;
-    }
-
-    return true;
   }
 
   /**
@@ -218,28 +200,28 @@ export class ProfileService {
         return 0;
       }
 
-      // Define critical fields to check
-      const criticalFields = [
-        'life.coreValues',
-        'life.currentLifePhase',
-        'work.role',
-        'work.workingHours.start',
-        'productivity.peakFocusHours',
-        'productivity.energyPattern.morning',
-        'health.exerciseRoutine.frequency',
-        'health.sleepSchedule.targetBedtime',
-        'agentPreferences.proactivityLevel',
-      ];
+      const sections = ['values', 'preferences', 'work_patterns', 'personality_traits'];
+      let totalFields = 0;
+      let filledFields = 0;
 
-      let filledCount = 0;
-
-      for (const field of criticalFields) {
-        if (await this.isFieldSet(userId, field)) {
-          filledCount++;
+      for (const section of sections) {
+        const sectionData = (profile as any)[section];
+        if (sectionData && typeof sectionData === 'object') {
+          const keys = Object.keys(sectionData);
+          totalFields += keys.length;
+          filledFields += keys.filter(key => {
+            const val = sectionData[key];
+            if (Array.isArray(val)) return val.length > 0;
+            if (typeof val === 'object' && val !== null) return Object.keys(val).length > 0;
+            return val !== null && val !== undefined && val !== '';
+          }).length;
         }
       }
 
-      return Math.round((filledCount / criticalFields.length) * 100);
+      if (profile.goals_summary) filledFields++;
+      totalFields++;
+
+      return totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
     } catch (error) {
       console.error('❌ [ProfileService] Error calculating completeness:', error);
       return 0;
@@ -247,51 +229,62 @@ export class ProfileService {
   }
 
   /**
-   * Get a summary of what the AI knows about the user
+   * Get a summary of the profile
    */
-  async getProfileSummary(userId: string): Promise<string> {
+  async getProfileSummary(userId: string): Promise<any> {
     try {
       const profile = await this.getProfile(userId);
       if (!profile) {
-        return 'No profile information available.';
+        return {
+          totalFields: 0,
+          filledFields: 0,
+          completenessPercentage: 0,
+          sections: {}
+        };
       }
 
-      const summary: string[] = [];
+      const sections = ['values', 'preferences', 'work_patterns', 'personality_traits', 'context_data'];
+      const summary: any = {
+        totalFields: 0,
+        filledFields: 0,
+        sections: {}
+      };
 
-      // Life context
-      if (profile.life.coreValues.length > 0) {
-        summary.push(`Values: ${profile.life.coreValues.join(', ')}`);
+      for (const section of sections) {
+        const sectionData = (profile as any)[section];
+        if (sectionData && typeof sectionData === 'object') {
+          const keys = Object.keys(sectionData);
+          const filled = keys.filter(key => {
+            const val = sectionData[key];
+            if (Array.isArray(val)) return val.length > 0;
+            if (typeof val === 'object' && val !== null) return Object.keys(val).length > 0;
+            return val !== null && val !== undefined && val !== '';
+          }).length;
+
+          summary.sections[section] = {
+            totalFields: keys.length,
+            filledFields: filled,
+            completeness: keys.length > 0 ? Math.round((filled / keys.length) * 100) : 0
+          };
+
+          summary.totalFields += keys.length;
+          summary.filledFields += filled;
+        }
       }
 
-      // Work
-      if (profile.work.role) {
-        summary.push(`Role: ${profile.work.role}${profile.work.company ? ` at ${profile.work.company}` : ''}`);
-      }
+      summary.completenessPercentage = summary.totalFields > 0
+        ? Math.round((summary.filledFields / summary.totalFields) * 100)
+        : 0;
 
-      // Productivity
-      if (profile.productivity.peakFocusHours.length > 0) {
-        summary.push(`Peak focus: ${profile.productivity.peakFocusHours.join(', ')}:00`);
-      }
-
-      // Health
-      if (profile.health.exerciseRoutine.types.length > 0) {
-        summary.push(`Exercise: ${profile.health.exerciseRoutine.types.join(', ')} ${profile.health.exerciseRoutine.frequency || ''}`);
-      }
-
-      // Goals
-      const totalGoals = profile.life.lifeGoals.shortTerm.length +
-        profile.life.lifeGoals.mediumTerm.length +
-        profile.life.lifeGoals.longTerm.length;
-      if (totalGoals > 0) {
-        summary.push(`${totalGoals} life goals tracked`);
-      }
-
-      return summary.length > 0
-        ? summary.join(' • ')
-        : 'Profile is being built as you interact with the system.';
+      return summary;
     } catch (error) {
       console.error('❌ [ProfileService] Error generating summary:', error);
-      return 'Error loading profile summary.';
+      return {
+        totalFields: 0,
+        filledFields: 0,
+        completenessPercentage: 0,
+        sections: {}
+      };
     }
   }
 }

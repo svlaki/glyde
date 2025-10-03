@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedSection, setSelectedSection] = useState<string | null>(null)
-  const [editingField, setEditingField] = useState<{ path: string; value: any } | null>(null)
+  const [editingField, setEditingField] = useState<{ path: string; value: string | number | boolean | Record<string, unknown> } | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -44,7 +44,7 @@ export default function ProfilePage() {
     setLoading(false)
   }
 
-  async function handleUpdateField(path: string, value: any) {
+  async function handleUpdateField(path: string, value: string | number | boolean | Record<string, unknown>) {
     if (!user) return
     const { error } = await updateProfileField(user, path, value)
     if (error) {
@@ -159,14 +159,14 @@ function SectionDetailModal({
   section: { key: string; label: string; icon: string }
   data: Record<string, any>
   onClose: () => void
-  onUpdate: (path: string, value: any) => void
+  onUpdate: (path: string, value: string | number | boolean | Record<string, unknown>) => void
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
 
-  function handleEdit(key: string, currentValue: any) {
+  function handleEdit(key: string, currentValue: string | number | boolean | Record<string, unknown>) {
     setEditingKey(key)
     setEditValue(JSON.stringify(currentValue, null, 2))
   }

@@ -82,7 +82,18 @@ export async function updateProfileField(req: Request, res: Response): Promise<v
 
     console.log('Updating profile field:', field, 'for user:', user_id);
 
-    await profileService.updateField(user_id, field, value);
+    // Parse field path (e.g., "values.coreValues" -> column: "values", field: "coreValues")
+    const pathParts = field.split('.');
+    const column = pathParts[0];
+    const fieldName = pathParts.slice(1).join('.');
+    
+    if (!fieldName) {
+      // Direct column update
+      await profileService.updateProfile(user_id, { [column]: value });
+    } else {
+      // Nested field update
+      await profileService.updateField(user_id, column, fieldName, value);
+    }
 
     res.json({
       success: true,

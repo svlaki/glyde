@@ -8,7 +8,6 @@ export interface Category {
   icon?: string
   description?: string
   context?: Record<string, any>
-  applies_to?: Array<'events' | 'tasks' | 'goals'>
   created_at?: string
   updated_at?: string
 }
@@ -16,8 +15,7 @@ export interface Category {
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
 export async function fetchUserCategories(
-  user: User,
-  type?: 'events' | 'tasks' | 'goals'
+  user: User
 ): Promise<{ categories: Category[], error: string | null }> {
   try {
     if (!user) {
@@ -30,8 +28,7 @@ export async function fetchUserCategories(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_id: user.id,
-        type
+        user_id: user.id
       }),
     })
 
@@ -56,7 +53,6 @@ export async function createUserCategory(
     icon?: string
     description?: string
     context?: Record<string, any>
-    applies_to?: Array<'events' | 'tasks' | 'goals'>
   }
 ): Promise<{ category: Category | null, error: string | null }> {
   try {

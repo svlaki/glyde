@@ -68,7 +68,6 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const loadChatHistory = useCallback(async () => {
     if (!user || !sessionId) return;
     
-    console.log('🔄 [CHAT] Loading history for session:', sessionId);
     try {
       const agentServiceUrl = (import.meta as any).env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
       const response = await fetch(`${agentServiceUrl}/api/chat/history`, {
@@ -84,17 +83,15 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
       });
 
       if (!response.ok) {
-        console.log('ℹ️ [CHAT] No history found or error loading:', response.status);
         return;
       }
 
       const result = await response.json();
       
       if (result.success && result.messages && result.messages.length > 0) {
-        console.log('✅ [CHAT] Loaded', result.messages.length, 'messages from backend');
         
         // Filter out internal greeting messages - check for multiple variations
-        const filteredHistory = result.messages.filter((msg: any) => {
+        const filteredHistory = result.messages.filter((msg: { role: string; content: string; timestamp?: string }) => {
           if (msg.sender !== 'user') return true; // Keep all assistant messages
           
           const content = msg.content.toLowerCase();
@@ -104,13 +101,12 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
             content.includes('current time') && content.includes('events') && content.includes('schedule');
           
           if (isGreetingMessage) {
-            console.log('🚫 [CHAT] Filtering out greeting message:', msg.content);
           }
           
           return !isGreetingMessage;
         });
         
-        const formattedMessages = filteredHistory.map((msg: any) => ({
+        const formattedMessages = filteredHistory.map((msg: { role: string; content: string; timestamp?: string }) => ({
           id: msg.id,
           content: msg.content,
           sender: msg.sender,
@@ -122,9 +118,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
           lastTimestampRef.current = filteredHistory[filteredHistory.length - 1].timestamp;
         }
         
-        console.log('✅ [CHAT] After filtering:', formattedMessages.length, 'messages remain');
       } else {
-        console.log('ℹ️ [CHAT] No messages found in response');
       }
     } catch (err) {
       console.error('Error loading chat history:', err);

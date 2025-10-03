@@ -32,7 +32,25 @@ const PORT = process.env.PORT || 8000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
+
+// Request logging middleware
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+  next();
+});
+
+// Input validation middleware
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Check for required user_id in POST requests
+  if (req.method === 'POST' && req.body && !req.body.user_id && !req.url.includes('/health')) {
+    return res.status(400).json({ 
+      error: 'user_id is required in request body',
+      success: false 
+    });
+  }
+  next();
+});
 
 // Health check
 app.get('/health', (req, res) => {
@@ -92,8 +110,33 @@ app.post('/api/agent/process', addStartTime, processAgentMessage);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  console.error('❌ [SERVER] Unhandled error:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+  
+  // Don't leak error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const errorMessage = isDevelopment ? err.message : 'Internal server error';
+  
+  res.status(500).json({ 
+    error: errorMessage,
+    success: false,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler for undefined routes
+app.use('*', (req: express.Request, res: express.Response) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    success: false,
+    path: req.originalUrl,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, () => {

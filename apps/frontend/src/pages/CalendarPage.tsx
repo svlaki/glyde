@@ -46,19 +46,18 @@ export function CalendarPage() {
       loadUserEvents();
       loadUserTasks();
 
-      // Set up real-time subscription to events table in user's schema
-      const userSchema = `u_${user.id.replace(/-/g, '')}`;
+      // Set up real-time subscription to events table in public schema
       const channel = supabase
         .channel(`events-${user.id}`)
         .on(
           'postgres_changes',
           {
             event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: userSchema,
-            table: 'events'
+            schema: 'public',
+            table: 'events',
+            filter: `user_id=eq.${user.id}`
           },
           (payload) => {
-            console.log('Real-time event change detected:', payload);
             // Reload events when any change occurs
             loadUserEvents();
           }
@@ -88,7 +87,6 @@ export function CalendarPage() {
           return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
         });
         setTasks(sortedTasks);
-        console.log(`✓ [TASKS] Loaded ${sortedTasks.length} pending tasks`);
       }
     } catch (err) {
       console.error('Unexpected error loading tasks:', err);
@@ -107,7 +105,6 @@ export function CalendarPage() {
         setEvents([]);
       } else {
         // Log event count instead of full data
-        console.log(`📅 [CALENDAR] Loaded ${userEvents.length} events`);
         
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
@@ -115,7 +112,6 @@ export function CalendarPage() {
           const color = event.color || '#6B7280'; // Default gray if no color
           const category = event.category || 'Personal';
 
-          console.log(`📅 [CATEGORY] Event "${event.event_title}" has category "${category}" with color ${color}`);
 
           return {
             id: event.id,
@@ -138,7 +134,6 @@ export function CalendarPage() {
         });
         
         // Log formatted event count instead of full data
-        console.log(`📅 [CALENDAR] Formatted ${formattedEvents.length} events for display`);
         
         // Show user events (empty array if no events)
         setEvents(formattedEvents);
@@ -150,13 +145,13 @@ export function CalendarPage() {
     }
   }
 
-  function handleDateClick(info: any) {
+  function handleDateClick(info: { dateStr: string }) {
     setSelectedDate(info.dateStr);
     setSelectedEvent(null);
     setIsModalOpen(true);
   }
 
-  function handleEventClick(info: any) {
+  function handleEventClick(info: { event: { id: string; title: string; extendedProps: any } }) {
     const event = events.find(e => e.id === info.event.id);
     if (event) {
       setSelectedEvent(event);
@@ -513,8 +508,8 @@ interface EventModalProps {
   event: ExtendedCalendarEvent | null;
   date: string | null;
   onSave: () => void;
-  user: any;
-  toast: any;
+  user: { id: string; email?: string };
+  toast: (options: { title: string; description: string; variant?: string }) => void;
 }
 
 function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: EventModalProps) {

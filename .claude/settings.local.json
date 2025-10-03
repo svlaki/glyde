@@ -21,7 +21,15 @@
       "mcp__serena__search_for_pattern",
       "mcp__serena__list_dir",
       "mcp__supabase__execute_sql",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__list_extensions",
+      "mcp__supabase__list_migrations",
+      "mcp__serena__replace_symbol_body",
+      "Bash(docker-compose:*)",
+      "mcp__serena__find_symbol",
+      "mcp__serena__get_symbols_overview",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": [],

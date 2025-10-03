@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, fetchGoalCheckIns, Goal, GoalCheckIn } from '../lib/goalService'
+import { supabase } from '../lib/supabase'
+import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
 import { fetchUserCategories, Category } from '../lib/categoryService'
 
 export default function GoalsPage() {
@@ -21,6 +22,26 @@ export default function GoalsPage() {
     }
   }, [user, filter])
 
+  // Real-time subscription for goals
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel(`goals-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'goals',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        loadGoals()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
   async function loadGoals() {
     if (!user) return
     setLoading(true)
@@ -36,7 +57,7 @@ export default function GoalsPage() {
 
   async function loadCategories() {
     if (!user) return
-    const { categories: fetchedCategories } = await fetchUserCategories(user, 'goals')
+    const { categories: fetchedCategories } = await fetchUserCategories(user)
     setCategories(fetchedCategories)
   }
 
