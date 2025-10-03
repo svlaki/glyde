@@ -206,8 +206,7 @@ export abstract class BaseAgent {
     attendees?: string[],
     location?: string,
     energy_level?: 'low' | 'medium' | 'high',
-    archetype?: string,
-    archetypeData?: Record<string, any>
+    category?: string
   ): Promise<void> {
     try {
       await this.zepGraphService.addCalendarEvent(userId, {
@@ -218,13 +217,12 @@ export abstract class BaseAgent {
         endTime: endTime?.toISOString(),
         location,
         description: eventDescription || undefined,
-        archetype: archetype || 'generic',
-        archetypeData: archetypeData || {},
+        category: category || 'Personal',
         participants: attendees || [],
         topics: [],
         createdAt: new Date().toISOString()
       });
-      console.log(`Persisted calendar event to Zep Graph for user ${userId}: ${eventTitle} (${archetype})`);
+      console.log(`Persisted calendar event to Zep Graph for user ${userId}: ${eventTitle} (${category || 'Personal'})`);
     } catch (error) {
       console.error('Failed to persist calendar event to Zep Graph:', error);
     }

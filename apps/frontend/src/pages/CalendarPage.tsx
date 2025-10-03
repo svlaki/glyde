@@ -8,11 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { fetchUserEvents, createEvent, updateEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
+import { fetchUserTasks, Task } from '../lib/taskService';
 import { InteractionBox, Interaction } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { supabase } from '../lib/supabase';
+import { useToast } from '../components/ui/toast';
 
 // Extended CalendarEvent interface for UI display
 interface ExtendedCalendarEvent extends CalendarEvent {
@@ -27,20 +29,23 @@ interface ExtendedCalendarEvent extends CalendarEvent {
 
 export function CalendarPage() {
   const { user, session } = useAuth();
+  const { toast } = useToast();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { interactions, removeInteraction } = useInteractions();
-  
+
   // Connect to agent system for interactions
   useAgentInteractions();
 
-  // Load real user events from the backend
+  // Load real user events and tasks from the backend
   useEffect(() => {
     if (user) {
       loadUserEvents();
-      
+      loadUserTasks();
+
       // Set up real-time subscription to events table in user's schema
       const userSchema = `u_${user.id.replace(/-/g, '')}`;
       const channel = supabase
@@ -59,7 +64,7 @@ export function CalendarPage() {
           }
         )
         .subscribe();
-      
+
       // Cleanup subscription on unmount
       return () => {
         channel.unsubscribe();
@@ -67,9 +72,33 @@ export function CalendarPage() {
     }
   }, [user]);
 
+  async function loadUserTasks() {
+    if (!user) return;
+
+    try {
+      const { tasks: userTasks, error } = await fetchUserTasks(user, { status: 'pending' });
+      if (error) {
+        console.error('Error loading user tasks:', error);
+        setTasks([]);
+      } else {
+        // Sort tasks by due date (soonest first)
+        const sortedTasks = userTasks.sort((a, b) => {
+          if (!a.due_date) return 1;
+          if (!b.due_date) return -1;
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        });
+        setTasks(sortedTasks);
+        console.log(`✓ [TASKS] Loaded ${sortedTasks.length} pending tasks`);
+      }
+    } catch (err) {
+      console.error('Unexpected error loading tasks:', err);
+      setTasks([]);
+    }
+  }
+
   async function loadUserEvents() {
     if (!user) return;
-    
+
     try {
       const { events: userEvents, error } = await fetchUserEvents(user);
       if (error) {
@@ -82,12 +111,12 @@ export function CalendarPage() {
         
         // Transform user events to match the calendar format
         const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
-          // Use archetype-based color from backend
+          // Use category-based color from backend
           const color = event.color || '#6B7280'; // Default gray if no color
-          const archetype = event.archetype || 'generic';
-          
-          console.log(`📅 [ARCHETYPE] Event "${event.event_title}" has archetype "${archetype}" with color ${color}`);
-          
+          const category = event.category || 'Personal';
+
+          console.log(`📅 [CATEGORY] Event "${event.event_title}" has category "${category}" with color ${color}`);
+
           return {
             id: event.id,
             event_title: event.event_title,
@@ -97,15 +126,14 @@ export function CalendarPage() {
             event_description: event.event_description,
             event_created_at: event.event_created_at,
             event_updated_at: event.event_updated_at,
+            category: category,
             title: event.event_title,
             start: event.event_starts_at,
             end: event.event_ends_at,
             backgroundColor: color,
             borderColor: color,
             textColor: '#FFFFFF',
-            color: color,
-            archetype: archetype,
-            archetype_data: event.archetype_data || {}
+            color: color
           };
         });
         
@@ -285,12 +313,65 @@ export function CalendarPage() {
           </div>
         </div>
 
-        {/* Right Side - Chat */}
+        {/* Right Side - Chat + Task List */}
         <div className="w-96 bg-white flex flex-col" style={{ maxWidth: '384px', minWidth: '384px' }}>
-          <div className="flex-1 p-3 overflow-hidden">
+          {/* Chat Panel - Half Height */}
+          <div className="h-1/2 p-3 overflow-hidden border-b-2 border-gray-200">
             <div className="h-full overflow-hidden">
               <ChatPanel onEventCreated={loadUserEvents} />
             </div>
+          </div>
+
+          {/* Task List - Half Height */}
+          <div className="h-1/2 p-4 overflow-y-auto">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming Tasks</h3>
+              <p className="text-xs text-gray-500">Sorted by due date</p>
+            </div>
+
+            {tasks.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <p className="text-sm">No pending tasks</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tasks.map(task => (
+                  <div
+                    key={task.id}
+                    className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <h4 className="text-sm font-medium text-gray-900 flex-1">{task.title}</h4>
+                      {task.priority && (
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                          task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {task.priority}
+                        </span>
+                      )}
+                    </div>
+
+                    {task.due_date && (
+                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <span>📅</span>
+                        <span>{new Date(task.due_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
+
+                    {task.category && (
+                      <div className="mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                          {task.category}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -304,6 +385,7 @@ export function CalendarPage() {
           date={selectedDate}
           onSave={loadUserEvents}
           user={user}
+          toast={toast}
         />
       )}
 
@@ -409,111 +491,21 @@ export function CalendarPage() {
   );
 }
 
-// Helper function to render archetype-specific data
-function renderArchetypeData(archetype: string, data: any): React.ReactNode {
-  if (!data || typeof data !== 'object') return 'No additional data';
-
-  switch (archetype) {
-    case 'workout':
-      if (data.exercises && Array.isArray(data.exercises)) {
-        return (
-          <div>
-            <strong>Exercises:</strong>
-            <ul className="list-disc list-inside mt-1">
-              {data.exercises.map((exercise: any, index: number) => (
-                <li key={index}>
-                  {exercise.name} - {exercise.sets} sets × {exercise.reps} reps
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      }
-      break;
-    
-    case 'grocery':
-      if (data.items && Array.isArray(data.items)) {
-        return (
-          <div>
-            <strong>Shopping List:</strong>
-            <ul className="list-disc list-inside mt-1">
-              {data.items.map((item: any, index: number) => (
-                <li key={index} className={item.completed ? 'line-through text-gray-500' : ''}>
-                  {item.item} ({item.quantity})
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      }
-      break;
-
-    case 'meeting':
-      return (
-        <div className="space-y-1">
-          {data.attendees && Array.isArray(data.attendees) && <div><strong>Attendees:</strong> {data.attendees.join(', ')}</div>}
-          {data.agenda && <div><strong>Agenda:</strong> {data.agenda}</div>}
-          {data.meeting_link && <div><strong>Link:</strong> <a href={data.meeting_link} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Join Meeting</a></div>}
-        </div>
-      );
-
-    case 'travel':
-      return (
-        <div className="space-y-1">
-          {data.destination && <div><strong>Destination:</strong> {data.destination}</div>}
-          {data.departure_time && <div><strong>Departure:</strong> {data.departure_time}</div>}
-          {data.transport && <div><strong>Transport:</strong> {data.transport}</div>}
-        </div>
-      );
-
-    case 'appointment':
-      return (
-        <div className="space-y-1">
-          {data.provider && <div><strong>Provider:</strong> {data.provider}</div>}
-          {data.type && <div><strong>Type:</strong> {data.type}</div>}
-          {data.location && <div><strong>Location:</strong> {data.location}</div>}
-        </div>
-      );
-
-    case 'work_focus':
-      if (data.tasks && Array.isArray(data.tasks)) {
-        return (
-          <div>
-            <strong>Tasks:</strong>
-            <ul className="list-disc list-inside mt-1">
-              {data.tasks.map((task: any, index: number) => (
-                <li key={index} className={task.completed ? 'line-through text-gray-500' : ''}>
-                  {task.task}
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      }
-      break;
-
-    case 'personal':
-      return (
-        <div className="space-y-1">
-          {data.notes && <div><strong>Notes:</strong> {data.notes}</div>}
-        </div>
-      );
-
-    default:
-      // For generic or unknown archetypes, display all data fields
-      return (
-        <div className="space-y-1">
-          {Object.entries(data).map(([key, value]) => (
-            <div key={key}>
-              <strong className="capitalize">{key.replace(/_/g, ' ')}:</strong> {String(value)}
-            </div>
-          ))}
-        </div>
-      );
-  }
-
-  return 'No additional data';
-}
+// Category colors mapping
+const CATEGORY_COLORS: Record<string, string> = {
+  'Work': '#3b82f6',
+  'School': '#8b5cf6',
+  'Health & Hygiene': '#ef4444',
+  'Social': '#f97316',
+  'Family': '#ec4899',
+  'Personal': '#10b981',
+  'Fitness': '#f59e0b',
+  'Hobbies': '#06b6d4',
+  'Finance': '#10b981',
+  'Shopping': '#78716c',
+  'Travel': '#6366f1',
+  'Self-Care': '#ec4899'
+};
 
 interface EventModalProps {
   isOpen: boolean;
@@ -522,15 +514,15 @@ interface EventModalProps {
   date: string | null;
   onSave: () => void;
   user: any;
+  toast: any;
 }
 
-function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalProps) {
+function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: EventModalProps) {
   const [title, setTitle] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
-  const [archetype, setArchetype] = useState('generic');
-  const [archetypeData, setArchetypeData] = useState<any>({});
+  const [category, setCategory] = useState('Personal');
 
   useEffect(() => {
     if (event) {
@@ -541,15 +533,13 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
       setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
       setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
       setDescription(event.event_description || '');
-      setArchetype(event.archetype || 'generic');
-      setArchetypeData(event.archetype_data || {});
+      setCategory(event.category || 'Personal');
     } else {
       setTitle('');
       setStartTime('10:00');
       setEndTime('11:00');
       setDescription('');
-      setArchetype('generic');
-      setArchetypeData({});
+      setCategory('Personal');
     }
   }, [event]);
 
@@ -563,364 +553,176 @@ function EventModal({ isOpen, onClose, event, date, onSave, user }: EventModalPr
     const starts_at = new Date(`${baseDate}T${startTime}:00`);
     const ends_at = new Date(`${baseDate}T${endTime}:00`);
 
-    const eventData = { 
-      event_title: title.trim(), 
+    const eventData = {
+      event_title: title.trim(),
       event_starts_at: starts_at.toISOString(),
       event_ends_at: ends_at.toISOString(),
       event_description: description.trim(),
-      archetype: archetype,
-      archetype_data: archetypeData,
+      category: category,
     };
 
-    if (event) {
-      await updateEvent(user, event.id, eventData);
-    } else {
-      await createEvent(user, eventData);
+    try {
+      if (event) {
+        await updateEvent(user, event.id, eventData);
+        toast({
+          title: 'Event updated',
+          description: `"${title}" has been updated successfully`,
+          variant: 'success'
+        });
+      } else {
+        await createEvent(user, eventData);
+        toast({
+          title: 'Event created',
+          description: `"${title}" has been added to your calendar`,
+          variant: 'success'
+        });
+      }
+      onSave();
+      onClose();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: event ? 'Failed to update event' : 'Failed to create event',
+        variant: 'error'
+      });
     }
-    onSave();
-    onClose();
   }
 
   async function handleDelete() {
     if (!user || !event) return;
-    await deleteEvent(user, event.id);
-    onSave();
-    onClose();
+    try {
+      await deleteEvent(user, event.id);
+      toast({
+        title: 'Event deleted',
+        description: `"${event.event_title}" has been removed from your calendar`,
+        variant: 'success'
+      });
+      onSave();
+      onClose();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete event',
+        variant: 'error'
+      });
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="fixed bg-white border-2 border-gray-400 text-black sm:max-w-md shadow-2xl z-[100]" 
-        style={{ 
-          backgroundColor: '#ffffff', 
-          opacity: '1 !important',
-          backdropFilter: 'none'
-        }} 
+      <DialogContent
+        className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl"
         aria-describedby="event-dialog-description"
       >
-        <DialogHeader className="bg-white">
-          <DialogTitle className="text-xl font-semibold text-gray-900 bg-white">
-            {event ? 'Edit Event' : 'Create New Event'}
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-foreground">
+            {event ? '✏️ Edit Event' : '➕ Create Event'}
           </DialogTitle>
         </DialogHeader>
         <div id="event-dialog-description" className="sr-only">
           {event ? 'Edit the details of an existing calendar event' : 'Create a new calendar event by filling in the details below'}
         </div>
-        <div className="space-y-4 py-4 bg-white">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Event Title</label>
-            <Input 
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground">Event Title</label>
+            <Input
               placeholder="Enter event title..."
-              value={title} 
+              value={title}
               onChange={e => setTitle(e.target.value)}
-              className="w-full bg-white border-gray-300 text-black placeholder-gray-500"
+              className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
+              autoFocus
             />
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Time
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span>🕐</span> Start Time
               </label>
-              <Input 
-                type="time" 
-                value={startTime} 
+              <Input
+                type="time"
+                value={startTime}
                 onChange={e => setStartTime(e.target.value)}
-                className="w-full bg-white border-gray-300 text-black"
+                className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Time
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span>🕐</span> End Time
               </label>
-              <Input 
-                type="time" 
-                value={endTime} 
+              <Input
+                type="time"
+                value={endTime}
                 onChange={e => setEndTime(e.target.value)}
-                className="w-full bg-white border-gray-300 text-black"
+                className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <span>📝</span> Description
             </label>
-            <textarea 
+            <textarea
               placeholder="Add event details..."
-              value={description} 
+              value={description}
               onChange={e => setDescription(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-3 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none transition-all"
               rows={3}
             />
           </div>
 
-          {/* Event Type Selector */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
-            <select 
-              value={archetype} 
-              onChange={e => setArchetype(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <span>🏷️</span> Category
+            </label>
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className="w-full h-11 px-4 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all cursor-pointer"
             >
-              <option value="generic">Generic</option>
-              <option value="workout">Workout</option>
-              <option value="grocery">Grocery</option>
-              <option value="meeting">Meeting</option>
-              <option value="appointment">Appointment</option>
-              <option value="travel">Travel</option>
-              <option value="work_focus">Work Focus</option>
-              <option value="personal">Personal</option>
+              {Object.keys(CATEGORY_COLORS).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
+            {CATEGORY_COLORS[category] && (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-accent/50 rounded-lg border border-border">
+                <div
+                  className="w-5 h-5 rounded-full border-2 border-border shadow-sm"
+                  style={{ backgroundColor: CATEGORY_COLORS[category] }}
+                />
+                <span className="text-sm text-muted-foreground font-medium">Event will appear in this color</span>
+              </div>
+            )}
           </div>
 
-          {/* Archetype-specific forms */}
-          {archetype === 'workout' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Workout Details</h3>
-              <div className="space-y-2">
-                <textarea
-                  placeholder="Enter exercises (one per line, format: Exercise Name - Sets x Reps)"
-                  value={(archetypeData.exercises || []).map((ex: any) => `${ex.name} - ${ex.sets} x ${ex.reps}`).join('\n')}
-                  onChange={e => {
-                    const exercises = e.target.value.split('\n').filter(line => line.trim()).map(line => {
-                      const match = line.match(/^(.+?)\s*-\s*(\d+)\s*x\s*(\d+)$/);
-                      if (match) {
-                        return { name: match[1].trim(), sets: parseInt(match[2]), reps: parseInt(match[3]) };
-                      }
-                      return { name: line.trim(), sets: 1, reps: 1 };
-                    });
-                    setArchetypeData({...archetypeData, exercises});
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
 
-          {archetype === 'grocery' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Shopping List</h3>
-              <div className="space-y-2">
-                <textarea
-                  placeholder="Enter items (one per line, format: Item Name - Quantity)"
-                  value={(archetypeData.items || []).map((item: any) => `${item.item} - ${item.quantity}`).join('\n')}
-                  onChange={e => {
-                    const items = e.target.value.split('\n').filter(line => line.trim()).map(line => {
-                      const parts = line.split(' - ');
-                      return { 
-                        item: parts[0]?.trim() || line.trim(), 
-                        quantity: parts[1]?.trim() || '1',
-                        completed: false 
-                      };
-                    });
-                    setArchetypeData({...archetypeData, items});
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-
-          {archetype === 'meeting' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Meeting Details</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Attendees</label>
-                  <input
-                    placeholder="Enter attendees (comma-separated)"
-                    value={(archetypeData.attendees || []).join(', ')}
-                    onChange={e => setArchetypeData({...archetypeData, attendees: e.target.value.split(',').map(s => s.trim()).filter(s => s)})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Agenda</label>
-                  <textarea
-                    placeholder="Meeting agenda..."
-                    value={archetypeData.agenda || ''}
-                    onChange={e => setArchetypeData({...archetypeData, agenda: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Meeting Link</label>
-                  <input
-                    placeholder="Zoom/Teams/Meet URL"
-                    value={archetypeData.meeting_link || ''}
-                    onChange={e => setArchetypeData({...archetypeData, meeting_link: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {archetype === 'appointment' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Appointment Details</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Provider</label>
-                  <input
-                    placeholder="Doctor, dentist, etc."
-                    value={archetypeData.provider || ''}
-                    onChange={e => setArchetypeData({...archetypeData, provider: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                  <input
-                    placeholder="Checkup, consultation, etc."
-                    value={archetypeData.type || ''}
-                    onChange={e => setArchetypeData({...archetypeData, type: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Location</label>
-                  <input
-                    placeholder="Address or clinic name"
-                    value={archetypeData.location || ''}
-                    onChange={e => setArchetypeData({...archetypeData, location: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {archetype === 'travel' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Travel Details</h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Destination</label>
-                  <input
-                    placeholder="Where are you going?"
-                    value={archetypeData.destination || ''}
-                    onChange={e => setArchetypeData({...archetypeData, destination: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Departure Time</label>
-                  <input
-                    placeholder="When do you leave?"
-                    value={archetypeData.departure_time || ''}
-                    onChange={e => setArchetypeData({...archetypeData, departure_time: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Transport</label>
-                  <input
-                    placeholder="Flight, car, train, etc."
-                    value={archetypeData.transport || ''}
-                    onChange={e => setArchetypeData({...archetypeData, transport: e.target.value})}
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {archetype === 'work_focus' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Work Tasks</h3>
-              <div className="space-y-2">
-                <textarea
-                  placeholder="Enter tasks (one per line)"
-                  value={(archetypeData.tasks || []).map((task: any) => task.task).join('\n')}
-                  onChange={e => {
-                    const tasks = e.target.value.split('\n').filter(line => line.trim()).map(line => ({
-                      task: line.trim(),
-                      completed: false
-                    }));
-                    setArchetypeData({...archetypeData, tasks});
-                  }}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-
-          {archetype === 'personal' && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Personal Notes</h3>
-              <div className="space-y-2">
-                <textarea
-                  placeholder="Add personal notes..."
-                  value={archetypeData.notes || ''}
-                  onChange={e => setArchetypeData({...archetypeData, notes: e.target.value})}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-black placeholder-gray-500"
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Display archetype information if viewing an existing event */}
-          {event && (
-            <div className="border-t pt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type Information</h3>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-xs font-medium text-gray-600">Archetype: </span>
-                  <span className="text-xs text-gray-800 capitalize">{event.archetype || 'generic'}</span>
-                  {event.color && (
-                    <div 
-                      className="inline-block w-3 h-3 rounded-full ml-2" 
-                      style={{ backgroundColor: event.color }}
-                    />
-                  )}
-                </div>
-                
-                {/* Display archetype-specific data */}
-                {event.archetype_data && Object.keys(event.archetype_data).length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-gray-600">Additional Data:</span>
-                    <div className="mt-1 text-xs text-gray-700 bg-gray-50 p-2 rounded">
-                      {renderArchetypeData(event.archetype || 'generic', event.archetype_data)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-        <DialogFooter className="flex justify-between">
+        <DialogFooter className="flex justify-between pt-6 border-t border-border">
           <div>
             {event && (
               <Button 
                 variant="destructive" 
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="h-11 px-6 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
               >
-                Delete
+                🗑️ Delete
               </Button>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button 
               variant="outline" 
               onClick={onClose}
-              className="border-gray-300 text-black hover:bg-gray-50"
+              className="h-11 px-6 border-2 border-border bg-background text-foreground hover:bg-accent font-semibold rounded-lg transition-all"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
             >
-              {event ? 'Save' : 'Create'}
+              {event ? '💾 Save' : '➕ Create'}
             </Button>
           </div>
         </DialogFooter>

@@ -14,6 +14,10 @@ import { deleteEventTool } from '../../tools/calendar/delete-event.js';
 import { deleteMultipleEventsTool } from '../../tools/calendar/delete-multiple-events.js';
 import { searchEventsTool } from '../../tools/calendar/search-events.js';
 import { listEventsTool } from '../../tools/calendar/list-events.js';
+import { createTaskTool, updateTaskTool, deleteTaskTool, listTasksTool, completeTaskTool } from '../../tools/tasks/index.js';
+import { createGoalTool, updateGoalTool, listGoalsTool, checkInGoalTool } from '../../tools/goals/index.js';
+import { getProfileTool, updateProfileTool } from '../../tools/profile/index.js';
+import { createCategoryTool, listCategoriesTool } from '../../tools/categories/index.js';
 
 // Utility functions
 
@@ -161,29 +165,6 @@ export class ConversationAgent extends BaseAgent {
     // Define tools for calendar and task operations
     // Calendar tools are imported from tools/calendar/ directory
 
-    const createTaskTool = tool(
-      async ({ title, description, dueDate, priority }) => {
-        const task = {
-          title,
-          description,
-          due_date: dueDate,
-          priority,
-        };
-        return `Task creation parameters: ${JSON.stringify(task)}`;
-      },
-      {
-        name: "create_task",
-        description: "Create a new task",
-        schema: z.object({
-          title: z.string().describe("Task title"),
-          description: z.string().nullable().describe("Task description"),
-          dueDate: z.string().nullable().describe("Due date in ISO format"),
-          priority: z.enum(["low", "medium", "high"]).nullable().describe("Task priority"),
-        }),
-      }
-    );
-
-
     const searchMemoryTool = tool(
       async ({ query, contextType }) => {
         return `Memory search parameters: ${JSON.stringify({ query, contextType })}`;
@@ -207,8 +188,28 @@ export class ConversationAgent extends BaseAgent {
       searchEventsTool,
       listEventsTool,
 
-      // Other tools
+      // Task management
       createTaskTool,
+      updateTaskTool,
+      deleteTaskTool,
+      listTasksTool,
+      completeTaskTool,
+
+      // Goal management
+      createGoalTool,
+      updateGoalTool,
+      listGoalsTool,
+      checkInGoalTool,
+
+      // User profile
+      getProfileTool,
+      updateProfileTool,
+
+      // Category management
+      createCategoryTool,
+      listCategoriesTool,
+
+      // Memory search
       searchMemoryTool
     ];
     const toolNode = new ToolNode(tools);
@@ -316,12 +317,13 @@ ALWAYS filter and present events logically based on the user's question. Don't d
 
 YOUR CAPABILITIES:
 1. Answer calendar questions using intelligent filtering based on context
-2. Create new events with natural language understanding and intelligent archetype detection
-3. Update and delete events (including archetype and structured data updates)
+2. Create new events with natural language understanding and intelligent category assignment
+3. Update and delete events (including category updates)
 4. Find scheduling conflicts automatically during event creation
-5. Search events by text, archetype type, or within structured data
-6. Create and manage tasks
-7. Search user's long-term memory and behavioral patterns using Zep memory service
+5. Search events by text or category
+6. Create and manage tasks and goals
+7. Manage categories - create new ones when users mention new types of activities
+8. Search user's long-term memory and behavioral patterns using Zep memory service
 
 IMPORTANT - When User Requests Multiple Events:
 - If user says "schedule multiple events", "create several events", "add a bunch of events", "schedule a week of events", etc.
@@ -368,62 +370,35 @@ WHEN CREATING EVENTS:
 - Be conversational: "I see you have 'X' at that time. How about 3pm instead?"
 - Explain what you're doing: "Let me add that grocery run to your calendar" or "I'll schedule your workout"
 
-INTELLIGENT EVENT ARCHETYPE DETECTION:
-When creating events, analyze the user's language to intelligently detect the event type and extract structured data:
+INTELLIGENT CATEGORY ASSIGNMENT:
+When creating events, tasks, or goals, intelligently assign them to appropriate categories:
 
-**GROCERY ARCHETYPE** (archetype: "grocery"):
-- Detect when: User mentions shopping, groceries, "get/buy/pick up" + food items, store names
-- Examples: "get milk and eggs", "grocery run", "pick up ingredients", "stop by Target"
-- Extract data: Parse items into items array
-- Schema: {items: [{item: "milk", quantity: "1", completed: false}, {item: "eggs", quantity: "1", completed: false}]}
+**DEFAULT CATEGORIES AVAILABLE:**
+- Work: Work-related activities, meetings, projects
+- School: Classes, study sessions, assignments
+- Health & Hygiene: Doctor appointments, dental visits, personal hygiene
+- Social: Hangouts, parties, social gatherings
+- Family: Family time, family events
+- Personal: Personal errands, self-care activities
+- Fitness: Workouts, gym, sports, exercise
+- Hobbies: Creative pursuits, hobbies, leisure activities
+- Finance: Banking, bill payments, financial planning
+- Shopping: Grocery shopping, errands, purchases
+- Travel: Trips, flights, vacations
+- Self-Care: Meditation, relaxation, spa, personal time
 
-**MEETING ARCHETYPE** (archetype: "meeting"):
-- Detect when: meeting, call, sync, discussion, 1:1, standup, review, presentation
-- Examples: "meeting with John about Q1", "sync with the team", "1:1 with manager"
-- Extract data: Parse attendee names, agenda topics from context
-- Schema: {attendees: ["John", "Sarah"], agenda: "Q1 planning discussion", meeting_link: null}
-
-**WORKOUT ARCHETYPE** (archetype: "workout"):
-- Detect when: gym, exercise, workout, run, yoga, training, fitness, cardio, strength
-- Examples: "hit the gym", "morning run", "yoga class", "strength training"
-- Extract data: Workout type, exercises mentioned, intensity level
-- Schema: {exercises: [{name: "deadlifts", sets: 3, reps: 8}, {name: "squats", sets: 3, reps: 10}]}
-
-**APPOINTMENT ARCHETYPE** (archetype: "appointment"):
-- Detect when: doctor, dentist, therapy, checkup, medical, appointment with professionals
-- Examples: "doctor appointment", "dental cleaning", "therapy session"
-- Extract data: Provider type, appointment purpose
-- Schema: {provider: "Dr. Smith", type: "checkup", location: "Medical Center"}
-
-**TRAVEL ARCHETYPE** (archetype: "travel"):
-- Detect when: flight, trip, travel, airport, hotel, vacation, drive to, fly to
-- Examples: "flight to NYC", "road trip", "vacation in Bali", "airport pickup"
-- Extract data: Destination, transportation method
-- Schema: {destination: "NYC", departure_time: "2:00 PM", transport: "flight"}
-
-**WORK_FOCUS ARCHETYPE** (archetype: "work_focus"):
-- Detect when: deep work, focus time, coding, project work, deadline, concentrated work
-- Examples: "focus time for coding", "work on project", "deep work session"
-- Extract data: Tasks to accomplish, focus technique
-- Schema: {tasks: [{task: "code review", completed: false}, {task: "API documentation", completed: false}]}
-
-**PERSONAL ARCHETYPE** (archetype: "personal"):
-- Detect when: self-care, family time, hobbies, personal activities, relaxation
-- Examples: "family dinner", "meditation time", "reading", "personal time"
-- Extract data: Activity type, goals or reflections
-- Schema: {notes: "Quality time with family, practice mindfulness"}
-
-**GENERIC ARCHETYPE** (archetype: "generic"):
-- Use for events that don't clearly fit other archetypes
-- Keep archetype_data as empty object {}
-
-ARCHETYPE DETECTION GUIDELINES:
-1. Analyze the ENTIRE user message for context clues
-2. Look for keywords, but also understand intent and context
-3. When multiple archetypes could apply, choose the most specific one
-4. Extract as much relevant structured data as possible
-5. Use consistent field names that match the database schemas
-6. If unsure, use "generic" archetype rather than guessing
+**CATEGORY ASSIGNMENT GUIDELINES:**
+1. Match events to the most appropriate existing category
+2. If a category doesn't exist but would be useful, create it using create_category tool
+3. Examples of category assignment:
+   - "meeting with boss" → Work
+   - "gym session" → Fitness
+   - "doctor appointment" → Health & Hygiene
+   - "grab groceries" → Shopping
+   - "study for exam" → School
+   - "dinner with friends" → Social
+   - "meditation" → Self-Care
+4. If user mentions a new type of activity not covered by existing categories, proactively create a new category
 
 CRITICAL TIMEZONE HANDLING:
 - User times are ALWAYS local time (e.g., "5pm" = 5pm local)
@@ -474,26 +449,39 @@ IMPORTANT: NEVER use partial UUIDs or truncated IDs. Only use full event IDs whe
 For contextual references, use semantic search or date-based search instead of guessing IDs.
 
 Your capabilities:
-1. Create, update, delete, and search calendar events with intelligent archetype detection
+1. Create, update, delete, and search calendar events with intelligent category assignment
 2. Detect and warn about scheduling conflicts
-3. Extract structured data from natural language (grocery items, meeting attendees, etc.)
-4. Parse natural language into structured actions
-5. Create and manage tasks
+3. Parse natural language into structured actions
+4. Create and manage tasks and goals with category assignment
+5. Create new categories when users mention new types of activities
 6. Search through user memory and context
 7. ALWAYS use the most appropriate tool based on user intent
 
 AVAILABLE TOOLS - Use These Tools Based on User Intent:
 
 📅 CALENDAR MANAGEMENT:
-- create_event: Create new calendar events with intelligent archetype detection
-- update_event: Modify existing events (supports archetype and structured data updates)
+- create_event: Create new calendar events with intelligent category assignment
+- update_event: Modify existing events (supports category updates)
 - delete_event: Remove a specific event
 - delete_multiple_events: Remove multiple events by date or search criteria
-- search_events: Find events by text, archetype, or within structured data
+- search_events: Find events by text or category
 - list_events: List events in a specific date range
 
 📋 TASK MANAGEMENT:
-- create_task: Create new tasks and to-do items
+- create_task: Create new tasks with category assignment
+- update_task: Update existing tasks
+- list_tasks: List tasks with optional filters
+- complete_task: Mark tasks as completed
+
+🎯 GOAL MANAGEMENT:
+- create_goal: Create new goals with category assignment
+- update_goal: Update existing goals
+- list_goals: List goals with optional filters
+- check_in_goal: Record progress check-ins for goals
+
+🏷️ CATEGORY MANAGEMENT:
+- create_category: Create new categories for organizing events, tasks, and goals
+- list_categories: List all available categories
 
 🧠 MEMORY & CONTEXT:
 - search_memory: Access user preferences, habits, goals, and past experiences

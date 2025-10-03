@@ -10,8 +10,7 @@ export interface DatabaseEvent {
   embedding?: number[];
   event_created_at: string;
   event_updated_at: string;
-  archetype?: string;
-  archetype_data?: ArchetypeData;
+  category?: string;
 }
 
 export interface EventArchetype {

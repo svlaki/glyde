@@ -4,13 +4,13 @@ import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createEventTool = tool(
-  async ({ title, startTime, endTime, location, description, archetype, archetype_data }, config) => {
+  async ({ title, startTime, endTime, location, description, category }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       throw new Error("User ID is required for creating events");
     }
 
-    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, archetype });
+    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category });
 
     // Initialize services
     const supabaseService = new SupabaseService();
@@ -53,7 +53,7 @@ export const createEventTool = tool(
       // Continue with event creation if conflict check fails
     }
 
-    // Create the event with archetype data if detected
+    // Create the event with category
     console.log('🔄 [CREATE-EVENT TOOL] Calling supabaseService.createEvent...');
     const event = await supabaseService.createEvent(userId, {
       event_title: title,
@@ -61,8 +61,7 @@ export const createEventTool = tool(
       event_ends_at: endTime,
       event_location: location || "",
       event_description: description || "",
-      archetype: archetype || 'generic',
-      archetype_data: archetype_data || {}
+      category: category || 'Personal'
     });
 
     console.log('📋 [CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
@@ -87,14 +86,13 @@ export const createEventTool = tool(
           endTime,
           location: location || undefined,
           description: description || undefined,
-          archetype: archetype || 'generic',
-          archetypeData: archetype_data || {},
+          category: category || 'Personal',
           participants: [],
           topics: [],
           createdAt: new Date().toISOString()
         });
 
-        console.log(`✅ [CREATE-EVENT TOOL] Event added to knowledge graph with archetype: ${archetype}`);
+        console.log(`✅ [CREATE-EVENT TOOL] Event added to knowledge graph with category: ${category}`);
       } catch (error) {
         console.error('⚠️ [CREATE-EVENT TOOL] Failed to add event to knowledge graph (non-critical):', error);
       }
@@ -103,44 +101,23 @@ export const createEventTool = tool(
     // Fire and forget - don't await this
     addToGraph();
 
-    // Add context about detected archetype in response
-    const archetypeContext = archetype && archetype !== 'generic' 
-      ? ` with smart ${archetype} details` 
+    // Add context about category in response
+    const categoryContext = category
+      ? ` in category "${category}"`
       : '';
 
-    return `✅ Event created successfully: "${title}" at ${new Date(startTime).toLocaleString()}${archetypeContext}`;
+    return `✅ Event created successfully: "${title}" at ${new Date(startTime).toLocaleString()}${categoryContext}`;
   },
   {
     name: "create_event",
-    description: "Create a new calendar event with intelligent archetype detection. Parse natural language into structured event data and detect event types automatically. Extract relevant structured data based on context.",
+    description: "Create a new calendar event. Assign the event to an appropriate category. If the category doesn't exist, you can create it first using create_category tool.",
     schema: z.object({
       title: z.string().describe("Event title extracted from user input or inferred from context. Make it descriptive and clear."),
       startTime: z.string().describe("Start time in ISO format. Parse relative dates like 'tomorrow', '1pm', 'Friday' into proper timestamps. Use intelligent time defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
       endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
       location: z.string().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().nullable().describe("Event description. Leave empty if not specified"),
-      archetype: z.enum(['grocery', 'meeting', 'workout', 'appointment', 'travel', 'work_focus', 'personal', 'generic']).nullable()
-        .describe("Intelligently detect the event type based on context clues. Examples: 'get milk' → grocery, 'meet with John' → meeting, 'gym time' → workout, 'doctor appointment' → appointment, 'flight to NYC' → travel, 'focus time for coding' → work_focus, 'family dinner' → personal. Use 'generic' if no specific type matches."),
-      archetype_data: z.record(z.any()).nullable()
-        .describe(`Extract structured data based on archetype. Examples:
-
-GROCERY: {items: [{item: "milk", quantity: "1 gallon", completed: false}, {item: "bread", quantity: "1 loaf", completed: false}]}
-
-MEETING: {attendees: ["John", "Sarah"], agenda: "Q4 planning discussion", meeting_link: null}
-
-WORKOUT: {exercises: [{name: "squats", sets: 3, reps: 10}, {name: "deadlifts", sets: 3, reps: 8}]}
-
-APPOINTMENT: {provider: "Dr. Smith", type: "checkup", location: "Medical Center"}
-
-TRAVEL: {destination: "New York", departure_time: "2:00 PM", transport: "flight"}
-
-WORK_FOCUS: {tasks: [{task: "code review", completed: false}, {task: "write documentation", completed: false}]}
-
-PERSONAL: {notes: "Quality time with family, practice mindfulness"}
-
-GENERIC: {} (empty object)
-
-Extract as much relevant data as possible from the user's input. Use the exact field names shown above.`)
+      category: z.string().nullable().describe("Category name for this event (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Fitness'). Use existing categories when possible. Defaults to 'Personal' if not specified."),
     }),
   }
 );;;;;;

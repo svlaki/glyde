@@ -7,6 +7,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isLoading: boolean
   session: Session | null
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -111,7 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const value: AuthContextValue = { user, isAuthenticated, isLoading, session }
+  async function signOut() {
+    try {
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      setIsAuthenticated(false)
+    } catch (error) {
+      console.error('Sign out error:', error)
+    }
+  }
+
+  const value: AuthContextValue = { user, isAuthenticated, isLoading, session, signOut }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

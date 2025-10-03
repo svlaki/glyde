@@ -12,8 +12,6 @@ export interface CalendarEvent {
   event_updated_at?: string
   category?: string
   color?: string
-  archetype?: string
-  archetype_data?: any
 }
 
 /**

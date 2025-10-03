@@ -10,8 +10,7 @@ export interface CalendarEventEntity {
   endTime?: string;
   location?: string;
   description?: string;
-  archetype?: string;
-  archetypeData?: Record<string, any>;
+  category?: string;
   energyLevel?: string;
   participants?: string[];
   topics?: string[];
@@ -112,14 +111,13 @@ export class ZepGraphService {
             endTime: event.endTime,
             location: event.location,
             description: event.description,
-            archetype: event.archetype || 'generic',
-            archetypeData: event.archetypeData || {},
+            category: event.category,
             energyLevel: event.energyLevel,
             participants: event.participants || [],
             topics: event.topics || [],
             createdAt: event.createdAt
           },
-          content: this.generateEventContent(event)
+          content: `Calendar event: ${event.title}. Category: ${event.category || 'Personal'}. ${event.startTime} - ${event.endTime || ''}${event.location ? `. Location: ${event.location}` : ''}${event.description ? `. ${event.description}` : ''}`
         })
       });
 
@@ -164,8 +162,7 @@ export class ZepGraphService {
           endTime: updates.endTime,
           location: updates.location,
           description: updates.description,
-          archetype: updates.archetype,
-          archetypeData: updates.archetypeData,
+          category: updates.category,
           energyLevel: updates.energyLevel,
           participants: updates.participants,
           topics: updates.topics,
@@ -287,104 +284,4 @@ export class ZepGraphService {
   async getEntityMapping(entityType: string, entityId: string): Promise<EntityMapping | null> {
     return await this.mappingService.getMapping(entityType, entityId);
   }
-
-  /**
-   * Generate rich content for calendar events based on archetype
-   */
-  private generateEventContent(event: CalendarEventEntity): string {
-    let content = `Calendar event: ${event.title} scheduled for ${event.startTime}`;
-
-    if (event.location) {
-      content += ` at ${event.location}`;
-    }
-
-    if (event.participants && event.participants.length > 0) {
-      content += `. Participants: ${event.participants.join(', ')}`;
-    }
-
-    if (event.archetype && event.archetype !== 'generic' && event.archetypeData) {
-      content += `. Event type: ${event.archetype}`;
-
-      switch (event.archetype) {
-        case 'grocery':
-          if (event.archetypeData.shopping_list) {
-            const items = event.archetypeData.shopping_list.map((item: any) => item.item || item).join(', ');
-            content += `. Shopping for: ${items}`;
-          }
-          break;
-
-        case 'meeting':
-          if (event.archetypeData.agenda) {
-            const topics = event.archetypeData.agenda.map((a: any) => a.topic || a).join(', ');
-            content += `. Meeting topics: ${topics}`;
-          }
-          break;
-
-        case 'workout':
-          if (event.archetypeData.workout_type) {
-            content += `. Workout: ${event.archetypeData.workout_type}`;
-          }
-          break;
-
-        case 'appointment':
-          if (event.archetypeData.provider_type) {
-            content += `. Appointment with: ${event.archetypeData.provider_type}`;
-          }
-          break;
-      }
-    }
-
-    if (event.energyLevel) {
-      content += `. Energy level required: ${event.energyLevel}`;
-    }
-
-    return content;
-  }
-
-  /**
-   * Health check for the graph service
-   */
-  async healthCheck(): Promise<boolean> {
-    try {
-      // Simple test to verify the client is working
-      await this.client.graph.search({
-        query: 'test',
-        userId: 'health-check',
-        limit: 1
-      });
-      return true;
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Health check failed:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Clean up all entities for a user (use with caution)
-   */
-  async cleanupUserGraph(userId: string): Promise<void> {
-    try {
-      console.log(`🧹 [ZepGraphService] Cleaning up graph data for user ${userId}`);
-
-      // Remove all mappings for this user
-      const userMappings = await this.mappingService.getUserMappings(userId);
-
-      for (const mapping of userMappings) {
-        try {
-          await this.client.graph.episode.delete(mapping.graphUuid);
-          await this.mappingService.deleteMapping(mapping.entityType, mapping.entityId);
-        } catch (error) {
-          console.warn(`⚠️ [ZepGraphService] Failed to delete entity ${mapping.graphUuid}:`, error);
-        }
-      }
-
-      console.log(`✅ [ZepGraphService] Cleaned up ${userMappings.length} entities for user ${userId}`);
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to cleanup user graph:', error);
-      throw error;
-    }
-  }
 }
-
-export default ZepGraphService;

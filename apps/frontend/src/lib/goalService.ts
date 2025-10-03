@@ -1,0 +1,295 @@
+import { User } from '@supabase/supabase-js'
+
+export interface Goal {
+  id: string
+  user_id: string
+  title: string
+  description?: string
+  category?: string
+  target_date?: string
+  status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
+  progress?: number
+  milestones?: Array<{
+    title: string
+    completed: boolean
+    due_date?: string
+  }>
+  goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+  parent_goal_id?: string
+  key_results?: Array<{
+    description: string
+    target_value: number
+    current_value: number
+    unit: string
+  }>
+  blockers?: string[]
+  resources_needed?: string[]
+  reflection_prompts?: string[]
+  priority_score?: number
+  energy_requirement?: 'low' | 'medium' | 'high'
+  review_frequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly'
+  created_at?: string
+  updated_at?: string
+}
+
+export interface GoalCheckIn {
+  id: string
+  goal_id: string
+  user_id: string
+  progress_update?: number
+  mood_rating?: number
+  confidence_level?: number
+  obstacles_encountered?: string[]
+  wins_and_progress?: string[]
+  next_steps?: string[]
+  reflection_notes?: string
+  agent_insights?: Record<string, any>
+  created_at?: string
+}
+
+const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+export async function fetchUserGoals(
+  user: User,
+  filters?: {
+    status?: string
+    category?: string
+    goal_type?: string
+    target_before?: string
+    target_after?: string
+  }
+): Promise<{ goals: Goal[], error: string | null }> {
+  try {
+    if (!user) {
+      return { goals: [], error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        ...filters
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { goals: [], error: data.error || 'Failed to fetch goals' }
+    }
+
+    return { goals: data.goals || [], error: null }
+  } catch (error) {
+    console.error('Error fetching goals:', error)
+    return { goals: [], error: 'Failed to fetch goals' }
+  }
+}
+
+export async function createUserGoal(
+  user: User,
+  goalData: {
+    title: string
+    description?: string
+    category?: string
+    target_date?: string
+    status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
+    progress?: number
+    milestones?: Array<{
+      title: string
+      completed: boolean
+      due_date?: string
+    }>
+    goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+    parent_goal_id?: string
+    key_results?: Array<{
+      description: string
+      target_value: number
+      current_value: number
+      unit: string
+    }>
+    blockers?: string[]
+    resources_needed?: string[]
+    reflection_prompts?: string[]
+    priority_score?: number
+    energy_requirement?: 'low' | 'medium' | 'high'
+    review_frequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly'
+  }
+): Promise<{ goal: Goal | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { goal: null, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        ...goalData
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { goal: null, error: data.error || 'Failed to create goal' }
+    }
+
+    return { goal: data.goal, error: null }
+  } catch (error) {
+    console.error('Error creating goal:', error)
+    return { goal: null, error: 'Failed to create goal' }
+  }
+}
+
+export async function updateUserGoal(
+  user: User,
+  goalId: string,
+  updates: Partial<Goal>
+): Promise<{ goal: Goal | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { goal: null, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        goal_id: goalId,
+        ...updates
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { goal: null, error: data.error || 'Failed to update goal' }
+    }
+
+    return { goal: data.goal, error: null }
+  } catch (error) {
+    console.error('Error updating goal:', error)
+    return { goal: null, error: 'Failed to update goal' }
+  }
+}
+
+export async function deleteUserGoal(
+  user: User,
+  goalId: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        goal_id: goalId
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to delete goal' }
+    }
+
+    return { success: data.success, error: data.error }
+  } catch (error) {
+    console.error('Error deleting goal:', error)
+    return { success: false, error: 'Failed to delete goal' }
+  }
+}
+
+export async function addGoalCheckIn(
+  user: User,
+  goalId: string,
+  checkInData: {
+    progress_update?: number
+    mood_rating?: number
+    confidence_level?: number
+    obstacles_encountered?: string[]
+    wins_and_progress?: string[]
+    next_steps?: string[]
+    reflection_notes?: string
+    agent_insights?: Record<string, any>
+  }
+): Promise<{ checkIn: GoalCheckIn | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { checkIn: null, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals/check-in`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        goal_id: goalId,
+        ...checkInData
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { checkIn: null, error: data.error || 'Failed to add check-in' }
+    }
+
+    return { checkIn: data.checkIn, error: null }
+  } catch (error) {
+    console.error('Error adding goal check-in:', error)
+    return { checkIn: null, error: 'Failed to add check-in' }
+  }
+}
+
+export async function fetchGoalCheckIns(
+  user: User,
+  goalId: string,
+  limit?: number
+): Promise<{ checkIns: GoalCheckIn[], error: string | null }> {
+  try {
+    if (!user) {
+      return { checkIns: [], error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/goals/check-ins`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        goal_id: goalId,
+        limit
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { checkIns: [], error: data.error || 'Failed to fetch check-ins' }
+    }
+
+    return { checkIns: data.checkIns || [], error: null }
+  } catch (error) {
+    console.error('Error fetching goal check-ins:', error)
+    return { checkIns: [], error: 'Failed to fetch check-ins' }
+  }
+}

@@ -2,12 +2,26 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+interface CardProps extends React.ComponentProps<"div"> {
+  hover?: boolean
+  elevation?: 'sm' | 'md' | 'lg' | 'xl'
+}
+
+function Card({ className, hover = false, elevation = 'md', ...props }: CardProps) {
+  const elevationClasses = {
+    sm: 'shadow-sm hover:shadow-md',
+    md: 'shadow-md hover:shadow-lg',
+    lg: 'shadow-lg hover:shadow-xl',
+    xl: 'shadow-xl hover:shadow-2xl'
+  }
+
   return (
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6",
+        elevationClasses[elevation],
+        hover && "transition-all duration-200 hover:scale-[1.02] cursor-pointer",
         className
       )}
       {...props}
