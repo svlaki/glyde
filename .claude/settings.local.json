@@ -29,7 +29,11 @@
       "Bash(docker-compose:*)",
       "mcp__serena__find_symbol",
       "mcp__serena__get_symbols_overview",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(cat:*)",
+      "Bash(if exist \"apps\\frontend\\nul\" del \"apps\\frontend\\nul\")",
+      "Bash(if exist \"nul\" del \"nul\")"
     ],
     "deny": [],
     "ask": [],
