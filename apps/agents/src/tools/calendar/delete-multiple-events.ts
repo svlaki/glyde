@@ -46,7 +46,7 @@ export const deleteMultipleEventsTool = tool(
           // Also search directly in database
           const allEvents = await supabaseService.getEventsForAgent(userId);
           const matchingEvents = allEvents.filter((event: any) => {
-            const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+            const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
             return searchText.includes(searchQuery.toLowerCase());
           });
 
@@ -73,7 +73,7 @@ export const deleteMultipleEventsTool = tool(
       if (deleteResult.success) {
         deletedCount++;
       } else {
-        errors.push(`Failed to delete "${event.event_title}": ${deleteResult.error}`);
+        errors.push(`Failed to delete "${event.title}": ${deleteResult.error}`);
       }
     }
 

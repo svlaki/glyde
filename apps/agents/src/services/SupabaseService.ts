@@ -9,11 +9,11 @@ export let supabase: SupabaseClient;
 export function initializeSupabase() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
+
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
-  
+
   supabase = createClient(supabaseUrl, supabaseKey);
 }
 
@@ -40,69 +40,9 @@ export class SupabaseService {
   // Helper method to convert UTC times to local display times (same as frontend does)
   private convertUTCToLocalDisplay(utcTimeString: string, timezone: string = 'America/New_York'): string {
     if (!utcTimeString) return utcTimeString;
-    
+
     // Use the new timezone utilities for proper conversion
     return convertFromUTC(utcTimeString, timezone);
-  }
-
-  // Helper method to suggest archetype based on event title/description
-  private async suggestArchetype(title: string, description: string = ''): Promise<string> {
-    try {
-      const { data, error } = await this.client.rpc('suggest_event_archetype', {
-        event_title: title,
-        event_description: description
-      });
-
-      if (error) {
-        console.error('Error suggesting archetype:', error);
-        return 'generic';
-      }
-
-      return data || 'generic';
-    } catch (error) {
-      console.error('Exception suggesting archetype:', error);
-      return 'generic';
-    }
-  }
-
-  // Helper method to get archetype color
-  private async getArchetypeColor(archetype: string, archetypeData: any = {}): Promise<string> {
-    try {
-      const { data, error } = await this.client.rpc('get_event_archetype_color', {
-        archetype_name: archetype,
-        archetype_data: archetypeData
-      });
-
-      if (error) {
-        console.error('Error getting archetype color:', error);
-        return '#6B7280';
-      }
-
-      return data || '#6B7280';
-    } catch (error) {
-      console.error('Exception getting archetype color:', error);
-      return '#6B7280';
-    }
-  }
-
-  // Get all available archetypes
-  async getArchetypes(): Promise<any[]> {
-    try {
-      const { data, error } = await this.client
-        .from('event_archetypes')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching archetypes:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Exception fetching archetypes:', error);
-      return [];
-    }
   }
 
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
@@ -122,14 +62,12 @@ export class SupabaseService {
 
   // Method for agents - includes timezone conversion for proper local time display
   async getEventsForAgent(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    console.log('🔍 [SUPABASE SERVICE - AGENT] Fetching events for user:', userId);
-    
     try {
       // Fetch user profile to get timezone
       const profile = await this.getProfile(userId);
       const userTimezone = profile?.timezone || 'America/New_York';
       console.log('🌍 [SUPABASE SERVICE - AGENT] Using user timezone:', userTimezone);
-      
+
       // Query public schema with RLS filtering
       let query = this.client
         .from('events')
@@ -147,12 +85,12 @@ export class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE - AGENT] Error fetching events:', error);
+        console.error('Error fetching events for agent:', error);
         return [];
       }
 
       console.log('✅ [SUPABASE SERVICE - AGENT] Retrieved', data?.length || 0, 'events for user');
-      
+
       // Transform with timezone conversion for agent display
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
@@ -168,19 +106,16 @@ export class SupabaseService {
         archetype: event.archetype || 'generic',
         archetype_data: event.archetype_data || {}
       }));
-      
-      console.log('🔄 [SUPABASE SERVICE - AGENT] Transformed', transformedEvents.length, 'events with timezone conversion');
+
       return transformedEvents;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE - AGENT] Exception fetching events:', error);
+      console.error('Exception fetching events for agent:', error);
       return [];
     }
   }
 
   // Method for frontend - no timezone conversion (frontend handles it)
   async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    console.log('🔍 [SUPABASE SERVICE] Fetching events for user:', userId);
-    
     try {
       // Query public schema with RLS filtering
       let query = this.client
@@ -199,13 +134,12 @@ export class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error fetching events:', error);
-        console.error('❌ [SUPABASE SERVICE] Error details:', JSON.stringify(error, null, 2));
+        console.error('Error fetching events:', error);
         return [];
       }
 
       console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
-      
+
       // Transform to match DatabaseEvent interface (no timezone conversion for frontend)
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
@@ -221,35 +155,35 @@ export class SupabaseService {
         archetype: event.archetype || 'generic',
         archetype_data: event.archetype_data || {}
       }));
-      
+
       console.log('🔄 [SUPABASE SERVICE] Transformed', transformedEvents.length, 'events for frontend');
       return transformedEvents;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception fetching events:', error);
+      console.error('Exception fetching events:', error);
       return [];
     }
   }
 
-  async createEvent(userId: string, event: Partial<DatabaseEvent> & {title?: string; description?: string; start_time?: string; end_time?: string; location?: string; category?: string}): Promise<DatabaseEvent | null> {
+  async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string}): Promise<DatabaseEvent | null> {
     try {
       console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
-      
+
       // Fetch user profile to get timezone
       const profile = await this.getProfile(userId);
       const userTimezone = profile?.timezone || 'America/New_York';
       console.log('🌍 [SUPABASE SERVICE] Using user timezone:', userTimezone);
-      
+
       // Extract event data
-      const title = event.event_title || event.title || 'Untitled Event';
-      const description = event.event_description || event.description || null;
-      const location = event.event_location || event.location || null;
+      const title = event.event_title || (event as any).title || 'Untitled Event';
+      const description = event.event_description || (event as any).description || null;
+      const location = event.event_location || (event as any).location || null;
       const category = (event as any).category || 'Personal';
-      
+
       // Convert local times to UTC using timezone utilities
       const startTime = convertToUTC(event.event_starts_at || (event as any).start_time, userTimezone);
       const endTime = convertToUTC(event.event_ends_at || (event as any).end_time, userTimezone);
-      
+
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
         .from('events')
@@ -268,8 +202,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error creating event:', error);
-        console.error('❌ [SUPABASE SERVICE] Error details:', JSON.stringify(error, null, 2));
+        console.error('Error creating event:', error);
         return null;
       }
 
@@ -290,10 +223,10 @@ export class SupabaseService {
           color: data.color || '#3b82f6'
         } as DatabaseEvent;
       }
-      
+
       return null;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception creating event:', error);
+      console.error('Exception creating event:', error);
       return null;
     }
   }
@@ -303,7 +236,7 @@ export class SupabaseService {
       console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
-      
+
       // Build update object with only provided fields
       const updateData: any = {
         updated_at: new Date().toISOString()
@@ -326,13 +259,12 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error updating event:', error);
-        console.error('❌ [SUPABASE SERVICE] Error details:', JSON.stringify(error, null, 2));
+        console.error('Error updating event:', error);
         return null;
       }
 
       console.log('✅ [SUPABASE SERVICE] Event updated successfully:', JSON.stringify(data, null, 2));
-      
+
       // Transform to match DatabaseEvent interface
       if (data) {
         return {
@@ -350,10 +282,10 @@ export class SupabaseService {
           archetype_data: data.archetype_data || {}
         } as DatabaseEvent;
       }
-      
+
       return null;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception updating event:', error);
+      console.error('Exception updating event:', error);
       return null;
     }
   }
@@ -362,7 +294,7 @@ export class SupabaseService {
     try {
       console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
-      
+
       // Delete from public schema (RLS handles user filtering)
       const { error } = await this.client
         .from('events')
@@ -371,15 +303,14 @@ export class SupabaseService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error deleting event:', error);
-        console.error('❌ [SUPABASE SERVICE] Error details:', JSON.stringify(error, null, 2));
+        console.error('Error deleting event:', error);
         return { success: false, error: error.message };
       }
 
       console.log('✅ [SUPABASE SERVICE] Event deleted successfully');
       return { success: true, error: null };
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception deleting event:', error);
+      console.error('Exception deleting event:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -933,10 +864,10 @@ export class SupabaseService {
         })
       });
 
-      const data = await response.json() as { 
-        success?: boolean; 
-        messages?: DatabaseChatMessage[]; 
-        error?: string; 
+      const data = await response.json() as {
+        success?: boolean;
+        messages?: DatabaseChatMessage[];
+        error?: string;
       };
 
       if (!response.ok) {
@@ -967,10 +898,10 @@ export class SupabaseService {
         })
       });
 
-      const data = await response.json() as { 
-        success?: boolean; 
-        message?: DatabaseChatMessage; 
-        error?: string; 
+      const data = await response.json() as {
+        success?: boolean;
+        message?: DatabaseChatMessage;
+        error?: string;
       };
 
       if (!response.ok) {
@@ -987,11 +918,11 @@ export class SupabaseService {
 
   async searchSimilarEvents(userId: string, queryEmbedding: number[], limit: number = 10): Promise<VectorSearchResult<DatabaseEvent>[]> {
     console.log('🔍 DEBUG: Calling match_events with:', {
-      user_id: userId, 
-      embedding_length: queryEmbedding.length, 
-      match_count: limit 
+      user_id: userId,
+      embedding_length: queryEmbedding.length,
+      match_count: limit
     });
-    
+
     const { data, error } = await this.client
       .rpc('match_events', {
         query_embedding: queryEmbedding,

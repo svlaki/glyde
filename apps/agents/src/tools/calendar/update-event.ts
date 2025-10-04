@@ -31,13 +31,13 @@ export const updateEventTool = tool(
         // Also search directly in database
         const events = await supabaseService.getEventsForAgent(userId);
         const matchingEvents = events.filter((event: any) => {
-          const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
           return searchText.includes(searchQuery.toLowerCase());
         });
 
         if (matchingEvents.length > 0) {
           targetEventId = matchingEvents[0].id;
-          console.log('✅ [UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].event_title);
+          console.log('✅ [UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
         } else {
           throw new Error(`No event found matching: "${searchQuery}"`);
         }
@@ -55,12 +55,11 @@ export const updateEventTool = tool(
       userId,
       targetEventId,
       {
-        event_title: title || undefined,
-        event_starts_at: startTime || undefined,
-        event_ends_at: endTime || undefined,
-        event_location: location || undefined,
-        event_description: description || undefined,
-        category: category || undefined,
+        title: title || undefined,
+        start_time: startTime || undefined,
+        end_time: endTime || undefined,
+        location: location || undefined,
+        description: description || undefined,
       }
     );
 
@@ -76,12 +75,12 @@ export const updateEventTool = tool(
         await zepGraphService.updateCalendarEvent(userId, targetEventId, {
           type: 'CalendarEvent',
           eventId: updatedEvent.id,
-          title: updatedEvent.event_title,
-          startTime: updatedEvent.event_starts_at,
-          endTime: updatedEvent.event_ends_at,
-          location: updatedEvent.event_location || undefined,
-          description: updatedEvent.event_description || undefined,
-          category: updatedEvent.category || 'Personal',
+          title: updatedEvent.title,
+          startTime: updatedEvent.start_time,
+          endTime: updatedEvent.end_time,
+          location: updatedEvent.location || undefined,
+          description: updatedEvent.description || undefined,
+          category: category || 'Personal',
           participants: [],
           topics: [],
           createdAt: new Date().toISOString()
@@ -101,7 +100,7 @@ export const updateEventTool = tool(
       ? ` (category: ${category})`
       : '';
 
-    return `✅ Event updated: "${title || updatedEvent.event_title}"${categoryContext}`;
+    return `✅ Event updated: "${title || updatedEvent.title}"${categoryContext}`;
   },
   {
     name: "update_event",

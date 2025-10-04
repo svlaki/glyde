@@ -23,8 +23,8 @@ export const createEventTool = tool(
       const endDateTime = new Date(endTime);
 
       const conflictingEvents = existingEvents.filter(event => {
-        const eventStart = new Date(event.event_starts_at);
-        const eventEnd = new Date(event.event_ends_at);
+        const eventStart = new Date(event.start_time);
+        const eventEnd = new Date(event.end_time);
 
         return (
           (startDateTime >= eventStart && startDateTime < eventEnd) ||
@@ -35,32 +35,31 @@ export const createEventTool = tool(
 
       if (conflictingEvents.length > 0) {
         const conflictingEvent = conflictingEvents[0];
-        const conflictStartTime = new Date(conflictingEvent.event_starts_at).toLocaleTimeString('en-US', {
+        const conflictStartTime = new Date(conflictingEvent.start_time).toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         });
-        const conflictEndTime = new Date(conflictingEvent.event_ends_at).toLocaleTimeString('en-US', {
+        const conflictEndTime = new Date(conflictingEvent.end_time).toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         });
 
-        return `⚠️ Time conflict detected! You already have "${conflictingEvent.event_title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
       }
     } catch (error) {
-      console.error('🚨 [CREATE-EVENT TOOL] Error checking for conflicts:', error);
+      console.error('Error checking for conflicts:', error);
       // Continue with event creation if conflict check fails
     }
 
     // Create the event with category
-    console.log('🔄 [CREATE-EVENT TOOL] Calling supabaseService.createEvent...');
     const event = await supabaseService.createEvent(userId, {
-      event_title: title,
-      event_starts_at: startTime,
-      event_ends_at: endTime,
-      event_location: location || "",
-      event_description: description || "",
+      title,
+      start_time: startTime,
+      end_time: endTime,
+      location: location || "",
+      description: description || "",
       category: category || 'Personal'
     });
 

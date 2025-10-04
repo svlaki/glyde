@@ -45,7 +45,7 @@ export const searchEventsTool = tool(
         }
 
         // Search in basic event fields
-        const searchText = `${event.event_title} ${event.event_description || ''} ${event.event_location || ''}`.toLowerCase();
+        const searchText = `${event.title} ${event.description || ''} ${event.location || ''}`.toLowerCase();
         const queryWords = query.toLowerCase().split(' ');
         return queryWords.some((word: string) => searchText.includes(word));
       });
@@ -67,15 +67,15 @@ export const searchEventsTool = tool(
 
       // Add direct event matches
       relevantEvents.slice(0, limit).forEach((event: any) => {
-        const startTime = new Date(event.event_starts_at).toLocaleString();
+        const startTime = new Date(event.start_time).toLocaleString();
         const categoryLabel = event.category ? ` [${event.category}]` : '';
 
         combinedResults.push({
           source: 'database',
           event: event,
-          content: `📅 ${event.event_title} - ${startTime}${event.event_location ? ` at ${event.event_location}` : ''}${categoryLabel}`,
+          content: `📅 ${event.title} - ${startTime}${event.location ? ` at ${event.location}` : ''}${categoryLabel}`,
           relevance: 1.0,
-          timestamp: event.event_starts_at
+          timestamp: event.start_time
         });
       });
 
@@ -107,7 +107,7 @@ export const searchEventsTool = tool(
       const supabaseService = new SupabaseService();
       const events = await supabaseService.getEventsForAgent(userId);
       const relevantEvents = events.filter((event: any) => {
-        const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+        const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
         return searchText.includes(query.toLowerCase());
       }).slice(0, limit);
 
@@ -116,9 +116,9 @@ export const searchEventsTool = tool(
       }
 
       const formattedEvents = relevantEvents.map((event: any) => {
-        const startTime = new Date(event.event_starts_at).toLocaleString();
+        const startTime = new Date(event.start_time).toLocaleString();
         const categoryLabel = event.category ? ` [${event.category}]` : '';
-        return `📅 ${event.event_title} - ${startTime}${categoryLabel}`;
+        return `📅 ${event.title} - ${startTime}${categoryLabel}`;
       });
 
       return `Found ${relevantEvents.length} matching events (basic search):\n${formattedEvents.join('\n')}`;

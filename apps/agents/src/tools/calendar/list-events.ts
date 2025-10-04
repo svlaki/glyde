@@ -27,28 +27,28 @@ export const listEventsTool = tool(
     }
 
     // Sort by start time
-    events.sort((a, b) => new Date(a.event_starts_at).getTime() - new Date(b.event_starts_at).getTime());
+    events.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     // Take only the requested limit
     const limitedEvents = events.slice(0, limit);
 
     const eventList = limitedEvents.map(event => {
       // Events are already converted to local timezone by SupabaseService.getEventsForAgent
-      const startDate = new Date(event.event_starts_at);
-      const endDate = new Date(event.event_ends_at);
-      
-      const startTime = startDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit', 
-        hour12: true 
+      const startDate = new Date(event.start_time);
+      const endDate = new Date(event.end_time);
+
+      const startTime = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
       });
-      const endTime = endDate.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit', 
-        hour12: true 
+      const endTime = endDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
       });
-      
-      return `📅 ${event.event_title}\n   ⏰ ${startTime} - ${endTime}${event.event_location ? `\n   📍 ${event.event_location}` : ''}`;
+
+      return `📅 ${event.title}\n   ⏰ ${startTime} - ${endTime}${event.location ? `\n   📍 ${event.location}` : ''}`;
     });
 
     const totalText = events.length > limit ? ` (showing first ${limit} of ${events.length})` : '';
