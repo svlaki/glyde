@@ -1,4 +1,13 @@
-export { createGoalTool } from './create-goal.js';
-export { updateGoalTool } from './update-goal.js';
-export { listGoalsTool } from './list-goals.js';
-export { checkInGoalTool } from './check-in-goal.js';
+import { createGoalTool } from './create-goal.js';
+import { updateGoalTool } from './update-goal.js';
+import { listGoalsTool } from './list-goals.js';
+import { checkInGoalTool } from './check-in-goal.js';
+
+export { createGoalTool, updateGoalTool, listGoalsTool, checkInGoalTool };
+
+export const goalTools = [
+  createGoalTool,
+  updateGoalTool,
+  listGoalsTool,
+  checkInGoalTool
+];

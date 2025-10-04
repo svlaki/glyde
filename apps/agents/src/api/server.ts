@@ -26,6 +26,7 @@ import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCa
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { generateInteractionFromChat } from './chat-interactions.js';
+import { getChatHistory } from './chat-history.js';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -41,13 +42,14 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 });
 
 // Input validation middleware
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
   // Check for required user_id in POST requests
   if (req.method === 'POST' && req.body && !req.body.user_id && !req.url.includes('/health')) {
-    return res.status(400).json({ 
+    res.status(400).json({ 
       error: 'user_id is required in request body',
       success: false 
     });
+    return;
   }
   next();
 });
@@ -104,6 +106,9 @@ app.post('/api/interactions/clear', clearUserInteractions);
 
 // Intelligent interactions
 app.post('/api/interactions/from-chat', generateInteractionFromChat);
+
+// Chat history endpoint
+app.post('/api/chat/history', getChatHistory);
 
 // Agent endpoints - for LangGraph agent system
 app.post('/api/agent/process', addStartTime, processAgentMessage);

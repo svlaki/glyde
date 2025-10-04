@@ -1,29 +1,69 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { fetchUserProfile, updateProfileField, UserProfile, ProfileSummary } from '../lib/profileService'
+import { fetchUserProfile, updateProfileField } from '../lib/profileService'
+import { Loader, Text, Card, Grid, Progress, Button, Modal, Textarea, TextInput, Badge } from '@mantine/core'
 
+// New sections matching actual backend schema
 const PROFILE_SECTIONS = [
-  { key: 'life', label: 'Life', icon: '🌟' },
-  { key: 'work', label: 'Work', icon: '💼' },
-  { key: 'productivity', label: 'Productivity', icon: '⚡' },
-  { key: 'health', label: 'Health', icon: '💪' },
-  { key: 'relationships', label: 'Relationships', icon: '❤️' },
-  { key: 'routines', label: 'Routines', icon: '🔄' },
-  { key: 'decision_making', label: 'Decision Making', icon: '🎯' },
-  { key: 'communication', label: 'Communication', icon: '💬' },
-  { key: 'learning', label: 'Learning', icon: '📚' },
-  { key: 'agent_preferences', label: 'Agent Preferences', icon: '🤖' },
-  { key: 'rules', label: 'Rules & Boundaries', icon: '⚖️' }
+  {
+    key: 'values',
+    label: 'Values & Beliefs',
+    icon: '🌟',
+    description: 'Your core values, life principles, and what matters most to you',
+    isJsonb: true
+  },
+  {
+    key: 'preferences',
+    label: 'Preferences',
+    icon: '⚙️',
+    description: 'How you like things done, work environment, communication style',
+    isJsonb: true
+  },
+  {
+    key: 'work_patterns',
+    label: 'Work Patterns',
+    icon: '💼',
+    description: 'Productivity habits, peak hours, work style, focus patterns',
+    isJsonb: true
+  },
+  {
+    key: 'personality_traits',
+    label: 'Personality & Traits',
+    icon: '🧠',
+    description: 'Communication style, OCEAN traits, how you approach problems',
+    isJsonb: true
+  },
+  {
+    key: 'context_data',
+    label: 'Additional Context',
+    icon: '📋',
+    description: 'Any other context that helps the AI understand you better',
+    isJsonb: true
+  },
+  {
+    key: 'goals_summary',
+    label: 'Goals Summary',
+    icon: '🎯',
+    description: 'High-level overview of your goals and aspirations',
+    isJsonb: false // This is TEXT, not JSONB
+  }
 ]
+
+interface ProfileData {
+  values?: Record<string, any>
+  preferences?: Record<string, any>
+  work_patterns?: Record<string, any>
+  personality_traits?: Record<string, any>
+  context_data?: Record<string, any>
+  goals_summary?: string
+}
 
 export default function ProfilePage() {
   const { user } = useAuth()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [summary, setSummary] = useState<ProfileSummary | null>(null)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedSection, setSelectedSection] = useState<string | null>(null)
-  const [editingField, setEditingField] = useState<{ path: string; value: string | number | boolean | Record<string, unknown> } | null>(null)
+  const [selectedSection, setSelectedSection] = useState<typeof PROFILE_SECTIONS[number] | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -34,262 +74,341 @@ export default function ProfilePage() {
   async function loadProfile() {
     if (!user) return
     setLoading(true)
+    setError(null)
     const result = await fetchUserProfile(user)
     if (result.error) {
       setError(result.error)
     } else {
-      setProfile(result.profile || null)
-      setSummary(result.summary || null)
+      setProfile(result.profile as ProfileData || null)
     }
     setLoading(false)
   }
 
-  async function handleUpdateField(path: string, value: string | number | boolean | Record<string, unknown>) {
+  async function handleUpdateField(field: string, value: any) {
     if (!user) return
-    const { error } = await updateProfileField(user, path, value)
+    const { error } = await updateProfileField(user, field, value)
     if (error) {
       setError(error)
     } else {
       await loadProfile()
-      setEditingField(null)
+      setSelectedSection(null)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
+      <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <div className="text-lg text-foreground">Loading profile...</div>
+          <Loader size="lg" />
+          <Text size="lg">Loading profile...</Text>
         </div>
       </div>
     )
   }
 
+  const completeness = calculateCompleteness(profile)
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground mb-2">🤖 AI Context Profile</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold mb-2">🤖 AI Context Profile</h1>
+          <Text c="dimmed">
             Manage what your AI assistant knows about you. The more context you provide, the better it can help you.
-          </p>
+          </Text>
         </div>
 
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-4">
-          {error}
-        </div>
-      )}
+        {error && (
+          <Card className="mb-6" withBorder bg="red.0">
+            <Text c="red">{error}</Text>
+          </Card>
+        )}
 
-      {summary && (
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 mb-6 shadow-sm">
+        <Card withBorder className="mb-6" p="lg">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-foreground">Profile Completeness</h2>
-            <span className="text-3xl font-bold text-primary">
-              {Math.round(summary.completenessPercentage)}%
-            </span>
+            <Text size="lg" fw={600}>Profile Completeness</Text>
+            <Badge size="xl" variant="gradient" gradient={{ from: 'blue', to: 'cyan' }}>
+              {Math.round(completeness.percentage)}%
+            </Badge>
           </div>
-          <div className="w-full bg-accent rounded-full h-3">
-            <div
-              className="bg-primary h-3 rounded-full transition-all duration-500"
-              style={{ width: `${summary.completenessPercentage}%` }}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground mt-3">
-            {summary.filledFields} of {summary.totalFields} fields completed
-          </p>
-        </div>
-      )}
+          <Progress
+            value={completeness.percentage}
+            size="lg"
+            radius="xl"
+            striped
+            animated={completeness.percentage < 100}
+          />
+          <Text size="sm" c="dimmed" mt="sm">
+            {completeness.filled} of {completeness.total} sections have data
+          </Text>
+        </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {PROFILE_SECTIONS.map(section => {
-          const sectionData = profile?.[section.key as keyof UserProfile]
-          const sectionSummary = summary?.sections[section.key]
-          const completeness = sectionSummary ? (sectionSummary.filledFields / sectionSummary.totalFields) * 100 : 0
+        <Grid>
+          {PROFILE_SECTIONS.map(section => {
+            const sectionData = profile?.[section.key as keyof ProfileData]
+            const hasData = sectionData && (
+              typeof sectionData === 'string' ? sectionData.length > 0 :
+              Object.keys(sectionData).length > 0
+            )
+            const fieldCount = typeof sectionData === 'object' && sectionData !== null
+              ? Object.keys(sectionData).length
+              : (sectionData ? 1 : 0)
 
-          return (
-            <div
-              key={section.key}
-              className="bg-card border border-border rounded-xl p-5 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
-              onClick={() => setSelectedSection(section.key)}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{section.icon}</span>
-                  <h3 className="font-semibold text-foreground">{section.label}</h3>
-                </div>
-                <span className="text-sm font-semibold text-primary">{Math.round(completeness)}%</span>
-              </div>
-              <div className="w-full bg-accent rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${completeness}%` }}
-                />
-              </div>
-              {sectionSummary && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  {sectionSummary.filledFields} / {sectionSummary.totalFields} fields
-                </p>
-              )}
-            </div>
-          )
-        })}
+            return (
+              <Grid.Col key={section.key} span={{ base: 12, sm: 6, lg: 4 }}>
+                <Card
+                  withBorder
+                  p="lg"
+                  className="cursor-pointer hover:shadow-lg transition-all duration-200"
+                  onClick={() => setSelectedSection(section)}
+                  style={{ height: '100%' }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{section.icon}</span>
+                      <Text fw={600}>{section.label}</Text>
+                    </div>
+                    {hasData && <Badge color="green" variant="light">✓</Badge>}
+                  </div>
+                  <Text size="sm" c="dimmed" mb="md">
+                    {section.description}
+                  </Text>
+                  {hasData && (
+                    <Text size="xs" c="dimmed">
+                      {fieldCount} {section.isJsonb ? 'field' : 'character'}{fieldCount !== 1 ? 's' : ''}
+                    </Text>
+                  )}
+                  {!hasData && (
+                    <Text size="xs" c="dimmed" fs="italic">
+                      No data yet - click to add
+                    </Text>
+                  )}
+                </Card>
+              </Grid.Col>
+            )
+          })}
+        </Grid>
+
+        {selectedSection && (
+          <SectionEditModal
+            section={selectedSection}
+            data={profile?.[selectedSection.key as keyof ProfileData]}
+            onClose={() => setSelectedSection(null)}
+            onUpdate={handleUpdateField}
+          />
+        )}
       </div>
-
-      {selectedSection && (
-        <SectionDetailModal
-          section={PROFILE_SECTIONS.find(s => s.key === selectedSection)!}
-          data={profile?.[selectedSection as keyof UserProfile] as Record<string, any> || {}}
-          onClose={() => setSelectedSection(null)}
-          onUpdate={handleUpdateField}
-        />
-      )}
-    </div>
     </div>
   )
 }
 
-function SectionDetailModal({
+function calculateCompleteness(profile: ProfileData | null): { filled: number; total: number; percentage: number } {
+  if (!profile) return { filled: 0, total: PROFILE_SECTIONS.length, percentage: 0 }
+
+  let filled = 0
+  PROFILE_SECTIONS.forEach(section => {
+    const data = profile[section.key as keyof ProfileData]
+    if (data) {
+      if (typeof data === 'string' && data.length > 0) filled++
+      else if (typeof data === 'object' && Object.keys(data).length > 0) filled++
+    }
+  })
+
+  return {
+    filled,
+    total: PROFILE_SECTIONS.length,
+    percentage: (filled / PROFILE_SECTIONS.length) * 100
+  }
+}
+
+function SectionEditModal({
   section,
   data,
   onClose,
   onUpdate
 }: {
-  section: { key: string; label: string; icon: string }
-  data: Record<string, any>
+  section: typeof PROFILE_SECTIONS[number]
+  data: any
   onClose: () => void
-  onUpdate: (path: string, value: string | number | boolean | Record<string, unknown>) => void
+  onUpdate: (field: string, value: any) => void
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
+  const [textValue, setTextValue] = useState(typeof data === 'string' ? data : '')
 
-  function handleEdit(key: string, currentValue: string | number | boolean | Record<string, unknown>) {
+  const dataObject = typeof data === 'object' && data !== null ? data : {}
+
+  function handleEdit(key: string, currentValue: any) {
     setEditingKey(key)
-    setEditValue(JSON.stringify(currentValue, null, 2))
+    setEditValue(typeof currentValue === 'string' ? currentValue : JSON.stringify(currentValue, null, 2))
   }
 
   function handleSave(key: string) {
     try {
-      const parsed = JSON.parse(editValue)
-      onUpdate(`${section.key}.${key}`, parsed)
+      // Try to parse as JSON, fallback to string
+      let parsed: any
+      try {
+        parsed = JSON.parse(editValue)
+      } catch {
+        parsed = editValue // Keep as string if not valid JSON
+      }
+
+      const updatedData = { ...dataObject, [key]: parsed }
+      onUpdate(section.key, updatedData)
       setEditingKey(null)
     } catch (e) {
-      alert('Invalid JSON format')
+      alert('Error saving field')
     }
   }
 
   function handleAddField() {
-    if (!newKey) return
+    if (!newKey.trim()) {
+      alert('Field name is required')
+      return
+    }
     try {
-      const parsed = JSON.parse(newValue)
-      onUpdate(`${section.key}.${newKey}`, parsed)
+      let parsed: any
+      try {
+        parsed = JSON.parse(newValue)
+      } catch {
+        parsed = newValue // Keep as string if not valid JSON
+      }
+
+      const updatedData = { ...dataObject, [newKey]: parsed }
+      onUpdate(section.key, updatedData)
       setNewKey('')
       setNewValue('')
     } catch (e) {
-      alert('Invalid JSON format')
+      alert('Error adding field')
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-card border border-border rounded-2xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl">{section.icon}</span>
-            <h2 className="text-3xl font-bold text-foreground">{section.label}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-2xl w-10 h-10 rounded-full hover:bg-accent transition-all flex items-center justify-center"
-          >
-            ✕
-          </button>
-        </div>
+  function handleSaveText() {
+    onUpdate(section.key, textValue)
+  }
 
-        <div className="space-y-4">
-          {Object.entries(data).map(([key, value]) => (
-            <div key={key} className="border border-border rounded-lg p-4 bg-background hover:shadow-sm transition-shadow">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-semibold text-foreground">{key}</h4>
-                {editingKey !== key && (
-                  <button
-                    onClick={() => handleEdit(key, value)}
-                    className="text-primary hover:text-primary/80 text-sm font-medium px-3 py-1 rounded-md hover:bg-primary/10 transition-all"
-                  >
-                    ✏️ Edit
-                  </button>
-                )}
-              </div>
-              {editingKey === key ? (
-                <div>
-                  <textarea
-                    value={editValue}
-                    onChange={e => setEditValue(e.target.value)}
-                    className="w-full border border-input bg-background rounded-lg px-4 py-3 font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    rows={6}
-                  />
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => handleSave(key)}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
-                    >
-                      💾 Save
-                    </button>
-                    <button
-                      onClick={() => setEditingKey(null)}
-                      className="px-4 py-2 border border-border bg-background text-foreground rounded-lg text-sm font-semibold hover:bg-accent transition-all"
-                    >
-                      Cancel
-                    </button>
+  function handleDeleteField(key: string) {
+    if (!confirm(`Delete field "${key}"?`)) return
+    const updatedData = { ...dataObject }
+    delete updatedData[key]
+    onUpdate(section.key, updatedData)
+  }
+
+  return (
+    <Modal
+      opened={true}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{section.icon}</span>
+          <Text size="xl" fw={700}>{section.label}</Text>
+        </div>
+      }
+      size="xl"
+      styles={{ title: { width: '100%' } }}
+    >
+      <Text size="sm" c="dimmed" mb="lg">
+        {section.description}
+      </Text>
+
+      {!section.isJsonb ? (
+        // Text field (goals_summary)
+        <div>
+          <Textarea
+            label="Content"
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            minRows={8}
+            autosize
+            placeholder="Enter your goals summary..."
+          />
+          <Button onClick={handleSaveText} mt="md" fullWidth>
+            💾 Save
+          </Button>
+        </div>
+      ) : (
+        // JSONB fields
+        <div>
+          <div className="space-y-3 mb-6">
+            {Object.entries(dataObject).map(([key, value]) => (
+              <Card key={key} withBorder p="md">
+                <div className="flex items-start justify-between mb-2">
+                  <Text fw={600}>{key}</Text>
+                  <div className="flex gap-2">
+                    {editingKey !== key && (
+                      <>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          onClick={() => handleEdit(key, value)}
+                        >
+                          ✏️ Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          color="red"
+                          onClick={() => handleDeleteField(key)}
+                        >
+                          🗑️
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <pre className="text-sm bg-accent/50 p-3 rounded-lg overflow-x-auto text-foreground">
-                  {JSON.stringify(value, null, 2)}
-                </pre>
-              )}
-            </div>
-          ))}
-
-          <div className="border-t border-border pt-6 mt-6">
-            <h3 className="font-semibold text-foreground mb-4 text-lg">➕ Add New Field</h3>
-            <div className="space-y-3">
-              <input
-                type="text"
-                placeholder="Field name"
-                value={newKey}
-                onChange={e => setNewKey(e.target.value)}
-                className="w-full border border-input bg-background rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <textarea
-                placeholder='Value (JSON format, e.g., "text", 123, {"key": "value"})'
-                value={newValue}
-                onChange={e => setNewValue(e.target.value)}
-                className="w-full border border-input bg-background rounded-lg px-4 py-3 font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                rows={3}
-              />
-              <button
-                onClick={handleAddField}
-                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm"
-              >
-                ➕ Add Field
-              </button>
-            </div>
+                {editingKey === key ? (
+                  <div>
+                    <Textarea
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      minRows={4}
+                      autosize
+                      styles={{ input: { fontFamily: 'monospace' } }}
+                    />
+                    <div className="flex gap-2 mt-3">
+                      <Button onClick={() => handleSave(key)} size="sm">
+                        💾 Save
+                      </Button>
+                      <Button onClick={() => setEditingKey(null)} size="sm" variant="subtle">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <pre className="text-sm bg-gray-100 dark:bg-gray-800 p-3 rounded overflow-x-auto">
+                    {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
+                  </pre>
+                )}
+              </Card>
+            ))}
           </div>
-        </div>
 
-        <div className="mt-6 pt-4 border-t border-border">
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-3 border-2 border-border bg-background text-foreground rounded-lg font-semibold hover:bg-accent transition-all"
-          >
-            Close
-          </button>
+          <Card withBorder p="md" bg="gray.0">
+            <Text fw={600} mb="md">➕ Add New Field</Text>
+            <div className="space-y-3">
+              <TextInput
+                label="Field Name"
+                placeholder="e.g., coreValues, workStyle, etc."
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+              />
+              <Textarea
+                label="Value"
+                placeholder='Enter value (can be text, number, or JSON like {"key": "value"})'
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                minRows={3}
+                styles={{ input: { fontFamily: 'monospace' } }}
+              />
+              <Button onClick={handleAddField} fullWidth>
+                ➕ Add Field
+              </Button>
+            </div>
+          </Card>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }

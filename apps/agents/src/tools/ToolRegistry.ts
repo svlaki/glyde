@@ -5,6 +5,9 @@ import {
   updateCategoryTool,
   deleteCategoryTool
 } from './categories/index.js';
+import { taskTools } from './tasks/index.js';
+import { goalTools } from './goals/index.js';
+import { profileTools } from './profile/index.js';
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -32,6 +35,21 @@ export class ToolRegistry {
     this.tools.set(listCategoriesTool.name, listCategoriesTool);
     this.tools.set(updateCategoryTool.name, updateCategoryTool);
     this.tools.set(deleteCategoryTool.name, deleteCategoryTool);
+
+    // Register all task tools
+    taskTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
+
+    // Register all goal tools
+    goalTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
+
+    // Register all profile tools
+    profileTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
   }
 
   // Register a single tool
