@@ -24,9 +24,11 @@ setTimeout(() => {
 
 export async function processAgentMessage(req: Request, res: Response): Promise<void> {
   try {
+    console.log('📥 [AGENT] Received request body:', JSON.stringify(req.body, null, 2));
     const { context, message, targetAgent, isInternal } = req.body;
-    
+
     if (!context || !message) {
+      console.error('❌ [AGENT] Missing context or message:', { context: !!context, message: !!message });
       res.status(400).json({ error: 'Missing context or message in request body' });
       return;
     }

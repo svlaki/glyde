@@ -6,7 +6,7 @@ export interface DatabaseEvent {
   start_time: string;
   end_time: string;
   location?: string;
-  category?: string;  // category is a text field, not a foreign key
+  category?: string;
   created_at: string;
   updated_at: string;
 }
