@@ -3,13 +3,14 @@ import { User } from '@supabase/supabase-js'
 
 export interface CalendarEvent {
   id: string
-  event_title: string
-  event_starts_at: string
-  event_ends_at: string
-  event_location?: string
-  event_description?: string
-  event_created_at?: string
-  event_updated_at?: string
+  user_id?: string
+  title: string
+  start_time: string
+  end_time: string
+  location?: string
+  description?: string
+  created_at?: string
+  updated_at?: string
   category?: string
   color?: string
 }

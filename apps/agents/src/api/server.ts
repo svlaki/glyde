@@ -41,13 +41,20 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 });
 
 // Input validation middleware
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
+  // Skip validation for health check and agent endpoint (agent has its own validation)
+  if (req.url.includes('/health') || req.url.includes('/api/agent/process')) {
+    next();
+    return;
+  }
+
   // Check for required user_id in POST requests
-  if (req.method === 'POST' && req.body && !req.body.user_id && !req.url.includes('/health')) {
-    return res.status(400).json({ 
+  if (req.method === 'POST' && req.body && !req.body.user_id) {
+    res.status(400).json({
       error: 'user_id is required in request body',
-      success: false 
+      success: false
     });
+    return;
   }
   next();
 });
@@ -104,6 +111,23 @@ app.post('/api/interactions/clear', clearUserInteractions);
 
 // Intelligent interactions
 app.post('/api/interactions/from-chat', generateInteractionFromChat);
+
+// Chat endpoints
+app.post('/api/chat/history', async (req, res) => {
+  try {
+    const { user_id, session_id, limit = 50 } = req.body;
+
+    // For now, return empty array - chat history is managed in frontend
+    // This endpoint exists to prevent 404 errors
+    res.json({
+      success: true,
+      messages: []
+    });
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch chat history' });
+  }
+});
 
 // Agent endpoints - for LangGraph agent system
 app.post('/api/agent/process', addStartTime, processAgentMessage);

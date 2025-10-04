@@ -94,17 +94,15 @@ export class SupabaseService {
       // Transform with timezone conversion for agent display
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
-        event_title: event.title,
-        event_starts_at: this.convertUTCToLocalDisplay(event.start_time, userTimezone),
-        event_ends_at: this.convertUTCToLocalDisplay(event.end_time, userTimezone),
-        event_location: event.location,
-        event_description: event.description,
-        event_created_at: event.created_at,
-        event_updated_at: event.updated_at,
-        category: event.category || 'Personal',
-        color: event.color || '#3b82f6',
-        archetype: event.archetype || 'generic',
-        archetype_data: event.archetype_data || {}
+        user_id: event.user_id,
+        title: event.title,
+        start_time: this.convertUTCToLocalDisplay(event.start_time, userTimezone),
+        end_time: this.convertUTCToLocalDisplay(event.end_time, userTimezone),
+        location: event.location,
+        description: event.description,
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        category: event.category || 'Personal'
       }));
 
       return transformedEvents;
@@ -143,17 +141,15 @@ export class SupabaseService {
       // Transform to match DatabaseEvent interface (no timezone conversion for frontend)
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
-        event_title: event.title,
-        event_starts_at: event.start_time, // Frontend handles timezone conversion
-        event_ends_at: event.end_time,     // Frontend handles timezone conversion
-        event_location: event.location,
-        event_description: event.description,
-        event_created_at: event.created_at,
-        event_updated_at: event.updated_at,
-        category: event.category || 'Personal',
-        color: event.color || '#3b82f6',
-        archetype: event.archetype || 'generic',
-        archetype_data: event.archetype_data || {}
+        user_id: event.user_id,
+        title: event.title,
+        start_time: event.start_time, // Frontend handles timezone conversion
+        end_time: event.end_time,     // Frontend handles timezone conversion
+        location: event.location,
+        description: event.description,
+        created_at: event.created_at,
+        updated_at: event.updated_at,
+        category: event.category || 'Personal'
       }));
 
       console.log('🔄 [SUPABASE SERVICE] Transformed', transformedEvents.length, 'events for frontend');
@@ -175,14 +171,14 @@ export class SupabaseService {
       console.log('🌍 [SUPABASE SERVICE] Using user timezone:', userTimezone);
 
       // Extract event data
-      const title = event.event_title || (event as any).title || 'Untitled Event';
-      const description = event.event_description || (event as any).description || null;
-      const location = event.event_location || (event as any).location || null;
-      const category = (event as any).category || 'Personal';
+      const title = event.title || 'Untitled Event';
+      const description = event.description || null;
+      const location = event.location || null;
+      const category = event.category || 'Personal';
 
       // Convert local times to UTC using timezone utilities
-      const startTime = convertToUTC(event.event_starts_at || (event as any).start_time, userTimezone);
-      const endTime = convertToUTC(event.event_ends_at || (event as any).end_time, userTimezone);
+      const startTime = convertToUTC(event.start_time || new Date().toISOString(), userTimezone);
+      const endTime = convertToUTC(event.end_time || new Date().toISOString(), userTimezone);
 
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -194,9 +190,7 @@ export class SupabaseService {
           end_time: endTime,
           location: location,
           description: description,
-          category: category,
-          archetype: 'generic',
-          archetype_data: {}
+          category: category
         })
         .select()
         .single();
@@ -212,15 +206,15 @@ export class SupabaseService {
       if (data) {
         return {
           id: data.id,
-          event_title: data.title,
-          event_starts_at: data.start_time,
-          event_ends_at: data.end_time,
-          event_location: data.location,
-          event_description: data.description,
-          event_created_at: data.created_at,
-          event_updated_at: data.updated_at,
-          category: data.category || 'Personal',
-          color: data.color || '#3b82f6'
+          user_id: data.user_id,
+          title: data.title,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          location: data.location,
+          description: data.description,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          category: data.category || 'Personal'
         } as DatabaseEvent;
       }
 
@@ -242,11 +236,11 @@ export class SupabaseService {
         updated_at: new Date().toISOString()
       };
 
-      if (updates.event_title !== undefined) updateData.title = updates.event_title;
-      if (updates.event_starts_at !== undefined) updateData.start_time = updates.event_starts_at;
-      if (updates.event_ends_at !== undefined) updateData.end_time = updates.event_ends_at;
-      if (updates.event_location !== undefined) updateData.location = updates.event_location;
-      if (updates.event_description !== undefined) updateData.description = updates.event_description;
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.start_time !== undefined) updateData.start_time = updates.start_time;
+      if (updates.end_time !== undefined) updateData.end_time = updates.end_time;
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.category !== undefined) updateData.category = updates.category;
 
       // Update in public schema (RLS handles user filtering)
@@ -269,17 +263,15 @@ export class SupabaseService {
       if (data) {
         return {
           id: data.id,
-          event_title: data.title,
-          event_starts_at: data.start_time,
-          event_ends_at: data.end_time,
-          event_location: data.location,
-          event_description: data.description,
-          event_created_at: data.created_at,
-          event_updated_at: data.updated_at,
-          category: data.category || 'Personal',
-          color: data.color || '#3b82f6',
-          archetype: data.archetype || 'generic',
-          archetype_data: data.archetype_data || {}
+          user_id: data.user_id,
+          title: data.title,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          location: data.location,
+          description: data.description,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          category: data.category || 'Personal'
         } as DatabaseEvent;
       }
 

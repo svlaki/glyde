@@ -35,10 +35,36 @@ export function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [userTimezone, setUserTimezone] = useState<string>('America/Chicago');
   const { interactions, removeInteraction } = useInteractions();
 
   // Connect to agent system for interactions
   useAgentInteractions();
+
+  // Fetch user timezone from profile
+  useEffect(() => {
+    if (user) {
+      const fetchTimezone = async () => {
+        try {
+          const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+          const response = await fetch(`${agentServiceUrl}/api/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id })
+          });
+          if (response.ok) {
+            const profile = await response.json();
+            if (profile.timezone) {
+              setUserTimezone(profile.timezone);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch user timezone:', error);
+        }
+      };
+      fetchTimezone();
+    }
+  }, [user]);
 
   // Load real user events and tasks from the backend
   useEffect(() => {
@@ -115,17 +141,17 @@ export function CalendarPage() {
 
           return {
             id: event.id,
-            event_title: event.event_title,
-            event_starts_at: event.event_starts_at,
-            event_ends_at: event.event_ends_at,
-            event_location: event.event_location,
-            event_description: event.event_description,
-            event_created_at: event.event_created_at,
-            event_updated_at: event.event_updated_at,
+            user_id: event.user_id,
+            title: event.title,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            location: event.location,
+            description: event.description,
+            created_at: event.created_at,
+            updated_at: event.updated_at,
             category: category,
-            title: event.event_title,
-            start: event.event_starts_at,
-            end: event.event_ends_at,
+            start: event.start_time,
+            end: event.end_time,
             backgroundColor: color,
             borderColor: color,
             textColor: '#FFFFFF',
@@ -198,6 +224,7 @@ export function CalendarPage() {
               <FullCalendar
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                 initialView="timeGridWeek"
+                timeZone={userTimezone}
                 headerToolbar={{
                   left: 'prev,next today',
                   center: 'title',
@@ -206,9 +233,9 @@ export function CalendarPage() {
                 events={events.map(e => ({
                   ...e,
                   id: e.id,
-                  title: e.event_title,
-                  start: e.event_starts_at,
-                  end: e.event_ends_at,
+                  title: e.title,
+                  start: e.start_time,
+                  end: e.end_time,
                   backgroundColor: e.color || e.backgroundColor || '#3B82F6',
                   borderColor: e.color || e.borderColor || '#3B82F6',
                   textColor: '#FFFFFF',
@@ -220,8 +247,8 @@ export function CalendarPage() {
                 eventDrop={async (info) => {
                   // Update event when dragged to new time
                   const updatedEvent = {
-                    event_starts_at: info.event.start?.toISOString(),
-                    event_ends_at: info.event.end?.toISOString() || new Date(info.event.start!.getTime() + 60 * 60 * 1000).toISOString(),
+                    start_time: info.event.start?.toISOString(),
+                    end_time: info.event.end?.toISOString() || new Date(info.event.start!.getTime() + 60 * 60 * 1000).toISOString(),
                   };
                   
                   try {
@@ -253,8 +280,8 @@ export function CalendarPage() {
                 eventResize={async (info) => {
                   // Update event duration when resized
                   const updatedEvent = {
-                    event_starts_at: info.event.start?.toISOString(),
-                    event_ends_at: info.event.end?.toISOString(),
+                    start_time: info.event.start?.toISOString(),
+                    end_time: info.event.end?.toISOString(),
                   };
                   
                   try {
@@ -521,13 +548,13 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
 
   useEffect(() => {
     if (event) {
-      setTitle(event.event_title || '');
+      setTitle(event.title || '');
       // Convert UTC time to local time for display in the form
-      const startDate = new Date(event.event_starts_at);
-      const endDate = new Date(event.event_ends_at);
+      const startDate = new Date(event.start_time);
+      const endDate = new Date(event.end_time);
       setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
       setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
-      setDescription(event.event_description || '');
+      setDescription(event.description || '');
       setCategory(event.category || 'Personal');
     } else {
       setTitle('');
@@ -541,7 +568,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
   async function handleSave() {
     if (!user || !title.trim()) return;
 
-    const baseDate = date ? date.split('T')[0] : (event?.event_starts_at.split('T')[0]);
+    const baseDate = date ? date.split('T')[0] : (event?.start_time.split('T')[0]);
     if (!baseDate) return;
 
     // Create dates in local timezone and convert to ISO string
@@ -549,10 +576,10 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
     const ends_at = new Date(`${baseDate}T${endTime}:00`);
 
     const eventData = {
-      event_title: title.trim(),
-      event_starts_at: starts_at.toISOString(),
-      event_ends_at: ends_at.toISOString(),
-      event_description: description.trim(),
+      title: title.trim(),
+      start_time: starts_at.toISOString(),
+      end_time: ends_at.toISOString(),
+      description: description.trim(),
       category: category,
     };
 
@@ -589,7 +616,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
       await deleteEvent(user, event.id);
       toast({
         title: 'Event deleted',
-        description: `"${event.event_title}" has been removed from your calendar`,
+        description: `"${event.title}" has been removed from your calendar`,
         variant: 'success'
       });
       onSave();
