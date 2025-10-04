@@ -106,8 +106,8 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         
         // Check for time conflicts
         const hasConflict = existingEvents.some(event => {
-          const eventStart = new Date(event.event_starts_at);
-          const eventEnd = new Date(event.event_ends_at);
+          const eventStart = new Date(event.start_time);
+          const eventEnd = new Date(event.end_time);
           
           // Check if proposed event overlaps with existing event
           return (startDate < eventEnd && endDate > eventStart);
@@ -128,10 +128,10 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         }
         
         const eventData = {
-          event_title: eventTitle,
-          event_starts_at: startDate.toISOString(),
-          event_ends_at: endDate.toISOString(),
-          event_description: interaction.eventData.description || '',
+          title: eventTitle,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          description: interaction.eventData.description || '',
         };
 
         console.log(`📅 [INTERACTION RESPONSE] Event data prepared:`, JSON.stringify(eventData, null, 2));

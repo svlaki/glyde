@@ -31,13 +31,13 @@ export const deleteEventTool = tool(
         // Also search directly in database
         const events = await supabaseService.getEventsForAgent(userId);
         const matchingEvents = events.filter((event: any) => {
-          const searchText = `${event.event_title} ${event.event_description || ''}`.toLowerCase();
+          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
           return searchText.includes(searchQuery.toLowerCase());
         });
 
         if (matchingEvents.length > 0) {
           targetEventId = matchingEvents[0].id;
-          console.log('✅ [DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].event_title);
+          console.log('✅ [DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].title);
         } else {
           throw new Error(`No event found matching: "${searchQuery}"`);
         }

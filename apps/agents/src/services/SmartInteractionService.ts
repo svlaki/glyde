@@ -26,8 +26,8 @@ export class SmartInteractionService {
     const proposedEnd = new Date(`${baseDate}T${endTime}:00`);
     
     return events.some(event => {
-      const eventStart = new Date(event.event_starts_at);
-      const eventEnd = new Date(event.event_ends_at);
+      const eventStart = new Date(event.start_time);
+      const eventEnd = new Date(event.end_time);
       
       // Check if events overlap
       return (proposedStart < eventEnd && proposedEnd > eventStart);
@@ -45,12 +45,12 @@ export class SmartInteractionService {
     // Get user's events and patterns
     const events = await this.supabaseService.getEventsForAgent(userId);
     const todayEvents = events.filter(event => {
-      const eventDate = new Date(event.event_starts_at);
+      const eventDate = new Date(event.start_time);
       return eventDate.toDateString() === now.toDateString();
     });
     
     const tomorrowEvents = events.filter(event => {
-      const eventDate = new Date(event.event_starts_at);
+      const eventDate = new Date(event.start_time);
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
       return eventDate.toDateString() === tomorrow.toDateString();
@@ -155,21 +155,21 @@ export class SmartInteractionService {
     
     // 5. Meeting preparation reminders
     const upcomingMeeting = todayEvents.find(e => {
-      const eventTime = new Date(e.event_starts_at);
+      const eventTime = new Date(e.start_time);
       const timeDiff = (eventTime.getTime() - now.getTime()) / (1000 * 60); // minutes
-      return timeDiff > 15 && timeDiff < 60 && e.event_title.toLowerCase().includes('meeting');
+      return timeDiff > 15 && timeDiff < 60 && e.title.toLowerCase().includes('meeting');
     });
     
     if (upcomingMeeting && !userSuggestions.has(`prep-${upcomingMeeting.id}`)) {
-      const meetingTime = new Date(upcomingMeeting.event_starts_at);
+      const meetingTime = new Date(upcomingMeeting.start_time);
       const prepTime = new Date(meetingTime.getTime() - 15 * 60000); // 15 mins before
       
       interactions.push({
         id: `meeting-prep-${Date.now()}`,
-        question: `"${upcomingMeeting.event_title}" starts soon. Block 15 minutes to prepare?`,
+        question: `"${upcomingMeeting.title}" starts soon. Block 15 minutes to prepare?`,
         type: 'yes_no',
         eventData: {
-          title: `Prep: ${upcomingMeeting.event_title}`,
+          title: `Prep: ${upcomingMeeting.title}`,
           startTime: `${prepTime.getHours().toString().padStart(2, '0')}:${prepTime.getMinutes().toString().padStart(2, '0')}`,
           endTime: `${meetingTime.getHours().toString().padStart(2, '0')}:${meetingTime.getMinutes().toString().padStart(2, '0')}`,
           description: 'Review agenda, gather materials, and set intentions'
@@ -183,7 +183,7 @@ export class SmartInteractionService {
     // 6. Exercise reminder based on patterns
     if (currentHour >= 7 && currentHour < 19 && !userSuggestions.has('exercise-today')) {
       const hasExerciseToday = todayEvents.some(e => 
-        e.event_title.toLowerCase().match(/gym|workout|exercise|yoga|run|walk|fitness/)
+        e.title.toLowerCase().match(/gym|workout|exercise|yoga|run|walk|fitness/)
       );
       
       if (!hasExerciseToday) {
@@ -211,12 +211,12 @@ export class SmartInteractionService {
     // 7. Tomorrow preparation (evening)
     if (currentHour >= 20 && currentHour < 22 && tomorrowEvents.length > 0 && !userSuggestions.has('tomorrow-prep')) {
       const firstEvent = tomorrowEvents.sort((a, b) => 
-        new Date(a.event_starts_at).getTime() - new Date(b.event_starts_at).getTime()
+        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
       )[0];
       
       interactions.push({
         id: `tomorrow-prep-${Date.now()}`,
-        question: `Tomorrow starts with "${firstEvent.event_title}". Review your day now?`,
+        question: `Tomorrow starts with "${firstEvent.title}". Review your day now?`,
         type: 'yes_no',
         eventData: {
           title: 'Tomorrow Planning',
@@ -267,12 +267,12 @@ export class SmartInteractionService {
   private findMeaningfulGaps(events: any[]): Array<{duration: number, startTime: string, endTime: string}> {
     const gaps = [];
     const sortedEvents = events.sort((a, b) => 
-      new Date(a.event_starts_at).getTime() - new Date(b.event_starts_at).getTime()
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
     );
     
     for (let i = 0; i < sortedEvents.length - 1; i++) {
-      const currentEnd = new Date(sortedEvents[i].event_ends_at);
-      const nextStart = new Date(sortedEvents[i + 1].event_starts_at);
+      const currentEnd = new Date(sortedEvents[i].end_time);
+      const nextStart = new Date(sortedEvents[i + 1].start_time);
       const gapMinutes = (nextStart.getTime() - currentEnd.getTime()) / (1000 * 60);
       
       if (gapMinutes >= 30 && gapMinutes <= 180) { // 30 mins to 3 hours

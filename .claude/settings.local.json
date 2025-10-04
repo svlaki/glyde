@@ -22,6 +22,7 @@
       "mcp__serena__list_dir",
       "mcp__supabase__execute_sql",
       "mcp__supabase__apply_migration",
+      "mcp__serena__read_memory",
       "mcp__supabase__list_tables",
       "mcp__supabase__list_extensions",
       "mcp__supabase__list_migrations",

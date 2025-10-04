@@ -50,8 +50,8 @@ export abstract class BaseAgent {
   private async loadBasicMemoryContext(context: AgentContext): Promise<MemoryContext> {
     const recentEvents = await this.supabaseService.getEvents(context.userId);
     const recentEventSummaries = recentEvents.slice(0, 10).map(event => ({
-      content: `${event.event_title} - ${event.event_description || ''}`,
-      timestamp: event.event_starts_at
+      content: `${event.title} - ${event.description || ''}`,
+      timestamp: event.start_time
     }));
 
     const baseMessages: BaseMessage[] = context.conversationHistory.map(msg => {
