@@ -1,5 +1,5 @@
-import { supabase } from './supabase'
 import { User } from '@supabase/supabase-js'
+import { post } from './apiClient'
 
 export interface CalendarEvent {
   id: string
@@ -33,29 +33,24 @@ export async function fetchUserEvents(
     }
 
     // Use the backend API instead of direct Supabase calls
-    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success?: boolean; events?: CalendarEvent[]; error?: string }>(
+      '/api/events',
+      {
         user_id: user.id,
         start_date: startDate ? startDate.toISOString() : null,
         end_date: endDate ? endDate.toISOString() : null
-      })
-    });
+      }
+    )
 
     if (!response.ok) {
-      return { events: [], error: 'Failed to fetch events from backend' }
+      return { events: [], error: response.error || 'Failed to fetch events from backend' }
     }
 
-    const data = await response.json();
-    
-    if (data.success) {
-      return { events: data.events || [], error: null }
-    } else {
-      return { events: [], error: data.error || 'Unknown error' }
+    if (response.data?.success) {
+      return { events: response.data.events ?? [], error: null }
     }
+
+    return { events: [], error: response.data?.error || 'Unknown error' }
   } catch (err: any) {
     console.error('Unexpected error in fetchUserEvents:', err)
     return { events: [], error: err.message || 'An unexpected error occurred' }
@@ -78,31 +73,24 @@ export async function createEvent(
     }
 
     // Use the correct endpoint for creating events
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-    const response = await fetch(`${agentServiceUrl}/api/events/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success?: boolean; event?: CalendarEvent; error?: string }>(
+      '/api/events/create',
+      {
         user_id: user.id,
         ...event
-      })
-    })
-    
+      }
+    )
+
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Agent service error: ${errorText}`)
-    }
-    
-    const data = await response.json()
-
-    if (!data.success) {
-      console.error('Error creating event:', data.error)
-      return { event: null, error: data.error }
+      return { event: null, error: response.error || 'Failed to create event' }
     }
 
-    return { event: data.event, error: null };
+    if (!response.data?.success || !response.data.event) {
+      console.error('Error creating event:', response.data?.error)
+      return { event: null, error: response.data?.error || 'Failed to create event' }
+    }
+
+    return { event: response.data.event, error: null };
 
   } catch (err: any) {
     console.error('Unexpected error in createEvent:', err)
@@ -129,32 +117,25 @@ export async function updateEvent(
     }
 
     // Use the correct endpoint for updating events
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-    const response = await fetch(`${agentServiceUrl}/api/events/update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success?: boolean; event?: CalendarEvent; error?: string }>(
+      '/api/events/update',
+      {
         user_id: user.id,
         event_id: eventId,
         ...event
-      })
-    })
-    
+      }
+    )
+
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Agent service error: ${errorText}`)
-    }
-    
-    const data = await response.json()
-
-    if (!data.success) {
-      console.error('Error updating event:', data.error);
-      return { event: null, error: data.error };
+      return { event: null, error: response.error || 'Failed to update event' }
     }
 
-    return { event: data.event, error: null };
+    if (!response.data?.success || !response.data.event) {
+      console.error('Error updating event:', response.data?.error)
+      return { event: null, error: response.data?.error || 'Failed to update event' }
+    }
+
+    return { event: response.data.event, error: null };
   } catch (err: any) {
     console.error('Unexpected error in updateEvent:', err);
     return { event: null, error: err.message || 'An unexpected error occurred' };
@@ -177,30 +158,23 @@ export async function deleteEvent(
     }
 
     // Use the backend API instead of direct RPC calls
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-    const response = await fetch(`${agentServiceUrl}/api/events/delete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success?: boolean; error?: string }>(
+      '/api/events/delete',
+      {
         user_id: user.id,
         event_id: eventId
-      })
-    });
+      }
+    )
 
     if (!response.ok) {
-      const errorText = await response.text()
-      return { success: false, error: `Backend error: ${errorText}` };
+      return { success: false, error: response.error || 'Failed to delete event' };
     }
 
-    const data = await response.json();
-
-    if (data.success) {
+    if (response.data?.success) {
       return { success: true, error: null };
-    } else {
-      return { success: false, error: data.error || 'Unknown error' };
     }
+
+    return { success: false, error: response.data?.error || 'Unknown error' };
   } catch (err: any) {
     console.error('Unexpected error in deleteEvent:', err);
     return { success: false, error: err.message || 'An unexpected error occurred' };

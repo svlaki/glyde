@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { post } from './apiClient'
 
 export interface UserProfile {
   user_id: string
@@ -30,8 +31,6 @@ export interface ProfileSummary {
   }
 }
 
-const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-
 export async function fetchUserProfile(
   user: User,
   section?: string
@@ -41,36 +40,38 @@ export async function fetchUserProfile(
       return { error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/profile`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{
+      section?: string
+      data?: any
+      profile?: UserProfile
+      completeness?: any
+      summary?: ProfileSummary
+      error?: string
+    }>(
+      '/api/profile',
+      {
         user_id: user.id,
         section
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { error: data.error || 'Failed to fetch profile' }
+      return { error: response.error || 'Failed to fetch profile' }
     }
 
     if (section) {
       return {
-        section: data.section,
-        data: data.data,
+        section: response.data?.section,
+        data: response.data?.data,
         error: null
       }
-    } else {
-      return {
-        profile: data.profile,
-        completeness: data.completeness,
-        summary: data.summary,
-        error: null
-      }
+    }
+
+    return {
+      profile: response.data?.profile,
+      completeness: response.data?.completeness,
+      summary: response.data?.summary,
+      error: null
     }
   } catch (error) {
     console.error('Error fetching profile:', error)
@@ -92,27 +93,22 @@ export async function updateUserProfile(
       return { success: false, error: 'Either section with data or complete profile data is required' }
     }
 
-    const response = await fetch(`${API_URL}/api/profile/update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      '/api/profile/update',
+      {
         user_id: user.id,
         section,
         data
-      }),
-    })
-
-    const responseData = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { success: false, error: responseData.error || 'Failed to update profile' }
+      return { success: false, error: response.error || 'Failed to update profile' }
     }
 
     return {
-      success: responseData.success,
-      message: responseData.message,
+      success: Boolean(response.data?.success),
+      message: response.data?.message,
       error: null
     }
   } catch (error) {
@@ -135,27 +131,22 @@ export async function updateProfileField(
       return { success: false, error: 'Field is required' }
     }
 
-    const response = await fetch(`${API_URL}/api/profile/field`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      '/api/profile/field',
+      {
         user_id: user.id,
         field,
         value
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to update profile field' }
+      return { success: false, error: response.error || 'Failed to update profile field' }
     }
 
     return {
-      success: data.success,
-      message: data.message,
+      success: Boolean(response.data?.success),
+      message: response.data?.message,
       error: null
     }
   } catch (error) {
@@ -177,26 +168,21 @@ export async function batchUpdateProfileFields(
       return { success: false, error: 'Updates array is required' }
     }
 
-    const response = await fetch(`${API_URL}/api/profile/batch-update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      '/api/profile/batch-update',
+      {
         user_id: user.id,
         updates
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to batch update profile fields' }
+      return { success: false, error: response.error || 'Failed to batch update profile fields' }
     }
 
     return {
-      success: data.success,
-      message: data.message,
+      success: Boolean(response.data?.success),
+      message: response.data?.message,
       error: null
     }
   } catch (error) {

@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
-
-const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+import { post } from './apiClient'
 
 interface AuthContextValue {
   user: User | null
@@ -78,27 +77,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const res = await fetch(`${AGENT_SERVICE_URL}/api/user/create-schema`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
+      const response = await post<{ success: boolean; error?: string }>(
+        '/api/user/create-schema',
+        {
+          user_id: session.user.id,
+          user_email: session.user.email
         },
-        body: JSON.stringify({ 
-          user_id: session.user.id, 
-          user_email: session.user.email 
-        })
-      })
-      
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`HTTP ${res.status}: ${errorText}`)
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(response.error || 'Failed to create user schema')
       }
-      
-      const data = await res.json()
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create user schema')
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.error || 'Failed to create user schema')
       }
       
       console.log('✅ User schema created successfully')

@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { post } from './apiClient'
 
 export interface Category {
   id: string
@@ -12,8 +13,6 @@ export interface Category {
   updated_at?: string
 }
 
-const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-
 export async function fetchUserCategories(
   user: User
 ): Promise<{ categories: Category[], error: string | null }> {
@@ -22,23 +21,17 @@ export async function fetchUserCategories(
       return { categories: [], error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/categories`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id
-      }),
-    })
-
-    const data = await response.json()
+    const response = await post<{ categories?: Category[]; error?: string }>(
+      '/api/categories',
+      { user_id: user.id }
+    )
 
     if (!response.ok) {
-      return { categories: [], error: data.error || 'Failed to fetch categories' }
+      return { categories: [], error: response.error || 'Failed to fetch categories' }
     }
 
-    return { categories: data.categories || [], error: null }
+    const categories = Array.isArray(response.data?.categories) ? response.data!.categories : []
+    return { categories, error: null }
   } catch (error) {
     console.error('Error fetching categories:', error)
     return { categories: [], error: 'Failed to fetch categories' }
@@ -64,24 +57,23 @@ export async function createUserCategory(
       return { category: null, error: 'Name and color are required' }
     }
 
-    const response = await fetch(`${API_URL}/api/categories/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ category?: Category; error?: string }>(
+      '/api/categories/create',
+      {
         user_id: user.id,
         ...categoryData
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { category: null, error: data.error || 'Failed to create category' }
+      return { category: null, error: response.error || 'Failed to create category' }
     }
 
-    return { category: data.category, error: null }
+    if (!response.data?.category) {
+      return { category: null, error: 'Category payload missing from response' }
+    }
+
+    return { category: response.data.category, error: null }
   } catch (error) {
     console.error('Error creating category:', error)
     return { category: null, error: 'Failed to create category' }
@@ -98,25 +90,24 @@ export async function updateUserCategory(
       return { category: null, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/categories/update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ category?: Category; error?: string }>(
+      '/api/categories/update',
+      {
         user_id: user.id,
         category_id: categoryId,
         ...updates
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { category: null, error: data.error || 'Failed to update category' }
+      return { category: null, error: response.error || 'Failed to update category' }
     }
 
-    return { category: data.category, error: null }
+    if (!response.data?.category) {
+      return { category: null, error: 'Category payload missing from response' }
+    }
+
+    return { category: response.data.category, error: null }
   } catch (error) {
     console.error('Error updating category:', error)
     return { category: null, error: 'Failed to update category' }
@@ -132,26 +123,21 @@ export async function deleteUserCategory(
       return { success: false, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/categories/delete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success: boolean; message?: string; error?: string }>(
+      '/api/categories/delete',
+      {
         user_id: user.id,
         category_id: categoryId
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to delete category' }
+      return { success: false, error: response.error || 'Failed to delete category' }
     }
 
     return {
-      success: data.success,
-      message: data.message,
+      success: Boolean(response.data?.success),
+      message: response.data?.message,
       error: null
     }
   } catch (error) {
@@ -173,24 +159,23 @@ export async function getCategoryColor(
       return { color: null, error: 'Category name is required' }
     }
 
-    const response = await fetch(`${API_URL}/api/categories/color`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ color?: string; error?: string }>(
+      '/api/categories/color',
+      {
         user_id: user.id,
         category_name: categoryName
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { color: null, error: data.error || 'Failed to fetch category color' }
+      return { color: null, error: response.error || 'Failed to fetch category color' }
     }
 
-    return { color: data.color, error: null }
+    if (!response.data || typeof response.data.color !== 'string') {
+      return { color: null, error: 'Category color missing from response' }
+    }
+
+    return { color: response.data.color, error: null }
   } catch (error) {
     console.error('Error fetching category color:', error)
     return { color: null, error: 'Failed to fetch category color' }

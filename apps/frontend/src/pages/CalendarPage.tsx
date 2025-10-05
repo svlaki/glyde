@@ -14,8 +14,9 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { getAgentServiceUrl } from '../lib/config';
 
-const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+const AGENT_SERVICE_URL = getAgentServiceUrl();
 
 
 export function CalendarPage() {
@@ -87,38 +88,6 @@ export function CalendarPage() {
     };
   }, [user]);
 
-  // Load real user events and tasks from the backend
-  useEffect(() => {
-    if (!user) {
-      setEvents([]);
-      setTasks([]);
-      return;
-    }
-
-    loadUserEvents();
-    loadUserTasks();
-
-    const channel = supabase
-      .channel(`events-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'events',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          loadUserEvents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [loadUserEvents, loadUserTasks, user]);
-
   const loadUserTasks = useCallback(async () => {
     if (!user) return;
 
@@ -179,6 +148,38 @@ export function CalendarPage() {
       }
     }
   }, [eventLoadErrorShown, toast, transformEvent, user]);
+
+  // Load real user events and tasks from the backend once the loaders are defined
+  useEffect(() => {
+    if (!user) {
+      setEvents([]);
+      setTasks([]);
+      return;
+    }
+
+    loadUserEvents();
+    loadUserTasks();
+
+    const channel = supabase
+      .channel(`events-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadUserEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [loadUserEvents, loadUserTasks, user]);
 
   function handleDateClick(info: { dateStr: string }) {
     setSelectedDate(info.dateStr);

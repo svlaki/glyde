@@ -6,7 +6,9 @@
  * - Input validation and sanitization
  * - Error message formatting
  * - Performance optimization utilities
- */
+*/
+
+import { ApiRequestOptions, request } from './apiClient'
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -39,37 +41,15 @@ export interface ApiError {
  */
 export async function apiCall<T>(
   url: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<ApiResponse<T>> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
+  const result = await request<T>(url, options)
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
-      };
-    }
-
-    return {
-      success: true,
-      data: data,
-    };
-  } catch (error) {
-    console.error('API call failed:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Network error',
-    };
+  if (result.ok) {
+    return { success: true, data: result.data }
   }
+
+  return { success: false, error: result.error || 'Network error' }
 }
 
 // Validate required fields

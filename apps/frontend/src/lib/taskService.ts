@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { post } from './apiClient'
 
 export interface Task {
   id: string
@@ -23,8 +24,6 @@ export interface Task {
   task_metadata?: Record<string, any>
 }
 
-const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
-
 export async function fetchUserTasks(
   user: User,
   filters?: {
@@ -40,24 +39,20 @@ export async function fetchUserTasks(
       return { tasks: [], error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/tasks`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ tasks?: Task[]; error?: string }>(
+      '/api/tasks',
+      {
         user_id: user.id,
         ...filters
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { tasks: [], error: data.error || 'Failed to fetch tasks' }
+      return { tasks: [], error: response.error || 'Failed to fetch tasks' }
     }
 
-    return { tasks: data.tasks || [], error: null }
+    const tasks = Array.isArray(response.data?.tasks) ? response.data!.tasks : []
+    return { tasks, error: null }
   } catch (error) {
     console.error('Error fetching tasks:', error)
     return { tasks: [], error: 'Failed to fetch tasks' }
@@ -87,24 +82,23 @@ export async function createUserTask(
       return { task: null, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/tasks/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ task?: Task; error?: string }>(
+      '/api/tasks/create',
+      {
         user_id: user.id,
         ...taskData
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { task: null, error: data.error || 'Failed to create task' }
+      return { task: null, error: response.error || 'Failed to create task' }
     }
 
-    return { task: data.task, error: null }
+    if (!response.data?.task) {
+      return { task: null, error: 'Task payload missing from response' }
+    }
+
+    return { task: response.data.task, error: null }
   } catch (error) {
     console.error('Error creating task:', error)
     return { task: null, error: 'Failed to create task' }
@@ -121,25 +115,24 @@ export async function updateUserTask(
       return { task: null, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/tasks/update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ task?: Task; error?: string }>(
+      '/api/tasks/update',
+      {
         user_id: user.id,
         task_id: taskId,
         ...updates
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { task: null, error: data.error || 'Failed to update task' }
+      return { task: null, error: response.error || 'Failed to update task' }
     }
 
-    return { task: data.task, error: null }
+    if (!response.data?.task) {
+      return { task: null, error: 'Task payload missing from response' }
+    }
+
+    return { task: response.data.task, error: null }
   } catch (error) {
     console.error('Error updating task:', error)
     return { task: null, error: 'Failed to update task' }
@@ -155,24 +148,19 @@ export async function deleteUserTask(
       return { success: false, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/tasks/delete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ success: boolean; error?: string }>(
+      '/api/tasks/delete',
+      {
         user_id: user.id,
         task_id: taskId
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to delete task' }
+      return { success: false, error: response.error || 'Failed to delete task' }
     }
 
-    return { success: data.success, error: data.error }
+    return { success: Boolean(response.data?.success), error: response.data?.error ?? null }
   } catch (error) {
     console.error('Error deleting task:', error)
     return { success: false, error: 'Failed to delete task' }
@@ -190,26 +178,25 @@ export async function completeUserTask(
       return { task: null, error: 'User not authenticated' }
     }
 
-    const response = await fetch(`${API_URL}/api/tasks/complete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const response = await post<{ task?: Task; error?: string }>(
+      '/api/tasks/complete',
+      {
         user_id: user.id,
         task_id: taskId,
         notes,
         actual_duration: actualDuration
-      }),
-    })
-
-    const data = await response.json()
+      }
+    )
 
     if (!response.ok) {
-      return { task: null, error: data.error || 'Failed to complete task' }
+      return { task: null, error: response.error || 'Failed to complete task' }
     }
 
-    return { task: data.task, error: null }
+    if (!response.data?.task) {
+      return { task: null, error: 'Task payload missing from response' }
+    }
+
+    return { task: response.data.task, error: null }
   } catch (error) {
     console.error('Error completing task:', error)
     return { task: null, error: 'Failed to complete task' }

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from './authContext';
 import { useInteractions } from './interactionContext';
 import { Interaction } from '../components/InteractionBox';
+import { post } from './apiClient';
 
 export function useAgentInteractions() {
   const { user, session } = useAuth();
@@ -14,22 +15,20 @@ export function useAgentInteractions() {
 
     async function pollForInteractions() {
       try {
-        const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/interactions/pending`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session!.access_token}`
-          },
-          body: JSON.stringify({
+        const response = await post<{ success?: boolean; interactions?: any[] }>(
+          '/api/interactions/pending',
+          {
             user_id: user!.id
-          })
-        });
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${session!.access_token}`
+            }
+          }
+        );
 
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && Array.isArray(result.interactions)) {
-            result.interactions.forEach((agentInteraction: any) => {
+        if (response.ok && response.data?.success && Array.isArray(response.data.interactions)) {
+          response.data.interactions.forEach((agentInteraction: any) => {
               // Skip if we've already processed this interaction
               if (processedInteractionIds.current.has(agentInteraction.id)) {
                 return;
@@ -45,18 +44,19 @@ export function useAgentInteractions() {
                 onResponse: async (response: string) => {
                   // Send response back to agent
                   try {
-                    await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/interactions/respond`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session!.access_token}`
-                      },
-                      body: JSON.stringify({
+                    await post(
+                      '/api/interactions/respond',
+                      {
                         user_id: user!.id,
                         interaction_id: agentInteraction.id,
-                        response: response
-                      })
-                    });
+                        response
+                      },
+                      {
+                        headers: {
+                          Authorization: `Bearer ${session!.access_token}`
+                        }
+                      }
+                    );
                     
                     // Keep in processed set so it won't show again
                     // processedInteractionIds.current.delete(agentInteraction.id);
