@@ -633,25 +633,28 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl"
+        className="w-full max-w-[500px] sm:max-w-[520px] max-h-[85vh] overflow-y-auto rounded-3xl border border-border/70 bg-gradient-to-br from-background via-muted/40 to-muted shadow-2xl"
         aria-describedby="event-dialog-description"
       >
-        <DialogHeader>
+        <DialogHeader className="space-y-1 pb-2">
           <DialogTitle className="text-2xl font-bold text-foreground">
             {event ? '✏️ Edit Event' : '➕ Create Event'}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {event ? 'Refresh the details of your existing event with a cleaner, more focused layout.' : 'Craft a new calendar event with thoughtfully spaced inputs for easier scanning.'}
+          </p>
         </DialogHeader>
         <div id="event-dialog-description" className="sr-only">
           {event ? 'Edit the details of an existing calendar event' : 'Create a new calendar event by filling in the details below'}
         </div>
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 py-2">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground">Event Title</label>
             <Input
               placeholder="Enter event title..."
               value={title}
               onChange={e => setTitle(e.target.value)}
-              className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
+              className="h-12 rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base shadow-sm transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary"
               autoFocus
             />
           </div>
@@ -665,7 +668,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
                 type="time"
                 value={startTime}
                 onChange={e => setStartTime(e.target.value)}
-                className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
+                className="h-12 rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base shadow-sm transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary"
               />
             </div>
             <div className="space-y-2">
@@ -676,7 +679,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
                 type="time"
                 value={endTime}
                 onChange={e => setEndTime(e.target.value)}
-                className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
+                className="h-12 rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base shadow-sm transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
@@ -689,8 +692,8 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
               placeholder="Add event details..."
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="w-full px-4 py-3 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary resize-none transition-all"
-              rows={3}
+              className="w-full resize-none rounded-2xl border-2 border-border/60 bg-background/90 px-4 py-4 text-base text-foreground placeholder-muted-foreground shadow-sm transition-all focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
             />
           </div>
 
@@ -701,16 +704,16 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
             <select
               value={category}
               onChange={e => setCategory(e.target.value)}
-              className="w-full h-11 px-4 bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all cursor-pointer"
+              className="w-full h-12 cursor-pointer rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base text-foreground shadow-sm transition-all focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {Object.keys(CATEGORY_COLORS).map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
             {CATEGORY_COLORS[category] && (
-              <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-accent/50 rounded-lg border border-border">
+              <div className="mt-2 flex items-center gap-2 rounded-2xl border border-border/70 bg-accent/40 px-3 py-3 shadow-inner">
                 <div
-                  className="w-5 h-5 rounded-full border-2 border-border shadow-sm"
+                  className="h-5 w-5 rounded-full border-2 border-border/80 shadow-sm"
                   style={{ backgroundColor: CATEGORY_COLORS[category] }}
                 />
                 <span className="text-sm text-muted-foreground font-medium">Event will appear in this color</span>
@@ -720,29 +723,29 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
 
 
         </div>
-        <DialogFooter className="flex justify-between pt-6 border-t border-border">
+        <DialogFooter className="flex justify-between pt-6 border-t border-border/60">
           <div>
             {event && (
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleDelete}
-                className="h-11 px-6 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
+                className="h-11 rounded-2xl border border-destructive/30 bg-destructive px-6 font-semibold text-destructive-foreground shadow-sm transition-all hover:bg-destructive/90 hover:shadow-md"
               >
                 🗑️ Delete
               </Button>
             )}
           </div>
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={onClose}
-              className="h-11 px-6 border-2 border-border bg-background text-foreground hover:bg-accent font-semibold rounded-lg transition-all"
+              className="h-11 rounded-2xl border-2 border-border/70 bg-background/90 px-6 font-semibold text-foreground transition-all hover:bg-accent"
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
-              className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
+              className="h-11 rounded-2xl border border-primary/40 bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md"
             >
               {event ? '💾 Save' : '➕ Create'}
             </Button>
