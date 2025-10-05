@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/authContext';
+import { useCategories } from '../lib/categoryContext';
 import { WeekCalendar } from '../components/calendar/WeekCalendar';
 import { fetchUserEvents, updateEvent, createEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
 import type { ExtendedCalendarEvent } from '../types/calendar';
@@ -18,29 +19,9 @@ import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
-// Category colors mapping
-const CATEGORY_COLORS: Record<string, string> = {
-  'Work': '#3b82f6',
-  'School': '#8b5cf6',
-  'Health & Hygiene': '#ef4444',
-  'Social': '#f97316',
-  'Family': '#ec4899',
-  'Personal': '#10b981',
-  'Fitness': '#f59e0b',
-  'Hobbies': '#06b6d4',
-  'Finance': '#10b981',
-  'Shopping': '#78716c',
-  'Travel': '#6366f1',
-  'Self-Care': '#ec4899'
-};
-
-function getCategoryColor(category: string): string {
-  return CATEGORY_COLORS[category] || '#10b981'; // Default to Personal green
-}
-
-
 export function CalendarPage() {
   const { user } = useAuth();
+  const { categories, getCategoryColor } = useCategories();
   const { toast } = useToast();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -340,8 +321,12 @@ export function CalendarPage() {
                     )}
 
                     {task.category && (
-                      <div className="mt-1">
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                      <div className="mt-1 flex items-center gap-1">
+                        <div
+                          className="w-3 h-3 rounded-full border border-gray-300"
+                          style={{ backgroundColor: getCategoryColor(task.category) }}
+                        />
+                        <span className="text-xs text-gray-700">
                           {task.category}
                         </span>
                       </div>
@@ -386,6 +371,7 @@ interface EventModalProps {
 }
 
 function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTimezone }: EventModalProps) {
+  const { categories, getCategoryColor } = useCategories();
   const [title, setTitle] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -552,15 +538,15 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
               onChange={e => setCategory(e.target.value)}
               className="w-full h-12 cursor-pointer rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base text-foreground shadow-sm transition-all focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              {Object.keys(CATEGORY_COLORS).map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.name}>{cat.icon ? `${cat.icon} ${cat.name}` : cat.name}</option>
               ))}
             </select>
-            {CATEGORY_COLORS[category] && (
+            {getCategoryColor(category) && (
               <div className="mt-2 flex items-center gap-2 rounded-2xl border border-border/70 bg-accent/40 px-3 py-3 shadow-inner">
                 <div
                   className="h-5 w-5 rounded-full border-2 border-border/80 shadow-sm"
-                  style={{ backgroundColor: CATEGORY_COLORS[category] }}
+                  style={{ backgroundColor: getCategoryColor(category) }}
                 />
                 <span className="text-sm text-muted-foreground font-medium">Event will appear in this color</span>
               </div>

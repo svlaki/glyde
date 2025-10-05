@@ -1,3 +1,10 @@
+// DEPRECATED: This file is deprecated in favor of useCategories hook
+// Use the CategoryContext instead for dynamic category colors from the backend
+// This file will be removed in a future update
+
+/**
+ * @deprecated Use useCategories() hook instead
+ */
 export const CATEGORY_COLORS: Record<string, string> = {
   'Work': '#3b82f6',
   'School': '#8b5cf6',
@@ -13,6 +20,9 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Self-Care': '#ec4899'
 };
 
+/**
+ * @deprecated Use useCategories().getCategoryColor() instead
+ */
 export function getCategoryColor(category?: string, fallback: string = '#6B7280'): string {
   if (!category) {
     return fallback;

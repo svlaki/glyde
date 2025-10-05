@@ -3,9 +3,9 @@ import categoryService from '../services/CategoryService.js';
 
 export async function getUserCategories(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
+    const userId = req.body.user_id;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
@@ -33,9 +33,9 @@ export async function getUserCategories(req: Request, res: Response): Promise<vo
 
 export async function createUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
+    const userId = req.body.user_id;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
@@ -85,9 +85,9 @@ export async function createUserCategory(req: Request, res: Response): Promise<v
 
 export async function updateUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
+    const userId = req.body.user_id;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
@@ -137,9 +137,9 @@ export async function updateUserCategory(req: Request, res: Response): Promise<v
 
 export async function deleteUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
+    const userId = req.body.user_id;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
@@ -167,9 +167,9 @@ export async function deleteUserCategory(req: Request, res: Response): Promise<v
 
 export async function getCategoryColor(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
+    const userId = req.body.user_id;
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 

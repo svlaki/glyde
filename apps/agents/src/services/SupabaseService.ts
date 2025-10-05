@@ -65,28 +65,20 @@ export class SupabaseService {
   // NO timezone conversion - caller (Agent or Frontend) handles display timezone
   async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
-      // Query public schema with RLS filtering
-      let query = this.client
-        .from('events')
-        .select('*')
-        .eq('user_id', userId)
-        .order('start_time', { ascending: true });
-
-      if (startDate) {
-        query = query.gte('start_time', startDate);
-      }
-      if (endDate) {
-        query = query.lte('end_time', endDate);
-      }
-
-      const { data, error } = await query;
+      // Use the new function that joins category data
+      const { data, error } = await this.client
+        .rpc('get_events_with_categories', {
+          p_user_id: userId,
+          p_start_date: startDate || null,
+          p_end_date: endDate || null
+        });
 
       if (error) {
         console.error('Error fetching events:', error);
         return [];
       }
 
-      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events (UTC) for user');
+      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events (UTC) with categories for user');
 
       // Transform to match DatabaseEvent interface - times remain as UTC
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
@@ -99,7 +91,11 @@ export class SupabaseService {
         description: event.description,
         created_at: event.created_at,
         updated_at: event.updated_at,
-        category: event.category || 'Personal'
+        category: event.category_name || 'Personal', // For backward compatibility
+        category_id: event.category_id,
+        category_name: event.category_name,
+        category_color: event.category_color,
+        category_icon: event.category_icon
       }));
 
       return transformedEvents;
@@ -111,7 +107,7 @@ export class SupabaseService {
 
   // Accepts UTC timestamps for start_time and end_time
   // NO timezone conversion - caller must provide UTC times
-  async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string}): Promise<DatabaseEvent | null> {
+  async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
       console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
 
@@ -119,9 +115,23 @@ export class SupabaseService {
       const title = event.title || 'Untitled Event';
       const description = event.description || null;
       const location = event.location || null;
-      const category = event.category || 'Personal';
       const startTime = event.start_time || new Date().toISOString();
       const endTime = event.end_time || new Date().toISOString();
+
+      // Handle category - prefer category_id, fallback to category name lookup
+      let categoryId = event.category_id || null;
+      
+      if (!categoryId && event.category) {
+        // Look up category by name
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', event.category)
+          .single();
+        
+        categoryId = categoryData?.id || null;
+      }
 
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -133,7 +143,8 @@ export class SupabaseService {
           end_time: endTime,     // Must be UTC
           location: location,
           description: description,
-          category: category
+          category: event.category || 'Personal', // Keep for backward compatibility
+          category_id: categoryId
         })
         .select()
         .single();
@@ -145,30 +156,18 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Event created:', data.id);
 
-      // Return with UTC timestamps
-      if (data) {
-        return {
-          id: data.id,
-          user_id: data.user_id,
-          title: data.title,
-          start_time: data.start_time, // UTC
-          end_time: data.end_time,     // UTC
-          location: data.location,
-          description: data.description,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          category: data.category || 'Personal'
-        } as DatabaseEvent;
-      }
-
-      return null;
+      // Fetch with category data
+      const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
+      const createdEvent = eventsWithCategories.find(e => e.id === data.id);
+      
+      return createdEvent || null;
     } catch (error) {
       console.error('Exception creating event:', error);
       return null;
     }
   }
 
-  async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent>): Promise<DatabaseEvent | null> {
+  async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
       console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
@@ -192,7 +191,25 @@ export class SupabaseService {
       }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
-      if (updates.category !== undefined) updateData.category = updates.category;
+      
+      // Handle category - prefer category_id, fallback to category name lookup
+      if (updates.category_id !== undefined) {
+        updateData.category_id = updates.category_id;
+      } else if (updates.category !== undefined) {
+        updateData.category = updates.category; // Keep for backward compatibility
+        
+        // Look up category by name to set category_id
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', updates.category)
+          .single();
+        
+        if (categoryData?.id) {
+          updateData.category_id = categoryData.id;
+        }
+      }
 
       // Update in public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -208,25 +225,13 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event updated successfully:', JSON.stringify(data, null, 2));
+      console.log('✅ [SUPABASE SERVICE] Event updated successfully');
 
-      // Transform to match DatabaseEvent interface
-      if (data) {
-        return {
-          id: data.id,
-          user_id: data.user_id,
-          title: data.title,
-          start_time: data.start_time,
-          end_time: data.end_time,
-          location: data.location,
-          description: data.description,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
-          category: data.category || 'Personal'
-        } as DatabaseEvent;
-      }
-
-      return null;
+      // Fetch with category data
+      const eventsWithCategories = await this.getEvents(userId);
+      const updatedEvent = eventsWithCategories.find(e => e.id === eventId);
+      
+      return updatedEvent || null;
     } catch (error) {
       console.error('Exception updating event:', error);
       return null;
@@ -330,40 +335,44 @@ export class SupabaseService {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting tasks for user:', userId);
 
-      let query = this.client
-        .from('tasks')
-        .select('*')
-        .eq('user_id', userId)
-        .order('due_date', { ascending: true, nullsFirst: false });
-
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      }
-      if (filters?.category) {
-        query = query.eq('category', filters.category);
-      }
-      if (filters?.priority) {
-        query = query.eq('priority', filters.priority);
-      }
-      if (filters?.parentGoalId) {
-        query = query.eq('parent_goal_id', filters.parentGoalId);
-      }
-      if (filters?.dueBefore) {
-        query = query.lte('due_date', filters.dueBefore);
-      }
-      if (filters?.dueAfter) {
-        query = query.gte('due_date', filters.dueAfter);
-      }
-
-      const { data, error } = await query;
+      // Use the new function that joins category data
+      const { data, error } = await this.client
+        .rpc('get_tasks_with_categories', {
+          p_user_id: userId
+        });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error getting tasks:', error);
         return [];
       }
 
-      console.log(`✅ [SUPABASE SERVICE] Found ${data?.length || 0} tasks`);
-      return data || [];
+      let filteredTasks = data || [];
+
+      // Apply filters client-side since RPC function doesn't support them yet
+      if (filters?.status) {
+        filteredTasks = filteredTasks.filter((t: any) => t.status === filters.status);
+      }
+      if (filters?.category) {
+        // Support both old category name and new category_name
+        filteredTasks = filteredTasks.filter((t: any) => 
+          t.category_name === filters.category || t.category === filters.category
+        );
+      }
+      if (filters?.priority) {
+        filteredTasks = filteredTasks.filter((t: any) => t.priority === filters.priority);
+      }
+      if (filters?.parentGoalId) {
+        filteredTasks = filteredTasks.filter((t: any) => t.parent_goal_id === filters.parentGoalId);
+      }
+      if (filters?.dueBefore) {
+        filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date <= filters.dueBefore!);
+      }
+      if (filters?.dueAfter) {
+        filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date >= filters.dueAfter!);
+      }
+
+      console.log(`✅ [SUPABASE SERVICE] Found ${filteredTasks.length} tasks with categories`);
+      return filteredTasks;
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception getting tasks:', error);
       return [];
@@ -581,40 +590,44 @@ export class SupabaseService {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting goals for user:', userId);
 
-      let query = this.client
-        .from('goals')
-        .select('*')
-        .eq('user_id', userId)
-        .order('priority_score', { ascending: false });
-
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      }
-      if (filters?.category) {
-        query = query.eq('category', filters.category);
-      }
-      if (filters?.goalType) {
-        query = query.eq('goal_type', filters.goalType);
-      }
-      if (filters?.parentGoalId) {
-        query = query.eq('parent_goal_id', filters.parentGoalId);
-      }
-      if (filters?.targetBefore) {
-        query = query.lte('target_date', filters.targetBefore);
-      }
-      if (filters?.targetAfter) {
-        query = query.gte('target_date', filters.targetAfter);
-      }
-
-      const { data, error } = await query;
+      // Use the new function that joins category data
+      const { data, error } = await this.client
+        .rpc('get_goals_with_categories', {
+          p_user_id: userId
+        });
 
       if (error) {
         console.error('❌ [SUPABASE SERVICE] Error getting goals:', error);
         return [];
       }
 
-      console.log(`✅ [SUPABASE SERVICE] Found ${data?.length || 0} goals`);
-      return data || [];
+      let filteredGoals = data || [];
+
+      // Apply filters client-side since RPC function doesn't support them yet
+      if (filters?.status) {
+        filteredGoals = filteredGoals.filter((g: any) => g.status === filters.status);
+      }
+      if (filters?.category) {
+        // Support both old category name and new category_name
+        filteredGoals = filteredGoals.filter((g: any) => 
+          g.category_name === filters.category || g.category === filters.category
+        );
+      }
+      if (filters?.goalType) {
+        filteredGoals = filteredGoals.filter((g: any) => g.goal_type === filters.goalType);
+      }
+      if (filters?.parentGoalId) {
+        filteredGoals = filteredGoals.filter((g: any) => g.parent_goal_id === filters.parentGoalId);
+      }
+      if (filters?.targetBefore) {
+        filteredGoals = filteredGoals.filter((g: any) => g.target_date && g.target_date <= filters.targetBefore!);
+      }
+      if (filters?.targetAfter) {
+        filteredGoals = filteredGoals.filter((g: any) => g.target_date && g.target_date >= filters.targetAfter!);
+      }
+
+      console.log(`✅ [SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
+      return filteredGoals;
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception getting goals:', error);
       return [];
