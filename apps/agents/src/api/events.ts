@@ -44,7 +44,7 @@ export async function getUserEvents(req: Request, res: Response): Promise<void> 
 
     logger.info('Fetching events for user', { user_id, start_date, end_date });
 
-    const events = await getSupabaseService().getEvents(userId, start_date, end_date);
+    const events = await getSupabaseService().getEvents(user_id, start_date, end_date);
     
     logger.info('Successfully fetched events', { count: events.length, user_id });
     
@@ -108,9 +108,7 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    const { user_id: _ignoredUserId, ...eventData } = req.body ?? {};
-
-    console.log('Creating event for user:', userId);
+    console.log('Creating event for user:', user_id);
     console.log('Event data:', eventData);
 
     const createdEvent = await getSupabaseService().createEvent(user_id, {

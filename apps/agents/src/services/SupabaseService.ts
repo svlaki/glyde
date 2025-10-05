@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
 import { convertToUTC } from '../utils/timezoneUtils.js';
+import { env } from '../utils/env.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
