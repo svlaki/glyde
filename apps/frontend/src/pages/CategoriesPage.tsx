@@ -109,18 +109,18 @@ export default function CategoriesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold text-foreground">Categories</h1>
+      <div className="container mx-auto px-3 py-5 max-w-5xl">
+        <div className="flex justify-between items-center mb-5">
+          <h1 className="text-3xl font-bold text-foreground">Categories</h1>
           <button
             onClick={handleCreateClick}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
           >
             ➕ Create Category
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {categories.map(category => (
             <CategoryCard
               key={category.id}
@@ -151,36 +151,36 @@ interface CategoryCardProps {
 function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
   return (
     <div
-      className="bg-card border border-border rounded-xl p-6 shadow-md hover:shadow-xl transition-all"
-      style={{ borderLeftWidth: '4px', borderLeftColor: category.color }}
+      className="bg-card border border-border rounded-lg p-4 shadow-sm hover:shadow-lg transition-all"
+      style={{ borderLeftWidth: '3px', borderLeftColor: category.color }}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{category.icon || '📁'}</span>
-          <h3 className="text-xl font-bold text-foreground">{category.name}</h3>
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{category.icon || '📁'}</span>
+          <h3 className="text-lg font-bold text-foreground">{category.name}</h3>
         </div>
         <div
-          className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+          className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
           style={{ backgroundColor: category.color }}
         />
       </div>
 
       {category.description && (
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
           {category.description}
         </p>
       )}
 
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-2 mt-3">
         <button
           onClick={() => onEdit(category)}
-          className="text-sm text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-md hover:bg-primary/10 transition-all"
+          className="text-xs text-primary hover:text-primary/80 font-semibold px-2.5 py-1 rounded-md hover:bg-primary/10 transition-all"
         >
           ✏️ Edit
         </button>
         <button
           onClick={() => onDelete(category.id)}
-          className="text-sm text-red-500 hover:text-red-600 font-semibold px-3 py-1.5 rounded-md hover:bg-red-500/10 transition-all"
+          className="text-xs text-red-500 hover:text-red-600 font-semibold px-2.5 py-1 rounded-md hover:bg-red-500/10 transition-all"
         >
           🗑️ Delete
         </button>

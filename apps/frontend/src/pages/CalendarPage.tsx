@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/authContext';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { fetchUserEvents, updateEvent, CalendarEvent } from '../lib/calendarService';
+import { WeekCalendar } from '../components/calendar/WeekCalendar';
+import { fetchUserEvents, updateEvent, createEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
+import type { ExtendedCalendarEvent } from '../types/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { fetchUserTasks, Task } from '../lib/taskService';
 import { InteractionBox, Interaction } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
@@ -16,6 +17,26 @@ import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+
+// Category colors mapping
+const CATEGORY_COLORS: Record<string, string> = {
+  'Work': '#3b82f6',
+  'School': '#8b5cf6',
+  'Health & Hygiene': '#ef4444',
+  'Social': '#f97316',
+  'Family': '#ec4899',
+  'Personal': '#10b981',
+  'Fitness': '#f59e0b',
+  'Hobbies': '#06b6d4',
+  'Finance': '#10b981',
+  'Shopping': '#78716c',
+  'Travel': '#6366f1',
+  'Self-Care': '#ec4899'
+};
+
+function getCategoryColor(category: string): string {
+  return CATEGORY_COLORS[category] || '#10b981'; // Default to Personal green
+}
 
 
 export function CalendarPage() {
@@ -49,6 +70,67 @@ export function CalendarPage() {
 
   // Connect to agent system for interactions
   useAgentInteractions();
+
+  const loadUserTasks = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { tasks: userTasks, error } = await fetchUserTasks(user, { status: 'pending' });
+      if (error) {
+        console.error('Error loading user tasks:', error);
+        setTasks([]);
+        if (!taskLoadErrorShown.current) {
+          toast({ title: 'Unable to load tasks', description: 'Please refresh to try again.', variant: 'error' });
+          taskLoadErrorShown.current = true;
+        }
+        return;
+      }
+
+      taskLoadErrorShown.current = false;
+
+      const sortedTasks = [...userTasks].sort((a, b) => {
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      setTasks(sortedTasks);
+    } catch (err) {
+      console.error('Unexpected error loading tasks:', err);
+      setTasks([]);
+      if (!taskLoadErrorShown.current) {
+        toast({ title: 'Unexpected task error', description: 'We could not load tasks right now.', variant: 'error' });
+        taskLoadErrorShown.current = true;
+      }
+    }
+  }, [toast, user]);
+
+  const loadUserEvents = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { events: userEvents, error } = await fetchUserEvents(user);
+      if (error) {
+        console.error('Error loading user events:', error);
+        setEvents([]);
+        if (!eventLoadErrorShown.current) {
+          toast({ title: 'Unable to load events', description: 'Please refresh to try again.', variant: 'error' });
+          eventLoadErrorShown.current = true;
+        }
+        return;
+      }
+
+      eventLoadErrorShown.current = false;
+      const formattedEvents = userEvents.map(transformEvent);
+      setEvents(formattedEvents);
+    } catch (error) {
+      console.error('Error loading user events:', error);
+      setEvents([]);
+      if (!eventLoadErrorShown.current) {
+        toast({ title: 'Unexpected calendar error', description: 'We could not load your events.', variant: 'error' });
+        eventLoadErrorShown.current = true;
+      }
+    }
+  }, [toast, transformEvent, user]);
 
   // Fetch user timezone from profile
   useEffect(() => {
@@ -119,80 +201,16 @@ export function CalendarPage() {
     };
   }, [loadUserEvents, loadUserTasks, user]);
 
-  const loadUserTasks = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const { tasks: userTasks, error } = await fetchUserTasks(user, { status: 'pending' });
-      if (error) {
-        console.error('Error loading user tasks:', error);
-        setTasks([]);
-        if (!taskLoadErrorShown.current) {
-          toast({ title: 'Unable to load tasks', description: 'Please refresh to try again.', variant: 'error' });
-          taskLoadErrorShown.current = true;
-        }
-        return;
-      }
-
-      taskLoadErrorShown.current = false;
-
-      const sortedTasks = [...userTasks].sort((a, b) => {
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      });
-      setTasks(sortedTasks);
-    } catch (err) {
-      console.error('Unexpected error loading tasks:', err);
-      setTasks([]);
-      if (!taskLoadErrorShown.current) {
-        toast({ title: 'Unexpected task error', description: 'We could not load tasks right now.', variant: 'error' });
-        taskLoadErrorShown.current = true;
-      }
-    }
-  }, [taskLoadErrorShown, toast, user]);
-
-  const loadUserEvents = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const { events: userEvents, error } = await fetchUserEvents(user);
-      if (error) {
-        console.error('Error loading user events:', error);
-        setEvents([]);
-        if (!eventLoadErrorShown.current) {
-          toast({ title: 'Unable to load events', description: 'Please refresh to try again.', variant: 'error' });
-          eventLoadErrorShown.current = true;
-        }
-        return;
-      }
-
-      eventLoadErrorShown.current = false;
-      const formattedEvents = userEvents.map(transformEvent);
-      setEvents(formattedEvents);
-    } catch (error) {
-      console.error('Error loading user events:', error);
-      setEvents([]);
-      if (!eventLoadErrorShown.current) {
-        toast({ title: 'Unexpected calendar error', description: 'We could not load your events.', variant: 'error' });
-        eventLoadErrorShown.current = true;
-      }
-    }
-  }, [eventLoadErrorShown, toast, transformEvent, user]);
-
-  function handleDateClick(info: { dateStr: string }) {
-    setSelectedDate(info.dateStr);
+  function handleDateClick(date: Date) {
+    setSelectedDate(date.toISOString());
     setSelectedEvent(null);
     setIsModalOpen(true);
   }
 
-  function handleEventClick(info: { event: { id: string; title: string; extendedProps: any } }) {
-    const event = events.find(e => e.id === info.event.id);
-    if (event) {
-      setSelectedEvent(event);
-      setSelectedDate(null);
-      setIsModalOpen(true);
-    }
+  function handleEventClick(event: ExtendedCalendarEvent) {
+    setSelectedEvent(event);
+    setSelectedDate(null);
+    setIsModalOpen(true);
   }
 
   function handleModalClose() {
@@ -211,39 +229,30 @@ export function CalendarPage() {
     }
   }, [loadUserEvents, removeInteraction]);
 
-  const handleCalendarEventUpdate = useCallback(async (
+  const handleEventDrop = useCallback(async (
     eventId: string,
-    updates: { start_time?: string | null; end_time?: string | null }
+    newStart: Date,
+    newEnd: Date
   ) => {
     if (!user) {
       toast({ title: 'Not signed in', description: 'Please sign in again to manage events.', variant: 'warning' });
-      return false;
-    }
-
-    const payload: Record<string, string> = {};
-    if (updates.start_time) {
-      payload.start_time = updates.start_time;
-    }
-    if (updates.end_time) {
-      payload.end_time = updates.end_time;
-    }
-
-    if (Object.keys(payload).length === 0) {
-      return true;
+      return;
     }
 
     try {
-      const { error } = await updateEvent(user, eventId, payload);
+      const { error } = await updateEvent(user, eventId, {
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString()
+      });
+      
       if (error) {
         throw new Error(error);
       }
 
       await loadUserEvents();
-      return true;
     } catch (error) {
       console.error('Error updating event timing:', error);
       toast({ title: 'Unable to update event', description: 'Please try again.', variant: 'error' });
-      return false;
     }
   }, [loadUserEvents, toast, user]);
 
@@ -263,71 +272,12 @@ export function CalendarPage() {
           {/* Calendar */}
           <div className="flex-1 p-2 bg-white">
             <div className="h-full bg-white rounded-lg p-1">
-              <FullCalendar
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="timeGridWeek"
-                timeZone={userTimezone}
-                headerToolbar={{
-                  left: 'prev,next today',
-                  center: 'title',
-                  right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                }}
+              <WeekCalendar
                 events={events}
-                dateClick={handleDateClick}
-                eventClick={handleEventClick}
-                editable={true}
-                droppable={true}
-                eventDrop={async (info) => {
-                  const start = info.event.start ? info.event.start.toISOString() : null;
-                  const end = info.event.end
-                    ? info.event.end.toISOString()
-                    : info.event.start
-                      ? new Date(info.event.start.getTime() + 60 * 60 * 1000).toISOString()
-                      : null;
-
-                  if (!start) {
-                    info.revert();
-                    return;
-                  }
-
-                  const success = await handleCalendarEventUpdate(info.event.id, {
-                    start_time: start,
-                    end_time: end
-                  });
-
-                  if (!success) {
-                    info.revert();
-                  }
-                }}
-                eventResize={async (info) => {
-                  const start = info.event.start ? info.event.start.toISOString() : null;
-                  const end = info.event.end ? info.event.end.toISOString() : null;
-
-                  if (!start || !end) {
-                    info.revert();
-                    return;
-                  }
-
-                  const success = await handleCalendarEventUpdate(info.event.id, {
-                    start_time: start,
-                    end_time: end
-                  });
-
-                  if (!success) {
-                    info.revert();
-                  }
-                }}
-                height="100%"
-                themeSystem="standard"
-                eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
-                slotMinTime="00:00:00"
-                slotMaxTime="24:00:00"
-                allDaySlot={false}
-                dayHeaderFormat={{ weekday: 'short', month: 'numeric', day: 'numeric' }}
-                eventDisplay="block"
-                displayEventTime={true}
-                eventClassNames="rounded-md shadow-sm"
-                nowIndicator={true}
+                onEventClick={handleEventClick}
+                onDateClick={handleDateClick}
+                onEventDrop={handleEventDrop}
+                userTimezone={userTimezone}
               />
             </div>
           </div>
@@ -423,22 +373,6 @@ export function CalendarPage() {
 }
 
 export default CalendarPage
-
-// Category colors mapping
-const CATEGORY_COLORS: Record<string, string> = {
-  'Work': '#3b82f6',
-  'School': '#8b5cf6',
-  'Health & Hygiene': '#ef4444',
-  'Social': '#f97316',
-  'Family': '#ec4899',
-  'Personal': '#10b981',
-  'Fitness': '#f59e0b',
-  'Hobbies': '#06b6d4',
-  'Finance': '#10b981',
-  'Shopping': '#78716c',
-  'Travel': '#6366f1',
-  'Self-Care': '#ec4899'
-};
 
 interface EventModalProps {
   isOpen: boolean;
