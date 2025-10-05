@@ -239,6 +239,11 @@ export function Auth() {
               {error}
             </div>
           )}
+          {success && (
+            <div className="text-sm text-green-400 bg-green-900/40 rounded-md p-2 text-center">
+              {success}
+            </div>
+          )}
         </div>
       </Card>
     </div>
