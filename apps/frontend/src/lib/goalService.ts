@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { apiCall, validateRequired, formatErrorMessage } from './apiUtils'
 
 export interface Goal {
   id: string
@@ -59,33 +60,35 @@ export async function fetchUserGoals(
     target_after?: string
   }
 ): Promise<{ goals: Goal[], error: string | null }> {
-  try {
-    if (!user) {
-      return { goals: [], error: 'User not authenticated' }
-    }
-
-    const response = await fetch(`${API_URL}/api/goals`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        ...filters
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { goals: [], error: data.error || 'Failed to fetch goals' }
-    }
-
-    return { goals: data.goals || [], error: null }
-  } catch (error) {
-    console.error('Error fetching goals:', error)
-    return { goals: [], error: 'Failed to fetch goals' }
+  if (!user) {
+    return { goals: [], error: 'User not authenticated' }
   }
+
+  // Validate API URL
+  if (!API_URL) {
+    console.error('API_URL is not configured')
+    return { goals: [], error: 'Service configuration error' }
+  }
+
+  const result = await apiCall<{ goals: Goal[] }>(`${API_URL}/api/goals`, {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: user.id,
+      ...filters
+    }),
+  })
+
+  if (!result.success) {
+    return { goals: [], error: formatErrorMessage(result.error) }
+  }
+
+  // Validate response structure
+  if (!result.data || !Array.isArray(result.data.goals)) {
+    console.error('Invalid goals data format:', result.data)
+    return { goals: [], error: 'Invalid goals data format' }
+  }
+
+  return { goals: result.data.goals, error: null }
 }
 
 export async function createUserGoal(

@@ -2,216 +2,176 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabase'
 import { fetchUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, Category } from '../lib/categoryService'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
 
 export default function CategoriesPage() {
   const { user } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 
   useEffect(() => {
     if (user) {
       loadCategories()
+      subscribeToCategories()
     }
   }, [user])
 
-  // Real-time subscription for categories
-  useEffect(() => {
-    if (!user) return
+  async function loadCategories() {
+    try {
+      const { categories: data, error: fetchError } = await fetchUserCategories(user!)
+      if (fetchError) {
+        setError(fetchError)
+      } else {
+        setCategories(data)
+        setError(null)
+      }
+    } catch (err) {
+      setError('Failed to load categories')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const channel = supabase.channel(`categories-${user.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'categories',
-        filter: `user_id=eq.${user.id}`
-      }, () => {
-        loadCategories()
-      })
+  function subscribeToCategories() {
+    const channel = supabase
+      .channel('categories-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'categories', filter: `user_id=eq.${user!.id}` },
+        () => loadCategories()
+      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
-
-  async function loadCategories() {
-    if (!user) return
-    setLoading(true)
-    const { categories: fetchedCategories, error } = await fetchUserCategories(user)
-    if (error) {
-      setError(error)
-    } else {
-      setCategories(fetchedCategories)
-    }
-    setLoading(false)
   }
 
-  async function handleCreateCategory(categoryData: Partial<Category>) {
-    if (!user) return
-    
-    try {
-      setError(null) // Clear previous errors
-      const { category, error } = await createUserCategory(user, categoryData as any)
-      if (error) {
-        setError(error)
-      } else {
-        await loadCategories()
-        setShowCreateModal(false)
-      }
-    } catch (err) {
-      console.error('Error creating category:', err)
-      setError('Failed to create category. Please try again.')
-    }
+  function handleCreateClick() {
+    setEditingCategory(null)
+    setIsModalOpen(true)
   }
 
-  async function handleUpdateCategory(categoryId: string, updates: Partial<Category>) {
-    if (!user) return
-    
+  function handleEditClick(category: Category) {
+    setEditingCategory(category)
+    setIsModalOpen(true)
+  }
+
+  function handleModalClose() {
+    setIsModalOpen(false)
+    setEditingCategory(null)
+  }
+
+  async function handleSaveCategory(categoryData: Partial<Category>) {
     try {
-      setError(null) // Clear previous errors
-      const { category, error } = await updateUserCategory(user, categoryId, updates)
-      if (error) {
-        setError(error)
+      if (editingCategory) {
+        await updateUserCategory(user!, editingCategory.id, categoryData)
       } else {
-        await loadCategories()
-        setEditingCategory(null)
+        await createUserCategory(user!, categoryData)
       }
+      await loadCategories()
+      handleModalClose()
     } catch (err) {
-      console.error('Error updating category:', err)
-      setError('Failed to update category. Please try again.')
+      console.error('Failed to save category:', err)
     }
   }
 
-  async function handleDeleteCategory(categoryId: string) {
-    if (!user) return
-    if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) return
-    
+  async function handleDeleteCategory(id: string) {
+    if (!confirm('Are you sure you want to delete this category?')) return
     try {
-      setError(null) // Clear previous errors
-      const { success, error } = await deleteUserCategory(user, categoryId)
-      if (error) {
-        setError(error)
-      } else {
-        await loadCategories()
-      }
+      await deleteUserCategory(user!, id)
+      await loadCategories()
     } catch (err) {
-      console.error('Error deleting category:', err)
-      setError('Failed to delete category. Please try again.')
+      console.error('Failed to delete category:', err)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <div className="text-lg text-foreground">Loading categories...</div>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-lg text-muted-foreground">Loading categories...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-lg text-red-500">{error}</div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-foreground">🏷️ Categories</h1>
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold text-foreground">Categories</h1>
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow-md"
+            onClick={handleCreateClick}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
           >
             ➕ Create Category
           </button>
         </div>
 
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-4">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.length === 0 ? (
-          <div className="col-span-full text-center py-16 bg-card border border-border rounded-xl">
-            <div className="text-6xl mb-4">🏷️</div>
-            <p className="text-lg text-muted-foreground">
-              No categories found. Create your first category!
-            </p>
-          </div>
-        ) : (
-          categories.map(category => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {categories.map(category => (
             <CategoryCard
               key={category.id}
               category={category}
-              onEdit={setEditingCategory}
+              onEdit={handleEditClick}
               onDelete={handleDeleteCategory}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
 
-      {showCreateModal && (
         <CategoryModal
-          onSave={handleCreateCategory}
-          onClose={() => setShowCreateModal(false)}
-        />
-      )}
-
-      {editingCategory && (
-        <CategoryModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
           category={editingCategory}
-          onSave={(updates) => handleUpdateCategory(editingCategory.id, updates)}
-          onClose={() => setEditingCategory(null)}
+          onSave={handleSaveCategory}
         />
-      )}
-    </div>
+      </div>
     </div>
   )
 }
 
-function CategoryCard({
-  category,
-  onEdit,
-  onDelete
-}: {
+interface CategoryCardProps {
   category: Category
   onEdit: (category: Category) => void
   onDelete: (id: string) => void
-}) {
+}
+
+function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
   return (
-    <div className="bg-card border border-border rounded-xl p-5 shadow-sm hover:shadow-lg hover:scale-105 transition-all duration-200">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {category.icon && <span className="text-2xl">{category.icon}</span>}
-          <h3 className="text-lg font-semibold text-foreground">{category.name}</h3>
+    <div
+      className="bg-card border border-border rounded-xl p-6 shadow-md hover:shadow-xl transition-all"
+      style={{ borderLeftWidth: '4px', borderLeftColor: category.color }}
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">{category.icon || '📁'}</span>
+          <h3 className="text-xl font-bold text-foreground">{category.name}</h3>
         </div>
         <div
-          className="w-8 h-8 rounded-full border-2 border-border shadow-sm"
+          className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
           style={{ backgroundColor: category.color }}
         />
       </div>
 
       {category.description && (
-        <p className="text-sm text-muted-foreground mb-3">{category.description}</p>
+        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+          {category.description}
+        </p>
       )}
 
-      {category.context && Object.keys(category.context).length > 0 && (
-        <div className="mb-3">
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors font-medium">
-              🤖 AI Context ({Object.keys(category.context).length} fields)
-            </summary>
-            <pre className="mt-2 p-3 bg-accent/50 rounded-lg text-xs overflow-x-auto text-foreground">
-              {JSON.stringify(category.context, null, 2)}
-            </pre>
-          </details>
-        </div>
-      )}
-
-      <div className="flex gap-2 justify-end pt-3 border-t border-border">
+      <div className="flex gap-2 mt-4">
         <button
           onClick={() => onEdit(category)}
           className="text-sm text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-md hover:bg-primary/10 transition-all"
@@ -220,7 +180,7 @@ function CategoryCard({
         </button>
         <button
           onClick={() => onDelete(category.id)}
-          className="text-sm text-destructive hover:text-destructive/80 font-semibold px-3 py-1.5 rounded-md hover:bg-destructive/10 transition-all"
+          className="text-sm text-red-500 hover:text-red-600 font-semibold px-3 py-1.5 rounded-md hover:bg-red-500/10 transition-all"
         >
           🗑️ Delete
         </button>
@@ -229,146 +189,115 @@ function CategoryCard({
   )
 }
 
-function CategoryModal({
-  category,
-  onSave,
-  onClose
-}: {
-  category?: Category
-  onSave: (category: Partial<Category>) => void
+interface CategoryModalProps {
+  isOpen: boolean
   onClose: () => void
-}) {
-  const [formData, setFormData] = useState({
-    name: category?.name || '',
-    color: category?.color || '#3b82f6',
-    icon: category?.icon || '',
-    description: category?.description || '',
-    context: category?.context ? JSON.stringify(category.context, null, 2) : '{}'
-  })
+  category: Category | null
+  onSave: (data: Partial<Category>) => void
+}
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    
-    // Validate required fields
-    if (!formData.name.trim()) {
-      alert('Category name is required')
-      return
+function CategoryModal({ isOpen, onClose, category, onSave }: CategoryModalProps) {
+  const [name, setName] = useState('')
+  const [color, setColor] = useState('#3b82f6')
+  const [icon, setIcon] = useState('')
+  const [description, setDescription] = useState('')
+
+  useEffect(() => {
+    if (category) {
+      setName(category.name || '')
+      setColor(category.color || '#3b82f6')
+      setIcon(category.icon || '')
+      setDescription(category.description || '')
+    } else {
+      setName('')
+      setColor('#3b82f6')
+      setIcon('')
+      setDescription('')
     }
-    
-    if (!formData.color.trim()) {
-      alert('Category color is required')
-      return
-    }
-    
-    try {
-      let contextParsed = {}
-      if (formData.context.trim()) {
-        contextParsed = JSON.parse(formData.context)
-      }
-      
-      onSave({
-        name: formData.name.trim(),
-        color: formData.color.trim(),
-        icon: formData.icon.trim() || undefined,
-        description: formData.description.trim() || undefined,
-        context: Object.keys(contextParsed).length > 0 ? contextParsed : undefined
-      })
-    } catch (e) {
-      console.error('JSON parsing error:', e)
-      alert('Invalid JSON in context field. Please check your syntax.')
-    }
+  }, [category, isOpen])
+
+  function handleSubmit() {
+    if (!name.trim()) return
+
+    onSave({
+      name: name.trim(),
+      color,
+      icon,
+      description: description.trim(),
+    })
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-        <h2 className="text-2xl font-bold text-foreground mb-4">
-          {category ? '✏️ Edit Category' : '➕ Create Category'}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Name *</label>
-            <input
-              type="text"
-              required
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="w-full border border-input bg-background rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold text-foreground">
+            {category ? '✏️ Edit Category' : '➕ Create Category'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground">Name *</label>
+            <Input
+              placeholder="Enter category name..."
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
+              autoFocus
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Color *</label>
-            <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Color *</label>
               <input
                 type="color"
-                required
-                value={formData.color}
-                onChange={e => setFormData({ ...formData, color: e.target.value })}
-                className="h-11 w-20 border border-input rounded-lg cursor-pointer"
+                value={color}
+                onChange={e => setColor(e.target.value)}
+                className="h-11 w-full border border-input rounded-lg cursor-pointer bg-background"
               />
-              <input
-                type="text"
-                value={formData.color}
-                onChange={e => setFormData({ ...formData, color: e.target.value })}
-                className="flex-1 border border-input bg-background rounded-lg px-3 py-2 font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="#3b82f6"
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Icon</label>
+              <Input
+                placeholder="😊"
+                value={icon}
+                onChange={e => setIcon(e.target.value)}
+                className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Icon (emoji)</label>
-            <input
-              type="text"
-              value={formData.icon}
-              onChange={e => setFormData({ ...formData, icon: e.target.value })}
-              className="w-full border border-input bg-background rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="📅"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Description</label>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground">Description</label>
             <textarea
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              className="w-full border border-input bg-background rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              rows={2}
+              placeholder="Enter category description..."
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full h-24 border border-input bg-background rounded-lg px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">AI Context (JSON)</label>
-            <textarea
-              value={formData.context}
-              onChange={e => setFormData({ ...formData, context: e.target.value })}
-              className="w-full border border-input bg-background rounded-lg px-4 py-2.5 font-mono text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              rows={6}
-              placeholder='{"preferredTime": "morning", "energyLevel": "high"}'
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Add context the AI can learn from (e.g., preferred times, energy levels, priorities)
-            </p>
-          </div>
-
-          <div className="flex gap-2 justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 border-2 border-border bg-background text-foreground rounded-lg font-semibold hover:bg-accent transition-all"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-all shadow-sm"
-            >
-              {category ? '💾 Update' : '➕ Create'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="border-border hover:bg-muted"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!name.trim()}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {category ? 'Update' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
