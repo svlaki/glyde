@@ -3,10 +3,11 @@ import { SmartInteractionService } from '../services/SmartInteractionService.js'
 
 export async function generateInteractionFromChat(req: Request, res: Response): Promise<Response | void> {
   try {
-    const { user_id, chat_context } = req.body;
-    
-    if (!user_id || !chat_context) {
-      return res.status(400).json({ error: 'user_id and chat_context are required' });
+    const userId = req.authUserId;
+    const { chat_context } = req.body ?? {};
+
+    if (!userId || !chat_context) {
+      return res.status(400).json({ error: 'chat_context is required' });
     }
 
     const smartService = new SmartInteractionService();
@@ -31,7 +32,7 @@ export async function generateInteractionFromChat(req: Request, res: Response): 
     }
     
     // Generate a contextual interaction based on the chat
-    const interactions = await smartService.generateSmartInteractions(user_id);
+    const interactions = await smartService.generateSmartInteractions(userId);
     
     // If we have interactions, return the most relevant one
     if (interactions.length > 0) {

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
 
+const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
 interface AuthContextValue {
   user: User | null
   isAuthenticated: boolean
@@ -76,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const res = await fetch('http://localhost:8000/api/user/create-schema', {
+      const res = await fetch(`${AGENT_SERVICE_URL}/api/user/create-schema`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

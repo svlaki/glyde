@@ -1,14 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
-import { convertFromUTC, convertToUTC } from '../utils/timezoneUtils.js';
+import { convertToUTC } from '../utils/timezoneUtils.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
 
 // Initialize supabase client
 export function initializeSupabase() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
@@ -37,14 +37,6 @@ export class SupabaseService {
     return 'public';
   }
 
-  // Helper method to convert UTC times to local display times (same as frontend does)
-  private convertUTCToLocalDisplay(utcTimeString: string, timezone: string = 'America/New_York'): string {
-    if (!utcTimeString) return utcTimeString;
-
-    // Use the new timezone utilities for proper conversion
-    return convertFromUTC(utcTimeString, timezone);
-  }
-
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
     const { data, error } = await this.client
       .from('profile')
@@ -61,58 +53,16 @@ export class SupabaseService {
   }
 
   // Method for agents - includes timezone conversion for proper local time display
+  // DEPRECATED: Use getEvents() instead. This method is no longer needed.
+  // Timezone conversion should happen in the Agent layer, not the Service layer.
   async getEventsForAgent(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    try {
-      // Fetch user profile to get timezone
-      const profile = await this.getProfile(userId);
-      const userTimezone = profile?.timezone || 'America/New_York';
-      console.log('🌍 [SUPABASE SERVICE - AGENT] Using user timezone:', userTimezone);
-
-      // Query public schema with RLS filtering
-      let query = this.client
-        .from('events')
-        .select('*')
-        .eq('user_id', userId)
-        .order('start_time', { ascending: true });
-
-      if (startDate) {
-        query = query.gte('start_time', startDate);
-      }
-      if (endDate) {
-        query = query.lte('end_time', endDate);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching events for agent:', error);
-        return [];
-      }
-
-      console.log('✅ [SUPABASE SERVICE - AGENT] Retrieved', data?.length || 0, 'events for user');
-
-      // Transform with timezone conversion for agent display
-      const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
-        id: event.id,
-        user_id: event.user_id,
-        title: event.title,
-        start_time: this.convertUTCToLocalDisplay(event.start_time, userTimezone),
-        end_time: this.convertUTCToLocalDisplay(event.end_time, userTimezone),
-        location: event.location,
-        description: event.description,
-        created_at: event.created_at,
-        updated_at: event.updated_at,
-        category: event.category || 'Personal'
-      }));
-
-      return transformedEvents;
-    } catch (error) {
-      console.error('Exception fetching events for agent:', error);
-      return [];
-    }
+    console.warn('⚠️ getEventsForAgent is deprecated. Use getEvents() instead.');
+    return this.getEvents(userId, startDate, endDate);
   }
 
   // Method for frontend - no timezone conversion (frontend handles it)
+  // Returns all events as UTC timestamps from database
+  // NO timezone conversion - caller (Agent or Frontend) handles display timezone
   async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
       // Query public schema with RLS filtering
@@ -136,15 +86,15 @@ export class SupabaseService {
         return [];
       }
 
-      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events for user');
+      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events (UTC) for user');
 
-      // Transform to match DatabaseEvent interface (no timezone conversion for frontend)
+      // Transform to match DatabaseEvent interface - times remain as UTC
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
         user_id: event.user_id,
         title: event.title,
-        start_time: event.start_time, // Frontend handles timezone conversion
-        end_time: event.end_time,     // Frontend handles timezone conversion
+        start_time: event.start_time, // UTC from database
+        end_time: event.end_time,     // UTC from database
         location: event.location,
         description: event.description,
         created_at: event.created_at,
@@ -152,7 +102,6 @@ export class SupabaseService {
         category: event.category || 'Personal'
       }));
 
-      console.log('🔄 [SUPABASE SERVICE] Transformed', transformedEvents.length, 'events for frontend');
       return transformedEvents;
     } catch (error) {
       console.error('Exception fetching events:', error);
@@ -160,25 +109,19 @@ export class SupabaseService {
     }
   }
 
+  // Accepts UTC timestamps for start_time and end_time
+  // NO timezone conversion - caller must provide UTC times
   async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string}): Promise<DatabaseEvent | null> {
     try {
       console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
-      console.log('🔍 [SUPABASE SERVICE] Input event data:', JSON.stringify(event, null, 2));
 
-      // Fetch user profile to get timezone
-      const profile = await this.getProfile(userId);
-      const userTimezone = profile?.timezone || 'America/New_York';
-      console.log('🌍 [SUPABASE SERVICE] Using user timezone:', userTimezone);
-
-      // Extract event data
+      // Extract event data - times should already be in UTC
       const title = event.title || 'Untitled Event';
       const description = event.description || null;
       const location = event.location || null;
       const category = event.category || 'Personal';
-
-      // Convert local times to UTC using timezone utilities
-      const startTime = convertToUTC(event.start_time || new Date().toISOString(), userTimezone);
-      const endTime = convertToUTC(event.end_time || new Date().toISOString(), userTimezone);
+      const startTime = event.start_time || new Date().toISOString();
+      const endTime = event.end_time || new Date().toISOString();
 
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -186,8 +129,8 @@ export class SupabaseService {
         .insert({
           user_id: userId,
           title: title,
-          start_time: startTime,
-          end_time: endTime,
+          start_time: startTime, // Must be UTC
+          end_time: endTime,     // Must be UTC
           location: location,
           description: description,
           category: category
@@ -200,16 +143,16 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event created successfully:', JSON.stringify(data, null, 2));
+      console.log('✅ [SUPABASE SERVICE] Event created:', data.id);
 
-      // Transform to match DatabaseEvent interface
+      // Return with UTC timestamps
       if (data) {
         return {
           id: data.id,
           user_id: data.user_id,
           title: data.title,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          start_time: data.start_time, // UTC
+          end_time: data.end_time,     // UTC
           location: data.location,
           description: data.description,
           created_at: data.created_at,
@@ -231,14 +174,22 @@ export class SupabaseService {
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
 
+      // Fetch the user's timezone so we can correctly persist temporal updates
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+
       // Build update object with only provided fields
       const updateData: any = {
         updated_at: new Date().toISOString()
       };
 
       if (updates.title !== undefined) updateData.title = updates.title;
-      if (updates.start_time !== undefined) updateData.start_time = updates.start_time;
-      if (updates.end_time !== undefined) updateData.end_time = updates.end_time;
+      if (updates.start_time !== undefined) {
+        updateData.start_time = convertToUTC(updates.start_time, userTimezone);
+      }
+      if (updates.end_time !== undefined) {
+        updateData.end_time = convertToUTC(updates.end_time, userTimezone);
+      }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.category !== undefined) updateData.category = updates.category;
@@ -947,34 +898,68 @@ export class SupabaseService {
   }
 
   async getUserSettings(userId: string): Promise<Record<string, any>> {
-    const { data, error } = await this.client
-      .from('settings')
-      .select('*');
+    try {
+      if (!userId) {
+        throw new Error('User ID is required to fetch settings');
+      }
 
-    if (error) {
-      console.error('Error fetching settings:', error);
+      const { data, error } = await this.client
+        .from('settings')
+        .select('key, value')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return {};
+      }
+
+      if (!data) {
+        return {};
+      }
+
+      return data.reduce<Record<string, any>>((settings, setting: any) => {
+        if (setting?.key !== undefined) {
+          settings[setting.key] = setting.value;
+        }
+        return settings;
+      }, {});
+    } catch (error) {
+      console.error('Exception fetching settings:', error);
       return {};
     }
-
-    const settings: Record<string, any> = {};
-    data?.forEach(setting => {
-      settings[setting.key] = setting.value;
-    });
-
-    return settings;
   }
 
   async updateUserSetting(userId: string, key: string, value: any): Promise<boolean> {
-    const { error } = await this.client
-      .from('settings')
-      .upsert([{ key, value }]);
+    try {
+      if (!userId) {
+        throw new Error('User ID is required to update settings');
+      }
 
-    if (error) {
-      console.error('Error updating setting:', error);
+      if (!key || typeof key !== 'string') {
+        throw new Error('Setting key must be a non-empty string');
+      }
+
+      const { error } = await this.client
+        .from('settings')
+        .upsert([{
+          user_id: userId,
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        }], {
+          onConflict: 'user_id,key',
+        });
+
+      if (error) {
+        console.error('Error updating setting:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Exception updating setting:', error);
       return false;
     }
-
-    return true;
   }
 
   async subscribeToUserChanges(userId: string, callback: (payload: any) => void) {

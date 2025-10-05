@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { LogOut, Menu, X } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../lib/authContext'
+import { ThemeToggle } from './ui/theme-toggle'
+import { Drawer, Button, NavLink, Divider } from '@mantine/core'
 
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
@@ -29,86 +31,82 @@ export function MainLayout({ children }: MainLayoutProps) {
   }, [location.pathname])
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      <aside className="hidden w-64 flex-col border-r border-border/60 bg-card/70 px-5 py-8 shadow-sm lg:flex">
-        <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-          <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary/10 text-2xl">🚀</span>
-          Glyde
+    <div className="h-screen flex flex-col bg-background">
+      <nav className="bg-card border-b border-border shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <button
+                onClick={() => setMenuOpen(true)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+                aria-label="Toggle menu"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <h1 className="ml-3 text-xl font-bold text-foreground">Glyde</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <button
+                onClick={signOut}
+                className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
         </div>
-        <nav className="mt-10 flex flex-1 flex-col gap-1">
+      </nav>
+
+      <Drawer
+        opened={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">✨</span>
+            <span className="text-lg font-bold">Navigation</span>
+          </div>
+        }
+        padding="md"
+        size="sm"
+      >
+        <div className="flex flex-col gap-1">
           {navItems.map(item => (
             <NavLink
               key={item.path}
+              component={Link}
               to={item.path}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:text-primary',
-                  isActive && 'bg-primary text-primary-foreground shadow-sm'
-                )
-              }
-            >
-              <span className="text-lg" aria-hidden>
-                {item.icon}
-              </span>
-              {item.label}
-            </NavLink>
+              label={item.label}
+              leftSection={<span className="text-xl">{item.icon}</span>}
+              active={location.pathname === item.path}
+              onClick={() => setMenuOpen(false)}
+              variant="filled"
+              styles={{
+                root: {
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                },
+              }}
+            />
           ))}
-        </nav>
-        <div className="flex flex-col gap-3 pt-4">
-          <ThemeToggle />
-          <Button variant="outline" className="justify-start gap-2" onClick={signOut}>
-            <LogOut className="size-4" />
-            Sign out
-          </Button>
         </div>
-      </aside>
 
-      <div className="flex w-full flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border/70 bg-card/80 px-4 py-4 shadow-sm lg:hidden">
-          <div className="flex items-center gap-3">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="rounded-full"
-              onClick={() => setMobileOpen(open => !open)}
-            >
-              {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
-              <span className="sr-only">Toggle navigation</span>
-            </Button>
-            <span className="text-lg font-semibold text-foreground">Glyde</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Button size="icon" variant="outline" className="rounded-full" onClick={signOut}>
-              <LogOut className="size-4" />
-              <span className="sr-only">Sign out</span>
-            </Button>
-          </div>
-        </header>
+        <Divider my="md" />
 
-        {mobileOpen && (
-          <div className="border-b border-border/60 bg-card/95 px-4 py-4 shadow-sm lg:hidden">
-            <nav className="flex flex-col gap-1">
-              {navItems.map(item => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    cn(
-                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 hover:bg-primary/10 hover:text-primary',
-                      isActive && 'bg-primary text-primary-foreground shadow-sm'
-                    )
-                  }
-                >
-                  <span className="text-lg" aria-hidden>
-                    {item.icon}
-                  </span>
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-        )}
+        <Button
+          variant="subtle"
+          color="red"
+          fullWidth
+          onClick={() => {
+            setMenuOpen(false)
+            signOut()
+          }}
+        >
+          Sign Out
+        </Button>
+      </Drawer>
 
         <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
           <div className="mx-auto flex w-full flex-col">

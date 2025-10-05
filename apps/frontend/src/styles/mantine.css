@@ -1,0 +1,5 @@
+/* Import Mantine core styles */
+@import '@mantine/core/styles.css';
+@import '@mantine/notifications/styles.css';
+
+/* Mantine CSS variables will be injected here by MantineProvider */

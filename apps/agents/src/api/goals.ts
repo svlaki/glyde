@@ -3,14 +3,15 @@ import { getSupabaseService } from '../services/SupabaseService.js';
 
 export async function getUserGoals(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, status, category, goal_type, target_before, target_after } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Fetching goals for user:', user_id);
+    const { status, category, goal_type, target_before, target_after } = req.body;
+
+    console.log('Fetching goals for user:', userId);
 
     const filters: any = {};
     if (status) filters.status = status;
@@ -19,7 +20,7 @@ export async function getUserGoals(req: Request, res: Response): Promise<void> {
     if (target_before) filters.targetBefore = target_before;
     if (target_after) filters.targetAfter = target_after;
 
-    const goals = await getSupabaseService().getGoals(user_id, filters);
+    const goals = await getSupabaseService().getGoals(userId, filters);
 
     res.json({
       success: true,
@@ -34,17 +35,18 @@ export async function getUserGoals(req: Request, res: Response): Promise<void> {
 
 export async function createUserGoal(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, ...goalData } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Creating goal for user:', user_id);
+    const { user_id: _ignoredUserId, ...goalData } = req.body ?? {};
+
+    console.log('Creating goal for user:', userId);
     console.log('Goal data:', goalData);
 
-    const createdGoal = await getSupabaseService().createGoal(user_id, {
+    const createdGoal = await getSupabaseService().createGoal(userId, {
       title: goalData.title,
       description: goalData.description,
       category: goalData.category,
@@ -76,16 +78,22 @@ export async function createUserGoal(req: Request, res: Response): Promise<void>
 
 export async function updateUserGoal(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, goal_id, ...updates } = req.body;
-
-    if (!user_id || !goal_id) {
-      res.status(400).json({ error: 'user_id and goal_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Updating goal:', goal_id, 'for user:', user_id);
+    const { goal_id, ...updates } = req.body ?? {};
 
-    const updatedGoal = await getSupabaseService().updateGoal(user_id, goal_id, {
+    if (!goal_id) {
+      res.status(400).json({ error: 'goal_id is required' });
+      return;
+    }
+
+    console.log('Updating goal:', goal_id, 'for user:', userId);
+
+    const updatedGoal = await getSupabaseService().updateGoal(userId, goal_id, {
       title: updates.title,
       description: updates.description,
       category: updates.category,
@@ -117,16 +125,22 @@ export async function updateUserGoal(req: Request, res: Response): Promise<void>
 
 export async function deleteUserGoal(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, goal_id } = req.body;
-
-    if (!user_id || !goal_id) {
-      res.status(400).json({ error: 'user_id and goal_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Deleting goal:', goal_id, 'for user:', user_id);
+    const { goal_id } = req.body ?? {};
 
-    const result = await getSupabaseService().deleteGoal(user_id, goal_id);
+    if (!goal_id) {
+      res.status(400).json({ error: 'goal_id is required' });
+      return;
+    }
+
+    console.log('Deleting goal:', goal_id, 'for user:', userId);
+
+    const result = await getSupabaseService().deleteGoal(userId, goal_id);
 
     res.json(result);
 
@@ -138,16 +152,22 @@ export async function deleteUserGoal(req: Request, res: Response): Promise<void>
 
 export async function addGoalCheckIn(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, goal_id, ...checkInData } = req.body;
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-    if (!user_id || !goal_id) {
-      res.status(400).json({ error: 'user_id and goal_id are required' });
+    const { goal_id, ...checkInData } = req.body ?? {};
+
+    if (!goal_id) {
+      res.status(400).json({ error: 'goal_id is required' });
       return;
     }
 
     console.log('Adding check-in for goal:', goal_id);
 
-    const checkIn = await getSupabaseService().addGoalCheckIn(user_id, goal_id, {
+    const checkIn = await getSupabaseService().addGoalCheckIn(userId, goal_id, {
       progressUpdate: checkInData.progress_update,
       moodRating: checkInData.mood_rating,
       confidenceLevel: checkInData.confidence_level,
@@ -171,16 +191,22 @@ export async function addGoalCheckIn(req: Request, res: Response): Promise<void>
 
 export async function getGoalCheckIns(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, goal_id, limit } = req.body;
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-    if (!user_id || !goal_id) {
-      res.status(400).json({ error: 'user_id and goal_id are required' });
+    const { goal_id, limit } = req.body ?? {};
+
+    if (!goal_id) {
+      res.status(400).json({ error: 'goal_id is required' });
       return;
     }
 
     console.log('Fetching check-ins for goal:', goal_id);
 
-    const checkIns = await getSupabaseService().getGoalCheckIns(user_id, goal_id, limit);
+    const checkIns = await getSupabaseService().getGoalCheckIns(userId, goal_id, limit);
 
     res.json({
       success: true,

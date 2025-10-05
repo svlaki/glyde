@@ -1,5 +1,15 @@
-export { createTaskTool } from './create-task.js';
-export { updateTaskTool } from './update-task.js';
-export { deleteTaskTool } from './delete-task.js';
-export { listTasksTool } from './list-tasks.js';
-export { completeTaskTool } from './complete-task.js';
+import { createTaskTool } from './create-task.js';
+import { updateTaskTool } from './update-task.js';
+import { deleteTaskTool } from './delete-task.js';
+import { listTasksTool } from './list-tasks.js';
+import { completeTaskTool } from './complete-task.js';
+
+export { createTaskTool, updateTaskTool, deleteTaskTool, listTasksTool, completeTaskTool };
+
+export const taskTools = [
+  createTaskTool,
+  updateTaskTool,
+  deleteTaskTool,
+  listTasksTool,
+  completeTaskTool
+];

@@ -1,88 +1,96 @@
-import './src/styles/globals.css'
-
+import "./src/styles/globals.css"
+import "./src/styles/mantine.css"
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-
-import { MainLayout } from '@/components/MainLayout'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { Auth } from '@/components/Auth'
-import { ToastProvider } from '@/components/ui/toast'
-import { ThemeProvider } from '@/components/ui/theme-provider'
-import { AuthProvider } from '@/lib/authContext'
-import { InteractionProvider } from '@/lib/interactionContext'
-import CalendarPage from '@/pages/CalendarPage'
-import CategoriesPage from '@/pages/CategoriesPage'
-import GoalsPage from '@/pages/GoalsPage'
-import ProfilePage from '@/pages/ProfilePage'
-import TasksPage from '@/pages/TasksPage'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MantineProvider } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
+import { theme } from './src/styles/theme'
+import { AuthProvider } from './src/lib/authContext'
+import { InteractionProvider } from './src/lib/interactionContext'
+import { ToastProvider } from './src/components/ui/toast'
+import { ThemeProvider } from './src/components/ui/theme-provider'
+import { ErrorBoundary } from './src/components/ErrorBoundary'
+import { Auth } from './src/components/Auth'
+import { CalendarPage } from './src/pages/CalendarPage'
+import TasksPage from './src/pages/TasksPage'
+import GoalsPage from './src/pages/GoalsPage'
+import ProfilePage from './src/pages/ProfilePage'
+import CategoriesPage from './src/pages/CategoriesPage'
+import { ProtectedRoute } from './src/components/ProtectedRoute'
+import { MainLayout } from './src/components/MainLayout'
 
 function App() {
   return (
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <InteractionProvider>
-            <ToastProvider>
-              <Routes>
-                <Route path="/" element={<Auth />} />
-                <Route
-                  path="/calendar"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <CalendarPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/tasks"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <TasksPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/goals"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <GoalsPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/profile"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <ProfilePage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/categories"
-                  element={
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <CategoriesPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </ToastProvider>
-          </InteractionProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <MantineProvider theme={theme} defaultColorScheme="dark">
+            <Notifications position="top-right" zIndex={1000} />
+            <AuthProvider>
+              <InteractionProvider>
+                <ToastProvider>
+                  <Routes>
+                    <Route path="/" element={<Auth />} />
+                    <Route
+                      path="/calendar"
+                      element={
+                        <ProtectedRoute>
+                          <MainLayout>
+                            <CalendarPage />
+                          </MainLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/tasks"
+                      element={
+                        <ProtectedRoute>
+                          <MainLayout>
+                            <TasksPage />
+                          </MainLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/goals"
+                      element={
+                        <ProtectedRoute>
+                          <MainLayout>
+                            <GoalsPage />
+                          </MainLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <MainLayout>
+                            <ProfilePage />
+                          </MainLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/categories"
+                      element={
+                        <ProtectedRoute>
+                          <MainLayout>
+                            <CategoriesPage />
+                          </MainLayout>
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </ToastProvider>
+              </InteractionProvider>
+            </AuthProvider>
+          </MantineProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }
 

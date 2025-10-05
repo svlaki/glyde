@@ -1,24 +1,29 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
+import { formatEventTime } from "../../utils/timezoneUtils.js";
 
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit = 20 }, config) => {
     const userId = config?.configurable?.userId;
-    
+    const timezone = config?.configurable?.timezone;
+
     if (!userId) {
       throw new Error("User ID is required for listing events");
+    }
+    if (!timezone) {
+      throw new Error("Timezone is required for listing events");
     }
 
     // Initialize service
     const supabaseService = new SupabaseService();
 
+    // Get events as UTC
     let events;
-
     if (startDate && endDate) {
-      events = await supabaseService.getEventsForAgent(userId, startDate, endDate);
+      events = await supabaseService.getEvents(userId, startDate, endDate);
     } else {
-      events = await supabaseService.getEventsForAgent(userId);
+      events = await supabaseService.getEvents(userId);
     }
 
     if (events.length === 0) {
@@ -26,29 +31,17 @@ export const listEventsTool = tool(
       return `No events found${dateRange}`;
     }
 
-    // Sort by start time
+    // Sort by start time (UTC)
     events.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     // Take only the requested limit
     const limitedEvents = events.slice(0, limit);
 
     const eventList = limitedEvents.map(event => {
-      // Events are already converted to local timezone by SupabaseService.getEventsForAgent
-      const startDate = new Date(event.start_time);
-      const endDate = new Date(event.end_time);
+      // Format UTC times for user's timezone
+      const eventTime = formatEventTime(event.start_time, timezone);
 
-      const startTime = startDate.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-      const endTime = endDate.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-
-      return `📅 ${event.title}\n   ⏰ ${startTime} - ${endTime}${event.location ? `\n   📍 ${event.location}` : ''}`;
+      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}`;
     });
 
     const totalText = events.length > limit ? ` (showing first ${limit} of ${events.length})` : '';

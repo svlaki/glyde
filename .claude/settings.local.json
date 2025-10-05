@@ -34,7 +34,10 @@
       "Bash(npm install:*)",
       "Bash(cat:*)",
       "Bash(if exist \"apps\\frontend\\nul\" del \"apps\\frontend\\nul\")",
-      "Bash(if exist \"nul\" del \"nul\")"
+      "Bash(if exist \"nul\" del \"nul\")",
+      "mcp__zep-docs__search_documentation",
+      "mcp__serena__write_memory",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": [],
