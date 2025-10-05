@@ -1,7 +1,5 @@
-import dotenv from 'dotenv';
-
-// Configure dotenv first
-dotenv.config({ path: '.env' });
+import { env, isDevelopment, ENV_PATH } from '../utils/env.js';
+import { initializeSupabase } from '../services/SupabaseService.js';
 
 // Set environment variables explicitly if needed
 const requiredEnvVars = [
@@ -29,10 +27,6 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_K
   process.exit(1);
 }
 
-console.log('Environment variables loaded successfully');
-
-// Initialize Supabase client first
-import { initializeSupabase } from '../services/SupabaseService.js';
 initializeSupabase();
 
 import express from 'express';
@@ -48,7 +42,7 @@ import { processAgentMessage, addStartTime } from './agent.js';
 import { generateInteractionFromChat } from './chat-interactions.js';
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = env.PORT;
 
 // Middleware
 app.use(cors({
@@ -85,10 +79,12 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 });
 
 // Request logging middleware
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
-  next();
-});
+if (isDevelopment) {
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    next();
+  });
+}
 
 // Input sanitization middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {

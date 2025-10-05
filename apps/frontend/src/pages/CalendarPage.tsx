@@ -1,13 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/authContext';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { fetchUserEvents, createEvent, updateEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
+import { fetchUserEvents, updateEvent, CalendarEvent } from '../lib/calendarService';
 import { fetchUserTasks, Task } from '../lib/taskService';
 import { InteractionBox, Interaction } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
@@ -18,88 +15,111 @@ import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
-// Extended CalendarEvent interface for UI display
-interface ExtendedCalendarEvent extends CalendarEvent {
-  backgroundColor?: string;
-  borderColor?: string;
-  textColor?: string;
-  title?: string; // For FullCalendar compatibility
-  start?: string;  // For FullCalendar compatibility
-  end?: string;    // For FullCalendar compatibility
-}
+const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
 
 export function CalendarPage() {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ExtendedCalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [userTimezone, setUserTimezone] = useState<string>('America/Chicago');
+  const [userTimezone, setUserTimezone] = useState<string>('local');
   const { interactions, removeInteraction } = useInteractions();
+  const eventLoadErrorShown = useRef(false);
+  const taskLoadErrorShown = useRef(false);
+
+  const transformEvent = useCallback((event: CalendarEvent): ExtendedCalendarEvent => {
+    const category = event.category ?? 'Personal';
+    const color = event.color ?? getCategoryColor(category);
+
+    return {
+      ...event,
+      category,
+      color,
+      backgroundColor: color,
+      borderColor: color,
+      textColor: '#FFFFFF',
+      start: event.start_time,
+      end: event.end_time
+    };
+  }, []);
 
   // Connect to agent system for interactions
   useAgentInteractions();
 
   // Fetch user timezone from profile
   useEffect(() => {
-    if (user) {
-      const fetchTimezone = async () => {
-        try {
-          const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
-          const response = await fetch(`${agentServiceUrl}/api/profile`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: user.id })
-          });
-          if (response.ok) {
-            const profile = await response.json();
-            if (profile.timezone) {
-              setUserTimezone(profile.timezone);
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch user timezone:', error);
-        }
-      };
-      fetchTimezone();
+    if (!user) {
+      return;
     }
+
+    let isCancelled = false;
+
+    const fetchTimezone = async () => {
+      try {
+        const response = await fetch(`${AGENT_SERVICE_URL}/api/profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id })
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const profile = await response.json();
+
+        if (!isCancelled && profile?.timezone) {
+          setUserTimezone(profile.timezone);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user timezone:', error);
+      }
+    };
+
+    fetchTimezone();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user]);
 
   // Load real user events and tasks from the backend
   useEffect(() => {
-    if (user) {
-      loadUserEvents();
-      loadUserTasks();
-
-      // Set up real-time subscription to events table in public schema
-      const channel = supabase
-        .channel(`events-${user.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-            schema: 'public',
-            table: 'events',
-            filter: `user_id=eq.${user.id}`
-          },
-          (payload) => {
-            // Reload events when any change occurs
-            loadUserEvents();
-          }
-        )
-        .subscribe();
-
-      // Cleanup subscription on unmount
-      return () => {
-        channel.unsubscribe();
-      };
+    if (!user) {
+      setEvents([]);
+      setTasks([]);
+      return;
     }
-  }, [user]);
 
-  async function loadUserTasks() {
+    loadUserEvents();
+    loadUserTasks();
+
+    const channel = supabase
+      .channel(`events-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadUserEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [loadUserEvents, loadUserTasks, user]);
+
+  const loadUserTasks = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -107,71 +127,58 @@ export function CalendarPage() {
       if (error) {
         console.error('Error loading user tasks:', error);
         setTasks([]);
-      } else {
-        // Sort tasks by due date (soonest first)
-        const sortedTasks = userTasks.sort((a, b) => {
-          if (!a.due_date) return 1;
-          if (!b.due_date) return -1;
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-        });
-        setTasks(sortedTasks);
+        if (!taskLoadErrorShown.current) {
+          toast({ title: 'Unable to load tasks', description: 'Please refresh to try again.', variant: 'error' });
+          taskLoadErrorShown.current = true;
+        }
+        return;
       }
+
+      taskLoadErrorShown.current = false;
+
+      const sortedTasks = [...userTasks].sort((a, b) => {
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
+      setTasks(sortedTasks);
     } catch (err) {
       console.error('Unexpected error loading tasks:', err);
       setTasks([]);
+      if (!taskLoadErrorShown.current) {
+        toast({ title: 'Unexpected task error', description: 'We could not load tasks right now.', variant: 'error' });
+        taskLoadErrorShown.current = true;
+      }
     }
-  }
+  }, [taskLoadErrorShown, toast, user]);
 
-  async function loadUserEvents() {
+  const loadUserEvents = useCallback(async () => {
     if (!user) return;
 
     try {
       const { events: userEvents, error } = await fetchUserEvents(user);
       if (error) {
         console.error('Error loading user events:', error);
-        // Show empty calendar if there's an error
         setEvents([]);
-      } else {
-        // Log event count instead of full data
-        
-        // Transform user events to match the calendar format
-        const formattedEvents: ExtendedCalendarEvent[] = userEvents.map(event => {
-          // Use category-based color from backend
-          const color = event.color || '#6B7280'; // Default gray if no color
-          const category = event.category || 'Personal';
-
-
-          return {
-            id: event.id,
-            user_id: event.user_id,
-            title: event.title,
-            start_time: event.start_time,
-            end_time: event.end_time,
-            location: event.location,
-            description: event.description,
-            created_at: event.created_at,
-            updated_at: event.updated_at,
-            category: category,
-            start: event.start_time,
-            end: event.end_time,
-            backgroundColor: color,
-            borderColor: color,
-            textColor: '#FFFFFF',
-            color: color
-          };
-        });
-        
-        // Log formatted event count instead of full data
-        
-        // Show user events (empty array if no events)
-        setEvents(formattedEvents);
+        if (!eventLoadErrorShown.current) {
+          toast({ title: 'Unable to load events', description: 'Please refresh to try again.', variant: 'error' });
+          eventLoadErrorShown.current = true;
+        }
+        return;
       }
+
+      eventLoadErrorShown.current = false;
+      const formattedEvents = userEvents.map(transformEvent);
+      setEvents(formattedEvents);
     } catch (error) {
       console.error('Error loading user events:', error);
-      // Show empty calendar on error
       setEvents([]);
+      if (!eventLoadErrorShown.current) {
+        toast({ title: 'Unexpected calendar error', description: 'We could not load your events.', variant: 'error' });
+        eventLoadErrorShown.current = true;
+      }
     }
-  }
+  }, [eventLoadErrorShown, toast, transformEvent, user]);
 
   function handleDateClick(info: { dateStr: string }) {
     setSelectedDate(info.dateStr);
@@ -195,17 +202,50 @@ export function CalendarPage() {
   }
 
 
-  function handleInteractionResponse(interactionId: string, response: string) {
+  const handleInteractionResponse = useCallback((interactionId: string, response: string) => {
     removeInteraction(interactionId);
-    // Refresh calendar to show any newly created events
-    // Refresh for any positive response (yes or any multiple choice option that's not 'no')
     if (response !== 'no') {
-      // Small delay to ensure backend processing is complete
       setTimeout(() => {
         loadUserEvents();
       }, 1000);
     }
-  }
+  }, [loadUserEvents, removeInteraction]);
+
+  const handleCalendarEventUpdate = useCallback(async (
+    eventId: string,
+    updates: { start_time?: string | null; end_time?: string | null }
+  ) => {
+    if (!user) {
+      toast({ title: 'Not signed in', description: 'Please sign in again to manage events.', variant: 'warning' });
+      return false;
+    }
+
+    const payload: Record<string, string> = {};
+    if (updates.start_time) {
+      payload.start_time = updates.start_time;
+    }
+    if (updates.end_time) {
+      payload.end_time = updates.end_time;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return true;
+    }
+
+    try {
+      const { error } = await updateEvent(user, eventId, payload);
+      if (error) {
+        throw new Error(error);
+      }
+
+      await loadUserEvents();
+      return true;
+    } catch (error) {
+      console.error('Error updating event timing:', error);
+      toast({ title: 'Unable to update event', description: 'Please try again.', variant: 'error' });
+      return false;
+    }
+  }, [loadUserEvents, toast, user]);
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -232,84 +272,49 @@ export function CalendarPage() {
                   center: 'title',
                   right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 }}
-                events={events.map(e => ({
-                  ...e,
-                  id: e.id,
-                  title: e.title,
-                  start: e.start_time,
-                  end: e.end_time,
-                  backgroundColor: e.color || e.backgroundColor || '#3B82F6',
-                  borderColor: e.color || e.borderColor || '#3B82F6',
-                  textColor: '#FFFFFF',
-                }))}
+                events={events}
                 dateClick={handleDateClick}
                 eventClick={handleEventClick}
                 editable={true}
                 droppable={true}
                 eventDrop={async (info) => {
-                  // Update event when dragged to new time
-                  const updatedEvent = {
-                    start_time: info.event.start?.toISOString(),
-                    end_time: info.event.end?.toISOString() || new Date(info.event.start!.getTime() + 60 * 60 * 1000).toISOString(),
-                  };
-                  
-                  try {
-                    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/update`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session?.access_token}`
-                      },
-                      body: JSON.stringify({
-                        user_id: user?.id,
-                        event_id: info.event.id,
-                        event: updatedEvent
-                      })
-                    });
-                    
-                    if (response.ok) {
-                      // Refresh the calendar to show the update
-                      await loadUserEvents();
-                    } else {
-                      info.revert();
-                      console.error('Failed to update event');
-                    }
-                  } catch (error) {
+                  const start = info.event.start ? info.event.start.toISOString() : null;
+                  const end = info.event.end
+                    ? info.event.end.toISOString()
+                    : info.event.start
+                      ? new Date(info.event.start.getTime() + 60 * 60 * 1000).toISOString()
+                      : null;
+
+                  if (!start) {
                     info.revert();
-                    console.error('Error updating event:', error);
+                    return;
+                  }
+
+                  const success = await handleCalendarEventUpdate(info.event.id, {
+                    start_time: start,
+                    end_time: end
+                  });
+
+                  if (!success) {
+                    info.revert();
                   }
                 }}
                 eventResize={async (info) => {
-                  // Update event duration when resized
-                  const updatedEvent = {
-                    start_time: info.event.start?.toISOString(),
-                    end_time: info.event.end?.toISOString(),
-                  };
-                  
-                  try {
-                    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/update`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session?.access_token}`
-                      },
-                      body: JSON.stringify({
-                        user_id: user?.id,
-                        event_id: info.event.id,
-                        event: updatedEvent
-                      })
-                    });
-                    
-                    if (response.ok) {
-                      // Refresh the calendar to show the update
-                      await loadUserEvents();
-                    } else {
-                      info.revert();
-                      console.error('Failed to resize event');
-                    }
-                  } catch (error) {
+                  const start = info.event.start ? info.event.start.toISOString() : null;
+                  const end = info.event.end ? info.event.end.toISOString() : null;
+
+                  if (!start || !end) {
                     info.revert();
-                    console.error('Error resizing event:', error);
+                    return;
+                  }
+
+                  const success = await handleCalendarEventUpdate(info.event.id, {
+                    start_time: start,
+                    end_time: end
+                  });
+
+                  if (!success) {
+                    info.revert();
                   }
                 }}
                 height="100%"
@@ -413,104 +418,6 @@ export function CalendarPage() {
         />
       )}
 
-      {/* Custom Calendar Styling */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .fc-theme-standard {
-          background-color: rgb(255, 255, 255);
-          color: rgb(0, 0, 0);
-          font-family: system-ui, -apple-system, sans-serif;
-        }
-        .fc-theme-standard .fc-toolbar-title {
-          color: rgb(0, 0, 0);
-          font-weight: 300;
-          font-size: 1.5rem;
-        }
-        .fc-theme-standard .fc-col-header-cell {
-          background-color: rgb(249, 250, 251);
-          color: rgb(75, 85, 99);
-          border-color: rgb(229, 231, 235);
-          font-weight: 500;
-          text-transform: uppercase;
-          font-size: 0.75rem;
-          letter-spacing: 0.05em;
-        }
-        .fc-theme-standard .fc-daygrid-day,
-        .fc-theme-standard .fc-timegrid-slot {
-          background-color: rgb(255, 255, 255);
-          border-color: rgb(229, 231, 235);
-        }
-        .fc-theme-standard .fc-day-today {
-          background-color: rgba(59, 130, 246, 0.05) !important;
-        }
-        .fc-theme-standard .fc-button {
-          background-color: rgb(255, 255, 255);
-          border: 1px solid rgb(229, 231, 235);
-          color: rgb(0, 0, 0);
-          font-weight: 500;
-          border-radius: 9999px;
-          padding: 0.5rem 1rem;
-        }
-        .fc-theme-standard .fc-button:hover {
-          background-color: rgb(249, 250, 251);
-        }
-        .fc-theme-standard .fc-button-active {
-          background-color: rgb(0, 0, 0) !important;
-          border-color: rgb(0, 0, 0) !important;
-          color: white !important;
-        }
-        .fc-theme-standard .fc-button-active:hover {
-          background-color: rgb(31, 41, 55) !important;
-          border-color: rgb(31, 41, 55) !important;
-        }
-        .fc-theme-standard .fc-event {
-          border-radius: 0.375rem;
-          border: none;
-          font-weight: 500;
-          font-size: 0.875rem;
-          padding: 2px 6px;
-          box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-        .fc-theme-standard .fc-event:hover {
-          filter: brightness(0.95);
-          box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
-        }
-        .fc-theme-standard .fc-timegrid-axis {
-          color: rgb(107, 114, 128);
-          font-size: 0.75rem;
-        }
-        .fc-theme-standard .fc-timegrid-now-indicator-line {
-          border-color: #ef4444 !important;
-          border-width: 1px !important;
-          width: 100% !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: 40 !important;
-        }
-        .fc-theme-standard .fc-timegrid-now-indicator-arrow {
-          display: none !important;
-        }
-        .fc-theme-standard .fc-timegrid-slot-label {
-          color: rgb(107, 114, 128);
-        }
-        .fc-theme-standard .fc-scrollgrid {
-          border-color: rgb(229, 231, 235);
-        }
-        .fc-theme-standard .fc-scrollgrid-section > * {
-          border-color: rgb(229, 231, 235);
-        }
-        .fc-theme-standard .fc-more-link {
-          color: rgb(59, 130, 246);
-        }
-        .fc-theme-standard .fc-more-link:hover {
-          color: rgb(37, 99, 235);
-        }
-        .fc-theme-standard .fc-timegrid-divider {
-          border-color: rgb(229, 231, 235);
-        }
-        .fc-theme-standard .fc-timegrid-slot-minor {
-          border-color: rgb(243, 244, 246);
-        }
-      `}} />
     </div>
   );
 }

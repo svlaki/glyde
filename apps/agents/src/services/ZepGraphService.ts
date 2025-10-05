@@ -1,5 +1,6 @@
 import { ZepClient } from '@getzep/zep-cloud';
 import { EntityMappingService, type EntityMapping } from './EntityMappingService.js';
+import { env } from '../utils/env.js';
 
 // Custom entity types for structured data in the knowledge graph
 export interface CalendarEventEntity {
@@ -78,12 +79,12 @@ export class ZepGraphService {
   private userThreads: Map<string, string> = new Map();
 
   constructor() {
-    if (!process.env.ZEP_API_KEY) {
+    if (!env.ZEP_API_KEY) {
       throw new Error('ZEP_API_KEY environment variable is required');
     }
 
     this.client = new ZepClient({
-      apiKey: process.env.ZEP_API_KEY,
+      apiKey: env.ZEP_API_KEY,
     });
 
     this.mappingService = new EntityMappingService();

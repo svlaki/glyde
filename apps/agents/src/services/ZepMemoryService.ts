@@ -12,15 +12,16 @@
  * - Entity lifecycle management - use ZepGraphService
  */
 import { ZepClient } from '@getzep/zep-cloud';
-import type { 
-  MemoryContext, 
-  ConversationMemory, 
-  UserProfileMemory, 
-  EntityMemory, 
+import type {
+  MemoryContext,
+  ConversationMemory,
+  UserProfileMemory,
+  EntityMemory,
   VectorMemory,
-  Goal 
+  Goal
 } from '../types/agents.js';
 import { BaseMessage } from '@langchain/core/messages';
+import { env } from '../utils/env.js';
 
 export interface ZepUser {
   userId: string;
@@ -46,7 +47,7 @@ export class ZepMemoryService {
   private userSessions: Map<string, string> = new Map();
 
   constructor() {
-    const apiKey = process.env.ZEP_API_KEY;
+    const apiKey = env.ZEP_API_KEY;
     
     if (!apiKey) {
       throw new Error('ZEP_API_KEY environment variable is required');

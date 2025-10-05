@@ -4,6 +4,7 @@ import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../typ
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepMemoryService } from "../../services/ZepMemoryService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { env } from "../../utils/env.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
@@ -19,7 +20,7 @@ export abstract class BaseAgent {
     this.model = new ChatOpenAI({
       modelName,
       temperature: 0.1,
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY,
     });
     this.supabaseService = new SupabaseService();
     this.zepService = new ZepMemoryService();
