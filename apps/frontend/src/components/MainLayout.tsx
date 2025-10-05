@@ -1,16 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../lib/authContext'
-import { ThemeToggle } from './ui/theme-toggle'
-import { Drawer, Button, NavLink, Divider } from '@mantine/core'
-
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useAuth } from '@/lib/authContext'
 import { cn } from '@/lib/utils'
 
 interface MainLayoutProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
 const navItems = [
@@ -24,96 +20,117 @@ const navItems = [
 export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
   const { signOut } = useAuth()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    setMobileOpen(false)
+    setIsMobileMenuOpen(false)
   }, [location.pathname])
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(prev => !prev)
+  }
+
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <nav className="bg-card border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <button
-                onClick={() => setMenuOpen(true)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-                aria-label="Toggle menu"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <h1 className="ml-3 text-xl font-bold text-foreground">Glyde</h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <ThemeToggle />
-              <button
-                onClick={signOut}
-                className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                Sign Out
-              </button>
-            </div>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-card/80 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={toggleMobileMenu}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background/80 text-muted-foreground shadow-sm transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+              aria-label="Toggle navigation menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </button>
+            <Link to="/calendar" className="text-lg font-semibold tracking-tight text-foreground">
+              Glyde
+            </Link>
+            <nav className="hidden items-center gap-1 md:flex">
+              {navItems.map(item => {
+                const isActive = location.pathname === item.path
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                    )}
+                  >
+                    <span aria-hidden>{item.icon}</span>
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </nav>
           </div>
-        </div>
-      </nav>
-
-      <Drawer
-        opened={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        title={
           <div className="flex items-center gap-2">
-            <span className="text-2xl">✨</span>
-            <span className="text-lg font-bold">Navigation</span>
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              className="hidden md:inline-flex"
+            >
+              Sign out
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={signOut}
+              className="md:hidden"
+              aria-label="Sign out"
+            >
+              🚪
+            </Button>
           </div>
-        }
-        padding="md"
-        size="sm"
-      >
-        <div className="flex flex-col gap-1">
-          {navItems.map(item => (
-            <NavLink
-              key={item.path}
-              component={Link}
-              to={item.path}
-              label={item.label}
-              leftSection={<span className="text-xl">{item.icon}</span>}
-              active={location.pathname === item.path}
-              onClick={() => setMenuOpen(false)}
-              variant="filled"
-              styles={{
-                root: {
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                },
-              }}
-            />
-          ))}
         </div>
-
-        <Divider my="md" />
-
-        <Button
-          variant="subtle"
-          color="red"
-          fullWidth
-          onClick={() => {
-            setMenuOpen(false)
-            signOut()
-          }}
-        >
-          Sign Out
-        </Button>
-      </Drawer>
-
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
-          <div className="mx-auto flex w-full flex-col">
-            {children}
+        {isMobileMenuOpen && (
+          <div className="md:hidden">
+            <div className="space-y-2 border-t border-border/60 bg-card/95 p-4 shadow-xl">
+              {navItems.map(item => {
+                const isActive = location.pathname === item.path
+                return (
+                  <Button
+                    key={item.path}
+                    variant={isActive ? 'default' : 'ghost'}
+                    className="w-full justify-start gap-2 text-left"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    asChild
+                  >
+                    <Link to={item.path} className="flex items-center gap-2">
+                      <span aria-hidden>{item.icon}</span>
+                      {item.label}
+                    </Link>
+                  </Button>
+                )
+              })}
+              <Button
+                variant="destructive"
+                className="w-full justify-start"
+                onClick={() => {
+                  setIsMobileMenuOpen(false)
+                  signOut()
+                }}
+              >
+                Sign out
+              </Button>
+            </div>
           </div>
-        </main>
-      </div>
+        )}
+      </header>
+
+      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+          {children}
+        </div>
+      </main>
     </div>
   )
 }
