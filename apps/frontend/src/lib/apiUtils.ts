@@ -8,6 +8,8 @@
  * - Performance optimization utilities
  */
 
+import { supabase } from './supabase'
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -37,18 +39,50 @@ export interface ApiError {
  * }
  * ```
  */
+
+async function resolveAccessToken(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) {
+      console.error('Failed to retrieve session for auth headers:', error)
+      return null
+    }
+    return data.session?.access_token ?? null
+  } catch (err) {
+    console.error('Unexpected error retrieving auth session:', err)
+    return null
+  }
+}
+
+async function withAuthHeaders(options: RequestInit = {}): Promise<RequestInit> {
+  const accessToken = await resolveAccessToken()
+  const headers = new Headers(options.headers ?? {})
+
+  if (!(options.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  return {
+    ...options,
+    headers,
+  }
+}
+
+export async function authorizedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const requestInit = await withAuthHeaders(options)
+  return fetch(url, requestInit)
+}
+
 export async function apiCall<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
+    const response = await authorizedFetch(url, options)
 
     const data = await response.json();
 
