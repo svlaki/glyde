@@ -513,6 +513,8 @@ export function CalendarPage() {
   );
 }
 
+export default CalendarPage
+
 // Category colors mapping
 const CATEGORY_COLORS: Record<string, string> = {
   'Work': '#3b82f6',
