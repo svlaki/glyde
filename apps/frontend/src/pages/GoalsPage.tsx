@@ -3,7 +3,7 @@ import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabase'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, Goal } from '../lib/goalService'
 import { fetchUserCategories, Category } from '../lib/categoryService'
-import { validateRequired, formatErrorMessage, debounce } from '../lib/apiUtils'
+import { validateRequired, formatErrorMessage } from '../lib/apiUtils'
 import { usePerformanceMonitor } from '../lib/performance'
 
 export default function GoalsPage() {
@@ -28,21 +28,50 @@ export default function GoalsPage() {
     return goals.filter(goal => goal.status === filter);
   }, [goals, filter]);
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce((searchTerm: string) => {
-      // Implement search logic here if needed
-      console.log('Searching for:', searchTerm);
-    }, 300),
-    []
-  );
+  const loadGoals = useCallback(async () => {
+    if (!user) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const filters = filter !== 'all' ? { status: filter } : undefined
+      const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
+
+      if (error) {
+        setError(formatErrorMessage(error))
+      } else {
+        setGoals(fetchedGoals)
+      }
+    } catch (err) {
+      console.error('Error loading goals:', err)
+      setError('Failed to load goals. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [filter, user])
+
+  const loadCategories = useCallback(async () => {
+    if (!user) return
+
+    try {
+      const { categories: fetchedCategories, error } = await fetchUserCategories(user)
+      if (error) {
+        console.error('Error loading categories:', error)
+      } else {
+        setCategories(fetchedCategories)
+      }
+    } catch (err) {
+      console.error('Error loading categories:', err)
+    }
+  }, [user])
 
   useEffect(() => {
     if (user) {
-      loadGoals()
-      loadCategories()
+      void loadGoals()
+      void loadCategories()
     }
-  }, [user, filter, loadGoals])
+  }, [user, loadGoals, loadCategories])
 
   // Performance monitoring
   useEffect(() => {
@@ -60,53 +89,14 @@ export default function GoalsPage() {
         table: 'goals',
         filter: `user_id=eq.${user.id}`
       }, () => {
-        loadGoals()
+        void loadGoals()
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
-
-  const loadGoals = useCallback(async () => {
-    if (!user) return
-    
-    setLoading(true)
-    setError(null) // Clear previous errors
-    
-    try {
-      const filters = filter !== 'all' ? { status: filter } : undefined
-      const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
-      
-      if (error) {
-        setError(formatErrorMessage(error))
-      } else {
-        setGoals(fetchedGoals)
-      }
-    } catch (err) {
-      console.error('Error loading goals:', err)
-      setError('Failed to load goals. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }, [user, filter])
-
-  const loadCategories = useCallback(async () => {
-    if (!user) return
-    
-    try {
-      const { categories: fetchedCategories, error } = await fetchUserCategories(user)
-      if (error) {
-        console.error('Error loading categories:', error)
-        // Don't set error state for categories as it's not critical
-      } else {
-        setCategories(fetchedCategories)
-      }
-    } catch (err) {
-      console.error('Error loading categories:', err)
-    }
-  }, [user])
+  }, [user, loadGoals])
 
   const handleCreateGoal = useCallback(async (goalData: Partial<Goal>) => {
     if (!user) return
@@ -215,12 +205,12 @@ export default function GoalsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {goals.length === 0 ? (
+        {filteredGoals.length === 0 ? (
           <div className="col-span-full text-center py-12 text-gray-500">
             No goals found. Create your first goal!
           </div>
         ) : (
-          goals.map(goal => (
+          filteredGoals.map(goal => (
             <GoalCard
               key={goal.id}
               goal={goal}

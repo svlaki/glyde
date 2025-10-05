@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PlusIcon } from 'lucide-react'
 
 import { PageContainer } from '@/components/layout/PageContainer'
@@ -32,12 +32,37 @@ export default function TasksPage() {
   const [filter, setFilter] = useState<TaskFilterValue>('all')
   const [dialogState, setDialogState] = useState<{ mode: 'create' | 'edit'; task?: Task } | null>(null)
 
+  const loadTasks = useCallback(async () => {
+    if (!user) return
+
+    setLoading(true)
+    const filters = filter !== 'all' ? { status: filter } : undefined
+    const { tasks: fetchedTasks, error: fetchError } = await fetchUserTasks(user, filters)
+
+    if (fetchError) {
+      setError(fetchError)
+      setTasks([])
+    } else {
+      setError(null)
+      setTasks(fetchedTasks)
+    }
+
+    setLoading(false)
+  }, [filter, user])
+
+  const loadCategories = useCallback(async () => {
+    if (!user) return
+
+    const { categories: fetchedCategories } = await fetchUserCategories(user)
+    setCategories(fetchedCategories)
+  }, [user])
+
   useEffect(() => {
     if (user) {
       void loadTasks()
       void loadCategories()
     }
-  }, [user, filter])
+  }, [user, loadTasks, loadCategories])
 
   useEffect(() => {
     if (!user) return
@@ -61,28 +86,7 @@ export default function TasksPage() {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [user])
-
-  async function loadTasks() {
-    if (!user) return
-    setLoading(true)
-    const filters = filter !== 'all' ? { status: filter } : undefined
-    const { tasks: fetchedTasks, error: fetchError } = await fetchUserTasks(user, filters)
-    if (fetchError) {
-      setError(fetchError)
-      setTasks([])
-    } else {
-      setError(null)
-      setTasks(fetchedTasks)
-    }
-    setLoading(false)
-  }
-
-  async function loadCategories() {
-    if (!user) return
-    const { categories: fetchedCategories } = await fetchUserCategories(user)
-    setCategories(fetchedCategories)
-  }
+  }, [user, loadTasks])
 
   async function handleCreateTask(values: TaskFormValues) {
     if (!user) return
