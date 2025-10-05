@@ -1,10 +1,5 @@
 {
   "dependencies": {
-    "@fullcalendar/core": "^6.1.17",
-    "@fullcalendar/daygrid": "^6.1.17",
-    "@fullcalendar/interaction": "^6.1.17",
-    "@fullcalendar/react": "^6.1.17",
-    "@fullcalendar/timegrid": "^6.1.17",
     "@llm-ui/markdown": "^0.13.3",
     "@llm-ui/react": "^0.13.3",
     "@mantine/core": "^7.17.8",
@@ -23,6 +18,9 @@
     "date-fns-tz": "^3.2.0",
     "lucide-react": "^0.523.0",
     "react": "^19.1.0",
+    "react-big-calendar": "^1.12.1",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.3",
@@ -32,6 +30,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.11",
     "@types/react": "^19.1.8",
+    "@types/react-big-calendar": "^1.8.10",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.21",

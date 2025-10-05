@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { SlotInfo } from 'react-big-calendar';
 import { useAuth } from '../lib/authContext';
 import { useCategories } from '../lib/categoryContext';
 import { WeekCalendar } from '../components/calendar/WeekCalendar';
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { fetchUserTasks, Task } from '../lib/taskService';
-import { InteractionBox, Interaction } from '../components/InteractionBox';
+import { InteractionBox } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
@@ -16,6 +17,9 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
+import type { ExtendedCalendarEvent } from '../types/calendar';
+import { getCategoryColor } from '../lib/calendarCategories';
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
@@ -186,7 +190,7 @@ export function CalendarPage() {
     setSelectedDate(date.toISOString());
     setSelectedEvent(null);
     setIsModalOpen(true);
-  }
+  }, []);
 
   function handleEventClick(event: ExtendedCalendarEvent) {
     setSelectedEvent(event);
@@ -236,6 +240,42 @@ export function CalendarPage() {
       toast({ title: 'Unable to update event', description: 'Please try again.', variant: 'error' });
     }
   }, [loadUserEvents, toast, user]);
+
+  const handleEventMove = useCallback(async (
+    args: CalendarInteractionArgs
+  ) => {
+    const { event, start, end } = args;
+    const fallbackEnd = end ?? new Date(start.getTime() + 60 * 60 * 1000);
+
+    const success = await handleCalendarEventUpdate(event.id, {
+      start_time: start.toISOString(),
+      end_time: fallbackEnd.toISOString(),
+    });
+
+    if (!success) {
+      await loadUserEvents();
+    }
+  }, [handleCalendarEventUpdate, loadUserEvents]);
+
+  const handleEventResize = useCallback(async (
+    args: CalendarInteractionArgs
+  ) => {
+    const { event, start, end } = args;
+
+    if (!end) {
+      await loadUserEvents();
+      return;
+    }
+
+    const success = await handleCalendarEventUpdate(event.id, {
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+    });
+
+    if (!success) {
+      await loadUserEvents();
+    }
+  }, [handleCalendarEventUpdate, loadUserEvents]);
 
   return (
     <div className="min-h-screen bg-white text-black">
