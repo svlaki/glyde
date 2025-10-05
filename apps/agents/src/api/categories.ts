@@ -3,22 +3,21 @@ import categoryService from '../services/CategoryService.js';
 
 export async function getUserCategories(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Fetching categories for user:', user_id);
+    console.log('Fetching categories for user:', userId);
 
-    let categories = await categoryService.getCategories(user_id);
+    let categories = await categoryService.getCategories(userId);
 
     // Auto-create default categories if user has none
     if (categories.length === 0) {
       console.log('No categories found for user, creating defaults...');
-      await categoryService.createDefaultCategories(user_id);
-      categories = await categoryService.getCategories(user_id);
+      await categoryService.createDefaultCategories(userId);
+      categories = await categoryService.getCategories(userId);
     }
 
     res.json({
@@ -34,12 +33,13 @@ export async function getUserCategories(req: Request, res: Response): Promise<vo
 
 export async function createUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, ...categoryData } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
+
+    const { user_id: _ignoredUserId, ...categoryData } = req.body ?? {};
 
     if (!categoryData.name || !categoryData.color) {
       res.status(400).json({ error: 'name and color are required' });
@@ -57,9 +57,9 @@ export async function createUserCategory(req: Request, res: Response): Promise<v
       return;
     }
 
-    console.log('Creating category for user:', user_id);
+    console.log('Creating category for user:', userId);
 
-    const category = await categoryService.createCategory(user_id, {
+    const category = await categoryService.createCategory(userId, {
       name: categoryData.name.trim(),
       color: categoryData.color.trim(),
       icon: categoryData.icon?.trim(),
@@ -85,10 +85,16 @@ export async function createUserCategory(req: Request, res: Response): Promise<v
 
 export async function updateUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, category_id, ...updates } = req.body;
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-    if (!user_id || !category_id) {
-      res.status(400).json({ error: 'user_id and category_id are required' });
+    const { category_id, ...updates } = req.body ?? {};
+
+    if (!category_id) {
+      res.status(400).json({ error: 'category_id is required' });
       return;
     }
 
@@ -103,9 +109,9 @@ export async function updateUserCategory(req: Request, res: Response): Promise<v
       return;
     }
 
-    console.log('Updating category:', category_id, 'for user:', user_id);
+    console.log('Updating category:', category_id, 'for user:', userId);
 
-    const category = await categoryService.updateCategory(user_id, category_id, {
+    const category = await categoryService.updateCategory(userId, category_id, {
       name: updates.name?.trim(),
       color: updates.color?.trim(),
       icon: updates.icon?.trim(),
@@ -131,16 +137,22 @@ export async function updateUserCategory(req: Request, res: Response): Promise<v
 
 export async function deleteUserCategory(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, category_id } = req.body;
-
-    if (!user_id || !category_id) {
-      res.status(400).json({ error: 'user_id and category_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Deleting category:', category_id, 'for user:', user_id);
+    const { category_id } = req.body ?? {};
 
-    await categoryService.deleteCategory(user_id, category_id);
+    if (!category_id) {
+      res.status(400).json({ error: 'category_id is required' });
+      return;
+    }
+
+    console.log('Deleting category:', category_id, 'for user:', userId);
+
+    await categoryService.deleteCategory(userId, category_id);
 
     res.json({
       success: true,
@@ -155,14 +167,20 @@ export async function deleteUserCategory(req: Request, res: Response): Promise<v
 
 export async function getCategoryColor(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, category_name } = req.body;
-
-    if (!user_id || !category_name) {
-      res.status(400).json({ error: 'user_id and category_name are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    const color = await categoryService.getCategoryColor(user_id, category_name);
+    const { category_name } = req.body ?? {};
+
+    if (!category_name) {
+      res.status(400).json({ error: 'category_name is required' });
+      return;
+    }
+
+    const color = await categoryService.getCategoryColor(userId, category_name);
 
     res.json({
       success: true,

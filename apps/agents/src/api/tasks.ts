@@ -3,14 +3,15 @@ import { getSupabaseService } from '../services/SupabaseService.js';
 
 export async function getUserTasks(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, status, category, priority, due_before, due_after } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Fetching tasks for user:', user_id);
+    const { status, category, priority, due_before, due_after } = req.body;
+
+    console.log('Fetching tasks for user:', userId);
 
     const filters: any = {};
     if (status) filters.status = status;
@@ -19,7 +20,7 @@ export async function getUserTasks(req: Request, res: Response): Promise<void> {
     if (due_before) filters.dueBefore = due_before;
     if (due_after) filters.dueAfter = due_after;
 
-    const tasks = await getSupabaseService().getTasks(user_id, filters);
+    const tasks = await getSupabaseService().getTasks(userId, filters);
 
     res.json({
       success: true,
@@ -34,17 +35,18 @@ export async function getUserTasks(req: Request, res: Response): Promise<void> {
 
 export async function createUserTask(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, ...taskData } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Creating task for user:', user_id);
+    const { user_id: _ignoredUserId, ...taskData } = req.body ?? {};
+
+    console.log('Creating task for user:', userId);
     console.log('Task data:', taskData);
 
-    const createdTask = await getSupabaseService().createTask(user_id, {
+    const createdTask = await getSupabaseService().createTask(userId, {
       title: taskData.title,
       description: taskData.description,
       category: taskData.category,
@@ -73,16 +75,22 @@ export async function createUserTask(req: Request, res: Response): Promise<void>
 
 export async function updateUserTask(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, task_id, ...updates } = req.body;
-
-    if (!user_id || !task_id) {
-      res.status(400).json({ error: 'user_id and task_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Updating task:', task_id, 'for user:', user_id);
+    const { task_id, ...updates } = req.body ?? {};
 
-    const updatedTask = await getSupabaseService().updateTask(user_id, task_id, {
+    if (!task_id) {
+      res.status(400).json({ error: 'task_id is required' });
+      return;
+    }
+
+    console.log('Updating task:', task_id, 'for user:', userId);
+
+    const updatedTask = await getSupabaseService().updateTask(userId, task_id, {
       title: updates.title,
       description: updates.description,
       category: updates.category,
@@ -113,16 +121,22 @@ export async function updateUserTask(req: Request, res: Response): Promise<void>
 
 export async function deleteUserTask(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, task_id } = req.body;
-
-    if (!user_id || !task_id) {
-      res.status(400).json({ error: 'user_id and task_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Deleting task:', task_id, 'for user:', user_id);
+    const { task_id } = req.body ?? {};
 
-    const result = await getSupabaseService().deleteTask(user_id, task_id);
+    if (!task_id) {
+      res.status(400).json({ error: 'task_id is required' });
+      return;
+    }
+
+    console.log('Deleting task:', task_id, 'for user:', userId);
+
+    const result = await getSupabaseService().deleteTask(userId, task_id);
 
     res.json(result);
 
@@ -134,16 +148,22 @@ export async function deleteUserTask(req: Request, res: Response): Promise<void>
 
 export async function completeUserTask(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, task_id, notes, actual_duration } = req.body;
-
-    if (!user_id || !task_id) {
-      res.status(400).json({ error: 'user_id and task_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Completing task:', task_id, 'for user:', user_id);
+    const { task_id, notes, actual_duration } = req.body ?? {};
 
-    const completedTask = await getSupabaseService().completeTask(user_id, task_id, notes, actual_duration);
+    if (!task_id) {
+      res.status(400).json({ error: 'task_id is required' });
+      return;
+    }
+
+    console.log('Completing task:', task_id, 'for user:', userId);
+
+    const completedTask = await getSupabaseService().completeTask(userId, task_id, notes, actual_duration);
 
     res.json({
       success: true,

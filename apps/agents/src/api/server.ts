@@ -40,6 +40,7 @@ import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCa
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { generateInteractionFromChat } from './chat-interactions.js';
+import { authenticateRequest } from './middleware/auth.js';
 
 const app = express();
 const PORT = env.PORT;
@@ -249,7 +250,13 @@ app.post('/api/interactions/from-chat', generateInteractionFromChat);
 // Chat endpoints
 app.post('/api/chat/history', async (req, res) => {
   try {
-    const { user_id, session_id, limit = 50 } = req.body;
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    const { session_id, limit = 50 } = req.body ?? {};
 
     // For now, return empty array - chat history is managed in frontend
     // This endpoint exists to prevent 404 errors
@@ -329,6 +336,10 @@ app.use('*', (req: express.Request, res: express.Response) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Agent service running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Agent service running on port ${PORT}`);
+  });
+}
+
+export { app };
