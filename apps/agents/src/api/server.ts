@@ -1,18 +1,10 @@
-import dotenv from 'dotenv';
+import { env, isDevelopment, ENV_PATH } from '../utils/env.js';
+import { initializeSupabase } from '../services/SupabaseService.js';
 
-// Configure dotenv first
-dotenv.config({ path: '.env' });
-
-// Set environment variables explicitly if needed
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.OPENAI_API_KEY) {
-  console.error('Missing required environment variables');
-  process.exit(1);
+if (isDevelopment) {
+  console.log(`Environment variables loaded from ${ENV_PATH}`);
 }
 
-console.log('Environment variables loaded successfully');
-
-// Initialize Supabase client first
-import { initializeSupabase } from '../services/SupabaseService.js';
 initializeSupabase();
 
 import express from 'express';
@@ -28,17 +20,19 @@ import { processAgentMessage, addStartTime } from './agent.js';
 import { generateInteractionFromChat } from './chat-interactions.js';
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = env.PORT;
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
 
 // Request logging middleware
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
-  next();
-});
+if (isDevelopment) {
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    next();
+  });
+}
 
 // Input validation middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
@@ -143,7 +137,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
   
   // Don't leak error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
   const errorMessage = isDevelopment ? err.message : 'Internal server error';
   
   res.status(500).json({ 
