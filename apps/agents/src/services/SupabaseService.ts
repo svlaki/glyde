@@ -174,14 +174,22 @@ export class SupabaseService {
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
       console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
 
+      // Fetch the user's timezone so we can correctly persist temporal updates
+      const profile = await this.getProfile(userId);
+      const userTimezone = profile?.timezone || 'America/New_York';
+
       // Build update object with only provided fields
       const updateData: any = {
         updated_at: new Date().toISOString()
       };
 
       if (updates.title !== undefined) updateData.title = updates.title;
-      if (updates.start_time !== undefined) updateData.start_time = updates.start_time;
-      if (updates.end_time !== undefined) updateData.end_time = updates.end_time;
+      if (updates.start_time !== undefined) {
+        updateData.start_time = convertToUTC(updates.start_time, userTimezone);
+      }
+      if (updates.end_time !== undefined) {
+        updateData.end_time = convertToUTC(updates.end_time, userTimezone);
+      }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.category !== undefined) updateData.category = updates.category;
