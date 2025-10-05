@@ -113,21 +113,6 @@ export function debounce<T extends (...args: any[]) => any>(
   };
 }
 
-// Format date for display
-export function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-// Format time for display
-export function formatTime(date: string | Date): string {
-  const d = new Date(date);
-  return d.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+// Format date/time helpers were previously exported here but have been removed
+// because they were unused. Add new formatting helpers where they are needed
+// to keep modules focused and lightweight.
