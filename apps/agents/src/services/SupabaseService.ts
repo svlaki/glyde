@@ -898,34 +898,68 @@ export class SupabaseService {
   }
 
   async getUserSettings(userId: string): Promise<Record<string, any>> {
-    const { data, error } = await this.client
-      .from('settings')
-      .select('*');
+    try {
+      if (!userId) {
+        throw new Error('User ID is required to fetch settings');
+      }
 
-    if (error) {
-      console.error('Error fetching settings:', error);
+      const { data, error } = await this.client
+        .from('settings')
+        .select('key, value')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return {};
+      }
+
+      if (!data) {
+        return {};
+      }
+
+      return data.reduce<Record<string, any>>((settings, setting: any) => {
+        if (setting?.key !== undefined) {
+          settings[setting.key] = setting.value;
+        }
+        return settings;
+      }, {});
+    } catch (error) {
+      console.error('Exception fetching settings:', error);
       return {};
     }
-
-    const settings: Record<string, any> = {};
-    data?.forEach(setting => {
-      settings[setting.key] = setting.value;
-    });
-
-    return settings;
   }
 
   async updateUserSetting(userId: string, key: string, value: any): Promise<boolean> {
-    const { error } = await this.client
-      .from('settings')
-      .upsert([{ key, value }]);
+    try {
+      if (!userId) {
+        throw new Error('User ID is required to update settings');
+      }
 
-    if (error) {
-      console.error('Error updating setting:', error);
+      if (!key || typeof key !== 'string') {
+        throw new Error('Setting key must be a non-empty string');
+      }
+
+      const { error } = await this.client
+        .from('settings')
+        .upsert([{
+          user_id: userId,
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        }], {
+          onConflict: 'user_id,key',
+        });
+
+      if (error) {
+        console.error('Error updating setting:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Exception updating setting:', error);
       return false;
     }
-
-    return true;
   }
 
   async subscribeToUserChanges(userId: string, callback: (payload: any) => void) {
