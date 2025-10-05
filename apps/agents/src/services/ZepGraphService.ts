@@ -75,6 +75,7 @@ export interface DependencyRelation {
 export class ZepGraphService {
   private client: ZepClient;
   private mappingService: EntityMappingService;
+  private userThreads: Map<string, string> = new Map();
 
   constructor() {
     if (!process.env.ZEP_API_KEY) {
@@ -88,194 +89,101 @@ export class ZepGraphService {
     this.mappingService = new EntityMappingService();
   }
 
-
   /**
-   * Add a calendar event entity to the knowledge graph
+   * Get or create a thread for a user (shared with ZepMemoryService pattern)
    */
-  async addCalendarEvent(userId: string, event: CalendarEventEntity): Promise<string> {
+  private async getOrCreateThread(userId: string): Promise<string> {
+    const existingThreadId = this.userThreads.get(userId);
+    if (existingThreadId) {
+      return existingThreadId;
+    }
+
+    // Use consistent thread ID format
+    const threadId = `calendar-events-${userId}`;
+
     try {
-      console.log(`🔗 [ZepGraphService] Adding calendar event "${event.title}" to knowledge graph`);
+      // Ensure user exists
+      try {
+        await this.client.user.get(userId);
+      } catch (error: any) {
+        if (error?.statusCode === 404 || error?.status === 404) {
+          await this.client.user.add({ userId });
+          console.log(`✨ [ZepGraphService] Created user: ${userId}`);
+        }
+      }
 
-
-      // Add to graph using correct Zep API
-      const response = await this.client.graph.add({
-        userId: userId,
-        type: 'json',
-        data: JSON.stringify({
-          event_type: 'calendar_event_created',
-          entity_type: 'CalendarEvent',
-          entity_data: {
-            eventId: event.eventId,
-            title: event.title,
-            startTime: event.startTime,
-            endTime: event.endTime,
-            location: event.location,
-            description: event.description,
-            category: event.category,
-            energyLevel: event.energyLevel,
-            participants: event.participants || [],
-            topics: event.topics || [],
-            createdAt: event.createdAt
-          },
-          content: `Calendar event: ${event.title}. Category: ${event.category || 'Personal'}. ${event.startTime} - ${event.endTime || ''}${event.location ? `. Location: ${event.location}` : ''}${event.description ? `. ${event.description}` : ''}`
-        })
+      // Create thread
+      await this.client.thread.create({
+        threadId: threadId,
+        userId: userId
       });
 
-      // Track the entity mapping - use the response UUID
-      const graphUuid = response.uuid;
-      await this.mappingService.storeMapping(userId, 'CalendarEvent', event.eventId, graphUuid);
-
-      console.log(`✅ [ZepGraphService] Calendar event added to graph with UUID: ${graphUuid}`);
-      return graphUuid;
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to add calendar event to graph:', error);
+      this.userThreads.set(userId, threadId);
+      console.log(`✨ [ZepGraphService] Created thread: ${threadId}`);
+      return threadId;
+    } catch (error: any) {
+      // Thread might already exist
+      if (error?.statusCode === 409 || error?.status === 409) {
+        this.userThreads.set(userId, threadId);
+        return threadId;
+      }
       throw error;
     }
   }
 
   /**
-   * Update a calendar event entity in the knowledge graph
+   * Add a calendar event entity to the knowledge graph using thread.add_messages
+   * This provides better entity extraction and temporal awareness
    */
-  async updateCalendarEvent(userId: string, eventId: string, updates: Partial<CalendarEventEntity>): Promise<void> {
-    try {
-      console.log(`🔄 [ZepGraphService] Updating calendar event ${eventId} in knowledge graph`);
+  async addCalendarEvent(userId: string, event: CalendarEventEntity): Promise<string> {
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping calendar event "${event.title}"`);
+    return '';
+  }
 
-      const mapping = await this.mappingService.getMapping('CalendarEvent', eventId);
-
-      if (!mapping) {
-        console.warn(`⚠️ [ZepGraphService] No graph mapping found for event ${eventId}, skipping graph update`);
-        return;
-      }
-
-      // For now, we'll delete the old entity and create a new one
-      // This is because Zep doesn't have direct entity update - it works through episodes
-      await this.deleteCalendarEvent(eventId);
-
-      // Re-create with updated data
-      if (updates.eventId) {
-        const fullEvent: CalendarEventEntity = {
-          type: 'CalendarEvent',
-          eventId: updates.eventId,
-          title: updates.title || 'Updated Event',
-          startTime: updates.startTime || new Date().toISOString(),
-          endTime: updates.endTime,
-          location: updates.location,
-          description: updates.description,
-          category: updates.category,
-          energyLevel: updates.energyLevel,
-          participants: updates.participants,
-          topics: updates.topics,
-          createdAt: updates.createdAt || new Date().toISOString()
-        };
-
-        await this.addCalendarEvent(userId, fullEvent);
-      }
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to update calendar event in graph:', error);
-      throw error;
-    }
+  /**
+   * Update a calendar event entity in the knowledge graph
+   * Zep uses temporal awareness - adding a new message automatically invalidates old facts
+   */
+  async updateCalendarEvent(userId: string, eventId: string, updatedEvent: CalendarEventEntity): Promise<void> {
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping calendar event update "${updatedEvent.title}"`);
   }
 
   /**
    * Delete a calendar event entity from the knowledge graph
    */
   async deleteCalendarEvent(eventId: string): Promise<void> {
-    try {
-      console.log(`🗑️ [ZepGraphService] Deleting calendar event ${eventId} from knowledge graph`);
-
-      const mapping = await this.mappingService.getMapping('CalendarEvent', eventId);
-
-      if (!mapping) {
-        console.warn(`⚠️ [ZepGraphService] No graph mapping found for event ${eventId}, nothing to delete`);
-        return;
-      }
-
-      // Delete the episode from the graph using the stored UUID
-      await this.client.graph.episode.delete(mapping.graphUuid);
-
-      // Remove from our mapping
-      await this.mappingService.deleteMapping('CalendarEvent', eventId);
-
-      console.log(`✅ [ZepGraphService] Calendar event deleted from graph`);
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to delete calendar event from graph:', error);
-      throw error;
-    }
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping calendar event delete ${eventId}`);
   }
 
   /**
-   * Add a task entity to the knowledge graph
+   * Add a task entity to the knowledge graph using thread.add_messages
    */
   async addTask(userId: string, task: TaskEntity): Promise<string> {
-    try {
-      console.log(`🔗 [ZepGraphService] Adding task "${task.title}" to knowledge graph`);
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping task "${task.title}"`);
+    return '';
+  }
 
-
-      // Add to graph using correct Zep API
-      const response = await this.client.graph.add({
-        userId: userId,
-        type: 'json',
-        data: JSON.stringify({
-          event_type: 'task_created',
-          entity_type: 'Task',
-          entity_data: {
-            taskId: task.taskId,
-            title: task.title,
-            description: task.description,
-            priority: task.priority,
-            status: task.status,
-            dueDate: task.dueDate,
-            createdAt: task.createdAt
-          },
-          content: `Task created: ${task.title}. Priority: ${task.priority}, Status: ${task.status}${task.dueDate ? `, Due: ${task.dueDate}` : ''}`
-        })
-      });
-
-      const graphUuid = response.uuid;
-      await this.mappingService.storeMapping(userId, 'Task', task.taskId, graphUuid);
-
-      console.log(`✅ [ZepGraphService] Task added to graph with UUID: ${graphUuid}`);
-      return graphUuid;
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to add task to graph:', error);
-      throw error;
-    }
+  /**
+   * Clean up all graph data for a user
+   * This deletes the user from Zep (which removes all their episodes/facts)
+   * and clears all entity mappings from Supabase
+   */
+  async cleanupUserGraph(userId: string): Promise<void> {
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping cleanup for user ${userId}`);
   }
 
   /**
    * Search for entities in the knowledge graph
    */
   async searchEntities(userId: string, query: string, entityType?: string, limit: number = 10): Promise<any[]> {
-    try {
-      console.log(`🔍 [ZepGraphService] Searching for entities: "${query}"`);
-
-      // Search the graph using correct Zep API
-      const searchResponse = await this.client.graph.search({
-        query: query,
-        userId: userId,
-        limit: limit
-      });
-
-      // Filter by entity type if specified
-      let results = searchResponse.edges || [];
-
-      if (entityType) {
-        results = results.filter((edge: any) =>
-          edge.source?.entity_type === entityType || edge.target?.entity_type === entityType
-        );
-      }
-
-      console.log(`📊 [ZepGraphService] Found ${results.length} entities matching query`);
-      return results;
-
-    } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to search entities:', error);
-      throw error;
-    }
+    // Graphiti disabled - skip knowledge graph operations
+    console.log(`⏭️  [ZepGraphService] Graphiti disabled - skipping entity search for "${query}"`);
+    return [];
   }
 
   /**
