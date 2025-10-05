@@ -1,79 +1,81 @@
-import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../lib/authContext'
-import { ThemeToggle } from './ui/theme-toggle'
-import { Drawer, Button, NavLink, Divider } from '@mantine/core'
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Drawer, NavLink, Divider } from '@mantine/core';
 
-import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { useAuth } from '@/lib/authContext'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useAuth } from '@/lib/authContext';
 
-interface MainLayoutProps {
-  children: React.ReactNode
-}
+type MainLayoutProps = {
+  children: React.ReactNode;
+};
 
 const navItems = [
   { path: '/calendar', label: 'Calendar', icon: '📅' },
   { path: '/tasks', label: 'Tasks', icon: '✅' },
   { path: '/goals', label: 'Goals', icon: '🎯' },
   { path: '/profile', label: 'Profile', icon: '👤' },
-  { path: '/categories', label: 'Categories', icon: '🏷️' }
-]
+  { path: '/categories', label: 'Categories', icon: '🏷️' },
+];
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const location = useLocation()
-  const { signOut } = useAuth()
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation();
+  const { signOut } = useAuth();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
-    setMobileOpen(false)
-  }, [location.pathname])
+    setIsDrawerOpen(false);
+  }, [location.pathname]);
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <nav className="bg-card border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setMenuOpen(true)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-                aria-label="Toggle menu"
+                onClick={() => setIsDrawerOpen(true)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition"
+                aria-label="Toggle navigation menu"
+                type="button"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <h1 className="ml-3 text-xl font-bold text-foreground">Glyde</h1>
+              <Link to="/calendar" className="text-xl font-bold text-foreground">
+                Glyde
+              </Link>
             </div>
-            <div className="flex items-center gap-3">
+
+            <div className="flex items-center gap-2">
               <ThemeToggle />
-              <button
+              <Button
+                variant="outline"
                 onClick={signOut}
-                className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="hidden sm:inline-flex"
               >
                 Sign Out
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </nav>
 
       <Drawer
-        opened={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        opened={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
         title={
           <div className="flex items-center gap-2">
             <span className="text-2xl">✨</span>
-            <span className="text-lg font-bold">Navigation</span>
+            <span className="text-lg font-semibold">Navigation</span>
           </div>
         }
         padding="md"
         size="sm"
       >
         <div className="flex flex-col gap-1">
-          {navItems.map(item => (
+          {navItems.map((item) => (
             <NavLink
               key={item.path}
               component={Link}
@@ -81,7 +83,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               label={item.label}
               leftSection={<span className="text-xl">{item.icon}</span>}
               active={location.pathname === item.path}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => setIsDrawerOpen(false)}
               variant="filled"
               styles={{
                 root: {
@@ -96,24 +98,22 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Divider my="md" />
 
         <Button
-          variant="subtle"
-          color="red"
-          fullWidth
+          variant="destructive"
+          className="w-full"
           onClick={() => {
-            setMenuOpen(false)
-            signOut()
+            setIsDrawerOpen(false);
+            signOut();
           }}
         >
           Sign Out
         </Button>
       </Drawer>
 
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
-          <div className="mx-auto flex w-full flex-col">
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
+        <div className="mx-auto flex w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
+          {children}
+        </div>
+      </main>
     </div>
-  )
+  );
 }

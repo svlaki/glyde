@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../lib/authContext';
 import { useStreamingChat, ChatMessage } from './hooks/useStreamingChat';
-import { useStreamExample } from '@llm-ui/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send } from 'lucide-react';
@@ -34,7 +33,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const lastTimestampRef = useRef<string | null>(null);
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   // Initialize session ID when user is available
   useEffect(() => {
@@ -49,13 +48,13 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     messages,
     isStreaming,
     currentStreamingMessage,
-    isStreamFinished,
     setMessages,
     sendMessage,
-  } = useStreamingChat({
-    sessionId,
-    onEventCreated,
-  });
+  } = useStreamingChat(
+    onEventCreated
+      ? { sessionId, onEventCreated }
+      : { sessionId }
+  );
 
   // Direct markdown rendering - no need for complex llm-ui processing
 
@@ -91,26 +90,34 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
       if (result.success && result.messages && result.messages.length > 0) {
         
         // Filter out internal greeting messages - check for multiple variations
-        const filteredHistory = result.messages.filter((msg: { role: string; content: string; timestamp?: string }) => {
+        type HistoryMessage = {
+          id: string;
+          role: string;
+          sender?: string;
+          content: string;
+          timestamp?: string;
+        };
+
+        const filteredHistory = result.messages.filter((msg: HistoryMessage) => {
           if (msg.sender !== 'user') return true; // Keep all assistant messages
-          
+
           const content = msg.content.toLowerCase();
-          const isGreetingMessage = 
+          const isGreetingMessage =
             content.includes('please give me a brief greeting') ||
             content.includes('brief greeting') ||
             content.includes('current time') && content.includes('events') && content.includes('schedule');
-          
+
           if (isGreetingMessage) {
           }
-          
+
           return !isGreetingMessage;
         });
-        
-        const formattedMessages = filteredHistory.map((msg: { role: string; content: string; timestamp?: string }) => ({
-          id: msg.id,
+
+        const formattedMessages = filteredHistory.map((msg: HistoryMessage) => ({
+          id: msg.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           content: msg.content,
-          sender: msg.sender,
-          timestamp: msg.timestamp
+          sender: msg.sender === 'user' ? 'user' : 'assistant',
+          timestamp: msg.timestamp ?? new Date().toISOString()
         }));
         
         setMessages(formattedMessages);
@@ -164,11 +171,32 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
 
   // Streaming message component using llm-ui
   const StreamingMessage = ({ content }: { content: string }) => {
-    const { output } = useStreamExample(content, {
-      autoStart: true,
-      delayMultiplier: 0.5,
-      startIndex: 0,
-    });
+    const [output, setOutput] = useState('');
+
+    useEffect(() => {
+      setOutput('');
+
+      if (!content) {
+        return;
+      }
+
+      let index = 0;
+      const charactersPerTick = 3;
+      const intervalMs = 20;
+
+      const intervalId = window.setInterval(() => {
+        index = Math.min(content.length, index + charactersPerTick);
+        setOutput(content.slice(0, index));
+
+        if (index >= content.length) {
+          window.clearInterval(intervalId);
+        }
+      }, intervalMs);
+
+      return () => {
+        window.clearInterval(intervalId);
+      };
+    }, [content]);
 
     return (
       <div className="flex justify-start mb-4">
