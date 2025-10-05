@@ -4,18 +4,31 @@ import { useAuth } from '../lib/authContext'
 import { ThemeToggle } from './ui/theme-toggle'
 import { Drawer, Button, NavLink, Divider } from '@mantine/core'
 
-export function MainLayout({ children }: { children: React.ReactNode }) {
+import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { useAuth } from '@/lib/authContext'
+import { cn } from '@/lib/utils'
+
+interface MainLayoutProps {
+  children: React.ReactNode
+}
+
+const navItems = [
+  { path: '/calendar', label: 'Calendar', icon: '📅' },
+  { path: '/tasks', label: 'Tasks', icon: '✅' },
+  { path: '/goals', label: 'Goals', icon: '🎯' },
+  { path: '/profile', label: 'Profile', icon: '👤' },
+  { path: '/categories', label: 'Categories', icon: '🏷️' }
+]
+
+export function MainLayout({ children }: MainLayoutProps) {
   const location = useLocation()
   const { signOut } = useAuth()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  const navItems = [
-    { path: '/calendar', label: 'Calendar', icon: '📅' },
-    { path: '/tasks', label: 'Tasks', icon: '✓' },
-    { path: '/goals', label: 'Goals', icon: '🎯' },
-    { path: '/profile', label: 'Profile', icon: '👤' },
-    { path: '/categories', label: 'Categories', icon: '🏷️' }
-  ]
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -95,9 +108,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         </Button>
       </Drawer>
 
-      <main className="flex-1 overflow-auto bg-background">
-        {children}
-      </main>
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
+          <div className="mx-auto flex w-full flex-col">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
