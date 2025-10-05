@@ -70,42 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
   
-  // Helper function to call the user schema creation endpoint
-  async function callUserSchemaCreation(session: Session) {
-    try {
-      if (!session?.user?.id || !session?.access_token) {
-        console.warn('Invalid session data for schema creation')
-        return
-      }
-
-      const res = await fetch(`${AGENT_SERVICE_URL}/api/user/create-schema`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          user_id: session.user.id, 
-          user_email: session.user.email 
-        })
-      })
-      
-      if (!res.ok) {
-        const errorText = await res.text()
-        throw new Error(`HTTP ${res.status}: ${errorText}`)
-      }
-      
-      const data = await res.json()
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to create user schema')
-      }
-      
-      console.log('✅ User schema created successfully')
-    } catch (err) {
-      console.error('❌ User schema creation error:', err)
-      // Don't throw - this shouldn't block the auth flow
-    }
+  // Schema creation is no longer needed - using public tables with RLS
+  function callUserSchemaCreation(session: Session) {
+    // No-op: User schemas are deprecated in favor of public tables with RLS
+    console.log('✅ User authenticated - using public tables with RLS');
   }
 
   async function signOut() {

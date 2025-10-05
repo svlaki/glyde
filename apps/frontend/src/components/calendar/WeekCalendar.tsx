@@ -21,7 +21,15 @@ export function WeekCalendar({
   onEventDrop,
   userTimezone
 }: WeekCalendarProps) {
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  // Calculate week start so that today is the second day (index 1)
+  const getWeekStartForToday = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    return startOfWeek(yesterday, { weekStartsOn: 0 });
+  };
+  
+  const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStartForToday());
 
   // Generate array of days for the current week
   const weekDays = useMemo(() => {
@@ -40,7 +48,7 @@ export function WeekCalendar({
 
   // Go to today
   const goToToday = () => {
-    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+    setCurrentWeekStart(getWeekStartForToday());
   };
 
   // Hours for time grid (12 AM to 11 PM) - full 24 hours
