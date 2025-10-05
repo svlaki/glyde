@@ -21,6 +21,18 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('❌ [ErrorBoundary] Caught error:', error, errorInfo)
+    
+    // Log error to external service in production
+    if (process.env.NODE_ENV === 'production') {
+      // Here you would typically send to error tracking service
+      // Example: Sentry.captureException(error, { extra: errorInfo })
+      console.error('Production error:', {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        timestamp: new Date().toISOString()
+      })
+    }
   }
 
   handleReset = () => {

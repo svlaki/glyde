@@ -7,7 +7,11 @@
     "build": "tsc",
     "start": "node dist/api/server.js",
     "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "lint": "eslint src --ext .ts --fix",
+    "lint:check": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "quality": "npm run lint:check && npm run type-check && npm run test"
   },
   "dependencies": {
     "@getzep/zep-cloud": "^3.4.1",

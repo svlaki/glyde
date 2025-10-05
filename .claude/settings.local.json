@@ -34,7 +34,9 @@
       "Bash(npm install:*)",
       "Bash(cat:*)",
       "Bash(if exist \"apps\\frontend\\nul\" del \"apps\\frontend\\nul\")",
-      "Bash(if exist \"nul\" del \"nul\")"
+      "Bash(if exist \"nul\" del \"nul\")",
+      "Bash(docker system prune:*)",
+      "Bash(docker rmi:*)"
     ],
     "deny": [],
     "ask": [],
