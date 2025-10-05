@@ -15,6 +15,8 @@ import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
+import { format } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 // Extended CalendarEvent interface for UI display
 interface ExtendedCalendarEvent extends CalendarEvent {
@@ -312,7 +314,6 @@ export function CalendarPage() {
                 }}
                 height="100%"
                 themeSystem="standard"
-                timeZone="local"
                 eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
                 slotMinTime="00:00:00"
                 slotMaxTime="24:00:00"
@@ -408,6 +409,7 @@ export function CalendarPage() {
           onSave={loadUserEvents}
           user={user}
           toast={toast}
+          userTimezone={userTimezone}
         />
       )}
 
@@ -537,9 +539,10 @@ interface EventModalProps {
   onSave: () => void;
   user: { id: string; email?: string };
   toast: (options: { title: string; description: string; variant?: string }) => void;
+  userTimezone: string;
 }
 
-function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: EventModalProps) {
+function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTimezone }: EventModalProps) {
   const [title, setTitle] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -549,11 +552,11 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
   useEffect(() => {
     if (event) {
       setTitle(event.title || '');
-      // Convert UTC time to local time for display in the form
-      const startDate = new Date(event.start_time);
-      const endDate = new Date(event.end_time);
-      setStartTime(startDate.toTimeString().slice(0, 5)); // HH:MM format
-      setEndTime(endDate.toTimeString().slice(0, 5)); // HH:MM format
+      // Convert UTC time to user's timezone for display in the form
+      const startDate = toZonedTime(new Date(event.start_time), userTimezone);
+      const endDate = toZonedTime(new Date(event.end_time), userTimezone);
+      setStartTime(format(startDate, 'HH:mm'));
+      setEndTime(format(endDate, 'HH:mm'));
       setDescription(event.description || '');
       setCategory(event.category || 'Personal');
     } else {
@@ -563,7 +566,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
       setDescription('');
       setCategory('Personal');
     }
-  }, [event]);
+  }, [event, userTimezone]);
 
   async function handleSave() {
     if (!user || !title.trim()) return;
@@ -571,9 +574,9 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: Event
     const baseDate = date ? date.split('T')[0] : (event?.start_time.split('T')[0]);
     if (!baseDate) return;
 
-    // Create dates in local timezone and convert to ISO string
-    const starts_at = new Date(`${baseDate}T${startTime}:00`);
-    const ends_at = new Date(`${baseDate}T${endTime}:00`);
+    // Convert from user's timezone to UTC for storage
+    const starts_at = fromZonedTime(`${baseDate}T${startTime}:00`, userTimezone);
+    const ends_at = fromZonedTime(`${baseDate}T${endTime}:00`, userTimezone);
 
     const eventData = {
       title: title.trim(),
