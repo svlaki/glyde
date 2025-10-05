@@ -1,10 +1,17 @@
-# Glydeeee Database Schema and Security Model
+# Glyde Database Schema and Security Model
 
-This document outlines the database schema design, security model, and data isolation approach used in the Glydeeee application.
+This document outlines the database schema design, security model, and data isolation approach used in the Glyde application.
+
+Glyde stores every user inside a dedicated PostgreSQL schema, with shared public tables for auth-linked profile data. The SQL migrations in `supabase/migrations/` create:
+
+- Public tables for `profile`, AI interaction audit logs, and supporting views
+- Per-user schemas (`u_<uuid_without_hyphens>`) containing `events`, `tasks`, `goals`, `categories`, `messages`, and configuration tables
+- Supabase functions and triggers that keep these schemas in sync and enforce row-level security (RLS)
+- RPC helpers used by the LangGraph agent to read/write across the tenant boundary safely
 
 ## Schema Isolation Approach
 
-Glydeeee implements a multi-tenant database architecture using Supabase's schema isolation pattern. Each user gets their own dedicated PostgreSQL schema, ensuring complete data isolation between users.
+Glyde implements a multi-tenant database architecture using Supabase's schema isolation pattern. Each user gets their own dedicated PostgreSQL schema, ensuring complete data isolation between users.
 
 ### Key Features:
 

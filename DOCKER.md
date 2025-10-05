@@ -1,229 +1,67 @@
 # Docker Deployment Guide
 
-This guide explains how to run Glydeeee using Docker for easy deployment and consistent environments.
-
-## Architecture
-
-The Docker setup includes these services:
+This guide describes how to run the Glyde stack locally with Docker Compose. The compose file starts two services:
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Frontend       │───▶│  Agents Service │───▶│ Graphiti Memory│───▶│    Neo4j        │
-│  React + Vite   │    │  LangGraph      │    │ Python FastAPI │    │ Graph Database  │
-│  Port 3000      │    │  Port 8000      │    │  Port 8001      │    │  Port 7474/7687 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+┌──────────────────────────┐    ┌──────────────────────────┐
+│ Frontend (Vite + React) │──▶ │ Agents API (LangGraph)   │
+│ Port 3000 → 5173        │    │ Port 8000                │
+└──────────────────────────┘    └──────────────────────────┘
 ```
 
-## Quick Start
+There are no local databases in the Docker stack—connect to your hosted Supabase project instead.
 
-### 1. Setup Environment Variables
+## Prerequisites
 
-```bash
-# Copy the example file
-cp .env.example .env
+- Docker Engine 24+ and Docker Compose plugin
+- A `.env` file in the repository root with the required Supabase and AI credentials
+- Access to a Supabase project with the migrations in `supabase/migrations` applied
 
-# Edit .env with your actual values
-nano .env
-```
+## Environment variables
 
-Required environment variables:
-```env
-# Supabase Configuration
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-role-key
+Copy `.env.example` to `.env` and set the following keys before starting Docker:
 
-# OpenAI Configuration  
-OPENAI_API_KEY=sk-your-openai-api-key
-```
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_URL` | Supabase project URL used by both services |
+| `SUPABASE_ANON_KEY` | Public key for the frontend client |
+| `SUPABASE_SERVICE_KEY` | Service role key for the agent service |
+| `OPENAI_API_KEY` | OpenAI key for embeddings and agent reasoning |
+| `ZEP_API_KEY` *(optional)* | Enables persistent memory in the agent |
+| `ZEP_BASE_URL` *(optional)* | Override the Zep API base URL |
 
-### 2. Start the Stack
+Store secrets in your `.env`; they are injected into the containers at runtime via `docker-compose.yml`.
 
-```bash
-# Make the script executable
-chmod +x start-docker.sh
+## Starting the stack
 
-# Start all services
-./start-docker.sh
-```
+1. Build and start the services:
+   ```bash
+   docker compose up --build
+   ```
+2. Visit the frontend at http://localhost:3000. Docker maps this port to the Vite dev server running inside the container.
+3. The agent service is available at http://localhost:8000 (for example `http://localhost:8000/health`).
+4. Stop everything with:
+   ```bash
+   docker compose down
+   ```
 
-Or manually:
-```bash
-docker-compose up --build -d
-```
+### Using the helper script
 
-### 3. Access the Application
+`start-docker.sh` wraps `docker compose up --build -d` and performs a few sanity checks (verifying `.env` exists, confirming Docker Compose is installed). Feel free to run it instead of the manual commands.
 
-- **Frontend**: http://localhost:3000
-- **Agents API**: http://localhost:8000/health
-- **Graphiti Memory**: http://localhost:8001/health
-- **Neo4j Browser**: http://localhost:7474 (neo4j/graphiti_password)
+## Development tips
 
-## Services
-
-### Neo4j Graph Database
-- **Image**: neo4j:5.15-community
-- **Ports**: 7474 (HTTP), 7687 (Bolt)
-- **Credentials**: neo4j/graphiti_password
-- **Purpose**: Stores the knowledge graph for temporal memory
-
-### Graphiti Memory Service
-- **Build**: `services/graphiti/`
-- **Port**: 8001
-- **Purpose**: FastAPI service providing REST API for Graphiti operations
-- **Dependencies**: Neo4j database
-
-### Agents Service  
-- **Build**: `apps/agents/`
-- **Port**: 8000
-- **Purpose**: Node.js service running LangGraph agents
-- **Dependencies**: Graphiti service
-
-### Frontend
-- **Build**: `apps/frontend/`
-- **Port**: 3000
-- **Purpose**: React/Vite frontend application
-- **Dependencies**: Agents service
-
-## Health Checks
-
-All services include health checks that ensure proper startup order:
-
-```bash
-# Check service status
-docker-compose ps
-
-# View logs for specific service
-docker-compose logs neo4j
-docker-compose logs graphiti-service
-docker-compose logs agent
-docker-compose logs frontend
-```
-
-## Development vs Production
-
-### Development Mode
-```bash
-# Run individual services for development
-./dev-start.sh
-```
-
-This requires:
-- Neo4j running locally (bolt://localhost:7687)
-- Python environment with Graphiti dependencies
-- Node.js for agents and frontend
-
-### Production Mode (Docker)
-```bash
-# Run complete stack in containers
-./start-docker.sh
-```
-
-This provides:
-- Complete isolation
-- Consistent environments
-- Easy deployment
-- Automatic service orchestration
+- The frontend container mounts your local `apps/frontend` source tree so Vite picks up file changes instantly.
+- The agents container runs in production mode by default. For debugging you can rebuild with `NODE_ENV=development` or run the service locally outside Docker (`npm run dev` in `apps/agents`).
+- Logs from each service can be tailed with `docker compose logs -f <service-name>` (use `frontend` or `agent`).
 
 ## Troubleshooting
 
-### Service Won't Start
-1. Check Docker daemon is running
-2. Verify .env file exists and has correct values
-3. Check port conflicts (3000, 7474, 7687, 8000, 8001)
+| Symptom | Fix |
+| --- | --- |
+| Containers exit immediately | Ensure `.env` contains all required Supabase and OpenAI keys. Missing keys cause the agent service to fail validation. |
+| Frontend starts but API calls fail | Confirm the agent container is running and reachable at `http://localhost:8000`. Use `docker compose logs agent` for details. |
+| Changes do not hot reload in Docker | Check that the `apps/frontend` directory is mounted (see `docker-compose.yml`). On Linux you may need to set `CHOKIDAR_USEPOLLING=1` inside the container. |
+| `docker compose up` reports port conflicts | Stop other processes using ports 3000 or 8000, or edit the port mappings in `docker-compose.yml`. |
 
-```bash
-# Check what's using ports
-lsof -i :3000
-lsof -i :8000
-lsof -i :8001
-lsof -i :7474
-lsof -i :7687
-```
-
-### Memory Issues
-Neo4j requires adequate memory. Adjust in docker-compose.yml:
-
-```yaml
-neo4j:
-  environment:
-    - NEO4J_dbms_memory_heap_max__size=4g  # Increase if needed
-```
-
-### Neo4j Connection Issues
-1. Wait for Neo4j to fully initialize (can take 60+ seconds)
-2. Check Neo4j browser: http://localhost:7474
-3. Verify credentials: neo4j/graphiti_password
-
-### Graphiti Service Issues
-1. Check Neo4j is healthy first
-2. View Graphiti logs: `docker-compose logs graphiti-service`
-3. Test health endpoint: http://localhost:8001/health
-
-### Agent Service Issues
-1. Verify Supabase credentials in .env
-2. Check OpenAI API key is valid
-3. Ensure Graphiti service is healthy
-
-## Data Persistence
-
-### Neo4j Data
-Data is persisted in Docker volumes:
-- `neo4j_data`: Database files
-- `neo4j_logs`: Log files
-- `neo4j_plugins`: Plugin files
-
-To backup:
-```bash
-# Create backup
-docker-compose exec neo4j neo4j-admin database dump neo4j
-
-# Restore from backup
-docker-compose exec neo4j neo4j-admin database load neo4j
-```
-
-### Cleanup
-```bash
-# Stop services
-docker-compose down
-
-# Remove volumes (WARNING: deletes all data)
-docker-compose down -v
-
-# Remove images
-docker-compose down --rmi all
-```
-
-## Scaling
-
-For production deployment:
-
-1. **External Neo4j**: Use Neo4j AuraDB cloud service
-2. **Load Balancing**: Add nginx reverse proxy
-3. **Multiple Agents**: Scale agents service horizontally
-4. **Monitoring**: Add health check endpoints and monitoring
-
-Example production docker-compose additions:
-```yaml
-nginx:
-  image: nginx:alpine
-  ports:
-    - "80:80"
-  volumes:
-    - ./nginx.conf:/etc/nginx/nginx.conf
-  depends_on:
-    - agent
-```
-
-## Environment Variables Reference
-
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for LLM | Yes |
-| `NEO4J_URI` | Neo4j connection URI | No (set by docker) |
-| `NEO4J_USER` | Neo4j username | No (set by docker) |
-| `NEO4J_PASSWORD` | Neo4j password | No (set by docker) |
-| `GRAPHITI_SERVICE_URL` | Graphiti service URL | No (set by docker) |
+If you continue to see issues, compare your environment variables with the table above and verify that your Supabase instance has the latest migrations applied.

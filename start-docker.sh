@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Starting Glydeeee Docker Stack..."
+echo "🚀 Starting Glyde Docker stack..."
 
 # Check if .env exists
 if [ ! -f .env ]; then
@@ -34,8 +34,6 @@ echo ""
 echo "🎉 Services starting up! This may take a few minutes..."
 echo ""
 echo "📊 Service Status:"
-echo "   Neo4j Database:     http://localhost:7474 (neo4j/graphiti_password)"
-echo "   Graphiti Service:   http://localhost:8001/health"
 echo "   Agents API:         http://localhost:8000/health"
 echo "   Frontend:           http://localhost:3000"
 echo ""
@@ -46,7 +44,7 @@ echo ""
 echo "🔧 To stop services:"
 echo "   $COMPOSE_CMD down"
 echo ""
-echo "⏱️  Services are starting... Please wait 2-3 minutes for full initialization"
+echo "⏱️  Services are starting... Please wait 1-2 minutes for full initialization"
 
 # Wait a moment and show status
 sleep 5
