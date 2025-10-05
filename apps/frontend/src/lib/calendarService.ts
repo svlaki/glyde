@@ -1,5 +1,8 @@
-import { supabase } from './supabase'
 import { User } from '@supabase/supabase-js'
+
+import { getAgentServiceUrl } from './config'
+
+const agentServiceUrl = getAgentServiceUrl()
 
 export interface CalendarEvent {
   id: string
@@ -33,7 +36,7 @@ export async function fetchUserEvents(
     }
 
     // Use the backend API instead of direct Supabase calls
-    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`, {
+    const response = await fetch(`${agentServiceUrl}/api/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,7 +81,6 @@ export async function createEvent(
     }
 
     // Use the correct endpoint for creating events
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
     const response = await fetch(`${agentServiceUrl}/api/events/create`, {
       method: 'POST',
       headers: {
@@ -129,7 +131,6 @@ export async function updateEvent(
     }
 
     // Use the correct endpoint for updating events
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
     const response = await fetch(`${agentServiceUrl}/api/events/update`, {
       method: 'POST',
       headers: {
@@ -177,7 +178,6 @@ export async function deleteEvent(
     }
 
     // Use the backend API instead of direct RPC calls
-    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
     const response = await fetch(`${agentServiceUrl}/api/events/delete`, {
       method: 'POST',
       headers: {

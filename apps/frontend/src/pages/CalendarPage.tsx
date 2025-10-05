@@ -14,8 +14,9 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { getAgentServiceUrl } from '../lib/config';
 
-const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+const AGENT_SERVICE_URL = getAgentServiceUrl();
 
 
 export function CalendarPage() {

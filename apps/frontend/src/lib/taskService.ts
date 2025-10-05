@@ -1,5 +1,7 @@
 import { User } from '@supabase/supabase-js'
 
+import { getAgentServiceUrl } from './config'
+
 export interface Task {
   id: string
   user_id: string
@@ -23,7 +25,7 @@ export interface Task {
   task_metadata?: Record<string, any>
 }
 
-const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+const API_URL = getAgentServiceUrl()
 
 export async function fetchUserTasks(
   user: User,
