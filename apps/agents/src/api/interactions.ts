@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../services/SupabaseService.js';
-import { createUserEvent } from './events.js';
+import { getSupabaseService } from '../services/SupabaseService.js';
 
 // Store pending interactions in memory (in production, use Redis or database)
 const pendingInteractions = new Map();
@@ -10,15 +9,14 @@ const pendingInteractions = new Map();
 // Generate sample interactions for testing
 export async function getPendingInteractions(req: Request, res: Response): Promise<Response | void> {
   try {
-    const { user_id } = req.body;
-    
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Check if user already has pending interactions
     const userInteractions = Array.from(pendingInteractions.values())
-      .filter((interaction: any) => interaction.user_id === user_id);
+      .filter((interaction: any) => interaction.user_id === userId);
 
     if (userInteractions.length > 0) {
       // Return existing interactions
@@ -37,13 +35,13 @@ export async function getPendingInteractions(req: Request, res: Response): Promi
     // Use SmartInteractionService for intelligent context-aware interactions
     const SmartInteractionService = (await import('../services/SmartInteractionService.js')).SmartInteractionService;
     const smartService = new SmartInteractionService();
-    const smartInteractions = await smartService.generateSmartInteractions(user_id);
-    
+    const smartInteractions = await smartService.generateSmartInteractions(userId);
+
     // Store generated interactions
     smartInteractions.forEach(interaction => {
       pendingInteractions.set(interaction.id, {
         ...interaction,
-        user_id,
+        user_id: userId,
         created_at: new Date().toISOString()
       });
     });
@@ -61,12 +59,17 @@ export async function getPendingInteractions(req: Request, res: Response): Promi
 
 export async function respondToInteraction(req: Request, res: Response): Promise<Response | void> {
   try {
-    const { user_id, interaction_id, response } = req.body;
-    console.log(`🎯 [INTERACTION RESPONSE] Received: user_id=${user_id}, interaction_id=${interaction_id}, response=${response}`);
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    if (!user_id || !interaction_id || !response) {
+    const { interaction_id, response } = req.body ?? {};
+    console.log(`🎯 [INTERACTION RESPONSE] Received: user_id=${userId}, interaction_id=${interaction_id}, response=${response}`);
+
+    if (!interaction_id || !response) {
       console.log('❌ [INTERACTION RESPONSE] Missing required fields');
-      return res.status(400).json({ error: 'user_id, interaction_id, and response are required' });
+      return res.status(400).json({ error: 'interaction_id and response are required' });
     }
 
     const interaction = pendingInteractions.get(interaction_id);
@@ -85,14 +88,14 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     if ((response === 'yes' || (interaction.type === 'multiple_choice' && response !== 'no')) && interaction.eventData) {
       console.log(`🏃 [INTERACTION RESPONSE] Creating event for "yes" response`);
       console.log(`🔍 [INTERACTION RESPONSE] Interaction event data:`, JSON.stringify(interaction.eventData, null, 2));
-      
+
       try {
         const today = new Date();
         const baseDate = today.toISOString().split('T')[0];
-        
+
         // Check for conflicts before creating event
-        const supabaseService = new (await import('../services/SupabaseService.js')).SupabaseService();
-        const existingEvents = await supabaseService.getEvents(user_id);
+        const supabaseService = getSupabaseService();
+        const existingEvents = await supabaseService.getEvents(userId);
         
         // Create proposed time slots
         const [startHour, startMin] = interaction.eventData.startTime.split(':');
@@ -137,24 +140,8 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         console.log(`📅 [INTERACTION RESPONSE] Event data prepared:`, JSON.stringify(eventData, null, 2));
         console.log(`📅 [INTERACTION RESPONSE] Base date used:`, baseDate);
 
-        // Create event using existing function
-        const mockReq = { body: { user_id, event: eventData } } as Request;
-        const mockRes = {
-          json: (data: any) => {
-            console.log(`✅ [INTERACTION RESPONSE] Event created successfully:`, JSON.stringify(data, null, 2));
-            return data;
-          },
-          status: (code: number) => ({ 
-            json: (data: any) => {
-              console.log(`⚠️ [INTERACTION RESPONSE] Event creation status ${code}:`, JSON.stringify(data, null, 2));
-              return data;
-            }
-          })
-        } as any;
-
-        console.log(`🔄 [INTERACTION RESPONSE] Calling createUserEvent with mockReq.body:`, JSON.stringify(mockReq.body, null, 2));
-        await createUserEvent(mockReq, mockRes);
-        console.log(`🎉 [INTERACTION RESPONSE] Event creation call completed`);
+        await supabaseService.createEvent(userId, eventData);
+        console.log(`🎉 [INTERACTION RESPONSE] Event created for user ${userId}`);
       } catch (error) {
         console.error('❌ [INTERACTION RESPONSE] Error creating event from interaction:', error);
         console.error('❌ [INTERACTION RESPONSE] Error type:', typeof error);
@@ -182,15 +169,14 @@ export async function respondToInteraction(req: Request, res: Response): Promise
 // Clear all interactions for a user (dev utility)
 export async function clearUserInteractions(req: Request, res: Response): Promise<Response | void> {
   try {
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const keysToDelete = Array.from(pendingInteractions.keys())
-      .filter(key => pendingInteractions.get(key)?.user_id === user_id);
-    
+      .filter(key => pendingInteractions.get(key)?.user_id === userId);
+
     keysToDelete.forEach(key => pendingInteractions.delete(key));
 
     res.json({

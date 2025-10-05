@@ -12,16 +12,17 @@ function getSupabaseService(): SupabaseService {
 
 export async function getUserEvents(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, start_date, end_date } = req.body;
-    
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Fetching events for user:', user_id);
+    const { start_date, end_date } = req.body;
 
-    const events = await getSupabaseService().getEvents(user_id, start_date, end_date);
+    console.log('Fetching events for user:', userId);
+
+    const events = await getSupabaseService().getEvents(userId, start_date, end_date);
     
     res.json({
       success: true,
@@ -36,17 +37,18 @@ export async function getUserEvents(req: Request, res: Response): Promise<void> 
 
 export async function createUserEvent(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, ...eventData } = req.body;
-    
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Creating event for user:', user_id);
+    const { user_id: _ignoredUserId, ...eventData } = req.body ?? {};
+
+    console.log('Creating event for user:', userId);
     console.log('Event data:', eventData);
 
-    const createdEvent = await getSupabaseService().createEvent(user_id, eventData);
+    const createdEvent = await getSupabaseService().createEvent(userId, eventData);
     
     if (createdEvent) {
       res.json({
@@ -65,17 +67,23 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
 
 export async function updateUserEvent(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, event_id, ...eventData } = req.body;
-    
-    if (!user_id || !event_id) {
-      res.status(400).json({ error: 'user_id and event_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Updating event for user:', user_id);
+    const { event_id, ...eventData } = req.body ?? {};
+
+    if (!event_id) {
+      res.status(400).json({ error: 'event_id is required' });
+      return;
+    }
+
+    console.log('Updating event for user:', userId);
     console.log('Event updates:', eventData);
 
-    const updatedEvent = await getSupabaseService().updateEvent(user_id, event_id, eventData);
+    const updatedEvent = await getSupabaseService().updateEvent(userId, event_id, eventData);
     
     if (updatedEvent) {
       res.json({
@@ -94,16 +102,22 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
 
 export async function deleteUserEvent(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, event_id } = req.body;
-    
-    if (!user_id || !event_id) {
-      res.status(400).json({ error: 'user_id and event_id are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Deleting event for user:', user_id);
+    const { event_id } = req.body ?? {};
 
-    const result = await getSupabaseService().deleteEvent(user_id, event_id);
+    if (!event_id) {
+      res.status(400).json({ error: 'event_id is required' });
+      return;
+    }
+
+    console.log('Deleting event for user:', userId);
+
+    const result = await getSupabaseService().deleteEvent(userId, event_id);
     
     if (result.success) {
       res.json({

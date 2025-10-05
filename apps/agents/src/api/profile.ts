@@ -3,26 +3,27 @@ import profileService from '../services/ProfileService.js';
 
 export async function getUserProfile(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, section } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Fetching profile for user:', user_id);
+    const { section } = req.body ?? {};
+
+    console.log('Fetching profile for user:', userId);
 
     if (section) {
-      const sectionData = await profileService.getProfileSection(user_id, section);
+      const sectionData = await profileService.getProfileSection(userId, section);
       res.json({
         success: true,
         section: section,
         data: sectionData
       });
     } else {
-      const profile = await profileService.getProfile(user_id);
-      const completeness = await profileService.getProfileCompleteness(user_id);
-      const summary = await profileService.getProfileSummary(user_id);
+      const profile = await profileService.getProfile(userId);
+      const completeness = await profileService.getProfileCompleteness(userId);
+      const summary = await profileService.getProfileSummary(userId);
 
       res.json({
         success: true,
@@ -40,23 +41,24 @@ export async function getUserProfile(req: Request, res: Response): Promise<void>
 
 export async function updateUserProfile(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, section, data } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Updating profile for user:', user_id);
+    const { section, data } = req.body ?? {};
+
+    console.log('Updating profile for user:', userId);
 
     if (section) {
-      await profileService.updateProfileSection(user_id, section, data);
+      await profileService.updateProfileSection(userId, section, data);
       res.json({
         success: true,
         message: `Profile section ${section} updated successfully`
       });
     } else if (data) {
-      await profileService.updateProfile(user_id, data);
+      await profileService.updateProfile(userId, data);
       res.json({
         success: true,
         message: 'Profile updated successfully'
@@ -73,14 +75,20 @@ export async function updateUserProfile(req: Request, res: Response): Promise<vo
 
 export async function updateProfileField(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, field, value } = req.body;
-
-    if (!user_id || !field) {
-      res.status(400).json({ error: 'user_id and field are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Updating profile field:', field, 'for user:', user_id);
+    const { field, value } = req.body ?? {};
+
+    if (!field) {
+      res.status(400).json({ error: 'field is required' });
+      return;
+    }
+
+    console.log('Updating profile field:', field, 'for user:', userId);
 
     // Parse field path (e.g., "values.coreValues" -> column: "values", field: "coreValues")
     const pathParts = field.split('.');
@@ -89,10 +97,10 @@ export async function updateProfileField(req: Request, res: Response): Promise<v
     
     if (!fieldName) {
       // Direct column update
-      await profileService.updateProfile(user_id, { [column]: value });
+      await profileService.updateProfile(userId, { [column]: value });
     } else {
       // Nested field update
-      await profileService.updateField(user_id, column, fieldName, value);
+      await profileService.updateField(userId, column, fieldName, value);
     }
 
     res.json({
@@ -108,16 +116,22 @@ export async function updateProfileField(req: Request, res: Response): Promise<v
 
 export async function batchUpdateProfileFields(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, updates } = req.body;
-
-    if (!user_id || !updates || !Array.isArray(updates)) {
-      res.status(400).json({ error: 'user_id and updates array are required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    console.log('Batch updating profile fields for user:', user_id);
+    const { updates } = req.body ?? {};
 
-    await profileService.batchUpdateFields(user_id, updates);
+    if (!updates || !Array.isArray(updates)) {
+      res.status(400).json({ error: 'updates array is required' });
+      return;
+    }
+
+    console.log('Batch updating profile fields for user:', userId);
+
+    await profileService.batchUpdateFields(userId, updates);
 
     res.json({
       success: true,
