@@ -13,6 +13,7 @@ export function Auth() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(
     typeof window !== 'undefined' ? document.documentElement.classList.contains('dark') : false
   )
@@ -34,19 +35,43 @@ export function Auth() {
     setDarkMode(prev => !prev)
   }
 
-  async function handleSignUp() {
+  async function handleSignIn() {
     setLoading(true)
     setError(null)
+    setMessage(null)
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password })
-      
-      if (result.error) {
-        console.error('❌ [AUTH] SignIn error:', result.error)
-        setError(result.error.message)
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (signInError) {
+        console.error('❌ [AUTH] SignIn error:', signInError)
+        setError(signInError.message)
       }
       // No redirect here - the auth state change will trigger the redirect
     } catch (err) {
       console.error('❌ [AUTH] SignIn catch block error:', err)
+      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSignUp() {
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+
+      if (signUpError) {
+        console.error('❌ [AUTH] SignUp error:', signUpError)
+        setError(signUpError.message)
+      } else if (data?.user) {
+        setMessage('Registration successful! Please check your email to confirm your account.')
+      } else {
+        setMessage('Registration request sent. Please check your email to continue.')
+      }
+    } catch (err) {
+      console.error('❌ [AUTH] SignUp catch block error:', err)
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
     } finally {
       setLoading(false)
@@ -154,6 +179,17 @@ export function Auth() {
               or continue with email
             </span>
           </div>
+
+          {error && (
+            <div className="rounded-md bg-red-500/10 border border-red-500/40 text-red-200 px-3 py-2 text-sm">
+              {error}
+            </div>
+          )}
+          {message && (
+            <div className="rounded-md bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 px-3 py-2 text-sm">
+              {message}
+            </div>
+          )}
 
           <form
             className="space-y-4"
