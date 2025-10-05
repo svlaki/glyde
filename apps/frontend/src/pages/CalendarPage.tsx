@@ -1,12 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { SlotInfo } from 'react-big-calendar';
 import { useAuth } from '../lib/authContext';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
 import { fetchUserEvents, updateEvent, CalendarEvent } from '../lib/calendarService';
 import { fetchUserTasks, Task } from '../lib/taskService';
-import { InteractionBox, Interaction } from '../components/InteractionBox';
+import { InteractionBox } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
@@ -14,6 +11,9 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
+import type { ExtendedCalendarEvent } from '../types/calendar';
+import { getCategoryColor } from '../lib/calendarCategories';
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
@@ -180,20 +180,22 @@ export function CalendarPage() {
     }
   }, [eventLoadErrorShown, toast, transformEvent, user]);
 
-  function handleDateClick(info: { dateStr: string }) {
-    setSelectedDate(info.dateStr);
+  const handleSlotSelect = useCallback((slotInfo: SlotInfo) => {
+    const start = slotInfo.start instanceof Date ? slotInfo.start : new Date(slotInfo.start);
+    if (Number.isNaN(start.getTime())) {
+      return;
+    }
+
+    setSelectedDate(start.toISOString());
     setSelectedEvent(null);
     setIsModalOpen(true);
-  }
+  }, []);
 
-  function handleEventClick(info: { event: { id: string; title: string; extendedProps: any } }) {
-    const event = events.find(e => e.id === info.event.id);
-    if (event) {
-      setSelectedEvent(event);
-      setSelectedDate(null);
-      setIsModalOpen(true);
-    }
-  }
+  const handleEventSelect = useCallback((event: ExtendedCalendarEvent) => {
+    setSelectedEvent(event);
+    setSelectedDate(null);
+    setIsModalOpen(true);
+  }, []);
 
   function handleModalClose() {
     setIsModalOpen(false);
@@ -247,6 +249,42 @@ export function CalendarPage() {
     }
   }, [loadUserEvents, toast, user]);
 
+  const handleEventMove = useCallback(async (
+    args: CalendarInteractionArgs
+  ) => {
+    const { event, start, end } = args;
+    const fallbackEnd = end ?? new Date(start.getTime() + 60 * 60 * 1000);
+
+    const success = await handleCalendarEventUpdate(event.id, {
+      start_time: start.toISOString(),
+      end_time: fallbackEnd.toISOString(),
+    });
+
+    if (!success) {
+      await loadUserEvents();
+    }
+  }, [handleCalendarEventUpdate, loadUserEvents]);
+
+  const handleEventResize = useCallback(async (
+    args: CalendarInteractionArgs
+  ) => {
+    const { event, start, end } = args;
+
+    if (!end) {
+      await loadUserEvents();
+      return;
+    }
+
+    const success = await handleCalendarEventUpdate(event.id, {
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+    });
+
+    if (!success) {
+      await loadUserEvents();
+    }
+  }, [handleCalendarEventUpdate, loadUserEvents]);
+
   return (
     <div className="min-h-screen bg-white text-black">
       <div className="flex h-screen">
@@ -263,71 +301,13 @@ export function CalendarPage() {
           {/* Calendar */}
           <div className="flex-1 p-2 bg-white">
             <div className="h-full bg-white rounded-lg p-1">
-              <FullCalendar
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView="timeGridWeek"
-                timeZone={userTimezone}
-                headerToolbar={{
-                  left: 'prev,next today',
-                  center: 'title',
-                  right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                }}
+              <MainCalendar
                 events={events}
-                dateClick={handleDateClick}
-                eventClick={handleEventClick}
-                editable={true}
-                droppable={true}
-                eventDrop={async (info) => {
-                  const start = info.event.start ? info.event.start.toISOString() : null;
-                  const end = info.event.end
-                    ? info.event.end.toISOString()
-                    : info.event.start
-                      ? new Date(info.event.start.getTime() + 60 * 60 * 1000).toISOString()
-                      : null;
-
-                  if (!start) {
-                    info.revert();
-                    return;
-                  }
-
-                  const success = await handleCalendarEventUpdate(info.event.id, {
-                    start_time: start,
-                    end_time: end
-                  });
-
-                  if (!success) {
-                    info.revert();
-                  }
-                }}
-                eventResize={async (info) => {
-                  const start = info.event.start ? info.event.start.toISOString() : null;
-                  const end = info.event.end ? info.event.end.toISOString() : null;
-
-                  if (!start || !end) {
-                    info.revert();
-                    return;
-                  }
-
-                  const success = await handleCalendarEventUpdate(info.event.id, {
-                    start_time: start,
-                    end_time: end
-                  });
-
-                  if (!success) {
-                    info.revert();
-                  }
-                }}
-                height="100%"
-                themeSystem="standard"
-                eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: 'short' }}
-                slotMinTime="00:00:00"
-                slotMaxTime="24:00:00"
-                allDaySlot={false}
-                dayHeaderFormat={{ weekday: 'short', month: 'numeric', day: 'numeric' }}
-                eventDisplay="block"
-                displayEventTime={true}
-                eventClassNames="rounded-md shadow-sm"
-                nowIndicator={true}
+                onSelectEvent={handleEventSelect}
+                onSelectSlot={handleSlotSelect}
+                onEventDrop={handleEventMove}
+                onEventResize={handleEventResize}
+                userTimezone={userTimezone}
               />
             </div>
           </div>
