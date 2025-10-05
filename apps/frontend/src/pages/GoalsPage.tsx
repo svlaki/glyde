@@ -1,7 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabase'
-import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
+import {
+  fetchUserGoals,
+  createUserGoal,
+  updateUserGoal,
+  deleteUserGoal,
+  fetchGoalCheckIns,
+  Goal,
+  GoalCheckIn
+} from '../lib/goalService'
 import { fetchUserCategories, Category } from '../lib/categoryService'
 
 export default function GoalsPage() {
@@ -14,6 +22,9 @@ export default function GoalsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [checkInGoal, setCheckInGoal] = useState<Goal | null>(null)
+  const [progressGoal, setProgressGoal] = useState<Goal | null>(null)
+  const [goalCheckIns, setGoalCheckIns] = useState<GoalCheckIn[]>([])
+  const [loadingCheckIns, setLoadingCheckIns] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -42,9 +53,14 @@ export default function GoalsPage() {
     }
   }, [user])
 
-  async function loadGoals() {
+  const goalInsights = useMemo(() => calculateGoalInsights(goals), [goals])
+
+  async function loadGoals(options: { showLoading?: boolean } = {}) {
     if (!user) return
-    setLoading(true)
+    const showLoading = options.showLoading ?? true
+    if (showLoading) {
+      setLoading(true)
+    }
     const filters = filter !== 'all' ? { status: filter } : undefined
     const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
     if (error) {
@@ -52,7 +68,9 @@ export default function GoalsPage() {
     } else {
       setGoals(fetchedGoals)
     }
-    setLoading(false)
+    if (showLoading) {
+      setLoading(false)
+    }
   }
 
   async function loadCategories() {
@@ -94,6 +112,38 @@ export default function GoalsPage() {
     }
   }
 
+  async function handleViewProgress(goal: Goal) {
+    if (!user) return
+    setProgressGoal(goal)
+    setLoadingCheckIns(true)
+    const { checkIns, error } = await fetchGoalCheckIns(user, goal.id, 10)
+    if (error) {
+      setError(error)
+      setGoalCheckIns([])
+    } else {
+      const sortedCheckIns = [...checkIns].sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return dateB - dateA
+      })
+      setGoalCheckIns(sortedCheckIns)
+    }
+    setLoadingCheckIns(false)
+  }
+
+  async function handleCheckInSaved(goalId: string) {
+    await loadGoals({ showLoading: false })
+    if (user && progressGoal && progressGoal.id === goalId) {
+      const { checkIns } = await fetchGoalCheckIns(user, goalId, 10)
+      const sortedCheckIns = [...checkIns].sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return dateB - dateA
+      })
+      setGoalCheckIns(sortedCheckIns)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -113,6 +163,10 @@ export default function GoalsPage() {
           Create Goal
         </button>
       </div>
+
+      {goalInsights.totalGoals > 0 && (
+        <GoalInsights insights={goalInsights} onCreateGoal={() => setShowCreateModal(true)} />
+      )}
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -161,6 +215,7 @@ export default function GoalsPage() {
               onEdit={setEditingGoal}
               onDelete={handleDeleteGoal}
               onCheckIn={setCheckInGoal}
+              onViewProgress={handleViewProgress}
             />
           ))
         )}
@@ -187,6 +242,20 @@ export default function GoalsPage() {
         <CheckInModal
           goal={checkInGoal}
           onClose={() => setCheckInGoal(null)}
+          onSaved={handleCheckInSaved}
+        />
+      )}
+
+      {progressGoal && (
+        <GoalProgressModal
+          goal={progressGoal}
+          checkIns={goalCheckIns}
+          loading={loadingCheckIns}
+          onClose={() => {
+            setProgressGoal(null)
+            setGoalCheckIns([])
+          }}
+          onRequestCheckIn={() => setCheckInGoal(progressGoal)}
         />
       )}
     </div>
@@ -198,23 +267,43 @@ function GoalCard({
   categories,
   onEdit,
   onDelete,
-  onCheckIn
+  onCheckIn,
+  onViewProgress
 }: {
   goal: Goal
   categories: Category[]
   onEdit: (goal: Goal) => void
   onDelete: (id: string) => void
   onCheckIn: (goal: Goal) => void
+  onViewProgress: (goal: Goal) => void
 }) {
   const category = categories.find(c => c.name === goal.category)
   const progress = goal.progress || 0
+  const statusStyles: Record<string, string> = {
+    not_started: 'bg-gray-100 text-gray-700',
+    in_progress: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    on_hold: 'bg-yellow-100 text-yellow-800',
+    abandoned: 'bg-red-100 text-red-800'
+  }
+  const nextReview = getNextReviewDate(goal)
+  const reviewIsSoon = nextReview ? nextReview <= addDays(new Date(), 3) : false
 
   return (
     <div className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="mb-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold">{goal.title}</h3>
-          <span className="text-xs text-gray-500">{goal.goal_type}</span>
+          <div className="flex items-center gap-2">
+            {goal.status && (
+              <span className={`rounded-full px-2 py-1 text-xs capitalize ${statusStyles[goal.status] || 'bg-gray-100 text-gray-600'}`}>
+                {goal.status.replace('_', ' ')}
+              </span>
+            )}
+            {goal.goal_type && (
+              <span className="text-xs text-gray-500 uppercase">{goal.goal_type}</span>
+            )}
+          </div>
         </div>
         {category && (
           <span
@@ -249,7 +338,19 @@ function GoalCard({
         </div>
       )}
 
+      {nextReview && (
+        <div className={`mb-3 text-sm ${reviewIsSoon ? 'text-orange-600' : 'text-gray-500'}`}>
+          Next review: {nextReview.toLocaleDateString()} {reviewIsSoon && '(coming up)'}
+        </div>
+      )}
+
       <div className="flex gap-2 justify-end">
+        <button
+          onClick={() => onViewProgress(goal)}
+          className="text-sm text-purple-600 hover:text-purple-800"
+        >
+          Progress
+        </button>
         <button
           onClick={() => onCheckIn(goal)}
           className="text-sm text-green-600 hover:text-green-800"
@@ -425,7 +526,7 @@ function GoalModal({
   )
 }
 
-function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
+function CheckInModal({ goal, onClose, onSaved }: { goal: Goal; onClose: () => void; onSaved?: (goalId: string) => Promise<void> | void }) {
   const { user } = useAuth()
   const [formData, setFormData] = useState({
     progress_update: goal.progress || 0,
@@ -450,6 +551,9 @@ function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
 
     const { error } = await addGoalCheckIn(user, goal.id, checkInData)
     if (!error) {
+      if (onSaved) {
+        await onSaved(goal.id)
+      }
       onClose()
     }
   }
@@ -558,4 +662,319 @@ function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       </div>
     </div>
   )
+}
+
+function GoalProgressModal({
+  goal,
+  checkIns,
+  loading,
+  onClose,
+  onRequestCheckIn
+}: {
+  goal: Goal
+  checkIns: GoalCheckIn[]
+  loading: boolean
+  onClose: () => void
+  onRequestCheckIn: () => void
+}) {
+  const latestCheckIn = checkIns[0]
+  const previousCheckIn = checkIns[1]
+  const progressDelta = latestCheckIn && previousCheckIn && latestCheckIn.progress_update !== undefined && previousCheckIn.progress_update !== undefined
+    ? latestCheckIn.progress_update - previousCheckIn.progress_update
+    : null
+
+  const averageMood = checkIns.length
+    ? Math.round(
+        checkIns.reduce((total, item) => total + (item.mood_rating || 0), 0) /
+          checkIns.length
+      )
+    : null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold">{goal.title}</h2>
+            <p className="mt-1 text-sm text-gray-500">Progress insights and check-in history</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase text-gray-500">Current progress</p>
+            <p className="mt-2 text-2xl font-semibold">{goal.progress ?? 0}%</p>
+            {progressDelta !== null && (
+              <p className={`mt-1 text-xs ${progressDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {progressDelta >= 0 ? '+' : ''}{progressDelta}% since last check-in
+              </p>
+            )}
+          </div>
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase text-gray-500">Check-ins logged</p>
+            <p className="mt-2 text-2xl font-semibold">{checkIns.length}</p>
+            <button
+              onClick={onRequestCheckIn}
+              className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800"
+            >
+              Log a new check-in
+            </button>
+          </div>
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase text-gray-500">Average mood</p>
+            <p className="mt-2 text-2xl font-semibold">{averageMood ?? '—'}</p>
+            <p className="mt-1 text-xs text-gray-500">Across recent reflections</p>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-gray-700">Timeline</h3>
+          {loading ? (
+            <p className="mt-4 text-sm text-gray-500">Loading check-ins...</p>
+          ) : checkIns.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-dashed p-6 text-center text-sm text-gray-500">
+              No check-ins yet. Capture a quick reflection to start building momentum.
+            </div>
+          ) : (
+            <ul className="mt-4 space-y-4">
+              {checkIns.map(checkIn => (
+                <li key={checkIn.id} className="rounded-lg border bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">
+                      {checkIn.created_at ? new Date(checkIn.created_at).toLocaleString() : 'Check-in'}
+                    </p>
+                    {checkIn.progress_update !== undefined && (
+                      <span className="rounded-full bg-white px-3 py-1 text-xs text-gray-600">
+                        Progress {checkIn.progress_update}%
+                      </span>
+                    )}
+                  </div>
+                  {(checkIn.wins_and_progress?.length || checkIn.next_steps?.length) && (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {checkIn.wins_and_progress && checkIn.wins_and_progress.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium uppercase text-gray-500">Wins</p>
+                          <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                            {checkIn.wins_and_progress.map((item, index) => (
+                              <li key={index}>• {item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {checkIn.next_steps && checkIn.next_steps.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium uppercase text-gray-500">Next steps</p>
+                          <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                            {checkIn.next_steps.map((item, index) => (
+                              <li key={index}>• {item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {checkIn.obstacles_encountered && checkIn.obstacles_encountered.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs font-medium uppercase text-gray-500">Obstacles</p>
+                      <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                        {checkIn.obstacles_encountered.map((item, index) => (
+                          <li key={index}>• {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {checkIn.reflection_notes && (
+                    <p className="mt-3 text-xs italic text-gray-600">“{checkIn.reflection_notes}”</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface GoalInsightsData {
+  totalGoals: number
+  activeGoals: number
+  averageProgress: number
+  upcomingReviews: number
+  lowMomentumGoals: number
+  focusGoal: Goal | null
+  upcomingFocus: Goal[]
+}
+
+function GoalInsights({ insights, onCreateGoal }: { insights: GoalInsightsData; onCreateGoal: () => void }) {
+  const formatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric'
+      }),
+    []
+  )
+
+  return (
+    <div className="mb-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <InsightCard title="Active goals" value={insights.activeGoals} helper="In motion right now" />
+        <InsightCard title="Avg. progress" value={`${insights.averageProgress}%`} helper="Across all goals" />
+        <InsightCard title="Upcoming reviews" value={insights.upcomingReviews} helper="Within 2 weeks" />
+        <InsightCard title="Momentum alerts" value={insights.lowMomentumGoals} helper="Need extra focus" />
+      </div>
+
+      {insights.focusGoal && (
+        <div className="rounded-xl border bg-purple-50 p-4 shadow-sm">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-medium text-purple-700">Recommended focus goal</p>
+              <p className="mt-1 text-xl font-semibold text-purple-900">{insights.focusGoal.title}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm text-purple-800">
+                {insights.focusGoal.progress !== undefined && (
+                  <span className="rounded-full bg-purple-100 px-3 py-1">
+                    {insights.focusGoal.progress}% complete
+                  </span>
+                )}
+                {insights.focusGoal.target_date && (
+                  <span className="rounded-full bg-purple-100 px-3 py-1">
+                    Target {formatter.format(new Date(insights.focusGoal.target_date))}
+                  </span>
+                )}
+                {insights.focusGoal.energy_requirement && (
+                  <span className="rounded-full bg-purple-100 px-3 py-1 capitalize">
+                    Energy: {insights.focusGoal.energy_requirement}
+                  </span>
+                )}
+              </div>
+              {insights.focusGoal.description && (
+                <p className="mt-2 max-w-3xl text-sm text-purple-900/80">
+                  {insights.focusGoal.description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onCreateGoal}
+              className="self-start rounded-lg border border-purple-200 bg-white px-4 py-2 text-sm font-medium text-purple-700 transition hover:bg-purple-100"
+            >
+              Add supporting milestone
+            </button>
+          </div>
+        </div>
+      )}
+
+      {insights.upcomingFocus.length > 0 && (
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">Upcoming focus window</h2>
+            <span className="text-xs text-gray-500">Next 14 days</span>
+          </div>
+          <ul className="space-y-3">
+            {insights.upcomingFocus.slice(0, 4).map(goal => (
+              <li key={goal.id} className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium">{goal.title}</p>
+                  <p className="text-xs text-gray-500">Progress {goal.progress ?? 0}%</p>
+                </div>
+                {goal.target_date && (
+                  <span className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                    {formatter.format(new Date(goal.target_date))}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InsightCard({ title, value, helper }: { title: string; value: string | number; helper: string }) {
+  return (
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <p className="text-sm text-gray-500">{title}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs text-gray-500">{helper}</p>
+    </div>
+  )
+}
+
+function calculateGoalInsights(goals: Goal[]): GoalInsightsData {
+  if (!goals || goals.length === 0) {
+    return {
+      totalGoals: 0,
+      activeGoals: 0,
+      averageProgress: 0,
+      upcomingReviews: 0,
+      lowMomentumGoals: 0,
+      focusGoal: null,
+      upcomingFocus: []
+    }
+  }
+
+  const now = new Date()
+  const activeGoals = goals.filter(goal => goal.status !== 'completed' && goal.status !== 'abandoned')
+  const averageProgress = Math.round(
+    goals.reduce((total, goal) => total + (goal.progress || 0), 0) / goals.length
+  )
+  const upcomingFocus = activeGoals
+    .filter(goal => {
+      if (!goal.target_date) return false
+      const target = new Date(goal.target_date)
+      return target >= now && target <= addDays(now, 14)
+    })
+    .sort((a, b) => {
+      if (!a.target_date) return 1
+      if (!b.target_date) return -1
+      return new Date(a.target_date).getTime() - new Date(b.target_date).getTime()
+    })
+
+  const lowMomentumGoals = upcomingFocus.filter(goal => (goal.progress || 0) < 40).length
+  const upcomingReviews = activeGoals.filter(goal => {
+    const nextReview = getNextReviewDate(goal)
+    if (!nextReview) return false
+    return nextReview <= addDays(now, 14)
+  }).length
+
+  const focusGoal = upcomingFocus.find(goal => (goal.progress || 0) < 60) || activeGoals[0] || null
+
+  return {
+    totalGoals: goals.length,
+    activeGoals: activeGoals.length,
+    averageProgress,
+    upcomingReviews,
+    lowMomentumGoals,
+    focusGoal,
+    upcomingFocus
+  }
+}
+
+function getNextReviewDate(goal: Goal) {
+  const frequency = goal.review_frequency || 'weekly'
+  const mostRecent = goal.updated_at || goal.created_at
+  if (!mostRecent) return null
+  const baseDate = new Date(mostRecent)
+  const increments: Record<string, number> = {
+    daily: 1,
+    weekly: 7,
+    monthly: 30,
+    quarterly: 90
+  }
+  const days = increments[frequency] ?? 7
+  return addDays(baseDate, days)
+}
+
+function addDays(date: Date | string, days: number) {
+  const base = typeof date === 'string' ? new Date(date) : new Date(date)
+  const result = new Date(base)
+  result.setDate(result.getDate() + days)
+  return result
 }

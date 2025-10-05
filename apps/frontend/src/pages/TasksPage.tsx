@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabase'
 import { fetchUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask, Task } from '../lib/taskService'
@@ -13,6 +13,101 @@ export default function TasksPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+
+  const taskInsights = useMemo(() => {
+    if (!tasks || tasks.length === 0) {
+      return {
+        total: 0,
+        pendingCount: 0,
+        completedThisWeek: 0,
+        overdueTasks: [] as Task[],
+        dueTodayTasks: [] as Task[],
+        upcomingDeadlines: [] as Task[],
+        energyBuckets: getEmptyEnergyBuckets(),
+        recommendedTask: null as Task | null
+      }
+    }
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const weekAgo = new Date(now)
+    weekAgo.setDate(now.getDate() - 7)
+    const pendingTasks = tasks.filter(task => task.status !== 'completed' && task.status !== 'cancelled')
+
+    const overdueTasks = pendingTasks.filter(task =>
+      task.due_date ? new Date(task.due_date) < startOfToday : false
+    )
+
+    const dueTodayTasks = pendingTasks.filter(task => {
+      if (!task.due_date) return false
+      const dueDate = new Date(task.due_date)
+      return dueDate >= startOfToday && dueDate < endOfToday
+    })
+
+    const upcomingDeadlines = pendingTasks
+      .filter(task => {
+        if (!task.due_date) return false
+        const dueDate = new Date(task.due_date)
+        return dueDate >= endOfToday && dueDate <= addDays(now, 3)
+      })
+      .sort((a, b) => {
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+      })
+
+    const completedThisWeek = tasks.filter(task => {
+      if (task.status !== 'completed' || !task.completed_at) return false
+      const completedDate = new Date(task.completed_at)
+      return completedDate >= weekAgo
+    }).length
+
+    const priorityScore = { urgent: 4, high: 3, medium: 2, low: 1 } as const
+
+    const recommendedTask = [...pendingTasks]
+      .sort((a, b) => {
+        const priorityA = priorityScore[a.priority || 'medium'] || 1
+        const priorityB = priorityScore[b.priority || 'medium'] || 1
+
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA
+        }
+
+        const dueA = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER
+        const dueB = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER
+        return dueA - dueB
+      })
+      .shift() || null
+
+    const energyBuckets = ['low', 'medium', 'high'].map(level => {
+      const levelTasks = pendingTasks.filter(task => (task.energy_required || 'medium') === level)
+      const nextTask = [...levelTasks]
+        .sort((a, b) => {
+          const dueA = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER
+          const dueB = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER
+          return dueA - dueB
+        })
+        .shift() || null
+
+      return {
+        level: level as 'low' | 'medium' | 'high',
+        count: levelTasks.length,
+        nextTask
+      }
+    })
+
+    return {
+      total: tasks.length,
+      pendingCount: pendingTasks.length,
+      completedThisWeek,
+      overdueTasks,
+      dueTodayTasks,
+      upcomingDeadlines,
+      energyBuckets,
+      recommendedTask
+    }
+  }, [tasks])
 
   useEffect(() => {
     if (user) {
@@ -127,6 +222,10 @@ export default function TasksPage() {
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
+      )}
+
+      {taskInsights.pendingCount > 0 && (
+        <TaskInsights stats={taskInsights} onAddTask={() => setShowCreateModal(true)} />
       )}
 
       <div className="flex gap-2 mb-6">
@@ -279,6 +378,177 @@ function TaskCard({
       </div>
     </div>
   )
+}
+
+interface TaskInsightData {
+  total: number
+  pendingCount: number
+  completedThisWeek: number
+  overdueTasks: Task[]
+  dueTodayTasks: Task[]
+  upcomingDeadlines: Task[]
+  energyBuckets: Array<{
+    level: 'low' | 'medium' | 'high'
+    count: number
+    nextTask: Task | null
+  }>
+  recommendedTask: Task | null
+}
+
+function TaskInsights({ stats, onAddTask }: { stats: TaskInsightData; onAddTask: () => void }) {
+  const totalUrgentItems = stats.overdueTasks.length + stats.dueTodayTasks.length
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric'
+      }),
+    []
+  )
+
+  return (
+    <div className="mb-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Active Tasks</p>
+          <p className="mt-2 text-2xl font-semibold">{stats.pendingCount}</p>
+          <p className="mt-1 text-xs text-gray-500">{stats.total} total tasks tracked</p>
+        </div>
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Due Today</p>
+          <p className="mt-2 text-2xl font-semibold">{stats.dueTodayTasks.length}</p>
+          <p className="mt-1 text-xs text-gray-500">Stay ahead of today&apos;s commitments</p>
+        </div>
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Overdue</p>
+          <p className={`mt-2 text-2xl font-semibold ${totalUrgentItems > 0 ? 'text-red-600' : ''}`}>
+            {stats.overdueTasks.length}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {totalUrgentItems > 0 ? 'Prioritize these first' : 'You are on track!'}
+          </p>
+        </div>
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Completed (7d)</p>
+          <p className="mt-2 text-2xl font-semibold">{stats.completedThisWeek}</p>
+          <p className="mt-1 text-xs text-gray-500">Celebrate your recent wins</p>
+        </div>
+      </div>
+
+      {stats.recommendedTask && (
+        <div className="rounded-xl border bg-blue-50 p-4 shadow-sm">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <p className="text-sm font-medium text-blue-700">Next Best Action</p>
+              <p className="mt-1 text-xl font-semibold text-blue-900">{stats.recommendedTask.title}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-sm text-blue-800">
+                {stats.recommendedTask.priority && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 capitalize">
+                    Priority: {stats.recommendedTask.priority}
+                  </span>
+                )}
+                {stats.recommendedTask.energy_required && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 capitalize">
+                    Energy: {stats.recommendedTask.energy_required}
+                  </span>
+                )}
+                {stats.recommendedTask.estimated_duration && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1">
+                    {stats.recommendedTask.estimated_duration} min
+                  </span>
+                )}
+                {stats.recommendedTask.due_date && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1">
+                    Due {dateFormatter.format(new Date(stats.recommendedTask.due_date))}
+                  </span>
+                )}
+              </div>
+              {stats.recommendedTask.description && (
+                <p className="mt-2 max-w-3xl text-sm text-blue-900/80">
+                  {stats.recommendedTask.description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onAddTask}
+              className="self-start rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+            >
+              Add supporting task
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">Upcoming deadlines</h2>
+            <span className="text-xs text-gray-500">Next 3 days</span>
+          </div>
+          {stats.upcomingDeadlines.length === 0 ? (
+            <p className="text-sm text-gray-500">No deadlines approaching. Consider scheduling focused work.</p>
+          ) : (
+            <ul className="space-y-3">
+              {stats.upcomingDeadlines.slice(0, 4).map(task => (
+                <li key={task.id} className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{task.title}</p>
+                    {task.category && <p className="text-xs text-gray-500">{task.category}</p>}
+                  </div>
+                  {task.due_date && (
+                    <span className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+                      {dateFormatter.format(new Date(task.due_date))}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-base font-semibold">Energy planner</h2>
+            <p className="text-xs text-gray-500">Match tasks to your current energy level</p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {stats.energyBuckets.map(bucket => (
+              <div key={bucket.level} className="rounded-lg border bg-gray-50 p-3">
+                <p className="text-xs uppercase text-gray-500">{bucket.level}</p>
+                <p className="mt-1 text-xl font-semibold">{bucket.count}</p>
+                {bucket.nextTask ? (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Next: {bucket.nextTask.title}
+                    {bucket.nextTask.due_date && (
+                      <span className="block text-[11px] text-gray-400">
+                        {dateFormatter.format(new Date(bucket.nextTask.due_date))}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">No tasks mapped</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getEmptyEnergyBuckets() {
+  return [
+    { level: 'low' as const, count: 0, nextTask: null },
+    { level: 'medium' as const, count: 0, nextTask: null },
+    { level: 'high' as const, count: 0, nextTask: null }
+  ]
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date)
+  result.setDate(result.getDate() + days)
+  return result
 }
 
 function TaskModal({
