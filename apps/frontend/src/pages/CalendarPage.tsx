@@ -1,17 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ExtendedCalendarEvent } from '../types/calendar';
 import { useAuth } from '../lib/authContext';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { fetchUserEvents, updateEvent, CalendarEvent } from '../lib/calendarService';
+import { CATEGORY_COLORS, getCategoryColor } from '../lib/calendarCategories';
+import { createEvent, deleteEvent, fetchUserEvents, updateEvent, CalendarEvent } from '../lib/calendarService';
 import { fetchUserTasks, Task } from '../lib/taskService';
-import { InteractionBox, Interaction } from '../components/InteractionBox';
+import { InteractionBox } from '../components/InteractionBox';
 import { useInteractions } from '../lib/interactionContext';
 import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
@@ -423,22 +428,6 @@ export function CalendarPage() {
 }
 
 export default CalendarPage
-
-// Category colors mapping
-const CATEGORY_COLORS: Record<string, string> = {
-  'Work': '#3b82f6',
-  'School': '#8b5cf6',
-  'Health & Hygiene': '#ef4444',
-  'Social': '#f97316',
-  'Family': '#ec4899',
-  'Personal': '#10b981',
-  'Fitness': '#f59e0b',
-  'Hobbies': '#06b6d4',
-  'Finance': '#10b981',
-  'Shopping': '#78716c',
-  'Travel': '#6366f1',
-  'Self-Care': '#ec4899'
-};
 
 interface EventModalProps {
   isOpen: boolean;
