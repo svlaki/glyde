@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../../../lib/authContext';
 
 export interface ChatMessage {
@@ -28,6 +28,32 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [userTimezone, setUserTimezone] = useState<string>('America/Chicago');
+
+  // Fetch user timezone from profile
+  useEffect(() => {
+    if (user) {
+      const fetchTimezone = async () => {
+        try {
+          const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+          const response = await fetch(`${agentServiceUrl}/api/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.id })
+          });
+          if (response.ok) {
+            const profile = await response.json();
+            if (profile.timezone) {
+              setUserTimezone(profile.timezone);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch user timezone:', error);
+        }
+      };
+      fetchTimezone();
+    }
+  }, [user]);
 
   const addMessage = useCallback((message: ChatMessage) => {
     setMessages(prev => [...prev, message]);
@@ -60,7 +86,7 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
           context: {
             userId: user.id,
             sessionId: sessionId,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: userTimezone,
             conversationHistory: messages.map(msg => ({
               role: msg.sender === 'user' ? 'user' : 'assistant',
               content: msg.content
@@ -158,7 +184,7 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
       
       console.error('Failed to send message:', error);
     }
-  }, [user, session, sessionId, messages, addMessage, onEventCreated]);
+  }, [user, session, sessionId, messages, addMessage, onEventCreated, userTimezone]);
 
   // Send internal message without adding user message to chat
   const sendInternalMessage = useCallback(async (content: string) => {
@@ -179,7 +205,7 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
           context: {
             userId: user.id,
             sessionId: sessionId,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            timezone: userTimezone,
             conversationHistory: messages.map(msg => ({
               role: msg.sender === 'user' ? 'user' : 'assistant',
               content: msg.content
@@ -274,7 +300,7 @@ export const useStreamingChat = ({ sessionId, onEventCreated }: UseStreamingChat
       
       console.error('Failed to send internal message:', error);
     }
-  }, [user, session, sessionId, messages, addMessage, onEventCreated]);
+  }, [user, session, sessionId, messages, addMessage, onEventCreated, userTimezone]);
 
   return {
     messages,

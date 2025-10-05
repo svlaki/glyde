@@ -2,25 +2,37 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 
 export const createEventTool = tool(
   async ({ title, startTime, endTime, location, description, category }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
+
     if (!userId) {
       throw new Error("User ID is required for creating events");
     }
+    if (!timezone) {
+      throw new Error("Timezone is required for creating events");
+    }
 
-    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category });
+    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category, timezone });
 
     // Initialize services
     const supabaseService = new SupabaseService();
     const zepGraphService = new ZepGraphService();
 
-    // Check for conflicts BEFORE creating the event using simple overlap detection
+    // Convert local times to UTC for storage
+    const startTimeUTC = convertToUTC(startTime, timezone);
+    const endTimeUTC = convertToUTC(endTime, timezone);
+
+    console.log(`🌍 [CREATE-EVENT TOOL] Converted times - Local: ${startTime} → UTC: ${startTimeUTC}`);
+
+    // Check for conflicts using UTC times
     try {
-      const existingEvents = await supabaseService.getEventsForAgent(userId);
-      const startDateTime = new Date(startTime);
-      const endDateTime = new Date(endTime);
+      const existingEvents = await supabaseService.getEvents(userId);
+      const startDateTime = new Date(startTimeUTC);
+      const endDateTime = new Date(endTimeUTC);
 
       const conflictingEvents = existingEvents.filter(event => {
         const eventStart = new Date(event.start_time);
@@ -35,29 +47,18 @@ export const createEventTool = tool(
 
       if (conflictingEvents.length > 0) {
         const conflictingEvent = conflictingEvents[0];
-        const conflictStartTime = new Date(conflictingEvent.start_time).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-        const conflictEndTime = new Date(conflictingEvent.end_time).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-
-        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled from ${conflictStartTime} to ${conflictEndTime}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
       }
     } catch (error) {
       console.error('Error checking for conflicts:', error);
       // Continue with event creation if conflict check fails
     }
 
-    // Create the event with category
+    // Create the event with UTC times
     const event = await supabaseService.createEvent(userId, {
       title,
-      start_time: startTime,
-      end_time: endTime,
+      start_time: startTimeUTC,
+      end_time: endTimeUTC,
       location: location || "",
       description: description || "",
       category: category || 'Personal'
@@ -81,8 +82,8 @@ export const createEventTool = tool(
           type: 'CalendarEvent',
           eventId: event.id,
           title,
-          startTime,
-          endTime,
+          startTime: startTimeUTC,  // Store UTC in graph
+          endTime: endTimeUTC,      // Store UTC in graph
           location: location || undefined,
           description: description || undefined,
           category: category || 'Personal',
@@ -105,7 +106,7 @@ export const createEventTool = tool(
       ? ` in category "${category}"`
       : '';
 
-    return `✅ Event created successfully: "${title}" at ${new Date(startTime).toLocaleString()}${categoryContext}`;
+    return `✅ Event created successfully: "${title}" at ${formatEventTime(startTimeUTC, timezone)}${categoryContext}`;
   },
   {
     name: "create_event",

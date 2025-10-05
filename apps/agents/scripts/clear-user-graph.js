@@ -17,28 +17,40 @@ if (!userId) {
 
 async function clearUserData() {
   try {
-    console.log(`🧹 Clearing graph data for user: ${userId}`);
+    console.log(`🧹 Clearing all Zep data for user: ${userId}`);
+    console.log('This will:');
+    console.log('  - Delete user from Zep (all episodes, facts, graph data)');
+    console.log('  - Clear entity mappings from Supabase');
+    console.log('  - Reinitialize user for fresh start\n');
 
     const graphService = new ZepGraphService();
     const memoryService = new ZepMemoryService();
 
-    // Clear knowledge graph data
-    console.log('🔄 Clearing knowledge graph...');
+    // Clear all graph data (episodes, facts, mappings)
+    console.log('🔄 Clearing knowledge graph and entity mappings...');
     await graphService.cleanupUserGraph(userId);
 
-    // Initialize fresh user in memory service
-    console.log('🔄 Reinitializing user in memory service...');
+    // Reinitialize user in Zep
+    console.log('🔄 Reinitializing user in Zep...');
     await memoryService.initUser(userId, {
       email: `${userId}@example.com`,
       firstName: 'User',
       lastName: userId
     });
 
-    console.log('✅ User data cleared successfully!');
-    console.log(`✨ User ${userId} is ready for fresh data with the new services.`);
+    console.log('\n✅ User data cleared successfully!');
+    console.log(`✨ User ${userId} is ready for fresh data with improved Zep integration.`);
+    console.log('\nNext steps:');
+    console.log('  - Calendar events will now use thread.add_messages()');
+    console.log('  - Better entity extraction from natural language');
+    console.log('  - Temporal awareness for updates');
+    console.log('  - Episode-based tracking for deletion');
 
   } catch (error) {
-    console.error('❌ Error clearing user data:', error.message);
+    console.error('\n❌ Error clearing user data:', error.message);
+    if (error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
     process.exit(1);
   }
 }

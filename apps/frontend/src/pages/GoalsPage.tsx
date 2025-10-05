@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../lib/authContext'
 import { supabase } from '../lib/supabase'
-import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
+import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, Goal } from '../lib/goalService'
 import { fetchUserCategories, Category } from '../lib/categoryService'
+import { validateRequired, formatErrorMessage, debounce } from '../lib/apiUtils'
+import { usePerformanceMonitor } from '../lib/performance'
 
 export default function GoalsPage() {
   const { user } = useAuth()
@@ -10,17 +12,42 @@ export default function GoalsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'not_started' | 'in_progress' | 'completed'>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [checkInGoal, setCheckInGoal] = useState<Goal | null>(null)
+  
+  // Performance monitoring
+  const { endRender } = usePerformanceMonitor('GoalsPage')
+
+  // Memoized filtered goals for performance
+  const filteredGoals = useMemo(() => {
+    if (filter === 'all') return goals;
+    return goals.filter(goal => goal.status === filter);
+  }, [goals, filter]);
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((searchTerm: string) => {
+      // Implement search logic here if needed
+      console.log('Searching for:', searchTerm);
+    }, 300),
+    []
+  );
 
   useEffect(() => {
     if (user) {
       loadGoals()
       loadCategories()
     }
-  }, [user, filter])
+  }, [user, filter, loadGoals])
+
+  // Performance monitoring
+  useEffect(() => {
+    endRender();
+  });
 
   // Real-time subscription for goals
   useEffect(() => {
@@ -42,35 +69,75 @@ export default function GoalsPage() {
     }
   }, [user])
 
-  async function loadGoals() {
+  const loadGoals = useCallback(async () => {
     if (!user) return
+    
     setLoading(true)
-    const filters = filter !== 'all' ? { status: filter } : undefined
-    const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
-    if (error) {
-      setError(error)
-    } else {
-      setGoals(fetchedGoals)
+    setError(null) // Clear previous errors
+    
+    try {
+      const filters = filter !== 'all' ? { status: filter } : undefined
+      const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
+      
+      if (error) {
+        setError(formatErrorMessage(error))
+      } else {
+        setGoals(fetchedGoals)
+      }
+    } catch (err) {
+      console.error('Error loading goals:', err)
+      setError('Failed to load goals. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }
+  }, [user, filter])
 
-  async function loadCategories() {
+  const loadCategories = useCallback(async () => {
     if (!user) return
-    const { categories: fetchedCategories } = await fetchUserCategories(user)
-    setCategories(fetchedCategories)
-  }
-
-  async function handleCreateGoal(goalData: Partial<Goal>) {
-    if (!user) return
-    const { error } = await createUserGoal(user, goalData as any)
-    if (error) {
-      setError(error)
-    } else {
-      await loadGoals()
-      setShowCreateModal(false)
+    
+    try {
+      const { categories: fetchedCategories, error } = await fetchUserCategories(user)
+      if (error) {
+        console.error('Error loading categories:', error)
+        // Don't set error state for categories as it's not critical
+      } else {
+        setCategories(fetchedCategories)
+      }
+    } catch (err) {
+      console.error('Error loading categories:', err)
     }
-  }
+  }, [user])
+
+  const handleCreateGoal = useCallback(async (goalData: Partial<Goal>) => {
+    if (!user) return
+    
+    setIsCreating(true)
+    setError(null) // Clear previous errors
+    
+    try {
+      // Validate required fields
+      const validationError = validateRequired(goalData, ['title'])
+      if (validationError) {
+        setError(validationError)
+        return
+      }
+
+      const { goal, error } = await createUserGoal(user, goalData as any)
+      if (error) {
+        setError(formatErrorMessage(error))
+      } else if (goal) {
+        await loadGoals()
+        setShowCreateModal(false)
+      } else {
+        setError('Failed to create goal - no data returned')
+      }
+    } catch (err) {
+      console.error('Error creating goal:', err)
+      setError('Failed to create goal. Please try again.')
+    } finally {
+      setIsCreating(false)
+    }
+  }, [user, loadGoals])
 
   async function handleUpdateGoal(goalId: string, updates: Partial<Goal>) {
     if (!user) return

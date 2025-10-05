@@ -88,6 +88,30 @@ export class CategoryService {
   }
 
   /**
+   * Get a single category by ID
+   */
+  async getCategoryById(userId: string, categoryId: string): Promise<Category | null> {
+    try {
+      const { data, error } = await this.supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('id', categoryId)
+        .single();
+
+      if (error) {
+        console.error(`❌ [CategoryService] Error fetching category by id ${categoryId}:`, error);
+        return null;
+      }
+
+      return data as Category;
+    } catch (error) {
+      console.error(`❌ [CategoryService] Exception fetching category by id ${categoryId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Create a new category
    */
   async createCategory(userId: string, input: CategoryCreateInput): Promise<Category | null> {
@@ -207,7 +231,7 @@ export class CategoryService {
     context: Partial<CategoryContext>
   ): Promise<void> {
     try {
-      const category = await this.getCategoryByName(userId, categoryId);
+      const category = await this.getCategoryById(userId, categoryId);
       if (!category) {
         throw new Error('Category not found');
       }

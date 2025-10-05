@@ -8,6 +8,8 @@ import { SupabaseService } from '../../services/SupabaseService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { toDate } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { createEventTool } from '../../tools/calendar/create-event.js';
 import { updateEventTool } from '../../tools/calendar/update-event.js';
 import { deleteEventTool } from '../../tools/calendar/delete-event.js';
@@ -67,11 +69,15 @@ export class ConversationAgent extends BaseAgent {
       
       // Get user profile to fetch timezone
       const userProfile = await supabaseService.getProfile(context.userId);
-      const userTimezone = userProfile?.timezone || 'America/New_York';
+      if (!userProfile?.timezone) {
+        throw new Error('User profile missing timezone. Please set timezone in profile.');
+      }
+      const userTimezone = userProfile.timezone;
       console.log(`🌍 [CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
-      
-      const userEvents = await supabaseService.getEventsForAgent(context.userId);
-      console.log(`Loading ${userEvents?.length || 0} events for user ${context.userId}`);
+
+      // Get events as UTC - we'll format them for display in the agent prompt
+      const userEvents = await supabaseService.getEvents(context.userId);
+      console.log(`Loading ${userEvents?.length || 0} events (UTC) for user ${context.userId}`);
       
       // Build conversation history from context
       const messages: BaseMessage[] = [];
@@ -235,21 +241,20 @@ export class ConversationAgent extends BaseAgent {
       
       const eventContext = recentEvents.length > 0
         ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
-            // Parse the UTC time string correctly
-            const start = new Date(e.start_time);
-            const end = new Date(e.end_time);
+            // Events are UTC from database - format for user's timezone display
+            const startDate = toDate(e.start_time);
+            const endDate = toDate(e.end_time);
 
-            // Extract the UTC hour to determine time of day (events are stored in UTC)
-            const utcHour = start.getUTCHours();
-            const timeOfDay = utcHour < 12 ? 'morning' : utcHour < 17 ? 'afternoon' : 'evening';
+            // Format times in user's timezone using date-fns-tz
+            const dateStr = formatInTimeZone(startDate, state.timezone, 'EEE, MMM d');
+            const startTime = formatInTimeZone(startDate, state.timezone, 'h:mm a');
+            const endTime = formatInTimeZone(endDate, state.timezone, 'h:mm a');
 
-            // Format the date and time (will use local timezone for display)
-            const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-            const startTime = `${utcHour % 12 || 12}:${start.getUTCMinutes().toString().padStart(2, '0')} ${utcHour < 12 ? 'AM' : 'PM'}`;
-            const endHour = end.getUTCHours();
-            const endTime = `${endHour % 12 || 12}:${end.getUTCMinutes().toString().padStart(2, '0')} ${endHour < 12 ? 'AM' : 'PM'}`;
+            // Determine time of day based on user's timezone
+            const localHour = parseInt(formatInTimeZone(startDate, state.timezone, 'H'));
+            const timeOfDay = localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening';
 
-            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''} [Date: ${start.toISOString().split('T')[0]}]`;
+            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}]`;
           }).join('\n')}`
         : `\n\nUSER'S CALENDAR: No events found`;
 
@@ -266,9 +271,9 @@ export class ConversationAgent extends BaseAgent {
 YOUR CALENDAR:${eventContext}
 
 TIME CONTEXT:
-- Now: ${getCurrentTimeInTimezone(state.timezone || 'America/New_York')}
+- Now: ${getCurrentTimeInTimezone(state.timezone)}
 - Today: ${formatDateForComparison(now)}
-- Tomorrow: ${formatDateForComparison(tomorrow)} (${tomorrow.toLocaleDateString('en-US', { weekday: 'long', timeZone: state.timezone || 'America/New_York' })})
+- Tomorrow: ${formatDateForComparison(tomorrow)} (${formatInTimeZone(tomorrow, state.timezone, 'EEEE')})
 
 COMMUNICATION:
 - Be warm and conversational, not robotic

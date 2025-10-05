@@ -197,17 +197,9 @@ export class ZepMemoryService {
    * Get user context from Zep (replaces old getMemoryContext)
    */
   async getUserContext(userId: string): Promise<string> {
-    try {
-      await this.initUser(userId);
-      const sessionId = await this.getOrCreateSession(userId);
-
-      // Get user context from thread
-      const context = await this.client.thread.getUserContext(sessionId);
-      return context.context || '';
-    } catch (error) {
-      console.error('Failed to get user context:', error);
-      return '';
-    }
+    // Graphiti disabled - skip user context retrieval
+    console.log(`⏭️  [ZepMemoryService] Graphiti disabled - skipping user context for ${userId}`);
+    return '';
   }
 
   /**
