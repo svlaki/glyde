@@ -55,10 +55,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting middleware (simple in-memory store)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-const RATE_LIMIT_MAX_REQUESTS = 100; // 100 requests per window
+// Rate limiting DISABLED for development
+const RATE_LIMIT_DISABLED = true;
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 1000;
 
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (RATE_LIMIT_DISABLED) {
+    next();
+    return;
+  }
+  
   const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
   const now = Date.now();
   

@@ -83,8 +83,9 @@ function CustomEvent({ event }: EventProps<CalendarEventWithDates>) {
   
   return (
     <div className="rbc-event-content" title={`${title} (${startTime} - ${endTime})`}>
-      <div className="font-semibold">{startTime}</div>
-      <div className="font-medium">{title}</div>
+      <div className="text-xs opacity-90">{startTime}</div>
+      <div className="font-medium my-1">{title}</div>
+      <div className="text-xs opacity-90">{endTime}</div>
     </div>
   );
 }
@@ -114,9 +115,15 @@ export function MainCalendar({
         return null;
       }
 
-      // The Date object correctly represents the UTC time
-      // react-big-calendar will use this Date's local representation for display
-      // No timezone conversion needed - JavaScript Date automatically handles this
+      // Debug logging to understand the issue
+      console.log('[resolveDate]', {
+        input: value,
+        parsed: parsed.toISOString(),
+        localString: parsed.toLocaleString(),
+        hours: parsed.getHours(),
+        minutes: parsed.getMinutes()
+      });
+
       return parsed;
     },
     [],
@@ -248,7 +255,7 @@ export function MainCalendar({
       popup={true}
       popupOffset={30}
       getNow={() => new Date()}
-      showCurrentTime={true}
+      showCurrentTimeIndicator={true}
       onSelectEvent={event => onSelectEvent?.(event)}
       onSelectSlot={slotInfo => onSelectSlot?.(slotInfo)}
       onEventDrop={handleEventDrop}
@@ -264,8 +271,8 @@ export function MainCalendar({
       tooltipAccessor="title"
       eventPropGetter={eventPropGetter}
       components={components}
-      min={new Date(1970, 0, 1, 0, 0, 0)}
-      max={new Date(1970, 0, 1, 24, 0, 0)}
+      min={new Date(2000, 0, 1, 0, 0, 0)}
+      max={new Date(2000, 0, 1, 23, 59, 59)}
       style={{ height: '100%' }}
       dayLayoutAlgorithm="no-overlap"
     />

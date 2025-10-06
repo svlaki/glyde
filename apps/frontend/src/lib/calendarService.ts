@@ -29,35 +29,47 @@ export async function fetchUserEvents(
 ): Promise<{ events: CalendarEvent[], error: string | null }> {
   try {
     if (!user) {
+      console.error('[calendarService] No user provided');
       return { events: [], error: 'User not authenticated' }
     }
 
-    // Use the backend API instead of direct Supabase calls
-    const response = await fetch(`${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`, {
+    const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`;
+    const body = {
+      user_id: user.id,
+      start_date: startDate ? startDate.toISOString() : null,
+      end_date: endDate ? endDate.toISOString() : null
+    };
+
+    console.log('[calendarService] Fetching events:', { url, body });
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        user_id: user.id,
-        start_date: startDate ? startDate.toISOString() : null,
-        end_date: endDate ? endDate.toISOString() : null
-      })
+      body: JSON.stringify(body)
     });
 
+    console.log('[calendarService] Response status:', response.status, response.ok);
+
     if (!response.ok) {
+      console.error('[calendarService] Failed to fetch events:', response.status);
       return { events: [], error: 'Failed to fetch events from backend' }
     }
 
     const data = await response.json();
     
+    console.log('[calendarService] Response data:', { success: data.success, eventCount: data.events?.length });
+    console.log('[calendarService] First event:', data.events?.[0]);
+    
     if (data.success) {
       return { events: data.events || [], error: null }
     } else {
+      console.error('[calendarService] API returned error:', data.error);
       return { events: [], error: data.error || 'Unknown error' }
     }
   } catch (err: any) {
-    console.error('Unexpected error in fetchUserEvents:', err)
+    console.error('[calendarService] Exception in fetchUserEvents:', err)
     return { events: [], error: err.message || 'An unexpected error occurred' }
   }
 }

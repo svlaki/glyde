@@ -296,8 +296,8 @@ export function CalendarPage() {
           </div>
 
           {/* Calendar */}
-          <div className="flex-1 p-2 bg-white">
-            <div className="h-full bg-white rounded-lg p-1">
+          <div className="flex-1 p-2 bg-white min-h-0 overflow-hidden">
+            <div className="h-full bg-white rounded-lg p-1 overflow-hidden">
               <MainCalendar
                 events={events}
                 onSelectEvent={handleEventClick}

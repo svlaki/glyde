@@ -1,16 +1,30 @@
 /* React Big Calendar Custom Styles */
 
-/* Calendar container */
+/* Calendar container - CRITICAL: Must have explicit height for event positioning */
 .rbc-calendar {
   font-family: inherit;
   height: 100%;
+  min-height: 600px;
 }
 
-/* Time grid improvements */
+/* Ensure time view is scrollable */
+/* Calendar scrolling - only on time view */
 .rbc-time-view {
+  height: 100%;
   border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  overflow: hidden;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.rbc-time-content {
+  min-height: 1680px !important; /* 24 hours * 70px per hour (35px * 2 slots) */
+}
+
+/* Prevent scrolling on parent containers */
+.rbc-calendar {
+  height: 100%;
+  overflow: hidden !important;
 }
 
 /* Header styling - FORCE VISIBLE TEXT */
@@ -54,7 +68,8 @@
 /* Time slots - HIGHLY VISIBLE GRID LINES */
 .rbc-time-slot {
   border-top: 2px solid #cccccc !important;
-  min-height: 50px;
+  min-height: 35px;
+  height: 35px;
 }
 
 .dark .rbc-time-slot {
@@ -63,6 +78,22 @@
 
 .rbc-time-content {
   border-top: 3px solid #999999 !important;
+}
+
+/* Ensure time content has proper structure for grid */
+.rbc-time-content > * {
+  position: relative;
+}
+
+/* Force timeslot groups to show borders */
+.rbc-timeslot-group {
+  border-bottom: 2px solid #cccccc !important;
+  min-height: 35px !important;
+  height: 70px !important; /* Double height for 30-minute slots */
+}
+
+.dark .rbc-timeslot-group {
+  border-bottom: 2px solid #555555 !important;
 }
 
 /* Add vertical lines between days */
@@ -112,15 +143,30 @@
 
 .rbc-label {
   padding: 0 1rem;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 700;
   color: #000000 !important;
   text-align: right;
-  line-height: 50px;
+  line-height: 1;
+  position: relative;
+  top: -0.65rem; /* Fine-tuned offset to align exactly with grid line */
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
 }
 
 .dark .rbc-label {
-  color: #ffffff !important;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #000000 !important;
+  text-align: right;
+  line-height: 1;
+  position: relative;
+  top: -0.65rem; /* Fine-tuned offset to align exactly with grid line */
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
 }
 
 /* Day columns */
@@ -188,23 +234,15 @@
 
 /* Event label (time) */
 .rbc-event-label {
-  font-size: 0.7rem;
-  opacity: 0.9;
-  font-weight: 500;
-  margin-bottom: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: inherit !important;
+  display: none !important; /* Hide default time label since we show it in custom component */
 }
 
-/* FORCE EVENT TEXT TO BE VISIBLE - CRITICAL FIX */
+/*/* FORCE EVENT TEXT TO BE VISIBLE - CRITICAL FIX */
 .rbc-event,
 .rbc-event *,
 .rbc-event div,
 .rbc-event-content,
-.rbc-event-content *,
-.rbc-event-label {
+.rbc-event-content * {
   color: inherit !important;
   -webkit-text-fill-color: currentColor !important;
 }
@@ -375,8 +413,8 @@
   }
 
   .rbc-event-label {
-    font-size: 0.65rem;
-  }
+  display: none !important; /* Hide default time label since we show it in custom component */
+}
 
   .rbc-header {
     font-size: 0.75rem;
@@ -403,5 +441,5 @@
 /* For very short events (< 30 minutes), hide the time label */
 .rbc-event[style*="height: 1"] .rbc-event-label,
 .rbc-event[style*="height: 2"] .rbc-event-label {
-  display: none;
+  display: none !important; /* Hide default time label since we show it in custom component */
 }
