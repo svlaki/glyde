@@ -16,8 +16,15 @@ export class AgentRegistry {
 
   // Register an agent
   async registerAgent(agent: BaseAgent): Promise<void> {
+    const { type } = agent.getInfo();
+
+    if (this.agents.has(type)) {
+      console.warn(`Agent ${type} is already registered. Skipping duplicate registration.`);
+      return;
+    }
+
     await agent.initialize();
-    this.agents.set(agent.getInfo().type, agent);
+    this.agents.set(type, agent);
   }
 
   // Get a specific agent
@@ -46,6 +53,15 @@ export class AgentRegistry {
     return this.agents.has(type);
   }
 
+  // Retrieve an agent and throw a helpful error if it's missing
+  requireAgent(type: AgentType): BaseAgent {
+    const agent = this.agents.get(type);
+    if (!agent) {
+      throw new Error(`Agent ${type} is not registered`);
+    }
+    return agent;
+  }
+
   // Remove an agent
   unregisterAgent(type: AgentType): boolean {
     return this.agents.delete(type);
@@ -54,18 +70,18 @@ export class AgentRegistry {
   // Route a message to the appropriate agent
   async routeMessage(context: AgentContext, message: string, targetAgent?: AgentType): Promise<AgentResponse> {
     // If specific agent is requested, use that
-    if (targetAgent && this.hasAgent(targetAgent)) {
-      const agent = this.getAgent(targetAgent)!;
+    if (targetAgent) {
+      const agent = this.requireAgent(targetAgent);
       return await agent.processMessage(context, message);
     }
 
     // Otherwise, use the conversation agent as the orchestrator
     const conversationAgent = this.getAgent('conversation');
-    if (conversationAgent) {
-      return await conversationAgent.processMessage(context, message);
+    if (!conversationAgent) {
+      throw new Error('Conversation agent is not registered');
     }
 
-    throw new Error('No suitable agent found to handle the message');
+    return await conversationAgent.processMessage(context, message);
   }
 
   // Allow agents to delegate to other agents

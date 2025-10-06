@@ -69,10 +69,12 @@ export class ConversationAgent extends BaseAgent {
       
       // Get user profile to fetch timezone
       const userProfile = await supabaseService.getProfile(context.userId);
+      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+
       if (!userProfile?.timezone) {
-        throw new Error('User profile missing timezone. Please set timezone in profile.');
+        console.warn(`⚠️ [CONVERSATION AGENT] User profile missing timezone, falling back to ${userTimezone}`);
       }
-      const userTimezone = userProfile.timezone;
+
       console.log(`🌍 [CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
 
       // Get events as UTC - we'll format them for display in the agent prompt
@@ -105,7 +107,7 @@ export class ConversationAgent extends BaseAgent {
       const result = await this.graph.invoke({
         messages: messages,
         userId: context.userId,
-        timezone: userTimezone, // Use timezone from user profile instead of context
+        timezone: userTimezone, // Use resolved timezone from profile, context, or UTC fallback
         userEvents: userEvents || [],
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
