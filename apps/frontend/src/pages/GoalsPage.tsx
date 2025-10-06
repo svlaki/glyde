@@ -37,41 +37,9 @@ export default function GoalsPage() {
     []
   );
 
-  useEffect(() => {
-    if (user) {
-      loadGoals()
-      loadCategories()
-    }
-  }, [user, filter, loadGoals])
-
-  // Performance monitoring
-  useEffect(() => {
-    endRender();
-  });
-
-  // Real-time subscription for goals
-  useEffect(() => {
-    if (!user) return
-
-    const channel = supabase.channel(`goals-${user.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'goals',
-        filter: `user_id=eq.${user.id}`
-      }, () => {
-        loadGoals()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user])
-
   const loadGoals = useCallback(async () => {
     if (!user) return
-    
+
     setLoading(true)
     setError(null) // Clear previous errors
     
@@ -107,6 +75,38 @@ export default function GoalsPage() {
       console.error('Error loading categories:', err)
     }
   }, [user])
+
+  useEffect(() => {
+    if (user) {
+      loadGoals()
+      loadCategories()
+    }
+  }, [user, loadGoals, loadCategories])
+
+  // Performance monitoring
+  useEffect(() => {
+    endRender();
+  });
+
+  // Real-time subscription for goals
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel(`goals-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'goals',
+        filter: `user_id=eq.${user.id}`
+      }, () => {
+        loadGoals()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, loadGoals])
 
   const handleCreateGoal = useCallback(async (goalData: Partial<Goal>) => {
     if (!user) return
