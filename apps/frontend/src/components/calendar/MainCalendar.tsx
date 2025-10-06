@@ -108,26 +108,22 @@ export function MainCalendar({
         return null;
       }
 
+      // Parse the date string - backend sends ISO 8601 UTC strings like "2025-10-06T14:00:00.000Z"
       const parsed = typeof value === 'string' ? new Date(value) : value;
       if (Number.isNaN(parsed.getTime())) {
-        console.error('Invalid date parsed:', value, 'resulted in:', parsed);
         return null;
       }
 
-      // Log the parsed date for debugging
-      console.log('Parsed date:', value, '→', parsed.toISOString(), 'Local:', parsed.toLocaleString());
-      
-      // Events are stored in UTC in the database
-      // When we parse the ISO string with new Date(), JavaScript creates a Date object
-      // that already represents the UTC time correctly in the user's local timezone
-      // react-big-calendar will display this Date using local time, which is what we want
+      // The Date object correctly represents the UTC time
+      // react-big-calendar will use this Date's local representation for display
+      // No timezone conversion needed - JavaScript Date automatically handles this
       return parsed;
     },
     [],
   );
 
   const normalizedEvents = useMemo(() => {
-    return events
+    const result = events
       .map(event => {
         const startDate = resolveDate(event.start ?? event.start_time);
         const endDate = resolveDate(event.end ?? event.end_time);
@@ -143,6 +139,14 @@ export function MainCalendar({
         } satisfies CalendarEventWithDates;
       })
       .filter((event): event is CalendarEventWithDates => Boolean(event));
+    
+    // Debug logging
+    console.log('[Calendar] Normalized events:', result.length);
+    result.forEach(e => {
+      console.log(`  - ${e.title}: ${e.start.toLocaleString()}`);
+    });
+    
+    return result;
   }, [events, resolveDate]);
 
   const handleNavigate = useCallback(

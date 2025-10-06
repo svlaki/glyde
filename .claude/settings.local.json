@@ -38,7 +38,9 @@
       "mcp__zep-docs__search_documentation",
       "mcp__serena__write_memory",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(docker system prune:*)"
+      "Bash(docker system prune:*)",
+      "Bash(python:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": [],

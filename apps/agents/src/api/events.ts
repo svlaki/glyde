@@ -152,23 +152,27 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
 
 export async function updateUserEvent(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+    const { user_id, event_id, ...eventDataUpdate } = req.body ?? {};
+    
+    if (!user_id) {
+      res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
-    const { event_id, ...eventDataUpdate } = req.body ?? {};
+    if (!validateUserId(user_id)) {
+      res.status(400).json({ error: 'Invalid user_id format' });
+      return;
+    }
 
     if (!event_id) {
       res.status(400).json({ error: 'event_id is required' });
       return;
     }
 
-    console.log('Updating event for user:', userId);
+    console.log('Updating event for user:', user_id);
     console.log('Event updates:', eventDataUpdate);
 
-    const updatedEvent = await getSupabaseService().updateEvent(userId, event_id, eventDataUpdate);
+    const updatedEvent = await getSupabaseService().updateEvent(user_id, event_id, eventDataUpdate);
     
     if (updatedEvent) {
       res.json({

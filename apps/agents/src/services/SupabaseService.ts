@@ -80,13 +80,14 @@ export class SupabaseService {
 
       console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events (UTC) with categories for user');
 
-      // Transform to match DatabaseEvent interface - times remain as UTC
+      // Transform to match DatabaseEvent interface - convert timestamps to ISO 8601
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
         id: event.id,
         user_id: event.user_id,
         title: event.title,
-        start_time: event.start_time, // UTC from database
-        end_time: event.end_time,     // UTC from database
+        // Ensure dates are in ISO 8601 format for JavaScript Date parsing
+        start_time: new Date(event.start_time).toISOString(),
+        end_time: new Date(event.end_time).toISOString(),
         location: event.location,
         description: event.description,
         created_at: event.created_at,

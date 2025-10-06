@@ -39,6 +39,7 @@ export function CalendarPage() {
     const category = event.category ?? 'Personal';
     const color = event.color ?? getCategoryColor(category);
 
+    // Don't add start/end Date properties here - MainCalendar will create them from start_time/end_time
     return {
       ...event,
       category,
@@ -46,9 +47,6 @@ export function CalendarPage() {
       backgroundColor: color,
       borderColor: color,
       textColor: '#FFFFFF',
-      // Convert string timestamps to Date objects
-      start: new Date(event.start_time),
-      end: new Date(event.end_time)
     };
   }, [getCategoryColor]);
 
@@ -91,8 +89,13 @@ export function CalendarPage() {
   const loadUserEvents = useCallback(async () => {
     if (!user) return;
 
+    console.log('[CalendarPage] Loading events for user:', user.id);
+
     try {
       const { events: userEvents, error } = await fetchUserEvents(user);
+      
+      console.log('[CalendarPage] Fetch result:', { count: userEvents?.length, error });
+      
       if (error) {
         console.error('Error loading user events:', error);
         setEvents([]);
@@ -105,6 +108,10 @@ export function CalendarPage() {
 
       eventLoadErrorShown.current = false;
       const formattedEvents = userEvents.map(transformEvent);
+      
+      console.log('[CalendarPage] Formatted events:', formattedEvents.length);
+      console.log('[CalendarPage] Sample event:', formattedEvents[0]);
+      
       setEvents(formattedEvents);
     } catch (error) {
       console.error('Error loading user events:', error);
