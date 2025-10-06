@@ -30,7 +30,7 @@ export function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ExtendedCalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [userTimezone, setUserTimezone] = useState<string>('local');
+  const [userTimezone, setUserTimezone] = useState<string>('America/Chicago'); // Default to Chicago, will be overridden by profile
   const { interactions, removeInteraction } = useInteractions();
   const eventLoadErrorShown = useRef(false);
   const taskLoadErrorShown = useRef(false);
@@ -251,11 +251,16 @@ export function CalendarPage() {
     const { event, start, end } = args;
     const fallbackEnd = end ?? new Date(start.getTime() + 60 * 60 * 1000);
 
+    // Convert from user's timezone to UTC for storage
+    // The dates from react-big-calendar are already in the user's timezone after resolveDate conversion
+    const startUTC = fromZonedTime(start, userTimezone);
+    const endUTC = fromZonedTime(fallbackEnd, userTimezone);
+
     await handleCalendarEventUpdate(event.id, {
-      start_time: start.toISOString(),
-      end_time: fallbackEnd.toISOString(),
+      start_time: startUTC.toISOString(),
+      end_time: endUTC.toISOString(),
     });
-  }, [handleCalendarEventUpdate]);
+  }, [handleCalendarEventUpdate, userTimezone]);
 
   const handleEventResize = useCallback(async (
     args: CalendarInteractionArgs
@@ -266,11 +271,16 @@ export function CalendarPage() {
       return;
     }
 
+    // Convert from user's timezone to UTC for storage
+    // The dates from react-big-calendar are already in the user's timezone after resolveDate conversion
+    const startUTC = fromZonedTime(start, userTimezone);
+    const endUTC = fromZonedTime(end, userTimezone);
+
     await handleCalendarEventUpdate(event.id, {
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
+      start_time: startUTC.toISOString(),
+      end_time: endUTC.toISOString(),
     });
-  }, [handleCalendarEventUpdate]);
+  }, [handleCalendarEventUpdate, userTimezone]);
 
   return (
     <div className="min-h-screen bg-white text-black">

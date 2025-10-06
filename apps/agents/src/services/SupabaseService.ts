@@ -1,6 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
-import { convertToUTC } from '../utils/timezoneUtils.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
@@ -168,27 +167,26 @@ export class SupabaseService {
     }
   }
 
+  // Accepts UTC timestamps for start_time and end_time
+  // NO timezone conversion - caller must provide UTC times
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
       console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
       console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
-      console.log('🔍 [SUPABASE SERVICE] Updates:', JSON.stringify(updates, null, 2));
-
-      // Fetch the user's timezone so we can correctly persist temporal updates
-      const profile = await this.getProfile(userId);
-      const userTimezone = profile?.timezone || 'America/New_York';
+      console.log('🔍 [SUPABASE SERVICE] Updates (must be UTC):', JSON.stringify(updates, null, 2));
 
       // Build update object with only provided fields
+      // Note: start_time and end_time must already be in UTC format from caller
       const updateData: any = {
         updated_at: new Date().toISOString()
       };
 
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.start_time !== undefined) {
-        updateData.start_time = convertToUTC(updates.start_time, userTimezone);
+        updateData.start_time = updates.start_time; // Must be UTC from caller
       }
       if (updates.end_time !== undefined) {
-        updateData.end_time = convertToUTC(updates.end_time, userTimezone);
+        updateData.end_time = updates.end_time; // Must be UTC from caller
       }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;

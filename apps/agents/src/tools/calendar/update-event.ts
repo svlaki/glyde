@@ -2,12 +2,18 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateEventTool = tool(
   async ({ eventId, searchQuery, title, startTime, endTime, location, description, category }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
+
     if (!userId) {
       throw new Error("User ID is required for updating events");
+    }
+    if (!timezone) {
+      throw new Error("Timezone is required for updating events");
     }
 
     let targetEventId = eventId;
@@ -28,8 +34,8 @@ export const updateEventTool = tool(
           5 // limit
         );
 
-        // Also search directly in database
-        const events = await supabaseService.getEventsForAgent(userId);
+        // Also search directly in database (use getEvents instead of deprecated getEventsForAgent)
+        const events = await supabaseService.getEvents(userId);
         const matchingEvents = events.filter((event: any) => {
           const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
           return searchText.includes(searchQuery.toLowerCase());
@@ -51,13 +57,21 @@ export const updateEventTool = tool(
       throw new Error("No event ID provided and no search query given");
     }
 
+    // Convert local times to UTC for storage (same as create-event)
+    const startTimeUTC = startTime ? convertToUTC(startTime, timezone) : undefined;
+    const endTimeUTC = endTime ? convertToUTC(endTime, timezone) : undefined;
+
+    if (startTimeUTC || endTimeUTC) {
+      console.log(`🌍 [UPDATE-EVENT TOOL] Timezone conversion - ${startTime} → ${startTimeUTC}`);
+    }
+
     const updatedEvent = await supabaseService.updateEvent(
       userId,
       targetEventId,
       {
         title: title || undefined,
-        start_time: startTime || undefined,
-        end_time: endTime || undefined,
+        start_time: startTimeUTC,
+        end_time: endTimeUTC,
         location: location || undefined,
         description: description || undefined,
       }
