@@ -1,0 +1,110 @@
+/* Fix for light gray text in inputs and textareas - VERY STRONG SELECTORS */
+
+input,
+input[type="text"],
+input[type="time"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  color: #000000 !important;
+}
+
+/* Dark mode support */
+.dark input,
+.dark input[type="text"],
+.dark input[type="time"],
+.dark input[type="date"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark textarea,
+.dark select {
+  color: #ffffff !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #999999 !important;
+  opacity: 0.7;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #666666 !important;
+  opacity: 0.7;
+}
+
+/* Ensure option text is visible in select dropdowns */
+select option {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+.dark select option {
+  color: #ffffff !important;
+  background-color: #1a1a1a !important;
+}
+
+/* Fix for Input component from shadcn */
+input[data-slot="input"] {
+  color: #000000 !important;
+}
+
+.dark input[data-slot="input"] {
+  color: #ffffff !important;
+}
+
+/* Fix for time inputs specifically */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+}
+
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Fix calendar event text */
+.rbc-event-content,
+.rbc-event-label {
+  color: inherit !important;
+}
+
+/* FORCE BLACK TEXT ON ALL CALENDAR COMPONENTS */
+.rbc-event,
+.rbc-event *,
+.rbc-event-content,
+.rbc-event-content *,
+.rbc-day-slot .rbc-event,
+.rbc-time-slot,
+.rbc-time-header-content,
+.rbc-header,
+.rbc-day-bg,
+.rbc-time-content {
+  color: inherit !important;
+}
+
+/* Make sure dialog/modal text is visible */
+[role="dialog"] input,
+[role="dialog"] textarea,
+[role="dialog"] select,
+.dialog input,
+.dialog textarea,
+.dialog select {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+.dark [role="dialog"] input,
+.dark [role="dialog"] textarea,
+.dark [role="dialog"] select,
+.dark .dialog input,
+.dark .dialog textarea,
+.dark .dialog select {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}

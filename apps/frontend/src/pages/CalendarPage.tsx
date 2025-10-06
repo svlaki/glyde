@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { SlotInfo } from 'react-big-calendar';
 import { useAuth } from '../lib/authContext';
 import { useCategories } from '../lib/categoryContext';
-import { WeekCalendar } from '../components/calendar/WeekCalendar';
 import { fetchUserEvents, updateEvent, createEvent, deleteEvent, CalendarEvent } from '../lib/calendarService';
 import type { ExtendedCalendarEvent } from '../types/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -18,7 +17,6 @@ import { useToast } from '../components/ui/toast';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
-import type { ExtendedCalendarEvent } from '../types/calendar';
 import { getCategoryColor } from '../lib/calendarCategories';
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
@@ -186,8 +184,8 @@ export function CalendarPage() {
     };
   }, [loadUserEvents, loadUserTasks, user]);
 
-  function handleDateClick(date: Date) {
-    setSelectedDate(date.toISOString());
+  const handleDateClick = useCallback((slotInfo: SlotInfo) => {
+    setSelectedDate(slotInfo.start.toISOString());
     setSelectedEvent(null);
     setIsModalOpen(true);
   }, []);
@@ -214,30 +212,28 @@ export function CalendarPage() {
     }
   }, [loadUserEvents, removeInteraction]);
 
-  const handleEventDrop = useCallback(async (
+  const handleCalendarEventUpdate = useCallback(async (
     eventId: string,
-    newStart: Date,
-    newEnd: Date
-  ) => {
+    updates: { start_time: string; end_time: string }
+  ): Promise<boolean> => {
     if (!user) {
       toast({ title: 'Not signed in', description: 'Please sign in again to manage events.', variant: 'warning' });
-      return;
+      return false;
     }
 
     try {
-      const { error } = await updateEvent(user, eventId, {
-        start_time: newStart.toISOString(),
-        end_time: newEnd.toISOString()
-      });
-      
+      const { error } = await updateEvent(user, eventId, updates);
+
       if (error) {
         throw new Error(error);
       }
 
       await loadUserEvents();
+      return true;
     } catch (error) {
-      console.error('Error updating event timing:', error);
+      console.error('Error updating event:', error);
       toast({ title: 'Unable to update event', description: 'Please try again.', variant: 'error' });
+      return false;
     }
   }, [loadUserEvents, toast, user]);
 
@@ -247,15 +243,11 @@ export function CalendarPage() {
     const { event, start, end } = args;
     const fallbackEnd = end ?? new Date(start.getTime() + 60 * 60 * 1000);
 
-    const success = await handleCalendarEventUpdate(event.id, {
+    await handleCalendarEventUpdate(event.id, {
       start_time: start.toISOString(),
       end_time: fallbackEnd.toISOString(),
     });
-
-    if (!success) {
-      await loadUserEvents();
-    }
-  }, [handleCalendarEventUpdate, loadUserEvents]);
+  }, [handleCalendarEventUpdate]);
 
   const handleEventResize = useCallback(async (
     args: CalendarInteractionArgs
@@ -263,19 +255,14 @@ export function CalendarPage() {
     const { event, start, end } = args;
 
     if (!end) {
-      await loadUserEvents();
       return;
     }
 
-    const success = await handleCalendarEventUpdate(event.id, {
+    await handleCalendarEventUpdate(event.id, {
       start_time: start.toISOString(),
       end_time: end.toISOString(),
     });
-
-    if (!success) {
-      await loadUserEvents();
-    }
-  }, [handleCalendarEventUpdate, loadUserEvents]);
+  }, [handleCalendarEventUpdate]);
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -293,11 +280,12 @@ export function CalendarPage() {
           {/* Calendar */}
           <div className="flex-1 p-2 bg-white">
             <div className="h-full bg-white rounded-lg p-1">
-              <WeekCalendar
+              <MainCalendar
                 events={events}
-                onEventClick={handleEventClick}
-                onDateClick={handleDateClick}
-                onEventDrop={handleEventDrop}
+                onSelectEvent={handleEventClick}
+                onSelectSlot={handleDateClick}
+                onEventDrop={handleEventMove}
+                onEventResize={handleEventResize}
                 userTimezone={userTimezone}
               />
             </div>
@@ -413,6 +401,7 @@ interface EventModalProps {
 function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTimezone }: EventModalProps) {
   const { categories, getCategoryColor } = useCategories();
   const [title, setTitle] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [description, setDescription] = useState('');
@@ -424,28 +413,61 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
       // Convert UTC time to user's timezone for display in the form
       const startDate = toZonedTime(new Date(event.start_time), userTimezone);
       const endDate = toZonedTime(new Date(event.end_time), userTimezone);
-      setStartTime(format(startDate, 'HH:mm'));
-      setEndTime(format(endDate, 'HH:mm'));
+      
+      // Validate dates before formatting
+      if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+        setEventDate(format(startDate, 'yyyy-MM-dd'));
+        setStartTime(format(startDate, 'HH:mm'));
+        setEndTime(format(endDate, 'HH:mm'));
+      } else {
+        setEventDate(format(new Date(), 'yyyy-MM-dd'));
+        setStartTime('10:00');
+        setEndTime('11:00');
+      }
       setDescription(event.description || '');
       setCategory(event.category || 'Personal');
+    } else if (date) {
+      // Extract time from the clicked slot
+      const clickedDate = new Date(date);
+      setTitle('');
+      setEventDate(format(clickedDate, 'yyyy-MM-dd'));
+      
+      // Check if it's midnight (day click) or actual time (slot click)
+      const hours = clickedDate.getHours();
+      const minutes = clickedDate.getMinutes();
+      if (hours === 0 && minutes === 0) {
+        // Day header was clicked, use default time
+        setStartTime('10:00');
+        setEndTime('11:00');
+      } else {
+        // Time slot was clicked, use that time
+        setStartTime(format(clickedDate, 'HH:mm'));
+        const endDate = new Date(clickedDate.getTime() + 60 * 60 * 1000); // +1 hour
+        setEndTime(format(endDate, 'HH:mm'));
+      }
+      setDescription('');
+      setCategory('Personal');
     } else {
       setTitle('');
+      setEventDate(format(new Date(), 'yyyy-MM-dd'));
       setStartTime('10:00');
       setEndTime('11:00');
       setDescription('');
       setCategory('Personal');
     }
-  }, [event, userTimezone]);
+  }, [event, date, userTimezone]);
 
   async function handleSave() {
     if (!user || !title.trim()) return;
 
-    const baseDate = date ? date.split('T')[0] : (event?.start_time.split('T')[0]);
-    if (!baseDate) return;
+    if (!eventDate) {
+      toast({ title: 'Missing date', description: 'Please select a date for the event.', variant: 'warning' });
+      return;
+    }
 
     // Convert from user's timezone to UTC for storage
-    const starts_at = fromZonedTime(`${baseDate}T${startTime}:00`, userTimezone);
-    const ends_at = fromZonedTime(`${baseDate}T${endTime}:00`, userTimezone);
+    const starts_at = fromZonedTime(`${eventDate}T${startTime}:00`, userTimezone);
+    const ends_at = fromZonedTime(`${eventDate}T${endTime}:00`, userTimezone);
 
     const eventData = {
       title: title.trim(),
@@ -528,6 +550,18 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
               onChange={e => setTitle(e.target.value)}
               className="h-12 rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base shadow-sm transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary"
               autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <span>📅</span> Date
+            </label>
+            <Input
+              type="date"
+              value={eventDate}
+              onChange={e => setEventDate(e.target.value)}
+              className="h-12 rounded-2xl border-2 border-border/60 bg-background/90 px-4 text-base shadow-sm transition-all focus:border-primary focus:bg-background focus:ring-2 focus:ring-primary"
             />
           </div>
 

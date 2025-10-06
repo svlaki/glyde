@@ -24,6 +24,7 @@ const DEFAULT_END_TIME = '11:00';
 
 export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }: EventModalProps) {
   const [title, setTitle] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [startTime, setStartTime] = useState(DEFAULT_START_TIME);
   const [endTime, setEndTime] = useState(DEFAULT_END_TIME);
   const [description, setDescription] = useState('');
@@ -34,18 +35,41 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
       setTitle(event.title ?? '');
       const startDate = event.start_time ? new Date(event.start_time) : null;
       const endDate = event.end_time ? new Date(event.end_time) : null;
+      setEventDate(startDate ? startDate.toISOString().split('T')[0] : '');
       setStartTime(startDate ? startDate.toTimeString().slice(0, 5) : DEFAULT_START_TIME);
       setEndTime(endDate ? endDate.toTimeString().slice(0, 5) : DEFAULT_END_TIME);
       setDescription(event.description ?? '');
       setCategory(event.category ?? 'Personal');
+    } else if (date) {
+      // Extract time from the clicked slot if available
+      const clickedDate = new Date(date);
+      setTitle('');
+      setEventDate(clickedDate.toISOString().split('T')[0]);
+
+      // Use the clicked time, or default to 10am if it's midnight (day click vs time slot click)
+      const hours = clickedDate.getHours();
+      const minutes = clickedDate.getMinutes();
+      if (hours === 0 && minutes === 0) {
+        // Day header was clicked, use default time
+        setStartTime(DEFAULT_START_TIME);
+        setEndTime(DEFAULT_END_TIME);
+      } else {
+        // Time slot was clicked, use that time
+        setStartTime(clickedDate.toTimeString().slice(0, 5));
+        const endDate = new Date(clickedDate.getTime() + 60 * 60 * 1000); // +1 hour
+        setEndTime(endDate.toTimeString().slice(0, 5));
+      }
+      setDescription('');
+      setCategory('Personal');
     } else {
       setTitle('');
+      setEventDate(new Date().toISOString().split('T')[0]);
       setStartTime(DEFAULT_START_TIME);
       setEndTime(DEFAULT_END_TIME);
       setDescription('');
       setCategory('Personal');
     }
-  }, [event]);
+  }, [event, date]);
 
   const currentCategoryColor = useMemo(
     () => getCategoryColor(category),
@@ -64,14 +88,13 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
       return;
     }
 
-    const baseDate = date?.split('T')[0] ?? event?.start_time?.split('T')[0];
-    if (!baseDate) {
+    if (!eventDate) {
       toast({ title: 'Missing date', description: 'Please select a date for the event.', variant: 'warning' });
       return;
     }
 
-    const start = new Date(`${baseDate}T${startTime}:00`);
-    const end = new Date(`${baseDate}T${endTime}:00`);
+    const start = new Date(`${eventDate}T${startTime}:00`);
+    const end = new Date(`${eventDate}T${endTime}:00`);
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       toast({ title: 'Invalid time', description: 'Enter a valid start and end time.', variant: 'error' });
@@ -176,6 +199,18 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
               onChange={(e) => setTitle(e.target.value)}
               className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
               autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <span role="img" aria-hidden>📅</span> Date
+            </label>
+            <Input
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="h-11 text-base bg-background border-input focus:ring-2 focus:ring-primary"
             />
           </div>
 

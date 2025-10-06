@@ -37,7 +37,8 @@
       "Bash(if exist \"nul\" del \"nul\")",
       "mcp__zep-docs__search_documentation",
       "mcp__serena__write_memory",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(docker system prune:*)"
     ],
     "deny": [],
     "ask": [],

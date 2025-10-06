@@ -35,6 +35,7 @@ services:
       - ./apps/frontend/src:/app/src
       - ./apps/frontend/public:/app/public
       - ./apps/frontend/index.html:/app/index.html
+      - ./apps/frontend/main.tsx:/app/main.tsx
       - ./apps/frontend/vite.config.ts:/app/vite.config.ts
       - ./apps/frontend/tailwind.config.js:/app/tailwind.config.js
       - ./apps/frontend/postcss.config.js:/app/postcss.config.js

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { EventProps } from 'react-big-calendar';
 import {
   Calendar as BigCalendar,
   Views,
@@ -10,10 +11,11 @@ import {
 import withDragAndDrop, { type EventInteractionArgs } from 'react-big-calendar/lib/addons/dragAndDrop';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
+import './calendar-styles.css';
 
 import { addDays, format, parse, startOfToday, startOfWeek, getDay } from 'date-fns';
 import enUS from 'date-fns/locale/en-US';
-import { utcToZonedTime } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz';
 
 import type { ExtendedCalendarEvent } from '@/types/calendar';
 import { getCategoryColor } from '@/lib/calendarCategories';
@@ -24,8 +26,14 @@ const localizer = dateFnsLocalizer({
   format,
   parse: (value, formatString, backupDate, options) =>
     parse(value, formatString, backupDate, { locale: options?.locale ?? enUS }),
-  startOfWeek: (date, options) =>
-    startOfWeek(addDays(date, 1), { weekStartsOn: 1, ...(options ?? {}) }),
+  startOfWeek: (date, options) => {
+    // Calculate which day should be the start to make "today" the second column
+    const today = new Date();
+    const todayDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Week should start 1 day before today, so today is in column 2
+    const weekStartsOn = (todayDayOfWeek - 1 + 7) % 7;
+    return startOfWeek(date, { weekStartsOn, ...(options ?? {}) });
+  },
   getDay,
   locales,
 });
@@ -67,6 +75,20 @@ function toReadableTextColor(color: string): string {
   return brightness > 140 ? '#000000' : '#FFFFFF';
 }
 
+// Custom event component for better text display
+function CustomEvent({ event }: EventProps<CalendarEventWithDates>) {
+  const { title, start, end } = event;
+  const startTime = format(start, 'h:mm a');
+  const endTime = format(end, 'h:mm a');
+  
+  return (
+    <div className="rbc-event-content" title={`${title} (${startTime} - ${endTime})`}>
+      <div className="font-semibold">{startTime}</div>
+      <div className="font-medium">{title}</div>
+    </div>
+  );
+}
+
 export function MainCalendar({
   events,
   onSelectEvent,
@@ -75,7 +97,7 @@ export function MainCalendar({
   onEventResize,
   userTimezone,
 }: MainCalendarProps) {
-  const [referenceDate, setReferenceDate] = useState<Date>(() => addDays(startOfToday(), -1));
+  const [referenceDate, setReferenceDate] = useState<Date>(() => startOfToday());
   const [currentView, setCurrentView] = useState<View>(Views.WEEK);
 
   const displayDate = referenceDate;
@@ -91,13 +113,11 @@ export function MainCalendar({
         return null;
       }
 
-      if (userTimezone && userTimezone !== 'local') {
-        return utcToZonedTime(parsed, userTimezone);
-      }
-
+      // react-big-calendar displays Date objects using their local time components
+      // So we just return the parsed Date without timezone conversion
       return parsed;
     },
-    [userTimezone],
+    [],
   );
 
   const normalizedEvents = useMemo(() => {
@@ -122,7 +142,7 @@ export function MainCalendar({
   const handleNavigate = useCallback(
     (newDate: Date, _view: View, action: NavigateAction) => {
       if (action === 'TODAY') {
-        setReferenceDate(addDays(startOfToday(), -1));
+        setReferenceDate(startOfToday());
         return;
       }
 
@@ -150,6 +170,10 @@ export function MainCalendar({
       },
     };
   }, []);
+
+  const components = useMemo(() => ({
+    event: CustomEvent,
+  }), []);
 
   const handleEventDrop = useCallback(
     (args: EventInteractionArgs<CalendarEventWithDates>) => {
@@ -211,7 +235,10 @@ export function MainCalendar({
       views={[Views.WEEK]}
       selectable
       resizable
-      popup={false}
+      popup={true}
+      popupOffset={30}
+      getNow={() => new Date()}
+      showCurrentTime={true}
       onSelectEvent={event => onSelectEvent?.(event)}
       onSelectSlot={slotInfo => onSelectSlot?.(slotInfo)}
       onEventDrop={handleEventDrop}
@@ -223,10 +250,14 @@ export function MainCalendar({
       longPressThreshold={250}
       startAccessor="start"
       endAccessor="end"
+      titleAccessor="title"
+      tooltipAccessor="title"
       eventPropGetter={eventPropGetter}
+      components={components}
       min={new Date(1970, 0, 1, 0, 0, 0)}
       max={new Date(1970, 0, 1, 24, 0, 0)}
       style={{ height: '100%' }}
+      dayLayoutAlgorithm="no-overlap"
     />
   );
 }

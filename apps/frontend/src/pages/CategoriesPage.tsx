@@ -159,31 +159,34 @@ function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
 
   return (
     <div
-      className="relative border-3 rounded-xl p-6 shadow-sm hover:shadow-xl transition-all aspect-square flex flex-col items-center justify-center text-center group cursor-pointer"
-      style={{ 
+      className="relative border-3 rounded-xl p-6 shadow-sm hover:shadow-xl transition-all aspect-square flex flex-col items-center justify-between text-center group cursor-pointer"
+      style={{
         borderColor: category.color,
         backgroundColor: hexToRgba(category.color, 0.15),
         borderWidth: '3px'
       }}
       onClick={() => onEdit(category)}
     >
-      {/* Icon - large and centered */}
-      <div className="text-6xl mb-4">{category.icon || '📁'}</div>
+      {/* Top content - icon, name, description */}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Icon - large and centered */}
+        <div className="text-6xl mb-3">{category.icon || '📁'}</div>
 
-      {/* Category name */}
-      <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2">
-        {category.name}
-      </h3>
+        {/* Category name */}
+        <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2">
+          {category.name}
+        </h3>
 
-      {/* Description - only show on hover */}
-      {category.description && (
-        <p className="text-xs text-muted-foreground line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {category.description}
-        </p>
-      )}
+        {/* Description - always visible */}
+        {category.description && (
+          <p className="text-xs text-muted-foreground line-clamp-3 px-2">
+            {category.description}
+          </p>
+        )}
+      </div>
 
-      {/* Action buttons - show on hover */}
-      <div className="absolute bottom-3 left-0 right-0 flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Action buttons - at bottom, show on hover */}
+      <div className="w-full flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity mt-3">
         <button
           onClick={(e) => {
             e.stopPropagation()
