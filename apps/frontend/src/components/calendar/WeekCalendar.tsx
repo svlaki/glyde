@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format, startOfWeek, addDays, addWeeks, isSameDay, parseISO } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,15 @@ export function WeekCalendar({
   };
   
   const [currentWeekStart, setCurrentWeekStart] = useState(getWeekStartForToday());
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Generate array of days for the current week
   const weekDays = useMemo(() => {
@@ -69,6 +78,17 @@ export function WeekCalendar({
     return grouped;
   }, [events, weekDays]);
 
+  const currentTimeOffsetPercent = useMemo(() => {
+    const fractionalHour =
+      now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    return (fractionalHour / 24) * 100;
+  }, [now]);
+
+  const isCurrentWeekVisible = useMemo(
+    () => weekDays.some(day => isSameDay(day, now)),
+    [weekDays, now]
+  );
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header with navigation */}
@@ -96,16 +116,25 @@ export function WeekCalendar({
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-8 min-w-[800px]">
           {/* Time column */}
-          <div className="col-span-1 border-r border-border">
-            <div className="h-12 border-b border-border" /> {/* Header spacer */}
-            {hours.map(hour => (
-              <div
-                key={hour}
-                className="h-20 border-b border-border flex items-start justify-end pr-2 pt-1 text-xs text-muted-foreground"
-              >
-                {format(new Date().setHours(hour, 0), 'ha')}
-              </div>
-            ))}
+          <div className="col-span-1 border-r border-slate-300 dark:border-slate-700">
+            <div className="h-12 border-b border-slate-300 dark:border-slate-700" />
+            <div className="relative">
+              {hours.map(hour => (
+                <div
+                  key={hour}
+                  className="relative h-20 border-b border-slate-300 dark:border-slate-700 flex items-start justify-end pr-2 pt-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+                >
+                  {format(new Date().setHours(hour, 0), 'ha')}
+                  <div className="absolute top-1/2 left-0 right-0 border-t border-slate-200/70 dark:border-slate-800/70" />
+                </div>
+              ))}
+              {isCurrentWeekVisible && (
+                <div
+                  className="pointer-events-none absolute left-0 right-0 h-[2px] -translate-y-1/2 bg-red-500"
+                  style={{ top: `${currentTimeOffsetPercent}%` }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Day columns */}
@@ -113,31 +142,54 @@ export function WeekCalendar({
             const dayKey = format(day, 'yyyy-MM-dd');
             const dayEvents = eventsByDay[dayKey] || [];
             const isToday = isSameDay(day, new Date());
+            const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+            const columnBackground = isToday
+              ? 'bg-primary/10 dark:bg-primary/20'
+              : isWeekend
+              ? 'bg-muted/40 dark:bg-muted/20'
+              : '';
 
             return (
-              <div key={dayIndex} className="col-span-1 border-r border-border last:border-r-0">
+              <div
+                key={dayIndex}
+                className={`col-span-1 border-r border-slate-300 dark:border-slate-700 last:border-r-0 ${columnBackground}`}
+              >
                 {/* Day header */}
-                <div className={`h-12 border-b border-border flex flex-col items-center justify-center ${isToday ? 'bg-primary/10' : ''}`}>
-                  <div className="text-xs text-muted-foreground">
+                <div
+                  className={`h-12 border-b border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center ${
+                    isToday
+                      ? 'bg-primary/20 dark:bg-primary/30'
+                      : isWeekend
+                      ? 'bg-muted/50 dark:bg-muted/30'
+                      : ''
+                  }`}
+                >
+                  <div className="text-xs font-medium text-slate-700 dark:text-slate-200">
                     {format(day, 'EEE')}
                   </div>
-                  <div className={`text-sm font-semibold ${isToday ? 'text-primary' : ''}`}>
+                  <div
+                    className={`text-sm font-semibold ${
+                      isToday ? 'text-primary' : 'text-slate-900 dark:text-slate-100'
+                    }`}
+                  >
                     {format(day, 'd')}
                   </div>
                 </div>
 
                 {/* Time grid for this day */}
-                <div className="relative">
+                <div className={`relative ${columnBackground}`}>
                   {hours.map((hour, hourIndex) => (
                     <div
                       key={hourIndex}
-                      className="h-20 border-b border-border hover:bg-accent/50 cursor-pointer transition-colors"
+                      className="relative h-20 border-b border-slate-300 dark:border-slate-700 hover:bg-accent/50 cursor-pointer transition-colors"
                       onClick={() => {
                         const clickedDate = new Date(day);
                         clickedDate.setHours(hour, 0, 0, 0);
                         onDateClick(clickedDate);
                       }}
-                    />
+                    >
+                      <div className="absolute top-1/2 left-0 right-0 border-t border-slate-200/70 dark:border-slate-800/70" />
+                    </div>
                   ))}
 
                   {/* Events overlay */}
@@ -182,6 +234,13 @@ export function WeekCalendar({
                       })}
                     </div>
                   </div>
+
+                  {isToday && isCurrentWeekVisible && (
+                    <div
+                      className="pointer-events-none absolute left-0 right-0 h-[2px] -translate-y-1/2 bg-red-500 z-50"
+                      style={{ top: `${currentTimeOffsetPercent}%` }}
+                    />
+                  )}
                 </div>
               </div>
             );
