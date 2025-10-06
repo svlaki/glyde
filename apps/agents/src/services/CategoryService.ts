@@ -302,54 +302,18 @@ export class CategoryService {
         return;
       }
 
-      // Default categories everyone should have
-      const defaultCategories = [
-        // Work & Career
-        { name: 'Work', color: '#3b82f6', icon: '💼', description: 'Work-related tasks and meetings', order: 1 },
-        { name: 'Meetings', color: '#8b5cf6', icon: '🤝', description: 'Scheduled meetings and calls', order: 2 },
-
-        // Personal Development
-        { name: 'Personal', color: '#10b981', icon: '🏡', description: 'Personal activities and errands', order: 3 },
-        { name: 'Learning', color: '#f59e0b', icon: '📚', description: 'Education, courses, and skill development', order: 4 },
-
-        // Health & Wellness
-        { name: 'Exercise', color: '#ef4444', icon: '🏋️', description: 'Workouts and physical activity', order: 5 },
-        { name: 'Health', color: '#ec4899', icon: '🏥', description: 'Medical appointments and health-related activities', order: 6 },
-
-        // Social & Relationships
-        { name: 'Social', color: '#06b6d4', icon: '👥', description: 'Social events and hanging out with friends', order: 7 },
-        { name: 'Family', color: '#f43f5e', icon: '❤️', description: 'Family time and activities', order: 8 },
-
-        // Daily Life
-        { name: 'Errands', color: '#84cc16', icon: '🛒', description: 'Shopping and errands', order: 9 },
-        { name: 'Chores', color: '#a855f7', icon: '🧹', description: 'Household chores and maintenance', order: 10 },
-
-        // Entertainment & Hobbies
-        { name: 'Hobbies', color: '#14b8a6', icon: '🎨', description: 'Personal hobbies and creative pursuits', order: 11 },
-        { name: 'Entertainment', color: '#eab308', icon: '🎬', description: 'Movies, shows, games, and fun activities', order: 12 },
-      ];
-
-      // Insert all default categories
-      const { error } = await this.supabase
-        .from('categories')
-        .insert(
-          defaultCategories.map(cat => ({
-            user_id: userId,
-            name: cat.name,
-            color: cat.color,
-            icon: cat.icon,
-            description: cat.description,
-            display_order: cat.order,
-            context: {},
-          }))
-        );
+      // Call the database function that creates default categories
+      // This ensures we use a single source of truth (the SQL migration)
+      const { error } = await this.supabase.rpc('create_default_categories', {
+        target_user_id: userId
+      });
 
       if (error) {
         console.error('❌ [CategoryService] Error creating default categories:', error);
         throw error;
       }
 
-      console.log(`✅ [CategoryService] Created ${defaultCategories.length} default categories for user: ${userId}`);
+      console.log(`✅ [CategoryService] Created default categories for user: ${userId}`);
     } catch (error) {
       console.error('❌ [CategoryService] Exception creating default categories:', error);
       throw error;

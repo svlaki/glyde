@@ -44,7 +44,7 @@ export async function getUserEvents(req: Request, res: Response): Promise<void> 
 
     logger.info('Fetching events for user', { user_id, start_date, end_date });
 
-    const events = await getSupabaseService().getEvents(userId, start_date, end_date);
+    const events = await getSupabaseService().getEvents(user_id, start_date, end_date);
     
     logger.info('Successfully fetched events', { count: events.length, user_id });
     
@@ -108,9 +108,7 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    const { user_id: _ignoredUserId, ...eventData } = req.body ?? {};
-
-    console.log('Creating event for user:', userId);
+    console.log('Creating event for user:', user_id);
     console.log('Event data:', eventData);
 
     const createdEvent = await getSupabaseService().createEvent(user_id, {
@@ -160,7 +158,7 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    const { event_id, ...eventData } = req.body ?? {};
+    const { event_id, ...eventDataUpdate } = req.body ?? {};
 
     if (!event_id) {
       res.status(400).json({ error: 'event_id is required' });
@@ -168,9 +166,9 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
     }
 
     console.log('Updating event for user:', userId);
-    console.log('Event updates:', eventData);
+    console.log('Event updates:', eventDataUpdate);
 
-    const updatedEvent = await getSupabaseService().updateEvent(userId, event_id, eventData);
+    const updatedEvent = await getSupabaseService().updateEvent(userId, event_id, eventDataUpdate);
     
     if (updatedEvent) {
       res.json({

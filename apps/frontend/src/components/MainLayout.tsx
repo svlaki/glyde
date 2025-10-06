@@ -1,12 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
 import { ThemeToggle } from './ui/theme-toggle'
-import { Drawer, Button, NavLink, Divider } from '@mantine/core'
-
-import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { useAuth } from '@/lib/authContext'
+import { Drawer, Button as MantineButton, NavLink, Divider } from '@mantine/core'
 import { cn } from '@/lib/utils'
 
 interface MainLayoutProps {
@@ -37,7 +33,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <button
-                onClick={() => setMenuOpen(true)}
+                onClick={() => setMobileOpen(true)}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition-all"
                 aria-label="Toggle menu"
               >
@@ -61,8 +57,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       </nav>
 
       <Drawer
-        opened={menuOpen}
-        onClose={() => setMenuOpen(false)}
+        opened={mobileOpen}
+        onClose={() => setMobileOpen(false)}
         title={
           <div className="flex items-center gap-2">
             <span className="text-2xl">✨</span>
@@ -81,7 +77,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               label={item.label}
               leftSection={<span className="text-xl">{item.icon}</span>}
               active={location.pathname === item.path}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => setMobileOpen(false)}
               variant="filled"
               styles={{
                 root: {
@@ -95,25 +91,24 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <Divider my="md" />
 
-        <Button
+        <MantineButton
           variant="subtle"
           color="red"
           fullWidth
           onClick={() => {
-            setMenuOpen(false)
+            setMobileOpen(false)
             signOut()
           }}
         >
           Sign Out
-        </Button>
+        </MantineButton>
       </Drawer>
 
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
-          <div className="mx-auto flex w-full flex-col">
-            {children}
-          </div>
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background via-background to-muted/40">
+        <div className="mx-auto flex w-full flex-col">
+          {children}
+        </div>
+      </main>
     </div>
   )
 }

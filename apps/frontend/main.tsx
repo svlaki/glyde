@@ -7,6 +7,7 @@ import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { theme } from './src/styles/theme'
 import { AuthProvider } from './src/lib/authContext'
+import { CategoryProvider } from './src/lib/categoryContext'
 import { InteractionProvider } from './src/lib/interactionContext'
 import { ToastProvider } from './src/components/ui/toast'
 import { ThemeProvider } from './src/components/ui/theme-provider'
@@ -28,8 +29,9 @@ function App() {
           <MantineProvider theme={theme} defaultColorScheme="dark">
             <Notifications position="top-right" zIndex={1000} />
             <AuthProvider>
-              <InteractionProvider>
-                <ToastProvider>
+              <CategoryProvider>
+                <InteractionProvider>
+                  <ToastProvider>
                   <Routes>
                     <Route path="/" element={<Auth />} />
                     <Route
@@ -84,8 +86,9 @@ function App() {
                     />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
-                </ToastProvider>
-              </InteractionProvider>
+                  </ToastProvider>
+                </InteractionProvider>
+              </CategoryProvider>
             </AuthProvider>
           </MantineProvider>
         </ThemeProvider>

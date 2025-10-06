@@ -109,18 +109,18 @@ export default function CategoriesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold text-foreground">Categories</h1>
+      <div className="container mx-auto px-3 py-5 max-w-5xl">
+        <div className="flex justify-between items-center mb-5">
+          <h1 className="text-3xl font-bold text-foreground">Categories</h1>
           <button
             onClick={handleCreateClick}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
           >
             ➕ Create Category
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-4">
           {categories.map(category => (
             <CategoryCard
               key={category.id}
@@ -149,38 +149,56 @@ interface CategoryCardProps {
 }
 
 function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
+  // Convert hex color to rgba with transparency for background
+  const hexToRgba = (hex: string, alpha: number = 0.15) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   return (
     <div
-      className="bg-card border border-border rounded-xl p-6 shadow-md hover:shadow-xl transition-all"
-      style={{ borderLeftWidth: '4px', borderLeftColor: category.color }}
+      className="relative border-3 rounded-xl p-6 shadow-sm hover:shadow-xl transition-all aspect-square flex flex-col items-center justify-center text-center group cursor-pointer"
+      style={{ 
+        borderColor: category.color,
+        backgroundColor: hexToRgba(category.color, 0.15),
+        borderWidth: '3px'
+      }}
+      onClick={() => onEdit(category)}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{category.icon || '📁'}</span>
-          <h3 className="text-xl font-bold text-foreground">{category.name}</h3>
-        </div>
-        <div
-          className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
-          style={{ backgroundColor: category.color }}
-        />
-      </div>
+      {/* Icon - large and centered */}
+      <div className="text-6xl mb-4">{category.icon || '📁'}</div>
 
+      {/* Category name */}
+      <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2">
+        {category.name}
+      </h3>
+
+      {/* Description - only show on hover */}
       {category.description && (
-        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+        <p className="text-xs text-muted-foreground line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity">
           {category.description}
         </p>
       )}
 
-      <div className="flex gap-2 mt-4">
+      {/* Action buttons - show on hover */}
+      <div className="absolute bottom-3 left-0 right-0 flex gap-2 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={() => onEdit(category)}
-          className="text-sm text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-md hover:bg-primary/10 transition-all"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit(category)
+          }}
+          className="text-sm text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-md hover:bg-primary/10 transition-all bg-background/80"
         >
           ✏️ Edit
         </button>
         <button
-          onClick={() => onDelete(category.id)}
-          className="text-sm text-red-500 hover:text-red-600 font-semibold px-3 py-1.5 rounded-md hover:bg-red-500/10 transition-all"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete(category.id)
+          }}
+          className="text-sm text-red-500 hover:text-red-600 font-semibold px-3 py-1.5 rounded-md hover:bg-red-500/10 transition-all bg-background/80"
         >
           🗑️ Delete
         </button>
