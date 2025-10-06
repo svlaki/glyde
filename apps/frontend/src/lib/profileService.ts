@@ -78,49 +78,6 @@ export async function fetchUserProfile(
   }
 }
 
-export async function updateUserProfile(
-  user: User,
-  section?: string,
-  data?: Record<string, any>
-): Promise<{ success: boolean, message?: string, error: string | null }> {
-  try {
-    if (!user) {
-      return { success: false, error: 'User not authenticated' }
-    }
-
-    if (!section && !data) {
-      return { success: false, error: 'Either section with data or complete profile data is required' }
-    }
-
-    const response = await fetch(`${API_URL}/api/profile/update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        section,
-        data
-      }),
-    })
-
-    const responseData = await response.json()
-
-    if (!response.ok) {
-      return { success: false, error: responseData.error || 'Failed to update profile' }
-    }
-
-    return {
-      success: responseData.success,
-      message: responseData.message,
-      error: null
-    }
-  } catch (error) {
-    console.error('Error updating profile:', error)
-    return { success: false, error: 'Failed to update profile' }
-  }
-}
-
 export async function updateProfileField(
   user: User,
   field: string,
@@ -161,46 +118,5 @@ export async function updateProfileField(
   } catch (error) {
     console.error('Error updating profile field:', error)
     return { success: false, error: 'Failed to update profile field' }
-  }
-}
-
-export async function batchUpdateProfileFields(
-  user: User,
-  updates: Array<{ field: string, value: any }>
-): Promise<{ success: boolean, message?: string, error: string | null }> {
-  try {
-    if (!user) {
-      return { success: false, error: 'User not authenticated' }
-    }
-
-    if (!updates || !Array.isArray(updates)) {
-      return { success: false, error: 'Updates array is required' }
-    }
-
-    const response = await fetch(`${API_URL}/api/profile/batch-update`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        updates
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to batch update profile fields' }
-    }
-
-    return {
-      success: data.success,
-      message: data.message,
-      error: null
-    }
-  } catch (error) {
-    console.error('Error batch updating profile fields:', error)
-    return { success: false, error: 'Failed to batch update profile fields' }
   }
 }
