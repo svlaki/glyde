@@ -262,37 +262,3 @@ export async function addGoalCheckIn(
   }
 }
 
-export async function fetchGoalCheckIns(
-  user: User,
-  goalId: string,
-  limit?: number
-): Promise<{ checkIns: GoalCheckIn[], error: string | null }> {
-  try {
-    if (!user) {
-      return { checkIns: [], error: 'User not authenticated' }
-    }
-
-    const response = await fetch(`${API_URL}/api/goals/check-ins`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        goal_id: goalId,
-        limit
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { checkIns: [], error: data.error || 'Failed to fetch check-ins' }
-    }
-
-    return { checkIns: data.checkIns || [], error: null }
-  } catch (error) {
-    console.error('Error fetching goal check-ins:', error)
-    return { checkIns: [], error: 'Failed to fetch check-ins' }
-  }
-}

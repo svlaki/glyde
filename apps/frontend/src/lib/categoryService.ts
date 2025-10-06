@@ -160,39 +160,3 @@ export async function deleteUserCategory(
   }
 }
 
-export async function getCategoryColor(
-  user: User,
-  categoryName: string
-): Promise<{ color: string | null, error: string | null }> {
-  try {
-    if (!user) {
-      return { color: null, error: 'User not authenticated' }
-    }
-
-    if (!categoryName) {
-      return { color: null, error: 'Category name is required' }
-    }
-
-    const response = await fetch(`${API_URL}/api/categories/color`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user_id: user.id,
-        category_name: categoryName
-      }),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { color: null, error: data.error || 'Failed to fetch category color' }
-    }
-
-    return { color: data.color, error: null }
-  } catch (error) {
-    console.error('Error fetching category color:', error)
-    return { color: null, error: 'Failed to fetch category color' }
-  }
-}
