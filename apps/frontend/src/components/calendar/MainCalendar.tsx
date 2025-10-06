@@ -110,11 +110,17 @@ export function MainCalendar({
 
       const parsed = typeof value === 'string' ? new Date(value) : value;
       if (Number.isNaN(parsed.getTime())) {
+        console.error('Invalid date parsed:', value, 'resulted in:', parsed);
         return null;
       }
 
-      // react-big-calendar displays Date objects using their local time components
-      // So we just return the parsed Date without timezone conversion
+      // Log the parsed date for debugging
+      console.log('Parsed date:', value, '→', parsed.toISOString(), 'Local:', parsed.toLocaleString());
+      
+      // Events are stored in UTC in the database
+      // When we parse the ISO string with new Date(), JavaScript creates a Date object
+      // that already represents the UTC time correctly in the user's local timezone
+      // react-big-calendar will display this Date using local time, which is what we want
       return parsed;
     },
     [],

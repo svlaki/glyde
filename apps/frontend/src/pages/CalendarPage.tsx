@@ -14,9 +14,6 @@ import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
 import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
@@ -49,10 +46,11 @@ export function CalendarPage() {
       backgroundColor: color,
       borderColor: color,
       textColor: '#FFFFFF',
-      start: event.start_time,
-      end: event.end_time
+      // Convert string timestamps to Date objects
+      start: new Date(event.start_time),
+      end: new Date(event.end_time)
     };
-  }, []);
+  }, [getCategoryColor]);
 
   // Connect to agent system for interactions
   useAgentInteractions();
@@ -461,7 +459,15 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
   }, [event, date, userTimezone]);
 
   async function handleSave() {
-    if (!user || !title.trim()) return;
+    if (!user) {
+      toast({ title: 'Not signed in', description: 'Please sign in to create events.', variant: 'warning' });
+      return;
+    }
+    
+    if (!title.trim()) {
+      toast({ title: 'Missing title', description: 'Please enter an event title.', variant: 'warning' });
+      return;
+    }
 
     if (!eventDate) {
       toast({ title: 'Missing date', description: 'Please select a date for the event.', variant: 'warning' });

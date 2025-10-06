@@ -95,13 +95,14 @@
 }
 
 .rbc-label {
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  color: #666666 !important;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #000000 !important;
 }
 
 .dark .rbc-label {
-  color: #cccccc !important;
+  color: #ffffff !important;
 }
 
 /* Day columns */
