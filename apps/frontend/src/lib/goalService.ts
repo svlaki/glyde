@@ -52,6 +52,7 @@ const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000
 
 export async function fetchUserGoals(
   user: User,
+  accessToken: string,
   filters?: {
     status?: string
     category?: string
@@ -60,7 +61,7 @@ export async function fetchUserGoals(
     target_after?: string
   }
 ): Promise<{ goals: Goal[], error: string | null }> {
-  if (!user) {
+  if (!user || !accessToken) {
     return { goals: [], error: 'User not authenticated' }
   }
 
@@ -72,6 +73,9 @@ export async function fetchUserGoals(
 
   const result = await apiCall<{ goals: Goal[] }>(`${API_URL}/api/goals`, {
     method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    },
     body: JSON.stringify({
       user_id: user.id,
       ...filters
@@ -93,6 +97,7 @@ export async function fetchUserGoals(
 
 export async function createUserGoal(
   user: User,
+  accessToken: string,
   goalData: {
     title: string
     description?: string
@@ -122,7 +127,7 @@ export async function createUserGoal(
   }
 ): Promise<{ goal: Goal | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { goal: null, error: 'User not authenticated' }
     }
 
@@ -130,6 +135,7 @@ export async function createUserGoal(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -152,11 +158,12 @@ export async function createUserGoal(
 
 export async function updateUserGoal(
   user: User,
+  accessToken: string,
   goalId: string,
   updates: Partial<Goal>
 ): Promise<{ goal: Goal | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { goal: null, error: 'User not authenticated' }
     }
 
@@ -164,6 +171,7 @@ export async function updateUserGoal(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -187,10 +195,11 @@ export async function updateUserGoal(
 
 export async function deleteUserGoal(
   user: User,
+  accessToken: string,
   goalId: string
 ): Promise<{ success: boolean, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { success: false, error: 'User not authenticated' }
     }
 
@@ -198,6 +207,7 @@ export async function deleteUserGoal(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -220,6 +230,7 @@ export async function deleteUserGoal(
 
 export async function addGoalCheckIn(
   user: User,
+  accessToken: string,
   goalId: string,
   checkInData: {
     progress_update?: number
@@ -233,7 +244,7 @@ export async function addGoalCheckIn(
   }
 ): Promise<{ checkIn: GoalCheckIn | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { checkIn: null, error: 'User not authenticated' }
     }
 
@@ -241,6 +252,7 @@ export async function addGoalCheckIn(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,

@@ -7,7 +7,7 @@ import { validateRequired, formatErrorMessage, debounce } from '../lib/apiUtils'
 import { usePerformanceMonitor } from '../lib/performance'
 
 export default function GoalsPage() {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [goals, setGoals] = useState<Goal[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,14 +38,14 @@ export default function GoalsPage() {
   );
 
   const loadGoals = useCallback(async () => {
-    if (!user) return
+    if (!user || !session?.access_token) return
 
     setLoading(true)
     setError(null) // Clear previous errors
-    
+
     try {
       const filters = filter !== 'all' ? { status: filter } : undefined
-      const { goals: fetchedGoals, error } = await fetchUserGoals(user, filters)
+      const { goals: fetchedGoals, error } = await fetchUserGoals(user, session.access_token, filters)
       
       if (error) {
         setError(formatErrorMessage(error))
@@ -58,7 +58,7 @@ export default function GoalsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, filter])
+  }, [user, session, filter])
 
   const loadCategories = useCallback(async () => {
     if (!user) return
@@ -109,11 +109,11 @@ export default function GoalsPage() {
   }, [user, loadGoals])
 
   const handleCreateGoal = useCallback(async (goalData: Partial<Goal>) => {
-    if (!user) return
-    
+    if (!user || !session?.access_token) return
+
     setIsCreating(true)
     setError(null) // Clear previous errors
-    
+
     try {
       // Validate required fields
       const validationError = validateRequired(goalData, ['title'])
@@ -122,7 +122,7 @@ export default function GoalsPage() {
         return
       }
 
-      const { goal, error } = await createUserGoal(user, goalData as any)
+      const { goal, error } = await createUserGoal(user, session.access_token, goalData as any)
       if (error) {
         setError(formatErrorMessage(error))
       } else if (goal) {
@@ -137,11 +137,11 @@ export default function GoalsPage() {
     } finally {
       setIsCreating(false)
     }
-  }, [user, loadGoals])
+  }, [user, session, loadGoals])
 
   async function handleUpdateGoal(goalId: string, updates: Partial<Goal>) {
-    if (!user) return
-    const { error } = await updateUserGoal(user, goalId, updates)
+    if (!user || !session?.access_token) return
+    const { error } = await updateUserGoal(user, session.access_token, goalId, updates)
     if (error) {
       setError(error)
     } else {
@@ -151,9 +151,9 @@ export default function GoalsPage() {
   }
 
   async function handleDeleteGoal(goalId: string) {
-    if (!user) return
+    if (!user || !session?.access_token) return
     if (!confirm('Are you sure you want to delete this goal?')) return
-    const { error } = await deleteUserGoal(user, goalId)
+    const { error } = await deleteUserGoal(user, session.access_token, goalId)
     if (error) {
       setError(error)
     } else {
@@ -493,7 +493,7 @@ function GoalModal({
 }
 
 function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [formData, setFormData] = useState({
     progress_update: goal.progress || 0,
     mood_rating: 5,
@@ -506,7 +506,7 @@ function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!user) return
+    if (!user || !session?.access_token) return
 
     const checkInData = {
       ...formData,
@@ -515,7 +515,7 @@ function CheckInModal({ goal, onClose }: { goal: Goal; onClose: () => void }) {
       next_steps: formData.next_steps ? [formData.next_steps] : []
     }
 
-    const { error } = await addGoalCheckIn(user, goal.id, checkInData)
+    const { error } = await addGoalCheckIn(user, session.access_token, goal.id, checkInData)
     if (!error) {
       onClose()
     }
