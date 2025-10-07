@@ -75,6 +75,14 @@ export function CalendarPage() {
         if (!b.due_date) return -1;
         return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
       });
+
+      console.log('📋 [CalendarPage] Loaded tasks with categories:', sortedTasks.map(t => ({
+        title: t.title,
+        category: t.category,
+        category_name: t.category_name,
+        category_color: t.category_color
+      })));
+
       setTasks(sortedTasks);
     } catch (err) {
       console.error('Unexpected error loading tasks:', err);
@@ -343,45 +351,46 @@ export function CalendarPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {tasks.map(task => (
-                  <div
-                    key={task.id}
-                    className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between mb-1">
-                      <h4 className="text-sm font-medium text-gray-900 flex-1">{task.title}</h4>
-                      {task.priority && (
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                          task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {task.priority}
-                        </span>
+                {tasks.map(task => {
+                  const categoryColor = task.category_color || getCategoryColor(task.category || '');
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="bg-white border-l-4 border-r border-t border-b border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                      style={{ borderLeftColor: categoryColor }}
+                    >
+                      <div className="flex items-start justify-between mb-1">
+                        <h4 className="text-sm font-medium text-gray-900 flex-1">{task.title}</h4>
+                        {task.priority && (
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                            task.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                            task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {task.priority}
+                          </span>
+                        )}
+                      </div>
+
+                      {task.due_date && (
+                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                          <span>📅</span>
+                          <span>{new Date(task.due_date).toLocaleDateString()}</span>
+                        </div>
+                      )}
+
+                      {(task.category_name || task.category) && (
+                        <div className="mt-1">
+                          <span className="text-xs text-gray-700">
+                            {task.category_name || task.category}
+                          </span>
+                        </div>
                       )}
                     </div>
-
-                    {task.due_date && (
-                      <div className="flex items-center gap-1 text-xs text-gray-600">
-                        <span>📅</span>
-                        <span>{new Date(task.due_date).toLocaleDateString()}</span>
-                      </div>
-                    )}
-
-                    {task.category && (
-                      <div className="mt-1 flex items-center gap-1">
-                        <div
-                          className="w-3 h-3 rounded-full border border-gray-300"
-                          style={{ backgroundColor: getCategoryColor(task.category) }}
-                        />
-                        <span className="text-xs text-gray-700">
-                          {task.category}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

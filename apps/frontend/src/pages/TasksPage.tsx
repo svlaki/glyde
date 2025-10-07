@@ -177,16 +177,23 @@ export default function TasksPage() {
             ) : tasks.length === 0 ? (
               <TaskEmptyState onCreate={() => setDialogState({ mode: 'create' })} />
             ) : (
-              tasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  category={task.category ? categoryMap.get(task.category) ?? undefined : undefined}
-                  onComplete={handleCompleteTask}
-                  onEdit={taskToEdit => setDialogState({ mode: 'edit', task: taskToEdit })}
-                  onDelete={handleDeleteTask}
-                />
-              ))
+              tasks.map(task => {
+                // Use category data from task join if available, otherwise lookup by name
+                const category = task.category_name && task.category_color
+                  ? { name: task.category_name, color: task.category_color, id: task.category_id || '', user_id: user?.id || '' }
+                  : (task.category ? categoryMap.get(task.category) : undefined)
+
+                return (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    category={category}
+                    onComplete={handleCompleteTask}
+                    onEdit={taskToEdit => setDialogState({ mode: 'edit', task: taskToEdit })}
+                    onDelete={handleDeleteTask}
+                  />
+                )
+              })
             )}
           </div>
         </section>

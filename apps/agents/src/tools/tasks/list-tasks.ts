@@ -29,7 +29,8 @@ export const listTasksTool = tool(
         const dueStr = task.due_date ? ` (Due: ${new Date(task.due_date).toLocaleDateString()})` : '';
         const priorityStr = task.priority ? ` [${task.priority.toUpperCase()}]` : '';
         const statusStr = task.status ? ` - ${task.status}` : '';
-        return `${index + 1}. ${task.title}${priorityStr}${dueStr}${statusStr}`;
+        const categoryStr = task.category_name ? ` [${task.category_name}]` : (task.category ? ` [${task.category}]` : '');
+        return `${index + 1}. ${task.title}${priorityStr}${categoryStr}${dueStr}${statusStr}`;
       }).join('\n');
 
       return `Found ${tasks.length} task(s):\n${taskList}`;

@@ -22,6 +22,13 @@ export async function getUserTasks(req: Request, res: Response): Promise<void> {
 
     const tasks = await getSupabaseService().getTasks(userId, filters);
 
+    console.log('📤 [API] Returning tasks to frontend:', tasks.map(t => ({
+      title: t.title,
+      category_id: t.category_id,
+      category_name: t.category_name,
+      category_color: t.category_color
+    })));
+
     res.json({
       success: true,
       tasks: tasks

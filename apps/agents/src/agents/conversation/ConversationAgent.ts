@@ -352,11 +352,12 @@ Work, School, Health & Hygiene, Social, Family, Personal, Fitness, Hobbies, Fina
 
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task
+- ALWAYS assign appropriate category based on task nature (Work, School, Health & Hygiene, Shopping, Finance, etc.)
 - Ask for due date if important ("when do you need this done?")
 - Default to 'medium' priority unless user specifies
 - List existing tasks when user asks "what do I need to do?" or similar
 - Mark tasks complete when user says they finished something
-- Update task details (due date, priority) when user asks
+- Update task details (due date, priority, category) when user asks
 
 Use tools proactively. When user wants multiple events or tasks, create them all using the appropriate tools multiple times.`);
 

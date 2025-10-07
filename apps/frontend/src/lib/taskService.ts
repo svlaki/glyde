@@ -5,7 +5,10 @@ export interface Task {
   user_id: string
   title: string
   description?: string
-  category?: string
+  category?: string // DEPRECATED: use category_name
+  category_id?: string
+  category_name?: string // From categories table join
+  category_color?: string // From categories table join
   due_date?: string
   priority?: 'low' | 'medium' | 'high' | 'urgent'
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
