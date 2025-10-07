@@ -157,9 +157,10 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
     }
 
     try {
-      const { error } = await deleteEvent(user, event.id);
-      if (error) {
-        throw new Error(error);
+      const { success, error } = await deleteEvent(user, event.id);
+
+      if (!success) {
+        throw new Error(error ?? 'Failed to delete event');
       }
 
       toast({
