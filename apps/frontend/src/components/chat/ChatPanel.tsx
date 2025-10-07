@@ -251,8 +251,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
     <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden" style={{ width: '100%', maxWidth: '100%' }}>
       {/* Header */}
       <div className="bg-white p-4 border-b border-gray-200 rounded-t-lg">
-        <h2 className="text-lg font-medium text-gray-900">AI Assistant</h2>
-        <p className="text-sm text-gray-500">Your intelligent calendar companion</p>
+        <h2 className="text-lg font-medium text-gray-900">Chat</h2>
       </div>
 
       {/* Messages */}

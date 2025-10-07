@@ -9,8 +9,6 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { fetchUserTasks, Task } from '../lib/taskService';
 import { InteractionBox } from '../components/InteractionBox';
-import { useInteractions } from '../lib/interactionContext';
-import { useAgentInteractions } from '../lib/agentInteractionHook';
 import { ChatPanel } from '../components/chat/ChatPanel';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/ui/toast';
@@ -44,7 +42,6 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [userTimezone, setUserTimezone] = useState<string>('America/Chicago'); // Default to Chicago, will be overridden by profile
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { interactions, removeInteraction } = useInteractions();
   const eventLoadErrorShown = useRef(false);
   const taskLoadErrorShown = useRef(false);
 
@@ -63,8 +60,6 @@ export function CalendarPage() {
     };
   }, [getCategoryColor]);
 
-  // Connect to agent system for interactions
-  useAgentInteractions();
 
   const loadUserTasks = useCallback(async () => {
     if (!user || !session?.access_token) return;
@@ -235,14 +230,6 @@ export function CalendarPage() {
   }
 
 
-  const handleInteractionResponse = useCallback((interactionId: string, response: string) => {
-    removeInteraction(interactionId);
-    if (response !== 'no') {
-      setTimeout(() => {
-        loadUserEvents();
-      }, 1000);
-    }
-  }, [loadUserEvents, removeInteraction]);
 
   const handleCalendarEventUpdate = useCallback(async (
     eventId: string,
@@ -348,11 +335,8 @@ export function CalendarPage() {
           </div>
 
           {/* Interactions Box - Bottom */}
-          <div className="border-t-4 border-border">
-            <InteractionBox
-              interactions={interactions}
-              onResponseComplete={handleInteractionResponse}
-            />
+          <div>
+            <InteractionBox />
           </div>
         </div>
 
@@ -368,8 +352,7 @@ export function CalendarPage() {
           {/* Task List - Half Height */}
           <div className="h-1/2 p-4 overflow-y-auto">
             <div className="mb-3">
-              <h3 className="text-lg font-semibold text-foreground">Upcoming Tasks</h3>
-              <p className="text-xs text-muted-foreground">Sorted by due date</p>
+              <h3 className="text-lg font-semibold text-foreground">To-Do</h3>
             </div>
 
             {tasks.length === 0 ? (
