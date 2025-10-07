@@ -15,18 +15,25 @@ export interface Category {
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
 export async function fetchUserCategories(
-  user: User
+  user: User,
+  accessToken?: string
 ): Promise<{ categories: Category[], error: string | null }> {
   try {
     if (!user) {
       return { categories: [], error: 'User not authenticated' }
     }
 
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${API_URL}/api/categories`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id
       }),
@@ -53,7 +60,8 @@ export async function createUserCategory(
     icon?: string
     description?: string
     context?: Record<string, any>
-  }
+  },
+  accessToken?: string
 ): Promise<{ category: Category | null, error: string | null }> {
   try {
     if (!user) {
@@ -64,11 +72,17 @@ export async function createUserCategory(
       return { category: null, error: 'Name and color are required' }
     }
 
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${API_URL}/api/categories/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         ...categoryData
@@ -91,18 +105,25 @@ export async function createUserCategory(
 export async function updateUserCategory(
   user: User,
   categoryId: string,
-  updates: Partial<Category>
+  updates: Partial<Category>,
+  accessToken?: string
 ): Promise<{ category: Category | null, error: string | null }> {
   try {
     if (!user) {
       return { category: null, error: 'User not authenticated' }
     }
 
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${API_URL}/api/categories/update`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         category_id: categoryId,
@@ -125,18 +146,25 @@ export async function updateUserCategory(
 
 export async function deleteUserCategory(
   user: User,
-  categoryId: string
+  categoryId: string,
+  accessToken?: string
 ): Promise<{ success: boolean, message?: string, error: string | null }> {
   try {
     if (!user) {
       return { success: false, error: 'User not authenticated' }
     }
 
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${API_URL}/api/categories/delete`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         category_id: categoryId

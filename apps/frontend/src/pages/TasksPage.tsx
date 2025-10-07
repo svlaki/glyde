@@ -80,7 +80,7 @@ export default function TasksPage() {
 
   async function loadCategories() {
     if (!user) return
-    const { categories: fetchedCategories } = await fetchUserCategories(user)
+    const { categories: fetchedCategories } = await fetchUserCategories(user, session?.access_token)
     setCategories(fetchedCategories)
   }
 

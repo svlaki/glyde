@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 
 export default function CategoriesPage() {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +23,7 @@ export default function CategoriesPage() {
 
   async function loadCategories() {
     try {
-      const { categories: data, error: fetchError } = await fetchUserCategories(user!)
+      const { categories: data, error: fetchError } = await fetchUserCategories(user!, session?.access_token)
       if (fetchError) {
         setError(fetchError)
       } else {
@@ -70,9 +70,9 @@ export default function CategoriesPage() {
   async function handleSaveCategory(categoryData: Partial<Category>) {
     try {
       if (editingCategory) {
-        await updateUserCategory(user!, editingCategory.id, categoryData)
+        await updateUserCategory(user!, editingCategory.id, categoryData, session?.access_token)
       } else {
-        await createUserCategory(user!, categoryData)
+        await createUserCategory(user!, categoryData, session?.access_token)
       }
       await loadCategories()
       handleModalClose()
@@ -84,7 +84,7 @@ export default function CategoriesPage() {
   async function handleDeleteCategory(id: string) {
     if (!confirm('Are you sure you want to delete this category?')) return
     try {
-      await deleteUserCategory(user!, id)
+      await deleteUserCategory(user!, id, session?.access_token)
       await loadCategories()
     } catch (err) {
       console.error('Failed to delete category:', err)

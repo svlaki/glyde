@@ -15,7 +15,7 @@ interface CategoryContextType {
 const CategoryContext = createContext<CategoryContextType | undefined>(undefined)
 
 export function CategoryProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +29,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true)
-      const { categories: data, error: fetchError } = await fetchUserCategories(user)
+      const { categories: data, error: fetchError } = await fetchUserCategories(user, session?.access_token)
 
       if (fetchError) {
         setError(fetchError)

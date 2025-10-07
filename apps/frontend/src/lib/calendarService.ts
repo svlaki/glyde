@@ -24,6 +24,7 @@ export interface CalendarEvent {
  */
 export async function fetchUserEvents(
   user: User,
+  accessToken?: string,
   startDate?: Date,
   endDate?: Date
 ): Promise<{ events: CalendarEvent[], error: string | null }> {
@@ -42,11 +43,17 @@ export async function fetchUserEvents(
 
     console.log('[calendarService] Fetching events:', { url, body });
 
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body)
     });
 
@@ -82,7 +89,8 @@ export async function fetchUserEvents(
  */
 export async function createEvent(
   user: User,
-  event: Omit<CalendarEvent, 'id' | 'event_created_at' | 'event_updated_at'>
+  event: Omit<CalendarEvent, 'id' | 'event_created_at' | 'event_updated_at'>,
+  accessToken?: string
 ): Promise<{ event: CalendarEvent | null, error: string | null }> {
   try {
     if (!user) {
@@ -91,11 +99,18 @@ export async function createEvent(
 
     // Use the correct endpoint for creating events
     const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${agentServiceUrl}/api/events/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         ...event
@@ -133,7 +148,8 @@ export async function createEvent(
 export async function updateEvent(
   user: User,
   eventId: string,
-  event: Partial<Omit<CalendarEvent, 'id' | 'event_created_at' | 'event_updated_at'>>
+  event: Partial<Omit<CalendarEvent, 'id' | 'event_created_at' | 'event_updated_at'>>,
+  accessToken?: string
 ): Promise<{ event: CalendarEvent | null, error: string | null }> {
   try {
     if (!user) {
@@ -142,11 +158,18 @@ export async function updateEvent(
 
     // Use the correct endpoint for updating events
     const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${agentServiceUrl}/api/events/update`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         event_id: eventId,
@@ -181,7 +204,8 @@ export async function updateEvent(
  */
 export async function deleteEvent(
   user: User,
-  eventId: string
+  eventId: string,
+  accessToken?: string
 ): Promise<{ success: boolean, error: string | null }> {
   try {
     if (!user) {
@@ -190,11 +214,18 @@ export async function deleteEvent(
 
     // Use the backend API instead of direct RPC calls
     const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(`${agentServiceUrl}/api/events/delete`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         event_id: eventId

@@ -62,9 +62,9 @@ export default function GoalsPage() {
 
   const loadCategories = useCallback(async () => {
     if (!user) return
-    
+
     try {
-      const { categories: fetchedCategories, error } = await fetchUserCategories(user)
+      const { categories: fetchedCategories, error } = await fetchUserCategories(user, session?.access_token)
       if (error) {
         console.error('Error loading categories:', error)
         // Don't set error state for categories as it's not critical
@@ -74,7 +74,7 @@ export default function GoalsPage() {
     } catch (err) {
       console.error('Error loading categories:', err)
     }
-  }, [user])
+  }, [user, session])
 
   useEffect(() => {
     if (user) {

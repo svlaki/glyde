@@ -113,10 +113,10 @@ export function CalendarPage() {
     console.log('[CalendarPage] Loading events for user:', user.id);
 
     try {
-      const { events: userEvents, error } = await fetchUserEvents(user);
-      
+      const { events: userEvents, error } = await fetchUserEvents(user, session?.access_token);
+
       console.log('[CalendarPage] Fetch result:', { count: userEvents?.length, error });
-      
+
       if (error) {
         console.error('Error loading user events:', error);
         setEvents([]);
@@ -129,10 +129,10 @@ export function CalendarPage() {
 
       eventLoadErrorShown.current = false;
       const formattedEvents = userEvents.map(transformEvent);
-      
+
       console.log('[CalendarPage] Formatted events:', formattedEvents.length);
       console.log('[CalendarPage] Sample event:', formattedEvents[0]);
-      
+
       setEvents(formattedEvents);
     } catch (error) {
       console.error('Error loading user events:', error);
@@ -142,7 +142,7 @@ export function CalendarPage() {
         eventLoadErrorShown.current = true;
       }
     }
-  }, [toast, transformEvent, user]);
+  }, [toast, transformEvent, user, session]);
 
   // Fetch user timezone from profile
   useEffect(() => {
@@ -254,7 +254,7 @@ export function CalendarPage() {
     }
 
     try {
-      const { error } = await updateEvent(user, eventId, updates);
+      const { error } = await updateEvent(user, eventId, updates, session?.access_token);
 
       if (error) {
         throw new Error(error);
@@ -267,7 +267,7 @@ export function CalendarPage() {
       toast({ title: 'Unable to update event', description: 'Please try again.', variant: 'error' });
       return false;
     }
-  }, [loadUserEvents, toast, user]);
+  }, [loadUserEvents, toast, user, session]);;
 
   const handleEventMove = useCallback(async (
     args: CalendarInteractionArgs
@@ -435,6 +435,7 @@ export function CalendarPage() {
           user={user}
           toast={toast}
           userTimezone={userTimezone}
+          accessToken={session?.access_token}
         />
       )}
 
@@ -502,9 +503,10 @@ interface EventModalProps {
   user: { id: string; email?: string };
   toast: (options: { title: string; description: string; variant?: string }) => void;
   userTimezone: string;
+  accessToken?: string;
 }
 
-function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTimezone }: EventModalProps) {
+function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTimezone, accessToken }: EventModalProps) {
   const { categories, getCategoryColor } = useCategories();
   const [title, setTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -593,14 +595,14 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
 
     try {
       if (event) {
-        await updateEvent(user, event.id, eventData);
+        await updateEvent(user, event.id, eventData, accessToken);
         toast({
           title: 'Event updated',
           description: `"${title}" has been updated successfully`,
           variant: 'success'
         });
       } else {
-        await createEvent(user, eventData);
+        await createEvent(user, eventData, accessToken);
         toast({
           title: 'Event created',
           description: `"${title}" has been added to your calendar`,
@@ -621,7 +623,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
   async function handleDelete() {
     if (!user || !event) return;
     try {
-      const { success, error } = await deleteEvent(user, event.id);
+      const { success, error } = await deleteEvent(user, event.id, accessToken);
 
       if (!success) {
         throw new Error(error ?? 'Failed to delete event');
