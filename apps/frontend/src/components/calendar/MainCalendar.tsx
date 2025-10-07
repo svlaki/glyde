@@ -75,26 +75,31 @@ function toReadableTextColor(color: string): string {
   return brightness > 140 ? '#000000' : '#FFFFFF';
 }
 
-// Custom event component for better text display
-function CustomEvent({ event }: EventProps<CalendarEventWithDates>) {
+// Custom event component with time indicators
+function CustomEvent({ event, style }: EventProps<CalendarEventWithDates>) {
   const { title, start, end } = event;
   const startTime = format(start, 'h:mm a');
   const endTime = format(end, 'h:mm a');
 
   return (
-    <div className="rbc-event-content flex flex-col justify-between h-full" title={`${title} (${startTime} - ${endTime})`}>
-      <div className="text-xs opacity-90 px-1">
+    <div 
+      className="h-full p-1 flex flex-col justify-between"
+      style={style}
+      title={`${title} (${startTime} - ${endTime})`}
+    >
+      <div className="text-[10px] opacity-90">
         {startTime}
       </div>
-      <div className="font-medium text-sm px-1 flex-1 flex items-center">
-        {title}
+      <div className="font-medium text-xs flex-1 flex items-center overflow-hidden">
+        <span className="truncate">{title}</span>
       </div>
-      <div className="text-xs opacity-90 px-1">
+      <div className="text-[10px] opacity-90">
         {endTime}
       </div>
     </div>
   );
 }
+
 
 export function MainCalendar({
   events,
@@ -197,6 +202,8 @@ export function MainCalendar({
   const components = useMemo(() => ({
     event: CustomEvent,
   }), []);
+
+
 
   const handleEventDrop = useCallback(
     (args: EventInteractionArgs<CalendarEventWithDates>) => {

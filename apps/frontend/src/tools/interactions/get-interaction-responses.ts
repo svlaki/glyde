@@ -13,7 +13,6 @@ export interface InteractionResponseData {
   question: string;
   response: string;
   respondedAt: string;
-  entityType?: string;
   entityId?: string;
   metadata?: Record<string, any>;
 }
@@ -48,7 +47,6 @@ export async function getInteractionResponses(params: GetInteractionResponsesPar
         responded_at,
         interaction:user_interactions!interaction_id (
           question,
-          entity_type,
           entity_id,
           metadata,
           agent_id
@@ -86,7 +84,6 @@ export async function getInteractionResponses(params: GetInteractionResponsesPar
         question: item.interaction.question,
         response: item.response,
         respondedAt: item.responded_at,
-        entityType: item.interaction.entity_type,
         entityId: item.interaction.entity_id,
         metadata: item.interaction.metadata
       }));
@@ -136,7 +133,6 @@ export function subscribeToInteractionResponses(
             question: interaction.question,
             response: payload.new.response,
             respondedAt: payload.new.responded_at,
-            entityType: interaction.entity_type,
             entityId: interaction.entity_id,
             metadata: interaction.metadata
           });

@@ -77,20 +77,8 @@ export function InteractionBox() {
 
               {/* Card Content */}
               <div className="relative h-full p-3 flex flex-col justify-between">
-                {/* Top: Category/Type Icon */}
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold opacity-70" style={{ color: textColor }}>
-                    {interaction.entityType?.toUpperCase() || 'ACTION'}
-                  </span>
-                  {interaction.priority && interaction.priority > 7 && (
-                    <span className="text-xs" style={{ color: textColor }}>
-                      ⚡
-                    </span>
-                  )}
-                </div>
-
-                {/* Middle: Question */}
-                <div className="flex-1 flex items-center">
+                {/* Question */}
+                <div className="flex-1 flex items-center pt-1">
                   <p className="text-xs font-medium text-center leading-tight"
                      style={{ color: textColor }}>
                     {interaction.question}

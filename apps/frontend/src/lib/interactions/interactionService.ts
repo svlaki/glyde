@@ -10,7 +10,6 @@ export interface DBInteraction {
   options?: string[];
   priority: number;
   category_id?: string;
-  entity_type?: 'event' | 'task' | 'goal';
   entity_id?: string;
   metadata?: Record<string, any>;
   expires_at?: string;

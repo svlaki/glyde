@@ -11,7 +11,6 @@ export interface UIInteraction {
   priority: number;
   category?: string;
   categoryColor?: string;
-  entityType?: 'event' | 'task' | 'goal';
   entityId?: string;
   metadata?: Record<string, any>;
 }
@@ -37,7 +36,6 @@ export function useInteractions() {
       priority: dbInteraction.priority,
       category: category?.name,
       categoryColor: category?.color,
-      entityType: dbInteraction.entity_type,
       entityId: dbInteraction.entity_id,
       metadata: dbInteraction.metadata,
     };

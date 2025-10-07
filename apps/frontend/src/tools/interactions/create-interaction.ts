@@ -8,7 +8,6 @@ export interface CreateInteractionParams {
   options?: string[];
   priority?: number; // 1-10, default 5
   categoryId?: string;
-  entityType?: 'event' | 'task' | 'goal';
   entityId?: string;
   metadata?: Record<string, any>;
   expiresAt?: string; // ISO date string
@@ -34,7 +33,6 @@ export async function createInteraction(params: CreateInteractionParams): Promis
       options,
       priority = 5,
       categoryId,
-      entityType,
       entityId,
       metadata,
       expiresAt
@@ -83,7 +81,6 @@ export async function createInteraction(params: CreateInteractionParams): Promis
         options: options || null,
         priority,
         category_id: categoryId || null,
-        entity_type: entityType || null,
         entity_id: entityId || null,
         metadata: metadata || null,
         expires_at: expiresAt || null,
@@ -154,11 +151,6 @@ export const createInteractionSchema = {
       categoryId: {
         type: 'string',
         description: 'Category ID to determine the card color'
-      },
-      entityType: {
-        type: 'string',
-        enum: ['event', 'task', 'goal'],
-        description: 'Type of entity this interaction relates to'
       },
       entityId: {
         type: 'string',
