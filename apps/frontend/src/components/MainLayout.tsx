@@ -28,26 +28,26 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <nav className="bg-card border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
+      <nav className="bg-card border-b border-border">
+        <div className="px-2">
+          <div className="flex justify-between h-10 items-center">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
                 aria-label="Toggle menu"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <h1 className="ml-3 text-xl font-bold text-foreground">Glyde</h1>
+              <h1 className="text-sm font-semibold text-foreground">Glyde</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <ThemeToggle />
               <button
                 onClick={signOut}
-                className="px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-accent hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="px-2 py-1 text-xs font-medium text-foreground hover:bg-accent rounded transition-all"
               >
                 Sign Out
               </button>

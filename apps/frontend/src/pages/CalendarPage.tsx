@@ -18,19 +18,32 @@ import { format } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
 import { getCategoryColor } from '../lib/calendarCategories';
+import { ThemeToggle } from '../components/ui/theme-toggle';
+import { Drawer, Button as MantineButton, NavLink, Divider } from '@mantine/core';
+import { Link, useLocation } from 'react-router-dom';
+
+const navItems = [
+  { path: '/calendar', label: 'Calendar', icon: '📅' },
+  { path: '/tasks', label: 'Tasks', icon: '✅' },
+  { path: '/goals', label: 'Goals', icon: '🎯' },
+  { path: '/profile', label: 'Profile', icon: '👤' },
+  { path: '/categories', label: 'Categories', icon: '🏷️' }
+];
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
 export function CalendarPage() {
-  const { user, session } = useAuth();
+  const { user, session, signOut } = useAuth();
   const { categories, getCategoryColor } = useCategories();
   const { toast } = useToast();
+  const location = useLocation();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ExtendedCalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [userTimezone, setUserTimezone] = useState<string>('America/Chicago'); // Default to Chicago, will be overridden by profile
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { interactions, removeInteraction } = useInteractions();
   const eventLoadErrorShown = useRef(false);
   const taskLoadErrorShown = useRef(false);
@@ -294,21 +307,35 @@ export function CalendarPage() {
   }, [handleCalendarEventUpdate, userTimezone]);
 
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="flex h-screen">
         {/* Left Side - Calendar */}
-        <div className="flex-1 flex flex-col border-r-4 border-black">
-          {/* Header */}
-          <div className="bg-white p-2 border-b-2 border-black">
+        <div className="flex-1 flex flex-col border-r-4 border-border">
+          {/* Compact Header with Menu and Dark Mode */}
+          <div className="bg-card px-3 py-1 border-b border-border">
             <div className="flex items-center justify-between">
-              <h1 className="text-lg font-light text-black">Calendar</h1>
-              <div className="text-sm text-gray-500">Welcome, {user?.email}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMobileOpen(true)}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+                  aria-label="Toggle menu"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <span className="text-sm font-medium text-foreground">Calendar</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <span className="text-xs text-muted-foreground">Welcome, {user?.email}</span>
+              </div>
             </div>
           </div>
 
           {/* Calendar */}
-          <div className="flex-1 p-2 bg-white min-h-0 overflow-hidden">
-            <div className="h-full bg-white rounded-lg p-1 overflow-hidden">
+          <div className="flex-1 p-2 bg-background min-h-0 overflow-hidden">
+            <div className="h-full bg-card rounded-lg p-1 overflow-hidden">
               <MainCalendar
                 events={events}
                 onSelectEvent={handleEventClick}
@@ -321,8 +348,8 @@ export function CalendarPage() {
           </div>
 
           {/* Interactions Box - Bottom */}
-          <div className="border-t-4 border-black">
-            <InteractionBox 
+          <div className="border-t-4 border-border">
+            <InteractionBox
               interactions={interactions}
               onResponseComplete={handleInteractionResponse}
             />
@@ -330,9 +357,9 @@ export function CalendarPage() {
         </div>
 
         {/* Right Side - Chat + Task List */}
-        <div className="w-96 bg-white flex flex-col" style={{ maxWidth: '384px', minWidth: '384px' }}>
+        <div className="bg-card flex flex-col" style={{ width: '320px', minWidth: '320px', maxWidth: '320px' }}>
           {/* Chat Panel - Half Height */}
-          <div className="h-1/2 p-3 overflow-hidden border-b-2 border-gray-200">
+          <div className="h-1/2 p-3 overflow-hidden border-b-2 border-border">
             <div className="h-full overflow-hidden">
               <ChatPanel onEventCreated={loadUserEvents} />
             </div>
@@ -341,12 +368,12 @@ export function CalendarPage() {
           {/* Task List - Half Height */}
           <div className="h-1/2 p-4 overflow-y-auto">
             <div className="mb-3">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming Tasks</h3>
-              <p className="text-xs text-gray-500">Sorted by due date</p>
+              <h3 className="text-lg font-semibold text-foreground">Upcoming Tasks</h3>
+              <p className="text-xs text-muted-foreground">Sorted by due date</p>
             </div>
 
             {tasks.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
+              <div className="text-center py-8 text-muted-foreground">
                 <p className="text-sm">No pending tasks</p>
               </div>
             ) : (
@@ -357,11 +384,11 @@ export function CalendarPage() {
                   return (
                     <div
                       key={task.id}
-                      className="bg-white border-l-4 border-r border-t border-b border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                      className="bg-card border-l-4 border-r border-t border-b border-border rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
                       style={{ borderLeftColor: categoryColor }}
                     >
                       <div className="flex items-start justify-between mb-1">
-                        <h4 className="text-sm font-medium text-gray-900 flex-1">{task.title}</h4>
+                        <h4 className="text-sm font-medium text-foreground flex-1">{task.title}</h4>
                         {task.priority && (
                           <span className={`text-xs px-2 py-0.5 rounded ${
                             task.priority === 'urgent' ? 'bg-red-100 text-red-800' :
@@ -375,7 +402,7 @@ export function CalendarPage() {
                       </div>
 
                       {task.due_date && (
-                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <span>📅</span>
                           <span>{new Date(task.due_date).toLocaleDateString()}</span>
                         </div>
@@ -383,7 +410,7 @@ export function CalendarPage() {
 
                       {(task.category_name || task.category) && (
                         <div className="mt-1">
-                          <span className="text-xs text-gray-700">
+                          <span className="text-xs text-muted-foreground">
                             {task.category_name || task.category}
                           </span>
                         </div>
@@ -410,6 +437,55 @@ export function CalendarPage() {
           userTimezone={userTimezone}
         />
       )}
+
+      {/* Navigation Drawer */}
+      <Drawer
+        opened={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">✨</span>
+            <span className="text-lg font-bold">Navigation</span>
+          </div>
+        }
+        padding="md"
+        size="sm"
+      >
+        <div className="flex flex-col gap-1">
+          {navItems.map(item => (
+            <NavLink
+              key={item.path}
+              component={Link}
+              to={item.path}
+              label={item.label}
+              leftSection={<span className="text-xl">{item.icon}</span>}
+              active={location.pathname === item.path}
+              onClick={() => setMobileOpen(false)}
+              variant="filled"
+              styles={{
+                root: {
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                },
+              }}
+            />
+          ))}
+        </div>
+
+        <Divider my="md" />
+
+        <MantineButton
+          variant="subtle"
+          color="red"
+          fullWidth
+          onClick={() => {
+            setMobileOpen(false)
+            signOut()
+          }}
+        >
+          Sign Out
+        </MantineButton>
+      </Drawer>
 
     </div>
   );

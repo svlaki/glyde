@@ -80,12 +80,18 @@ function CustomEvent({ event }: EventProps<CalendarEventWithDates>) {
   const { title, start, end } = event;
   const startTime = format(start, 'h:mm a');
   const endTime = format(end, 'h:mm a');
-  
+
   return (
-    <div className="rbc-event-content" title={`${title} (${startTime} - ${endTime})`}>
-      <div className="text-xs opacity-90">{startTime}</div>
-      <div className="font-medium my-1">{title}</div>
-      <div className="text-xs opacity-90">{endTime}</div>
+    <div className="rbc-event-content flex flex-col justify-between h-full" title={`${title} (${startTime} - ${endTime})`}>
+      <div className="text-xs opacity-90 px-1">
+        {startTime}
+      </div>
+      <div className="font-medium text-sm px-1 flex-1 flex items-center">
+        {title}
+      </div>
+      <div className="text-xs opacity-90 px-1">
+        {endTime}
+      </div>
     </div>
   );
 }

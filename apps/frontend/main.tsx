@@ -39,9 +39,7 @@ function App() {
                       path="/calendar"
                       element={
                         <ProtectedRoute>
-                          <MainLayout>
-                            <CalendarPage />
-                          </MainLayout>
+                          <CalendarPage />
                         </ProtectedRoute>
                       }
                     />
