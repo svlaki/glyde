@@ -191,33 +191,45 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
 
 export async function deleteUserEvent(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.authUserId;
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
-    const { event_id } = req.body ?? {};
+    const authUserId = req.authUserId;
+    const { user_id, event_id } = req.body ?? {};
 
     if (!event_id) {
-      res.status(400).json({ error: 'event_id is required' });
+      sendErrorResponse(res, 400, 'event_id is required');
       return;
     }
 
-    console.log('Deleting event for user:', userId);
+    const resolvedUserId = authUserId ?? user_id;
 
-    const result = await getSupabaseService().deleteEvent(userId, event_id);
-    
+    if (!resolvedUserId) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(resolvedUserId)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    if (authUserId && user_id && authUserId !== user_id) {
+      sendErrorResponse(res, 403, 'Authenticated user does not match user_id');
+      return;
+    }
+
+    console.log('Deleting event for user:', resolvedUserId);
+
+    const result = await getSupabaseService().deleteEvent(resolvedUserId, event_id);
+
     if (result.success) {
       res.json({
         success: true
       });
     } else {
-      res.status(500).json({ error: result.error || 'Failed to delete event' });
+      sendErrorResponse(res, 500, result.error || 'Failed to delete event');
     }
 
   } catch (error) {
     console.error('Error deleting user event:', error);
-    res.status(500).json({ error: 'Failed to delete user event' });
+    sendErrorResponse(res, 500, 'Failed to delete user event');
   }
 }
