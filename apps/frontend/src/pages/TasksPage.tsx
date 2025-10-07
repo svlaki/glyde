@@ -24,7 +24,7 @@ import {
 } from '@/lib/taskService'
 
 export default function TasksPage() {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,10 +64,10 @@ export default function TasksPage() {
   }, [user])
 
   async function loadTasks() {
-    if (!user) return
+    if (!user || !session?.access_token) return
     setLoading(true)
     const filters = filter !== 'all' ? { status: filter } : undefined
-    const { tasks: fetchedTasks, error: fetchError } = await fetchUserTasks(user, filters)
+    const { tasks: fetchedTasks, error: fetchError } = await fetchUserTasks(user, session.access_token, filters)
     if (fetchError) {
       setError(fetchError)
       setTasks([])
@@ -85,9 +85,9 @@ export default function TasksPage() {
   }
 
   async function handleCreateTask(values: TaskFormValues) {
-    if (!user) return
+    if (!user || !session?.access_token) return
     const payload = transformFormValues(values)
-    const { error: createError } = await createUserTask(user, payload)
+    const { error: createError } = await createUserTask(user, session.access_token, payload)
     if (createError) {
       setError(createError)
       return
@@ -97,9 +97,9 @@ export default function TasksPage() {
   }
 
   async function handleUpdateTask(taskId: string, values: TaskFormValues) {
-    if (!user) return
+    if (!user || !session?.access_token) return
     const payload = transformFormValues(values)
-    const { error: updateError } = await updateUserTask(user, taskId, payload)
+    const { error: updateError } = await updateUserTask(user, session.access_token, taskId, payload)
     if (updateError) {
       setError(updateError)
       return
@@ -109,9 +109,9 @@ export default function TasksPage() {
   }
 
   async function handleDeleteTask(taskId: string) {
-    if (!user) return
+    if (!user || !session?.access_token) return
     if (!confirm('Are you sure you want to delete this task?')) return
-    const { error: deleteError } = await deleteUserTask(user, taskId)
+    const { error: deleteError } = await deleteUserTask(user, session.access_token, taskId)
     if (deleteError) {
       setError(deleteError)
       return
@@ -120,8 +120,8 @@ export default function TasksPage() {
   }
 
   async function handleCompleteTask(taskId: string) {
-    if (!user) return
-    const { error: completeError } = await completeUserTask(user, taskId)
+    if (!user || !session?.access_token) return
+    const { error: completeError } = await completeUserTask(user, session.access_token, taskId)
     if (completeError) {
       setError(completeError)
       return

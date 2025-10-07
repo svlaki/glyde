@@ -40,7 +40,9 @@
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(docker system prune:*)",
       "Bash(python:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__serena__list_memories",
+      "mcp__serena__find_referencing_symbols"
     ],
     "deny": [],
     "ask": [],

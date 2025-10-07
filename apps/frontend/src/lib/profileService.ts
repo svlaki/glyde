@@ -34,10 +34,11 @@ const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000
 
 export async function fetchUserProfile(
   user: User,
+  accessToken: string,
   section?: string
 ): Promise<{ profile?: UserProfile, section?: string, data?: any, completeness?: any, summary?: ProfileSummary, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { error: 'User not authenticated' }
     }
 
@@ -45,6 +46,7 @@ export async function fetchUserProfile(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -80,11 +82,12 @@ export async function fetchUserProfile(
 
 export async function updateProfileField(
   user: User,
+  accessToken: string,
   field: string,
   value: any
 ): Promise<{ success: boolean, message?: string, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { success: false, error: 'User not authenticated' }
     }
 
@@ -96,6 +99,7 @@ export async function updateProfileField(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,

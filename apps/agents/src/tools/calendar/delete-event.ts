@@ -16,30 +16,66 @@ export const deleteEventTool = tool(
 
     let targetEventId = eventId;
 
-    // If no eventId provided, search for the event using Zep and direct search
-    if (!targetEventId && searchQuery) {
+    // If no eventId provided, search for the event using improved fuzzy search
+    if (!targetEventId) {
+      if (!searchQuery) {
+        throw new Error("Either eventId or searchQuery must be provided");
+      }
+
       console.log('🔍 [DELETE-EVENT TOOL] Searching for event to delete:', searchQuery);
 
       try {
-        // Search knowledge graph for relevant events
-        const graphResults = await zepGraphService.searchEntities(userId,
-          `calendar event ${searchQuery}`,
-          undefined, // entityType
-          5 // limit
+        // Search directly in database with improved fuzzy matching
+        const events = await supabaseService.getEventsForAgent(userId);
+        
+        // Normalize search query - remove common words and split
+        const normalizedQuery = searchQuery.toLowerCase().trim();
+        const queryWords = normalizedQuery.split(/\s+/).filter(word => 
+          word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
         );
 
-        // Also search directly in database
-        const events = await supabaseService.getEventsForAgent(userId);
+        // Find matching events with fuzzy logic
         const matchingEvents = events.filter((event: any) => {
           const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-          return searchText.includes(searchQuery.toLowerCase());
+          
+          // Check if any significant query words are in the event text
+          const hasMatch = queryWords.some(word => searchText.includes(word));
+          
+          // Or check if the search text contains the full query
+          const hasFullMatch = searchText.includes(normalizedQuery);
+          
+          return hasMatch || hasFullMatch;
+        });
+
+        // Sort by relevance - prefer title matches over description matches
+        matchingEvents.sort((a, b) => {
+          const aTitle = a.title.toLowerCase();
+          const bTitle = b.title.toLowerCase();
+          
+          // Check how many query words match in title
+          const aMatches = queryWords.filter(word => aTitle.includes(word)).length;
+          const bMatches = queryWords.filter(word => bTitle.includes(word)).length;
+          
+          return bMatches - aMatches;
         });
 
         if (matchingEvents.length > 0) {
           targetEventId = matchingEvents[0].id;
           console.log('✅ [DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].title);
         } else {
-          throw new Error(`No event found matching: "${searchQuery}"`);
+          // Try graph search as fallback
+          const graphResults = await zepGraphService.searchEntities(userId,
+            `calendar event ${searchQuery}`,
+            undefined,
+            5
+          );
+          
+          if (graphResults.length > 0) {
+            // Try to extract event ID from graph results
+            console.log('📊 [DELETE-EVENT TOOL] Found in graph, searching events again with broader criteria');
+          }
+          
+          throw new Error(`No event found matching: "${searchQuery}". Available events: ${events.map(e => e.title).join(', ')}`);
         }
       } catch (error) {
         console.error('❌ [DELETE-EVENT TOOL] Search error:', error);
@@ -48,7 +84,7 @@ export const deleteEventTool = tool(
     }
 
     if (!targetEventId) {
-      throw new Error("No event ID provided and no search query given");
+      throw new Error("Failed to identify event to delete - this should not happen");
     }
 
     const deleteResult = await supabaseService.deleteEvent(userId, targetEventId);
@@ -77,10 +113,10 @@ export const deleteEventTool = tool(
   },
   {
     name: "delete_event",
-    description: "Delete an existing calendar event. If eventId is not provided, use semantic search to find the event by description.",
+    description: "Delete a calendar event by searching for it with a text query. Finds the event using fuzzy matching on title and description.",
     schema: z.object({
-      eventId: z.string().nullable().describe("Event ID to delete (optional - if not provided, search by description)"),
-      searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided"),
+      eventId: z.string().optional().describe("Event ID to delete (optional - rarely used, prefer searchQuery)"),
+      searchQuery: z.string().describe("Search query to find and delete the event. Examples: 'cs 221', 'meeting with john', 'workout'. The tool will fuzzy match against event titles and descriptions."),
     }),
   }
 );

@@ -43,6 +43,10 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  userTasks: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -80,7 +84,11 @@ export class ConversationAgent extends BaseAgent {
       // Get events as UTC - we'll format them for display in the agent prompt
       const userEvents = await supabaseService.getEvents(context.userId);
       console.log(`Loading ${userEvents?.length || 0} events (UTC) for user ${context.userId}`);
-      
+
+      // Get user tasks
+      const userTasks = await supabaseService.getTasks(context.userId);
+      console.log(`Loading ${userTasks?.length || 0} tasks for user ${context.userId}`);
+
       // Build conversation history from context
       const messages: BaseMessage[] = [];
       
@@ -109,6 +117,7 @@ export class ConversationAgent extends BaseAgent {
         userId: context.userId,
         timezone: userTimezone, // Use resolved timezone from profile, context, or UTC fallback
         userEvents: userEvents || [],
+        userTasks: userTasks || [],
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -260,6 +269,22 @@ export class ConversationAgent extends BaseAgent {
           }).join('\n')}`
         : `\n\nUSER'S CALENDAR: No events found`;
 
+      // Load user tasks for context
+      let userTasks: any[] = [];
+      if (state.userTasks && state.userTasks.length > 0) {
+        userTasks = state.userTasks;
+        console.log(`Using ${userTasks.length} pre-loaded tasks for context`);
+      }
+
+      const taskContext = userTasks.length > 0
+        ? `\n\nUSER'S TASKS (${userTasks.length} total):\n${userTasks.map((t, idx) => {
+            const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
+            const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
+            const statusStr = t.status === 'completed' ? ' ✓' : t.status === 'in_progress' ? ' 🔄' : '';
+            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}`;
+          }).join('\n')}`
+        : `\n\nUSER'S TASKS: No tasks found`;
+
       // Calculate temporal context for better understanding
       const now = new Date();
       const tomorrow = new Date(now);
@@ -268,9 +293,11 @@ export class ConversationAgent extends BaseAgent {
       dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       
       
-      const systemMessage = new SystemMessage(`You are a friendly personal calendar assistant. Help users manage their time naturally and conversationally.
+      const systemMessage = new SystemMessage(`You are a friendly personal calendar and task assistant. Help users manage their time and tasks naturally and conversationally.
 
 YOUR CALENDAR:${eventContext}
+
+YOUR TASKS:${taskContext}
 
 TIME CONTEXT:
 - Now: ${getCurrentTimeInTimezone(state.timezone)}
@@ -310,18 +337,28 @@ CRITICAL TIMEZONE:
 - User times are LOCAL: "5pm" = 5pm local, not UTC
 - Format timestamps: "2025-08-26T15:00:00.000" (NO .000Z suffix)
 
-TOOL SELECTION:
+TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
+- DELETE specific event → ALWAYS use delete_event with searchQuery DIRECTLY (has built-in search)
+  Example: "delete cs 221" → delete_event(searchQuery="cs 221")
+  DO NOT search_events first, delete_event will find it
 - Delete all on date → delete_multiple_events with date
-- Delete specific event → delete_event with searchQuery
 - Clear calendar → delete_multiple_events with searchQuery "*"
-- Update event → update_event (supports category changes)
-- Search events → search_events with text/category
+- UPDATE event → update_event (supports category changes)
+- SEARCH/FIND events → search_events with text/category (for viewing only)
 - List range → list_events with dates
 
 CATEGORIES:
 Work, School, Health & Hygiene, Social, Family, Personal, Fitness, Hobbies, Finance, Shopping, Travel, Self-Care
 
-Use tools proactively. When user wants multiple events, create them all using create_event multiple times.`);
+TASK MANAGEMENT:
+- When users mention "task", "todo", or "need to", use create_task
+- Ask for due date if important ("when do you need this done?")
+- Default to 'medium' priority unless user specifies
+- List existing tasks when user asks "what do I need to do?" or similar
+- Mark tasks complete when user says they finished something
+- Update task details (due date, priority) when user asks
+
+Use tools proactively. When user wants multiple events or tasks, create them all using the appropriate tools multiple times.`);
 
       const messages = [systemMessage, ...state.messages];
       

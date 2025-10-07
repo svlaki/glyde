@@ -37,12 +37,12 @@ export const createTaskTool = tool(
     description: "Create a new task with optional deadline, priority, and category. Use this when the user wants to add a task, todo item, or something they need to do.",
     schema: z.object({
       title: z.string().describe("Task title"),
-      description: z.string().optional().describe("Task description"),
-      dueDate: z.string().optional().describe("Due date (ISO format)"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("Priority level"),
-      category: z.string().optional().describe("Category name (e.g., 'Work', 'Personal', 'Health')"),
-      energyRequired: z.enum(["low", "medium", "high"]).optional().describe("Energy level required"),
-      estimatedDuration: z.number().optional().describe("Estimated duration in minutes"),
+      description: z.string().nullable().optional().describe("Task description"),
+      dueDate: z.string().nullable().optional().describe("Due date (ISO format)"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).nullable().optional().describe("Priority level"),
+      category: z.string().nullable().optional().describe("Category name (e.g., 'Work', 'Personal', 'Health')"),
+      energyRequired: z.enum(["low", "medium", "high"]).nullable().optional().describe("Energy level required"),
+      estimatedDuration: z.number().nullable().optional().describe("Estimated duration in minutes"),
     }),
   }
 );

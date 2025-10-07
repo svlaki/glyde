@@ -273,6 +273,7 @@ export class SupabaseService {
     title: string;
     description?: string;
     category?: string;
+    category_id?: string;
     dueDate?: string;
     priority?: 'low' | 'medium' | 'high' | 'urgent';
     status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -282,17 +283,33 @@ export class SupabaseService {
     estimatedDuration?: number;
     contextRequired?: Record<string, any>;
     recurringPattern?: Record<string, any>;
-    taskMetadata?: Record<string, any>;
   }): Promise<any> {
     try {
       console.log('📝 [SUPABASE SERVICE] Creating task for user:', userId);
+
+      // Handle category - prefer category_id, fallback to category name lookup
+      let categoryId = taskData.category_id || null;
+      
+      if (!categoryId && taskData.category) {
+        // Look up category by name
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', taskData.category)
+          .single();
+        
+        categoryId = categoryData?.id || null;
+      }
+
       const { data, error } = await this.client
         .from('tasks')
         .insert({
           user_id: userId,
           title: taskData.title,
           description: taskData.description,
-          category: taskData.category || 'personal',
+          category: taskData.category || 'Personal', // Keep for backward compatibility
+          category_id: categoryId,
           due_date: taskData.dueDate,
           priority: taskData.priority || 'medium',
           status: taskData.status || 'pending',
@@ -301,8 +318,7 @@ export class SupabaseService {
           energy_required: taskData.energyRequired,
           estimated_duration: taskData.estimatedDuration,
           context_required: taskData.contextRequired || {},
-          recurring_pattern: taskData.recurringPattern || {},
-          task_metadata: taskData.taskMetadata || {}
+          recurring_pattern: taskData.recurringPattern || {}
         })
         .select()
         .single();
@@ -385,6 +401,7 @@ export class SupabaseService {
     title?: string;
     description?: string;
     category?: string;
+    category_id?: string;
     dueDate?: string;
     priority?: 'low' | 'medium' | 'high' | 'urgent';
     status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -396,7 +413,6 @@ export class SupabaseService {
     contextRequired?: Record<string, any>;
     completionNotes?: string;
     recurringPattern?: Record<string, any>;
-    taskMetadata?: Record<string, any>;
   }): Promise<any> {
     try {
       console.log('🔄 [SUPABASE SERVICE] Updating task:', taskId);
@@ -407,7 +423,6 @@ export class SupabaseService {
 
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.description !== undefined) updateData.description = updates.description;
-      if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.dueDate !== undefined) updateData.due_date = updates.dueDate;
       if (updates.priority !== undefined) updateData.priority = updates.priority;
       if (updates.status !== undefined) {
@@ -424,7 +439,25 @@ export class SupabaseService {
       if (updates.contextRequired !== undefined) updateData.context_required = updates.contextRequired;
       if (updates.completionNotes !== undefined) updateData.completion_notes = updates.completionNotes;
       if (updates.recurringPattern !== undefined) updateData.recurring_pattern = updates.recurringPattern;
-      if (updates.taskMetadata !== undefined) updateData.task_metadata = updates.taskMetadata;
+
+      // Handle category - prefer category_id, fallback to category name lookup
+      if (updates.category_id !== undefined) {
+        updateData.category_id = updates.category_id;
+      } else if (updates.category !== undefined) {
+        updateData.category = updates.category; // Keep for backward compatibility
+        
+        // Look up category by name to set category_id
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', updates.category)
+          .single();
+        
+        if (categoryData?.id) {
+          updateData.category_id = categoryData.id;
+        }
+      }
 
       const { data, error } = await this.client
         .from('tasks')
@@ -521,6 +554,7 @@ export class SupabaseService {
     title: string;
     description?: string;
     category?: string;
+    category_id?: string;
     targetDate?: string;
     status?: 'active' | 'completed' | 'paused' | 'abandoned';
     progress?: number;
@@ -538,13 +572,29 @@ export class SupabaseService {
     try {
       console.log('🎯 [SUPABASE SERVICE] Creating goal for user:', userId);
 
+      // Handle category - prefer category_id, fallback to category name lookup
+      let categoryId = goalData.category_id || null;
+      
+      if (!categoryId && goalData.category) {
+        // Look up category by name
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', goalData.category)
+          .single();
+        
+        categoryId = categoryData?.id || null;
+      }
+
       const { data, error } = await this.client
         .from('goals')
         .insert({
           user_id: userId,
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category || 'personal',
+          category: goalData.category || 'Personal', // Keep for backward compatibility
+          category_id: categoryId,
           target_date: goalData.targetDate,
           status: goalData.status || 'active',
           progress: goalData.progress || 0,
@@ -640,6 +690,7 @@ export class SupabaseService {
     title?: string;
     description?: string;
     category?: string;
+    category_id?: string;
     targetDate?: string;
     status?: 'active' | 'completed' | 'paused' | 'abandoned';
     progress?: number;
@@ -663,7 +714,6 @@ export class SupabaseService {
 
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.description !== undefined) updateData.description = updates.description;
-      if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.targetDate !== undefined) updateData.target_date = updates.targetDate;
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.progress !== undefined) updateData.progress = updates.progress;
@@ -677,6 +727,25 @@ export class SupabaseService {
       if (updates.priorityScore !== undefined) updateData.priority_score = updates.priorityScore;
       if (updates.energyRequirement !== undefined) updateData.energy_requirement = updates.energyRequirement;
       if (updates.reviewFrequency !== undefined) updateData.review_frequency = updates.reviewFrequency;
+
+      // Handle category - prefer category_id, fallback to category name lookup
+      if (updates.category_id !== undefined) {
+        updateData.category_id = updates.category_id;
+      } else if (updates.category !== undefined) {
+        updateData.category = updates.category; // Keep for backward compatibility
+        
+        // Look up category by name to set category_id
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('name', updates.category)
+          .single();
+        
+        if (categoryData?.id) {
+          updateData.category_id = categoryData.id;
+        }
+      }
 
       const { data, error } = await this.client
         .from('goals')

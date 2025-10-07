@@ -22,7 +22,7 @@ import { getCategoryColor } from '../lib/calendarCategories';
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
 
 export function CalendarPage() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { categories, getCategoryColor } = useCategories();
   const { toast } = useToast();
   const [events, setEvents] = useState<ExtendedCalendarEvent[]>([]);
@@ -54,10 +54,10 @@ export function CalendarPage() {
   useAgentInteractions();
 
   const loadUserTasks = useCallback(async () => {
-    if (!user) return;
+    if (!user || !session?.access_token) return;
 
     try {
-      const { tasks: userTasks, error } = await fetchUserTasks(user, { status: 'pending' });
+      const { tasks: userTasks, error } = await fetchUserTasks(user, session.access_token, { status: 'pending' });
       if (error) {
         console.error('Error loading user tasks:', error);
         setTasks([]);
@@ -125,7 +125,7 @@ export function CalendarPage() {
 
   // Fetch user timezone from profile
   useEffect(() => {
-    if (!user) {
+    if (!user || !session?.access_token) {
       return;
     }
 
@@ -135,7 +135,10 @@ export function CalendarPage() {
       try {
         const response = await fetch(`${AGENT_SERVICE_URL}/api/profile`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
           body: JSON.stringify({ user_id: user.id })
         });
 
@@ -158,7 +161,7 @@ export function CalendarPage() {
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [user, session]);
 
   // Load real user events and tasks from the backend
   useEffect(() => {

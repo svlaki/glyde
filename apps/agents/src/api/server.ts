@@ -138,7 +138,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 
 // Input validation middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
-  // Skip validation for health check and agent endpoint (agent has its own validation)
+  // Skip validation for health check and agent endpoint
   if (req.url.includes('/health') || req.url.includes('/api/agent/process')) {
     next();
     return;

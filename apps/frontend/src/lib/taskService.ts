@@ -27,6 +27,7 @@ const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000
 
 export async function fetchUserTasks(
   user: User,
+  accessToken: string,
   filters?: {
     status?: string
     category?: string
@@ -36,7 +37,7 @@ export async function fetchUserTasks(
   }
 ): Promise<{ tasks: Task[], error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { tasks: [], error: 'User not authenticated' }
     }
 
@@ -44,6 +45,7 @@ export async function fetchUserTasks(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -66,6 +68,7 @@ export async function fetchUserTasks(
 
 export async function createUserTask(
   user: User,
+  accessToken: string,
   taskData: {
     title: string
     description?: string
@@ -83,7 +86,7 @@ export async function createUserTask(
   }
 ): Promise<{ task: Task | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { task: null, error: 'User not authenticated' }
     }
 
@@ -91,6 +94,7 @@ export async function createUserTask(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -113,11 +117,12 @@ export async function createUserTask(
 
 export async function updateUserTask(
   user: User,
+  accessToken: string,
   taskId: string,
   updates: Partial<Task>
 ): Promise<{ task: Task | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { task: null, error: 'User not authenticated' }
     }
 
@@ -125,6 +130,7 @@ export async function updateUserTask(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -148,10 +154,11 @@ export async function updateUserTask(
 
 export async function deleteUserTask(
   user: User,
+  accessToken: string,
   taskId: string
 ): Promise<{ success: boolean, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { success: false, error: 'User not authenticated' }
     }
 
@@ -159,6 +166,7 @@ export async function deleteUserTask(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,
@@ -181,12 +189,13 @@ export async function deleteUserTask(
 
 export async function completeUserTask(
   user: User,
+  accessToken: string,
   taskId: string,
   notes?: string,
   actualDuration?: number
 ): Promise<{ task: Task | null, error: string | null }> {
   try {
-    if (!user) {
+    if (!user || !accessToken) {
       return { task: null, error: 'User not authenticated' }
     }
 
@@ -194,6 +203,7 @@ export async function completeUserTask(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({
         user_id: user.id,

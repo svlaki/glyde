@@ -34,7 +34,7 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sessionId, setSessionId] = useState<string>('');
   const lastTimestampRef = useRef<string | null>(null);
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, session } = useAuth();
 
   // Initialize session ID when user is available
   useEffect(() => {
@@ -66,14 +66,15 @@ export function ChatPanel({ onEventCreated }: ChatPanelProps = {}) {
   // Load chat history when session is ready using backend API
   
   const loadChatHistory = useCallback(async () => {
-    if (!user || !sessionId) return;
-    
+    if (!user || !sessionId || !session?.access_token) return;
+
     try {
       const agentServiceUrl = (import.meta as any).env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
       const response = await fetch(`${agentServiceUrl}/api/chat/history`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           user_id: user.id,

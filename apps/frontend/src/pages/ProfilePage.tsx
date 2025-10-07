@@ -59,7 +59,7 @@ interface ProfileData {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,10 +72,10 @@ export default function ProfilePage() {
   }, [user])
 
   async function loadProfile() {
-    if (!user) return
+    if (!user || !session?.access_token) return
     setLoading(true)
     setError(null)
-    const result = await fetchUserProfile(user)
+    const result = await fetchUserProfile(user, session.access_token)
     if (result.error) {
       setError(result.error)
     } else {
@@ -85,8 +85,8 @@ export default function ProfilePage() {
   }
 
   async function handleUpdateField(field: string, value: any) {
-    if (!user) return
-    const { error } = await updateProfileField(user, field, value)
+    if (!user || !session?.access_token) return
+    const { error } = await updateProfileField(user, session.access_token, field, value)
     if (error) {
       setError(error)
     } else {
