@@ -325,6 +325,32 @@ TEMPORAL PARSING:
 - "this weekend" → upcoming Sat/Sun
 - All times are LOCAL timezone, never UTC
 
+CRITICAL: WHEN TO CREATE EVENT vs TASK vs GOAL
+
+CREATE EVENT when:
+✅ Has a SPECIFIC TIME (e.g., "meeting at 3pm", "dentist appointment Tuesday 2pm", "lunch at noon")
+✅ Time-bound activity (e.g., "class from 2-4pm", "gym session 6-7pm")
+✅ Appointment, meeting, or scheduled activity
+✅ Examples: meetings, appointments, classes, events, parties, calls
+
+CREATE TASK when:
+✅ NO specific time mentioned (e.g., "I need to buy groceries", "study for exam", "call mom")
+✅ Todo item or action to complete
+✅ Has a deadline but no specific start time (e.g., "submit report by Friday")
+✅ Flexible timing - can be done anytime
+✅ Examples: errands, homework, chores, emails to send, things to buy
+
+CREATE GOAL when:
+✅ Long-term objective or aspiration (e.g., "learn Spanish", "lose 20 pounds", "read 50 books")
+✅ Has milestones or sub-goals
+✅ Ongoing progress tracking needed
+✅ Examples: fitness goals, learning goals, career goals, personal development
+
+DEFAULT DECISION TREE:
+1. Does it have a SPECIFIC TIME? → EVENT
+2. Is it a todo/action item? → TASK
+3. Is it a long-term objective? → GOAL
+
 EVENT CREATION:
 - Ask for time if not specified
 - Default to 1 hour duration
@@ -339,8 +365,11 @@ CRITICAL TIMEZONE:
 
 TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
 - DELETE specific event → ALWAYS use delete_event with searchQuery DIRECTLY (has built-in search)
-  Example: "delete cs 221" → delete_event(searchQuery="cs 221")
+  Example: "delete cs 221 event" → delete_event(searchQuery="cs 221")
   DO NOT search_events first, delete_event will find it
+- DELETE specific task → ALWAYS use delete_task with searchQuery DIRECTLY (has built-in search)
+  Example: "delete cs 221 task" → delete_task(searchQuery="cs 221")
+  DO NOT list_tasks first, delete_task will find it
 - Delete all on date → delete_multiple_events with date
 - Clear calendar → delete_multiple_events with searchQuery "*"
 - UPDATE event → update_event (supports category changes)

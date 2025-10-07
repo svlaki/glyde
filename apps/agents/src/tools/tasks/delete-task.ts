@@ -3,15 +3,75 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const deleteTaskTool = tool(
-  async ({ taskId }, config) => {
+  async ({ taskId, searchQuery }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "❌ User ID required";
     }
 
+    let targetTaskId = taskId;
+
+    // If no taskId provided, search for the task
+    if (!targetTaskId) {
+      if (!searchQuery) {
+        return "❌ Either taskId or searchQuery must be provided";
+      }
+
+      console.log('🔍 [DELETE-TASK TOOL] Searching for task to delete:', searchQuery);
+
+      try {
+        const supabaseService = getSupabaseService();
+        const tasks = await supabaseService.getTasks(userId);
+
+        // Normalize search query - remove common words and split
+        const normalizedQuery = searchQuery.toLowerCase().trim();
+        const queryWords = normalizedQuery.split(/\s+/).filter(word =>
+          word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
+        );
+
+        // Find matching tasks with fuzzy logic
+        const matchingTasks = tasks.filter((task: any) => {
+          const searchText = `${task.title} ${task.description || ''}`.toLowerCase();
+
+          // Check if any significant query words are in the task text
+          const hasMatch = queryWords.some(word => searchText.includes(word));
+
+          // Or check if the search text contains the full query
+          const hasFullMatch = searchText.includes(normalizedQuery);
+
+          return hasMatch || hasFullMatch;
+        });
+
+        // Sort by relevance - prefer title matches
+        matchingTasks.sort((a, b) => {
+          const aTitle = a.title.toLowerCase();
+          const bTitle = b.title.toLowerCase();
+
+          const aMatches = queryWords.filter(word => aTitle.includes(word)).length;
+          const bMatches = queryWords.filter(word => bTitle.includes(word)).length;
+
+          return bMatches - aMatches;
+        });
+
+        if (matchingTasks.length > 0) {
+          targetTaskId = matchingTasks[0].id;
+          console.log('✅ [DELETE-TASK TOOL] Found task to delete:', matchingTasks[0].title);
+        } else {
+          return `❌ No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
+        }
+      } catch (error) {
+        console.error('❌ [DELETE-TASK TOOL] Search error:', error);
+        return `❌ Failed to find task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+    }
+
+    if (!targetTaskId) {
+      return "❌ Failed to identify task to delete - this should not happen";
+    }
+
     try {
       const supabaseService = getSupabaseService();
-      const result = await supabaseService.deleteTask(userId, taskId);
+      const result = await supabaseService.deleteTask(userId, targetTaskId);
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;
@@ -25,9 +85,10 @@ export const deleteTaskTool = tool(
   },
   {
     name: "delete_task",
-    description: "Delete a task. Use this when the user wants to remove a task permanently.",
+    description: "Delete a task by searching for it with a text query. Finds the task using fuzzy matching on title and description.",
     schema: z.object({
-      taskId: z.string().describe("Task ID to delete"),
+      taskId: z.string().optional().describe("Task ID to delete (optional - rarely used, prefer searchQuery)"),
+      searchQuery: z.string().describe("Search query to find and delete the task. Examples: 'cs 221', 'buy groceries', 'workout'. The tool will fuzzy match against task titles and descriptions."),
     }),
   }
 );
