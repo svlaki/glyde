@@ -94,6 +94,10 @@ if (isDevelopment) {
   });
 }
 
+// Authentication middleware - validates JWT and sets req.authUserId
+// This runs early to ensure protected routes have user context
+app.use(authenticateRequest);
+
 // Input sanitization middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
   // Skip sanitization for health check and agent endpoint
@@ -144,8 +148,9 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     return;
   }
 
-  // Check for required user_id in POST requests
-  if (req.method === 'POST' && req.body && !req.body.user_id) {
+  // Check for required user_id in POST requests (only if not already authenticated)
+  // If authentication middleware set req.authUserId, we don't need user_id in body
+  if (req.method === 'POST' && req.body && !req.body.user_id && !req.authUserId) {
     res.status(400).json({
       error: 'user_id is required in request body',
       success: false
@@ -153,7 +158,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
     return;
   }
 
-  // Validate user_id format (UUID)
+  // Validate user_id format (UUID) if provided in body
   if (req.body && req.body.user_id) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(req.body.user_id)) {

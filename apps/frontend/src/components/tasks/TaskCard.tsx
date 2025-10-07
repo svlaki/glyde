@@ -33,24 +33,110 @@ const energyMap: Record<NonNullable<Task['energy_required']>, string> = {
   high: 'High energy'
 }
 
+function isLightColor(color: string) {
+  let hex = color.trim()
+
+  if (hex.startsWith('#')) {
+    hex = hex.slice(1)
+  }
+
+  if (hex.length === 3) {
+    hex = hex
+      .split('')
+      .map(char => `${char}${char}`)
+      .join('')
+  }
+
+  if (hex.length !== 6 || /[^0-9a-fA-F]/.test(hex)) {
+    return false
+  }
+
+  const r = parseInt(hex.slice(0, 2), 16) / 255
+  const g = parseInt(hex.slice(2, 4), 16) / 255
+  const b = parseInt(hex.slice(4, 6), 16) / 255
+
+  const srgb = [r, g, b].map(value =>
+    value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)
+  )
+
+  const luminance = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2]
+
+  return luminance > 0.6
+}
+
 export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskCardProps) {
   const dueDate = task.due_date ? dateFormatter.format(new Date(task.due_date)) : null
   const createdDate = task.created_at ? dateFormatter.format(new Date(task.created_at)) : null
   const priorityBadge = task.priority ? priorityMap[task.priority] : null
+  const cardColor = category?.color || task.color
+  const useLightText = cardColor ? !isLightColor(cardColor) : false
+  const cardTextClass = cardColor
+    ? useLightText
+      ? 'text-white'
+      : 'text-slate-900'
+    : 'text-foreground'
+  const subtleTextClass = cardColor
+    ? useLightText
+      ? 'text-white/80'
+      : 'text-slate-900/80'
+    : 'text-muted-foreground'
+  const iconColorClass = cardColor
+    ? useLightText
+      ? 'text-white/80'
+      : 'text-slate-900/70'
+    : 'text-muted-foreground'
+  const footerBackgroundClass = cardColor
+    ? useLightText
+      ? 'bg-white/10'
+      : 'bg-black/5'
+    : 'bg-muted/40'
+  const footerBorderClass = cardColor
+    ? useLightText
+      ? 'border-t border-white/20'
+      : 'border-t border-black/10'
+    : 'border-t border-border/80'
+  const controlButtonClass = cardColor
+    ? useLightText
+      ? 'text-white/80 hover:text-white focus-visible:ring-white/30'
+      : 'text-slate-900/80 hover:text-slate-900 focus-visible:ring-slate-900/30'
+    : undefined
+  const deleteButtonClass = cardColor
+    ? useLightText
+      ? 'text-white/80 hover:text-white focus-visible:ring-white/30'
+      : 'text-slate-900/80 hover:text-slate-900 focus-visible:ring-slate-900/30'
+    : 'text-destructive hover:text-destructive'
+  const completeButtonClass = cardColor
+    ? useLightText
+      ? 'text-emerald-200 hover:text-emerald-100 focus-visible:ring-emerald-200/40'
+      : 'text-emerald-600 hover:text-emerald-700 focus-visible:ring-emerald-600/40'
+    : 'text-green-600 hover:text-green-600 focus-visible:ring-green-500/40 dark:text-green-400'
+  const energyPillClass = cardColor
+    ? useLightText
+      ? 'bg-white/20 text-white/90'
+      : 'bg-black/10 text-slate-900/80'
+    : 'bg-secondary text-secondary-foreground'
+  const categoryPillClass = cardColor
+    ? useLightText
+      ? 'bg-white/20 text-white'
+      : 'bg-black/10 text-slate-900'
+    : undefined
 
   return (
     <Card
       elevation="sm"
       className={cn(
         'border-border/70 transition-all duration-200',
-        task.status === 'completed' && 'border-green-500/60 bg-green-500/5'
+        cardColor && 'border-transparent',
+        cardTextClass,
+        task.status === 'completed' && !cardColor && 'border-green-500/60 bg-green-500/5'
       )}
+      style={cardColor ? { backgroundColor: cardColor } : undefined}
     >
       <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <CardTitle className="text-xl font-semibold text-foreground">{task.title}</CardTitle>
+          <CardTitle className={cn('text-xl font-semibold', cardTextClass)}>{task.title}</CardTitle>
           {task.description && (
-            <CardDescription className="max-w-3xl text-sm text-muted-foreground">
+            <CardDescription className={cn('max-w-3xl text-sm', subtleTextClass)}>
               {task.description}
             </CardDescription>
           )}
@@ -63,15 +149,23 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
             )}
             {category && (
               <span
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-white shadow"
-                style={{ backgroundColor: category.color }}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold shadow',
+                  cardColor ? categoryPillClass : 'text-white'
+                )}
+                style={cardColor ? undefined : { backgroundColor: category.color }}
               >
                 <Tag className="size-3.5" />
                 {category.name}
               </span>
             )}
             {task.energy_required && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                  energyPillClass
+                )}
+              >
                 {energyMap[task.energy_required]}
               </span>
             )}
@@ -82,21 +176,26 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
             <Button
               size="sm"
               variant="ghost"
-              className="text-green-600 hover:text-green-600 focus-visible:ring-green-500/40 dark:text-green-400"
+              className={cn(completeButtonClass)}
               onClick={() => onComplete(task.id)}
             >
               <CheckCircle2 className="size-4" />
               <span className="sr-only">Complete task</span>
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={() => onEdit(task)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(controlButtonClass)}
+            onClick={() => onEdit(task)}
+          >
             <PencilLine className="size-4" />
             <span className="sr-only">Edit task</span>
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            className="text-destructive hover:text-destructive"
+            className={cn(deleteButtonClass)}
             onClick={() => onDelete(task.id)}
           >
             <Trash2 className="size-4" />
@@ -104,28 +203,35 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+      <CardContent className={cn('grid gap-2 text-sm sm:grid-cols-2', subtleTextClass)}>
         {dueDate && (
           <div className="flex items-center gap-2">
-            <Clock3 className="size-4 text-muted-foreground" />
+            <Clock3 className={cn('size-4', iconColorClass)} />
             <span>Due {dueDate}</span>
           </div>
         )}
         {task.estimated_duration && (
           <div className="flex items-center gap-2">
-            <Clock3 className="size-4 text-muted-foreground" />
+            <Clock3 className={cn('size-4', iconColorClass)} />
             <span>{task.estimated_duration} min estimate</span>
           </div>
         )}
         {task.status && (
           <div className="flex items-center gap-2 capitalize">
-            <CheckCircle2 className="size-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">{task.status.replace('_', ' ')}</span>
+            <CheckCircle2 className={cn('size-4', iconColorClass)} />
+            <span className={cn('font-medium', cardTextClass)}>{task.status.replace('_', ' ')}</span>
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-between border-t border-border/80 bg-muted/40 py-4">
-        <div className="text-xs text-muted-foreground">
+      <CardFooter
+        className={cn(
+          'flex justify-between py-4',
+          footerBackgroundClass,
+          footerBorderClass,
+          subtleTextClass
+        )}
+      >
+        <div className="text-xs">
           {createdDate && <span>Created {createdDate}</span>}
         </div>
       </CardFooter>

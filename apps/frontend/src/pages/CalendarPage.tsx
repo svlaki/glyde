@@ -621,7 +621,12 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
   async function handleDelete() {
     if (!user || !event) return;
     try {
-      await deleteEvent(user, event.id);
+      const { success, error } = await deleteEvent(user, event.id);
+
+      if (!success) {
+        throw new Error(error ?? 'Failed to delete event');
+      }
+
       toast({
         title: 'Event deleted',
         description: `"${event.title}" has been removed from your calendar`,
@@ -630,6 +635,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
       onSave();
       onClose();
     } catch (error) {
+      console.error('Error deleting event:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete event',
