@@ -14,7 +14,7 @@ export default function GoalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'not_started' | 'in_progress' | 'completed'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [checkInGoal, setCheckInGoal] = useState<Goal | null>(null)
@@ -22,11 +22,15 @@ export default function GoalsPage() {
   // Performance monitoring
   const { endRender } = usePerformanceMonitor('GoalsPage')
 
-  // Memoized filtered goals for performance
-  const filteredGoals = useMemo(() => {
-    if (filter === 'all') return goals;
-    return goals.filter(goal => goal.status === filter);
-  }, [goals, filter]);
+  // Memoized filtered and organized goals for performance
+  const { longTermGoals, shortTermGoals } = useMemo(() => {
+    const filtered = categoryFilter === 'all' ? goals : goals.filter(goal => goal.category === categoryFilter);
+    
+    return {
+      longTermGoals: filtered.filter(goal => goal.time_horizon === 'long_term'),
+      shortTermGoals: filtered.filter(goal => goal.time_horizon === 'short_term' || !goal.time_horizon)
+    };
+  }, [goals, categoryFilter]);
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -44,8 +48,8 @@ export default function GoalsPage() {
     setError(null) // Clear previous errors
 
     try {
-      const filters = filter !== 'all' ? { status: filter } : undefined
-      const { goals: fetchedGoals, error } = await fetchUserGoals(user, session.access_token, filters)
+      // Load all goals without filtering - filtering is done client-side
+      const { goals: fetchedGoals, error } = await fetchUserGoals(user, session.access_token, undefined)
       
       if (error) {
         setError(formatErrorMessage(error))
@@ -58,7 +62,7 @@ export default function GoalsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, session, filter])
+  }, [user, session])
 
   const loadCategories = useCallback(async () => {
     if (!user) return
@@ -189,48 +193,72 @@ export default function GoalsPage() {
 
       <div className="flex gap-2 mb-6">
         <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded ${filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          onClick={() => setCategoryFilter('all')}
+          className={`px-4 py-2 rounded ${categoryFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
         >
           All
         </button>
-        <button
-          onClick={() => setFilter('not_started')}
-          className={`px-4 py-2 rounded ${filter === 'not_started' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-        >
-          Not Started
-        </button>
-        <button
-          onClick={() => setFilter('in_progress')}
-          className={`px-4 py-2 rounded ${filter === 'in_progress' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-        >
-          In Progress
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`px-4 py-2 rounded ${filter === 'completed' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-        >
-          Completed
-        </button>
+        {categories.map(category => (
+          <button
+            key={category.id}
+            onClick={() => setCategoryFilter(category.name)}
+            className={`px-4 py-2 rounded ${categoryFilter === category.name ? 'text-white' : 'bg-gray-200'}`}
+            style={{
+              backgroundColor: categoryFilter === category.name ? category.color : undefined
+            }}
+          >
+            {category.name}
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {goals.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-500">
-            No goals found. Create your first goal!
+      {/* Two-column layout: Short-term (left) and Long-term (right) */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Short-term Goals Column */}
+        <div>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800">⚡ Short-term Goals</h2>
+          <div className="space-y-4">
+            {shortTermGoals.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                No short-term goals yet. Start with something achievable!
+              </div>
+            ) : (
+              shortTermGoals.map(goal => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  categories={categories}
+                  onEdit={setEditingGoal}
+                  onDelete={handleDeleteGoal}
+                  onCheckIn={setCheckInGoal}
+                />
+              ))
+            )}
           </div>
-        ) : (
-          goals.map(goal => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              categories={categories}
-              onEdit={setEditingGoal}
-              onDelete={handleDeleteGoal}
-              onCheckIn={setCheckInGoal}
-            />
-          ))
-        )}
+        </div>
+
+        {/* Long-term Goals Column */}
+        <div>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800">🎯 Long-term Goals</h2>
+          <div className="space-y-4">
+            {longTermGoals.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                No long-term goals yet. Think big and set ambitious targets!
+              </div>
+            ) : (
+              longTermGoals.map(goal => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  categories={categories}
+                  onEdit={setEditingGoal}
+                  onDelete={handleDeleteGoal}
+                  onCheckIn={setCheckInGoal}
+                />
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {showCreateModal && (
@@ -357,6 +385,7 @@ function GoalModal({
     category: goal?.category || '',
     target_date: goal?.target_date || '',
     goal_type: goal?.goal_type || 'smart',
+    time_horizon: goal?.time_horizon || 'short_term',
     progress: goal?.progress || 0,
     energy_requirement: goal?.energy_requirement || 'medium',
     review_frequency: goal?.review_frequency || 'weekly'
@@ -419,6 +448,18 @@ function GoalModal({
               <option value="milestone">Milestone</option>
               <option value="habit">Habit</option>
               <option value="project">Project</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Time Horizon</label>
+            <select
+              value={formData.time_horizon}
+              onChange={e => setFormData({ ...formData, time_horizon: e.target.value as any })}
+              className="w-full border rounded px-3 py-2"
+            >
+              <option value="short_term">Short-term (Less than 6 months)</option>
+              <option value="long_term">Long-term (6 months or more)</option>
             </select>
           </div>
 

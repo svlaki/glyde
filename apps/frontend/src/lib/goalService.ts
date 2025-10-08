@@ -16,6 +16,7 @@ export interface Goal {
     due_date?: string
   }>
   goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+  time_horizon?: 'long_term' | 'short_term'
   parent_goal_id?: string
   key_results?: Array<{
     description: string
@@ -111,6 +112,7 @@ export async function createUserGoal(
       due_date?: string
     }>
     goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+    time_horizon?: 'long_term' | 'short_term'
     parent_goal_id?: string
     key_results?: Array<{
       description: string
