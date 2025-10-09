@@ -15,9 +15,15 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 
   useEffect(() => {
-    if (user) {
-      loadCategories()
-      subscribeToCategories()
+    if (!user) {
+      return
+    }
+
+    loadCategories()
+    const unsubscribe = subscribeToCategories()
+
+    return () => {
+      unsubscribe()
     }
   }, [user])
 
@@ -249,7 +255,14 @@ function CategoryModal({ isOpen, onClose, category, onSave }: CategoryModalProps
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose()
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-foreground">
