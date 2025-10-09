@@ -33,6 +33,41 @@ const energyMap: Record<NonNullable<Task['energy_required']>, string> = {
   high: 'High energy'
 }
 
+function adjustColor(color: string, amount: number) {
+  let hex = color.trim()
+
+  if (hex.startsWith('#')) {
+    hex = hex.slice(1)
+  }
+
+  if (hex.length === 3) {
+    hex = hex
+      .split('')
+      .map(char => `${char}${char}`)
+      .join('')
+  }
+
+  if (hex.length !== 6 || /[^0-9a-fA-F]/.test(hex)) {
+    return color
+  }
+
+  const adjustChannel = (channel: number) => {
+    const normalized = amount
+    if (normalized < 0) {
+      return Math.max(0, Math.min(255, Math.round(channel * (1 + normalized))))
+    }
+    return Math.max(0, Math.min(255, Math.round(channel + (255 - channel) * normalized)))
+  }
+
+  const r = adjustChannel(parseInt(hex.slice(0, 2), 16))
+  const g = adjustChannel(parseInt(hex.slice(2, 4), 16))
+  const b = adjustChannel(parseInt(hex.slice(4, 6), 16))
+
+  return `#${[r, g, b]
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
 function isLightColor(color: string) {
   let hex = color.trim()
 
@@ -68,8 +103,20 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
   const dueDate = task.due_date ? dateFormatter.format(new Date(task.due_date)) : null
   const createdDate = task.created_at ? dateFormatter.format(new Date(task.created_at)) : null
   const priorityBadge = task.priority ? priorityMap[task.priority] : null
-  const cardColor = category?.color || task.color
+  const resolvedCategory: Category | undefined = category ?? (task.category_name && (task.category_color || task.color)
+    ? {
+        id: task.category_id ?? `task-category-${task.category_name}`,
+        user_id: task.user_id,
+        name: task.category_name,
+        color: task.category_color || task.color || '#2563eb'
+      }
+    : undefined)
+  const cardColor = resolvedCategory?.color || task.category_color || task.color
   const useLightText = cardColor ? !isLightColor(cardColor) : false
+  const gradientBackground = cardColor
+    ? `linear-gradient(135deg, ${adjustColor(cardColor, -0.12)} 0%, ${adjustColor(cardColor, 0.08)} 100%)`
+    : undefined
+  const accentBorderColor = cardColor ? adjustColor(cardColor, useLightText ? -0.28 : 0.22) : undefined
   const cardTextClass = cardColor
     ? useLightText
       ? 'text-white'
@@ -120,19 +167,38 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
       ? 'bg-white/20 text-white'
       : 'bg-black/10 text-slate-900'
     : undefined
+  const highlightOverlay = cardColor
+    ? useLightText
+      ? 'rgba(255,255,255,0.38)'
+      : 'rgba(255,255,255,0.55)'
+    : undefined
+  const lowlightOverlay = cardColor
+    ? useLightText
+      ? 'rgba(0,0,0,0.25)'
+      : 'rgba(0,0,0,0.12)'
+    : undefined
 
   return (
     <Card
       elevation="sm"
       className={cn(
-        'border-border/70 transition-all duration-200',
-        cardColor && 'border-transparent',
+        'relative overflow-hidden border-border/70 transition-all duration-200',
+        cardColor && 'border-transparent shadow-lg shadow-black/10 dark:shadow-black/20',
         cardTextClass,
         task.status === 'completed' && !cardColor && 'border-green-500/60 bg-green-500/5'
       )}
-      style={cardColor ? { backgroundColor: cardColor } : undefined}
+      style={cardColor ? { background: gradientBackground, borderColor: accentBorderColor } : undefined}
     >
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+      {cardColor && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            background: `radial-gradient(circle at 18% 20%, ${highlightOverlay}, transparent 55%), radial-gradient(circle at 82% 0%, ${lowlightOverlay}, transparent 55%)`
+          }}
+        />
+      )}
+      <CardHeader className="relative z-10 gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <CardTitle className={cn('text-xl font-semibold', cardTextClass)}>{task.title}</CardTitle>
           {task.description && (
@@ -147,16 +213,16 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
                 {priorityBadge.label}
               </span>
             )}
-            {category && (
+            {resolvedCategory && (
               <span
                 className={cn(
                   'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold shadow',
                   cardColor ? categoryPillClass : 'text-white'
                 )}
-                style={cardColor ? undefined : { backgroundColor: category.color }}
+                style={cardColor ? undefined : { backgroundColor: resolvedCategory.color }}
               >
                 <Tag className="size-3.5" />
-                {category.name}
+                {resolvedCategory.name}
               </span>
             )}
             {task.energy_required && (
@@ -203,7 +269,7 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
           </Button>
         </div>
       </CardHeader>
-      <CardContent className={cn('grid gap-2 text-sm sm:grid-cols-2', subtleTextClass)}>
+      <CardContent className={cn('relative z-10 grid gap-2 text-sm sm:grid-cols-2', subtleTextClass)}>
         {dueDate && (
           <div className="flex items-center gap-2">
             <Clock3 className={cn('size-4', iconColorClass)} />
@@ -225,7 +291,7 @@ export function TaskCard({ task, category, onComplete, onEdit, onDelete }: TaskC
       </CardContent>
       <CardFooter
         className={cn(
-          'flex justify-between py-4',
+          'relative z-10 flex justify-between py-4',
           footerBackgroundClass,
           footerBorderClass,
           subtleTextClass
