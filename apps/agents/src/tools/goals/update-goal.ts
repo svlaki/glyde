@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const updateGoalTool = tool(
   async ({ goalId, title, description, targetDate, status, progress, category, priorityScore }, config) => {
@@ -11,6 +12,8 @@ export const updateGoalTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
+      const zepGraphService = new ZepGraphService();
+
       const updates: any = {};
 
       if (title !== undefined) updates.title = title;
@@ -26,6 +29,25 @@ export const updateGoalTool = tool(
       if (!goal) {
         return "❌ Failed to update goal";
       }
+
+      // Update in Zep knowledge graph asynchronously
+      const updateGraph = async () => {
+        try {
+          await zepGraphService.addGoal(userId, {
+            goalId: goal.id,
+            title: goal.title,
+            goal_type: goal.goal_type || 'SMART',
+            status: goal.status || 'active',
+            progress_percentage: progress !== undefined ? progress : (goal.progress || 0),
+            deadline: goal.target_date,
+            time_invested_minutes: 0, // Could be enhanced to track actual time
+          });
+          console.log(`✅ [update-goal] Goal update added to knowledge graph: ${goal.title}`);
+        } catch (error) {
+          console.error('⚠️ [update-goal] Failed to update knowledge graph (non-critical):', error);
+        }
+      };
+      updateGraph(); // Fire and forget
 
       return `✅ Goal updated: "${goal.title}"${progress !== undefined ? ` (Progress: ${progress}%)` : ''}`;
     } catch (error) {

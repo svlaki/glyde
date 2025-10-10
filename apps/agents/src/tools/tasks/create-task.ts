@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createTaskTool = tool(
   async ({ title, description, dueDate, priority, category, energyRequired, estimatedDuration }, config) => {
@@ -11,6 +12,8 @@ export const createTaskTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
+      const zepGraphService = new ZepGraphService();
+
       const task = await supabaseService.createTask(userId, {
         title,
         description: description || undefined,
@@ -24,6 +27,24 @@ export const createTaskTool = tool(
       if (!task) {
         return "❌ Failed to create task";
       }
+
+      // Add to Zep knowledge graph asynchronously
+      const addToGraph = async () => {
+        try {
+          await zepGraphService.addTask(userId, {
+            taskId: task.id,
+            title,
+            priority: priority || 'medium',
+            category: category || 'personal',
+            estimated_duration: estimatedDuration,
+            energy_required: energyRequired || 'medium',
+          });
+          console.log(`✅ [create-task] Task added to knowledge graph: ${title}`);
+        } catch (error) {
+          console.error('⚠️ [create-task] Failed to add to knowledge graph (non-critical):', error);
+        }
+      };
+      addToGraph(); // Fire and forget
 
       const dueDateStr = dueDate ? ` (Due: ${new Date(dueDate).toLocaleDateString()})` : '';
       return `✅ Task created: "${title}"${dueDateStr}`;

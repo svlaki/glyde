@@ -86,18 +86,18 @@ export const updateEventTool = tool(
       try {
         console.log('🧠 [UPDATE-EVENT TOOL] Updating knowledge graph (async)...');
 
+        const startDate = new Date(updatedEvent.start_time);
+        const endDate = new Date(updatedEvent.end_time);
+        const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+
         await zepGraphService.updateCalendarEvent(userId, targetEventId, {
-          type: 'CalendarEvent',
           eventId: updatedEvent.id,
           title: updatedEvent.title,
-          startTime: updatedEvent.start_time,
-          endTime: updatedEvent.end_time,
-          location: updatedEvent.location || undefined,
-          description: updatedEvent.description || undefined,
           category: category || 'Personal',
-          participants: [],
-          topics: [],
-          createdAt: new Date().toISOString()
+          duration_minutes: durationMinutes,
+          energy_level: 'medium',
+          location: updatedEvent.location || undefined,
+          attendee_count: 0
         });
 
         console.log(`✅ [UPDATE-EVENT TOOL] Event updated in knowledge graph`);

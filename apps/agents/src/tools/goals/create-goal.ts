@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createGoalTool = tool(
   async ({ title, description, targetDate, category, goalType, priorityScore, energyRequirement, reviewFrequency }, config) => {
@@ -11,6 +12,8 @@ export const createGoalTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
+      const zepGraphService = new ZepGraphService();
+
       const goal = await supabaseService.createGoal(userId, {
         title,
         description: description || undefined,
@@ -25,6 +28,25 @@ export const createGoalTool = tool(
       if (!goal) {
         return "❌ Failed to create goal";
       }
+
+      // Add to Zep knowledge graph asynchronously
+      const addToGraph = async () => {
+        try {
+          await zepGraphService.addGoal(userId, {
+            goalId: goal.id,
+            title,
+            goal_type: goalType || 'SMART',
+            status: 'active',
+            progress_percentage: 0,
+            deadline: targetDate,
+            time_invested_minutes: 0,
+          });
+          console.log(`✅ [create-goal] Goal added to knowledge graph: ${title}`);
+        } catch (error) {
+          console.error('⚠️ [create-goal] Failed to add to knowledge graph (non-critical):', error);
+        }
+      };
+      addToGraph(); // Fire and forget
 
       const targetStr = targetDate ? ` (Target: ${new Date(targetDate).toLocaleDateString()})` : '';
       return `✅ Goal created: "${title}"${targetStr}`;

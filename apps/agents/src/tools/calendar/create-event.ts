@@ -78,18 +78,18 @@ export const createEventTool = tool(
       try {
         console.log('🧠 [CREATE-EVENT TOOL] Adding to knowledge graph (async)...');
 
+        const startDate = new Date(startTimeUTC);
+        const endDate = new Date(endTimeUTC);
+        const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+
         await zepGraphService.addCalendarEvent(userId, {
-          type: 'CalendarEvent',
           eventId: event.id,
           title,
-          startTime: startTimeUTC,  // Store UTC in graph
-          endTime: endTimeUTC,      // Store UTC in graph
-          location: location || undefined,
-          description: description || undefined,
           category: category || 'Personal',
-          participants: [],
-          topics: [],
-          createdAt: new Date().toISOString()
+          duration_minutes: durationMinutes,
+          energy_level: 'medium',
+          location: location || undefined,
+          attendee_count: 0
         });
 
         console.log(`✅ [CREATE-EVENT TOOL] Event added to knowledge graph with category: ${category}`);

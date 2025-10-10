@@ -166,14 +166,14 @@ export abstract class BaseAgent {
   ): Promise<void> {
     try {
       await this.zepGraphService.addTask(userId, {
-        type: 'Task',
         taskId: `task-${Date.now()}`,
         title: taskTitle,
-        description: taskDescription || completionNotes || '',
-        status: 'completed',
         priority: 'medium',
-        dueDate: completionTime.toISOString(),
-        createdAt: new Date().toISOString()
+        category: undefined,
+        estimated_duration: actualDuration,
+        actual_duration: actualDuration,
+        satisfaction_rating: undefined,
+        energy_required: energyUsed || 'medium'
       });
       console.log(`Persisted task completion to Zep Graph for user ${userId}: ${taskTitle}`);
     } catch (error) {
@@ -211,17 +211,13 @@ export abstract class BaseAgent {
   ): Promise<void> {
     try {
       await this.zepGraphService.addCalendarEvent(userId, {
-        type: 'CalendarEvent',
         eventId: `event-${Date.now()}`,
         title: eventTitle,
-        startTime: startTime.toISOString(),
-        endTime: endTime?.toISOString(),
+        category: category || 'personal',
+        duration_minutes: endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 60000) : undefined,
+        energy_level: energy_level || 'medium',
         location,
-        description: eventDescription || undefined,
-        category: category || 'Personal',
-        participants: attendees || [],
-        topics: [],
-        createdAt: new Date().toISOString()
+        attendee_count: attendees?.length || 0
       });
       console.log(`Persisted calendar event to Zep Graph for user ${userId}: ${eventTitle} (${category || 'Personal'})`);
     } catch (error) {
