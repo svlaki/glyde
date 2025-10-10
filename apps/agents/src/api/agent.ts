@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
+import { ProactiveAgent } from '../agents/proactive/ProactiveAgent.js';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 
 // Initialize the agent registry
@@ -11,6 +12,9 @@ let initializationPromise: Promise<void> | null = null;
 async function initializeAgents(): Promise<void> {
   const conversationAgent = new ConversationAgent();
   await agentRegistry.registerAgent(conversationAgent);
+
+  const proactiveAgent = new ProactiveAgent();
+  await agentRegistry.registerAgent(proactiveAgent);
 }
 
 async function ensureAgentsInitialized(): Promise<void> {

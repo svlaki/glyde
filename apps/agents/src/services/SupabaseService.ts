@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
+import { AgentType } from '../types/agents.js';
 
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
@@ -391,6 +392,265 @@ export class SupabaseService {
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception getting tasks:', error);
       return [];
+    }
+  }
+
+  /**
+   * Create an interaction card for the user that agents can respond to
+   */
+  async createUserInteraction(
+    userId: string,
+    interaction: {
+      agentId: AgentType | string;
+      question: string;
+      interactionType: 'yes_no' | 'multiple_choice' | 'confirmation';
+      options?: string[] | null;
+      priority?: number;
+      categoryId?: string | null;
+      entityId?: string | null;
+      metadata?: Record<string, any> | null;
+      expiresAt?: string | null;
+    }
+  ): Promise<any | null> {
+    try {
+      const insertPayload = {
+        user_id: userId,
+        agent_id: interaction.agentId,
+        question: interaction.question,
+        interaction_type: interaction.interactionType,
+        options: interaction.options ?? null,
+        priority: interaction.priority ?? 5,
+        category_id: interaction.categoryId ?? null,
+        entity_id: interaction.entityId ?? null,
+        metadata: interaction.metadata ?? null,
+        expires_at: interaction.expiresAt ?? null,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await this.client
+        .from('user_interactions')
+        .insert(insertPayload)
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          console.warn('⚠️ [SUPABASE SERVICE] Duplicate interaction ignored:', interaction.question);
+          return null;
+        }
+
+        if (error.code === '23514') {
+          // Constraint violation (likely status enum). Try with legacy value "active"
+          const fallbackPayload = { ...insertPayload, status: 'active' };
+          const { data: fallbackData, error: fallbackError } = await this.client
+            .from('user_interactions')
+            .insert(fallbackPayload)
+            .select('*')
+            .single();
+
+          if (fallbackError) {
+            console.error('❌ [SUPABASE SERVICE] Error creating interaction with fallback status:', fallbackError);
+            throw fallbackError;
+          }
+
+          return fallbackData;
+        }
+
+        console.error('❌ [SUPABASE SERVICE] Error creating interaction:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception creating interaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all pending interactions for a user (optionally filtered by agent)
+   */
+  async getPendingUserInteractions(userId: string, agentId?: string): Promise<any[]> {
+    try {
+      const nowIso = new Date().toISOString();
+
+      let query = this.client
+        .from('user_interactions')
+        .select(`
+          *,
+          category:categories(id, name, color)
+        `)
+        .eq('user_id', userId)
+        .in('status', ['pending', 'active'])
+        .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      if (agentId) {
+        query = query.eq('agent_id', agentId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('❌ [SUPABASE SERVICE] Error fetching pending interactions:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception fetching pending interactions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get a single interaction by ID
+   */
+  async getUserInteractionById(interactionId: string): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('user_interactions')
+        .select('*')
+        .eq('id', interactionId)
+        .single();
+
+      if (error) {
+        console.error('❌ [SUPABASE SERVICE] Error fetching interaction:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception fetching interaction:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Record a user's response to an interaction and mark it as responded
+   */
+  async saveInteractionResponse(
+    userId: string,
+    interactionId: string,
+    response: string
+  ): Promise<{ interaction: any; response: any } | null> {
+    const respondedAt = new Date().toISOString();
+
+    try {
+      const { data: interaction, error: interactionError } = await this.client
+        .from('user_interactions')
+        .select('*')
+        .eq('id', interactionId)
+        .single();
+
+      if (interactionError || !interaction) {
+        console.error('❌ [SUPABASE SERVICE] Interaction not found when saving response:', interactionError);
+        return null;
+      }
+
+      const { data: responseRow, error: responseError } = await this.client
+        .from('interaction_responses')
+        .insert({
+          interaction_id: interactionId,
+          user_id: userId,
+          response,
+          responded_at: respondedAt,
+        })
+        .select('*')
+        .single();
+
+      if (responseError) {
+        console.error('❌ [SUPABASE SERVICE] Error saving interaction response:', responseError);
+        throw responseError;
+      }
+
+      const updateData: Record<string, any> = {
+        status: 'responded'
+      };
+
+      if (interaction && 'responded_at' in interaction) {
+        updateData.responded_at = respondedAt;
+      }
+
+      if (interaction && 'updated_at' in interaction) {
+        updateData.updated_at = respondedAt;
+      }
+
+      const { data: updatedInteraction, error: updateError } = await this.client
+        .from('user_interactions')
+        .update(updateData)
+        .eq('id', interactionId)
+        .select('*')
+        .single();
+
+      if (updateError) {
+        console.error('❌ [SUPABASE SERVICE] Error updating interaction status:', updateError);
+        throw updateError;
+      }
+
+      return { interaction: updatedInteraction, response: responseRow };
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception saving interaction response:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel all pending interactions for a user (primarily for development utilities)
+   */
+  async cancelPendingInteractions(userId: string): Promise<number> {
+    try {
+      const updateData: Record<string, any> = {
+        status: 'cancelled'
+      };
+
+      const sample = await this.client
+        .from('user_interactions')
+        .select('id, updated_at, status')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (!sample.error && sample.data && sample.data.length > 0) {
+        if ('updated_at' in sample.data[0]) {
+          updateData.updated_at = new Date().toISOString();
+        }
+      }
+
+      const { data, error } = await this.client
+        .from('user_interactions')
+        .update(updateData)
+        .eq('user_id', userId)
+        .in('status', ['pending', 'active'])
+        .select('id');
+
+      if (error) {
+        if (error.code === '23514') {
+          const fallbackUpdate = { ...updateData, status: 'dismissed' };
+          const { data: fallbackData, error: fallbackError } = await this.client
+            .from('user_interactions')
+            .update(fallbackUpdate)
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .select('id');
+
+          if (fallbackError) {
+            console.error('❌ [SUPABASE SERVICE] Error cancelling interactions with fallback:', fallbackError);
+            return 0;
+          }
+
+          return fallbackData?.length || 0;
+        }
+
+        console.error('❌ [SUPABASE SERVICE] Error cancelling interactions:', error);
+        return 0;
+      }
+
+      return data?.length || 0;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception cancelling interactions:', error);
+      return 0;
     }
   }
 

@@ -1,6 +1,8 @@
 import { supabase } from '../supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
+
 export interface DBInteraction {
   id: string;
   user_id: string;
@@ -102,35 +104,29 @@ class InteractionService {
   async respondToInteraction(interactionId: string, response: string): Promise<void> {
     if (!this.userId) throw new Error('User not initialized');
 
-    // Start a transaction to update both tables
-    const { error: responseError } = await supabase
-      .from('interaction_responses')
-      .insert({
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    if (!token) {
+      throw new Error('No active session found');
+    }
+
+    const apiResponse = await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
         interaction_id: interactionId,
-        user_id: this.userId,
-        response: response,
-        responded_at: new Date().toISOString(),
-      });
+        response
+      })
+    });
 
-    if (responseError) {
-      console.error('Error saving response:', responseError);
-      throw responseError;
+    if (!apiResponse.ok) {
+      const errorBody = await apiResponse.json().catch(() => ({}));
+      throw new Error(errorBody.error || 'Failed to respond to interaction');
     }
-
-    // Update interaction status
-    const { error: updateError } = await supabase
-      .from('user_interactions')
-      .update({ status: 'responded' })
-      .eq('id', interactionId)
-      .eq('user_id', this.userId);
-
-    if (updateError) {
-      console.error('Error updating interaction status:', updateError);
-      throw updateError;
-    }
-
-    // Notify any agents listening for responses
-    await this.notifyAgentOfResponse(interactionId, response);
   }
 
   async dismissInteraction(interactionId: string): Promise<void> {
@@ -146,16 +142,6 @@ class InteractionService {
       console.error('Error dismissing interaction:', error);
       throw error;
     }
-  }
-
-  private async notifyAgentOfResponse(interactionId: string, response: string) {
-    // This will be used by agents to process responses
-    // For now, just emit an event that agents can listen to
-    window.dispatchEvent(
-      new CustomEvent('agent-response', {
-        detail: { interactionId, response, userId: this.userId }
-      })
-    );
   }
 
   async createInteraction(interaction: Omit<DBInteraction, 'id' | 'created_at' | 'user_id'>): Promise<DBInteraction> {

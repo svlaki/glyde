@@ -153,13 +153,25 @@ export function InteractionBox() {
                 </div>
 
                 {/* Event Data Preview (if available) */}
-                {interaction.metadata?.eventTitle && (
+                {(interaction.metadata?.eventTitle || interaction.metadata?.displayTime || interaction.metadata?.dueDate) && (
                   <div className="mt-1 pt-1 border-t opacity-60"
                     style={{ borderColor: `${textColor}30` }}
                   >
-                    <p className="text-xs truncate" style={{ color: textColor }}>
-                      {interaction.metadata.eventTitle}
-                    </p>
+                    {interaction.metadata?.eventTitle && (
+                      <p className="text-xs truncate" style={{ color: textColor }}>
+                        {interaction.metadata.eventTitle}
+                      </p>
+                    )}
+                    {interaction.metadata?.displayTime && (
+                      <p className="text-[10px]" style={{ color: textColor }}>
+                        🕒 {interaction.metadata.displayTime}
+                      </p>
+                    )}
+                    {interaction.metadata?.dueDate && (
+                      <p className="text-[10px]" style={{ color: textColor }}>
+                        📆 Due {new Date(interaction.metadata.dueDate).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

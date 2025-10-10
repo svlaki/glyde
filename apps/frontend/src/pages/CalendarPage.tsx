@@ -17,7 +17,7 @@ import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { MainCalendar, type CalendarInteractionArgs } from '../components/calendar/MainCalendar';
 import { getCategoryColor } from '../lib/calendarCategories';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { Drawer, Button as MantineButton, NavLink, Divider } from '@mantine/core';
+import { Drawer, Button as MantineButton, NavLink, Divider, Menu } from '@mantine/core';
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
@@ -42,6 +42,7 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [userTimezone, setUserTimezone] = useState<string>('America/Chicago'); // Default to Chicago, will be overridden by profile
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [triggeringAgent, setTriggeringAgent] = useState(false);
   const eventLoadErrorShown = useRef(false);
   const taskLoadErrorShown = useRef(false);
 
@@ -293,6 +294,50 @@ export function CalendarPage() {
     });
   }, [handleCalendarEventUpdate, userTimezone]);
 
+  const handleTriggerProactiveAgent = useCallback(async () => {
+    if (!user || !session?.access_token) {
+      toast({
+        title: 'Unable to run agents',
+        description: 'Please sign in again to trigger proactive suggestions.',
+        variant: 'warning'
+      });
+      return;
+    }
+
+    setTriggeringAgent(true);
+    try {
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/agents/proactive/run`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ timezone: userTimezone })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || 'Unexpected error while running the agent');
+      }
+
+      toast({
+        title: 'Proactive planner updated',
+        description: result?.message || 'Created fresh suggestions based on your schedule.',
+        variant: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to trigger proactive agent:', error);
+      toast({
+        title: 'Agent run failed',
+        description: error instanceof Error ? error.message : 'Something went wrong while running the agent.',
+        variant: 'error'
+      });
+    } finally {
+      setTriggeringAgent(false);
+    }
+  }, [session, toast, user, userTimezone]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex h-screen">
@@ -313,12 +358,28 @@ export function CalendarPage() {
                 </button>
                 <span className="text-sm font-medium text-foreground">Calendar</span>
               </div>
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                <span className="text-xs text-muted-foreground">Welcome, {user?.email}</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Menu withinPortal>
+              <Menu.Target>
+                <MantineButton size="xs" variant="light" loading={triggeringAgent}>
+                  Agents
+                </MantineButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Automation</Menu.Label>
+                <Menu.Item onClick={handleTriggerProactiveAgent} disabled={triggeringAgent}>
+                  Run proactive planner
+                </Menu.Item>
+                <Menu.Divider />
+                <Menu.Label>Coming soon</Menu.Label>
+                <Menu.Item disabled>More agents on the way</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+            <span className="text-xs text-muted-foreground">Welcome, {user?.email}</span>
           </div>
+        </div>
+      </div>
 
           {/* Calendar */}
           <div className="flex-1 p-2 bg-background min-h-0 overflow-hidden">
