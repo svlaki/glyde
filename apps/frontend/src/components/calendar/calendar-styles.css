@@ -79,13 +79,16 @@
 
 /* Time slots - Clean grid lines */
 .rbc-time-slot {
-  border-top: 1px solid #e5e7eb !important;
   min-height: 20px !important;
   height: 20px !important;
   box-sizing: border-box !important;
 }
 
-.dark .rbc-time-slot {
+.rbc-time-slot + .rbc-time-slot {
+  border-top: 1px solid #e5e7eb !important;
+}
+
+.dark .rbc-time-slot + .rbc-time-slot {
   border-top: 1px solid #374151 !important;
 }
 
@@ -154,6 +157,14 @@
 .rbc-time-gutter .rbc-timeslot-group {
   border-bottom: none !important;
   position: relative;
+}
+
+.rbc-time-gutter .rbc-time-slot + .rbc-time-slot {
+  border-top: 1px solid #e5e7eb !important;
+}
+
+.dark .rbc-time-gutter .rbc-time-slot + .rbc-time-slot {
+  border-top: 1px solid #374151 !important;
 }
 
 /* Time labels - align with the hour line */
