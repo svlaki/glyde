@@ -36,7 +36,7 @@ export const createTaskTool = tool(
             title,
             priority: priority || 'medium',
             category: category || 'personal',
-            estimated_duration: estimatedDuration,
+            estimated_duration: estimatedDuration ?? undefined,
             energy_required: energyRequired || 'medium',
           });
           console.log(`✅ [create-task] Task added to knowledge graph: ${title}`);

@@ -33,7 +33,7 @@ export const completeTaskTool = tool(
             title: task.title,
             priority: task.priority || 'medium',
             category: task.category || 'personal',
-            actual_duration: actualDuration,
+            actual_duration: actualDuration ?? undefined,
             satisfaction_rating: 4, // Default good rating, can be enhanced later
             energy_required: task.energy_required || 'medium',
           });
