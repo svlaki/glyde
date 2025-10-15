@@ -355,8 +355,9 @@ EVENT CREATION:
 - Ask for time if not specified
 - Default to 1 hour duration
 - Parse natural language: "2pm tomorrow", "lunch Tuesday", "5pm"
-- Auto-assign to appropriate category (Work, Social, Fitness, Shopping, Health, etc.)
-- Create new categories when users mention new activity types
+- ALWAYS call list_categories FIRST to see what categories exist
+- Create new categories for specific entities (individual classes, projects, clients)
+- Use existing categories only when they accurately describe the activity
 - Conflicts detected automatically - suggest alternatives
 
 CRITICAL TIMEZONE:
@@ -376,8 +377,22 @@ TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
 - SEARCH/FIND events → search_events with text/category (for viewing only)
 - List range → list_events with dates
 
-CATEGORIES:
-Work, School, Health & Hygiene, Social, Family, Personal, Fitness, Hobbies, Finance, Shopping, Travel, Self-Care
+CATEGORY WORKFLOW (CRITICAL):
+1. ALWAYS call list_categories FIRST before creating events/tasks/goals
+2. For SPECIFIC named entities → create SPECIFIC categories:
+   - Classes: Create "CS173A", "PHIL 1" (NOT generic "School")
+   - Projects: Create "Project Phoenix" (NOT "Work")
+   - Clients: Create "Client Acme" (NOT "Work")
+   - Recurring activities: Create "Weekly D&D" (NOT "Hobbies")
+3. Use existing broad categories ONLY for truly generic activities
+4. When uncertain → create specific category rather than force-fit into generic ones
+
+CATEGORY EXAMPLES:
+✅ "Add CS173A class Tuesday 1:30pm" → list_categories → create_category("CS173A") → create_event(category="CS173A")
+✅ "Meeting for Project Phoenix" → list_categories → create_category("Project Phoenix") → create_event(category="Project Phoenix")
+✅ "Workout at gym" → list_categories → use existing "Fitness" if available, or create "Gym"
+❌ "Add CS173A class" → create_event(category="School") ← WRONG! Use specific category
+❌ "Project Phoenix meeting" → create_event(category="Work") ← WRONG! Create specific category
 
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task

@@ -36,7 +36,7 @@ export const createCategoryTool = tool(
   },
   {
     name: "create_category",
-    description: "Create a new category for organizing events, tasks, and goals. Categories are universal and can be used by all entity types. IMPORTANT: When creating an event/task/goal that doesn't fit existing categories, create a new category first. Always check existing categories with list_categories before creating.",
+    description: "Create a new category for organizing events, tasks, and goals. Categories are universal and can be used by all entity types. CRITICAL: Create SPECIFIC, GRANULAR categories for specific entities - individual classes (e.g., 'CS173A', 'PHIL 1'), projects (e.g., 'Project Phoenix'), clients (e.g., 'Client Acme'). Generic categories (Personal, Fitness, Social) should ONLY be used for truly generic recurring activities. Always check existing categories with list_categories before creating.",
     schema: z.object({
       name: z.string().describe("Category name (e.g., 'Gym', 'Project X', 'Doctor Appointments')"),
       color: z.string().optional().describe("Hex color code (e.g., '#3b82f6'). Use meaningful colors that match the category type."),

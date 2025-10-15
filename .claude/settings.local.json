@@ -43,7 +43,8 @@
       "Bash(npx tsc:*)",
       "mcp__serena__list_memories",
       "mcp__serena__find_referencing_symbols",
-      "mcp__supabase__search_docs"
+      "mcp__supabase__search_docs",
+      "Bash(docker:*)"
     ],
     "deny": [],
     "ask": [],

@@ -61,7 +61,7 @@ export const createEventTool = tool(
       end_time: endTimeUTC,
       location: location || "",
       description: description || "",
-      category: category || 'Personal'
+      category: category || ''
     });
 
     console.log('📋 [CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
@@ -85,7 +85,7 @@ export const createEventTool = tool(
         await zepGraphService.addCalendarEvent(userId, {
           eventId: event.id,
           title,
-          category: category || 'Personal',
+          category: category || '',
           duration_minutes: durationMinutes,
           energy_level: 'medium',
           location: location || undefined,
@@ -110,14 +110,14 @@ export const createEventTool = tool(
   },
   {
     name: "create_event",
-    description: "Create a new calendar event. Assign the event to an appropriate category. If the category doesn't exist, you can create it first using create_category tool.",
+    description: "Create a new calendar event. ALWAYS call list_categories first to check existing categories. For specific entities (classes, projects, clients), you MUST create a specific category first using create_category. Generic categories should only be used for truly generic activities.",
     schema: z.object({
       title: z.string().describe("Event title extracted from user input or inferred from context. Make it descriptive and clear."),
       startTime: z.string().describe("Start time in ISO format. Parse relative dates like 'tomorrow', '1pm', 'Friday' into proper timestamps. Use intelligent time defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
       endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
       location: z.string().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().nullable().describe("Event description. Leave empty if not specified"),
-      category: z.string().nullable().describe("Category name for this event (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Fitness'). Use existing categories when possible. Defaults to 'Personal' if not specified."),
+      category: z.string().nullable().describe("Category name for this event. Call list_categories first to see existing categories. For classes/projects/clients, create a SPECIFIC category first (e.g., 'CS173A' not 'School', 'Project Phoenix' not 'Work'). Generic categories are only for truly generic recurring activities. Required field - do not leave empty."),
     }),
   }
 );;;;;;
