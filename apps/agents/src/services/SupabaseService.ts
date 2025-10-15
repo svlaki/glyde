@@ -362,6 +362,13 @@ export class SupabaseService {
         return [];
       }
 
+      console.log('🔍 [SUPABASE SERVICE] Raw RPC data type:', typeof data);
+      console.log('🔍 [SUPABASE SERVICE] Raw RPC data:', JSON.stringify(data, null, 2));
+      console.log('🔍 [SUPABASE SERVICE] Is Array?', Array.isArray(data));
+      if (data && data.length > 0) {
+        console.log('🔍 [SUPABASE SERVICE] First item:', JSON.stringify(data[0], null, 2));
+      }
+
       let filteredTasks = data || [];
 
       // Apply filters client-side since RPC function doesn't support them yet

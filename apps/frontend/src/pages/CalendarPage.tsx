@@ -294,6 +294,37 @@ export function CalendarPage() {
     });
   }, [handleCalendarEventUpdate, userTimezone]);
 
+  // Auto-trigger proactive agent on login (once per session)
+  const hasTriggeredProactiveRef = useRef(false);
+  useEffect(() => {
+    if (!user || !session?.access_token || !userTimezone) return;
+    if (hasTriggeredProactiveRef.current) return;
+
+    hasTriggeredProactiveRef.current = true;
+
+    // Wait a bit for tasks/events to load, then trigger proactive agent
+    const timer = setTimeout(async () => {
+      try {
+        console.log('[CalendarPage] Auto-triggering proactive agent on login');
+        const response = await fetch(`${AGENT_SERVICE_URL}/api/agents/proactive/run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ timezone: userTimezone })
+        });
+
+        const result = await response.json();
+        console.log('[CalendarPage] Proactive agent result:', result);
+      } catch (error) {
+        console.error('[CalendarPage] Failed to auto-trigger proactive agent:', error);
+      }
+    }, 3000); // Wait 3 seconds for initial data to load
+
+    return () => clearTimeout(timer);
+  }, [user, session, userTimezone]);
+
   const handleTriggerProactiveAgent = useCallback(async () => {
     if (!user || !session?.access_token) {
       toast({
