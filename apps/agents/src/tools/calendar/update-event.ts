@@ -74,6 +74,7 @@ export const updateEventTool = tool(
         end_time: endTimeUTC,
         location: location || undefined,
         description: description || undefined,
+        category: category || undefined,
       }
     );
 

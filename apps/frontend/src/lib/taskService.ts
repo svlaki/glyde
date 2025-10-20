@@ -48,12 +48,15 @@ export async function fetchUserTasks(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
+        'Authorization': `Bearer ${accessToken}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
       },
       body: JSON.stringify({
         user_id: user.id,
         ...filters
       }),
+      cache: 'no-store'
     })
 
     const data = await response.json()

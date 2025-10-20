@@ -191,7 +191,8 @@ export function CalendarPage() {
     loadUserEvents();
     loadUserTasks();
 
-    const channel = supabase
+    // Subscribe to events table changes
+    const eventsChannel = supabase
       .channel(`events-${user.id}`)
       .on(
         'postgres_changes',
@@ -202,13 +203,33 @@ export function CalendarPage() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
+          console.log('🔄 [CalendarPage] Events changed, reloading...');
           loadUserEvents();
         }
       )
       .subscribe();
 
+    // Subscribe to tasks table changes (for category updates)
+    const tasksChannel = supabase
+      .channel(`tasks-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          console.log('🔄 [CalendarPage] Tasks changed, reloading...');
+          loadUserTasks();
+        }
+      )
+      .subscribe();
+
     return () => {
-      channel.unsubscribe();
+      eventsChannel.unsubscribe();
+      tasksChannel.unsubscribe();
     };
   }, [loadUserEvents, loadUserTasks, user]);
 

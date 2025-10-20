@@ -16,11 +16,15 @@ export const searchEventsTool = tool(
 
     try {
       const supabaseService = new SupabaseService();
-      let events = await supabaseService.getEventsForAgent(userId);
+      let events = await supabaseService.getEvents(userId);
 
-      // Apply category filter if specified
+      // Apply category filter if specified (case-insensitive, strips emoji icons)
       if (category) {
-        events = events.filter((event: any) => event.category === category);
+        const normalizedCategory = category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+        events = events.filter((event: any) => {
+          const eventCategory = (event.category || '').toLowerCase();
+          return eventCategory === normalizedCategory || eventCategory.includes(normalizedCategory);
+        });
       }
 
       if (events.length === 0) {

@@ -197,9 +197,25 @@ export class ZepMemoryService {
    * Get user context from Zep (replaces old getMemoryContext)
    */
   async getUserContext(userId: string): Promise<string> {
-    // Graphiti disabled - skip user context retrieval
-    console.log(`⏭️  [ZepMemoryService] Graphiti disabled - skipping user context for ${userId}`);
-    return '';
+    try {
+      // Use Zep graph search to get user context from recent conversations
+      const memoryResults = await this.searchMemory(userId, 'user preferences goals habits context', 5);
+
+      if (memoryResults.length === 0) {
+        console.log(`📭 [ZepMemoryService] No memory context found for ${userId}`);
+        return '';
+      }
+
+      const contextString = memoryResults
+        .map(result => result.content)
+        .join('\n');
+
+      console.log(`✅ [ZepMemoryService] Retrieved ${memoryResults.length} memory items for ${userId}`);
+      return contextString;
+    } catch (error) {
+      console.error(`❌ [ZepMemoryService] Failed to get user context for ${userId}:`, error);
+      return '';
+    }
   }
 
   /**

@@ -403,6 +403,23 @@ TASK MANAGEMENT:
 - Mark tasks complete when user says they finished something
 - Update task details (due date, priority, category) when user asks
 
+BULK CATEGORY UPDATES (CRITICAL):
+When user asks to "move X to category Y" or "put all X in category Y" or "categorize X as Y":
+1. Search for ALL matching items by TEXT CONTENT (DO NOT filter by category!):
+   - Use search_events(query="X", category=null) to find events by title/description
+   - Use list_tasks() with NO category filter, then filter response for "X" in title/description
+   - Use list_goals() with NO category filter, then filter response for "X" in title/description
+2. Update EVERY matching item with update_event/update_task/update_goal, passing the category parameter
+3. Report back how many of each type were updated
+
+Example: "move all mendicants things to mendicants category" should:
+  → search_events(query="mendicants", category=null) → find by text → update ALL with category="Mendicants"
+  → list_tasks() → filter for "mendicants" in title → update ALL with category="Mendicants"
+  → list_goals() → filter for "mendicants" in title → update ALL with category="Mendicants"
+
+CRITICAL: When searching for items to categorize, NEVER pass the destination category as a filter!
+You're searching for UNcategorized items that CONTAIN the search term, not items already IN that category.
+
 Use tools proactively. When user wants multiple events or tasks, create them all using the appropriate tools multiple times.`);
 
       const messages = [systemMessage, ...state.messages];

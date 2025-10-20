@@ -45,6 +45,8 @@ export async function fetchUserEvents(
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
     };
 
     if (accessToken) {
@@ -54,7 +56,8 @@ export async function fetchUserEvents(
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      cache: 'no-store'
     });
 
     console.log('[calendarService] Response status:', response.status, response.ok);

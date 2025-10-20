@@ -5,7 +5,17 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 export const listGoalsTool = tool(
   async ({ status, category, goalType }, config) => {
     const userId = config?.configurable?.userId;
+    console.log('🎯 [LIST-GOALS TOOL] Called with:', {
+      userId,
+      status,
+      category,
+      goalType,
+      hasConfig: !!config,
+      configKeys: config ? Object.keys(config) : []
+    });
+
     if (!userId) {
+      console.error('❌ [LIST-GOALS TOOL] Missing userId in config');
       return "❌ User ID required";
     }
 
@@ -17,9 +27,15 @@ export const listGoalsTool = tool(
       if (category) filters.category = category;
       if (goalType) filters.goalType = goalType;
 
+      console.log('🔍 [LIST-GOALS TOOL] Fetching goals with filters:', filters);
       const goals = await supabaseService.getGoals(userId, filters);
+      console.log('📊 [LIST-GOALS TOOL] Retrieved goals:', {
+        count: goals?.length || 0,
+        hasGoals: !!goals && goals.length > 0
+      });
 
       if (!goals || goals.length === 0) {
+        console.log('⚠️ [LIST-GOALS TOOL] No goals found');
         return "No goals found matching the criteria.";
       }
 

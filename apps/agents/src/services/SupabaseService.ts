@@ -376,10 +376,12 @@ export class SupabaseService {
         filteredTasks = filteredTasks.filter((t: any) => t.status === filters.status);
       }
       if (filters?.category) {
-        // Support both old category name and new category_name
-        filteredTasks = filteredTasks.filter((t: any) => 
-          t.category_name === filters.category || t.category === filters.category
-        );
+        // Strip emoji and do case-insensitive matching
+        const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+        filteredTasks = filteredTasks.filter((t: any) => {
+          const categoryName = (t.category_name || t.category || '').toLowerCase();
+          return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+        });
       }
       if (filters?.priority) {
         filteredTasks = filteredTasks.filter((t: any) => t.priority === filters.priority);
@@ -904,7 +906,7 @@ export class SupabaseService {
     targetAfter?: string;
   }): Promise<any[]> {
     try {
-      console.log('🔍 [SUPABASE SERVICE] Getting goals for user:', userId);
+      console.log('🔍 [SUPABASE SERVICE] Getting goals for user:', userId, 'with filters:', filters);
 
       // Use the new function that joins category data
       const { data, error } = await this.client
@@ -917,6 +919,12 @@ export class SupabaseService {
         return [];
       }
 
+      console.log('📥 [SUPABASE SERVICE] RPC returned:', {
+        dataExists: !!data,
+        rawCount: data?.length || 0,
+        sampleGoal: data?.[0] ? { id: data[0].id, title: data[0].title, user_id: data[0].user_id } : null
+      });
+
       let filteredGoals = data || [];
 
       // Apply filters client-side since RPC function doesn't support them yet
@@ -924,10 +932,12 @@ export class SupabaseService {
         filteredGoals = filteredGoals.filter((g: any) => g.status === filters.status);
       }
       if (filters?.category) {
-        // Support both old category name and new category_name
-        filteredGoals = filteredGoals.filter((g: any) => 
-          g.category_name === filters.category || g.category === filters.category
-        );
+        // Strip emoji and do case-insensitive matching
+        const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+        filteredGoals = filteredGoals.filter((g: any) => {
+          const categoryName = (g.category_name || g.category || '').toLowerCase();
+          return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+        });
       }
       if (filters?.goalType) {
         filteredGoals = filteredGoals.filter((g: any) => g.goal_type === filters.goalType);
