@@ -14,6 +14,7 @@ import { createEventTool } from '../../tools/calendar/create-event.js';
 import { updateEventTool } from '../../tools/calendar/update-event.js';
 import { deleteEventTool } from '../../tools/calendar/delete-event.js';
 import { deleteMultipleEventsTool } from '../../tools/calendar/delete-multiple-events.js';
+import { bulkUpdateEventsTool } from '../../tools/calendar/bulk-update-events.js';
 import { searchEventsTool } from '../../tools/calendar/search-events.js';
 import { listEventsTool } from '../../tools/calendar/list-events.js';
 import { createTaskTool, updateTaskTool, deleteTaskTool, listTasksTool, completeTaskTool } from '../../tools/tasks/index.js';
@@ -190,6 +191,7 @@ export class ConversationAgent extends BaseAgent {
       updateEventTool,
       deleteEventTool,
       deleteMultipleEventsTool,
+      bulkUpdateEventsTool,
       searchEventsTool,
       listEventsTool,
 
