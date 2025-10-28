@@ -8,6 +8,7 @@ import {
 import { taskTools } from './tasks/index.js';
 import { goalTools } from './goals/index.js';
 import { profileTools } from './profile/index.js';
+import { searchTools } from './search/index.js';
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -50,6 +51,11 @@ export class ToolRegistry {
     profileTools.forEach(tool => {
       this.tools.set(tool.name, tool);
     });
+
+    // Register all search tools
+    searchTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
   }
 
   // Register a single tool
@@ -80,14 +86,15 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'analysis' | 'coaching' | 'chat'): any[] {
+  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'analysis' | 'coaching' | 'chat' | 'search'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'search_events', 'list_events'],
       categories: ['create_category', 'list_categories', 'update_category', 'delete_category'],
       tasks: ['create_task', 'update_task', 'delete_task', 'list_tasks'],
       analysis: ['analyze_patterns', 'generate_insights'],
       coaching: ['set_goal', 'track_progress', 'suggest_actions'],
-      chat: ['search_similar', 'update_memory']
+      chat: ['search_similar', 'update_memory'],
+      search: ['web_search']
     };
 
     const toolNames = categoryPrefixes[category] || [];
@@ -95,7 +102,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'analysis' | 'coaching' | 'chat'): string[] {
+  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'analysis' | 'coaching' | 'chat' | 'search'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

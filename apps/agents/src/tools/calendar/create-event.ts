@@ -5,7 +5,7 @@ import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 
 export const createEventTool = tool(
-  async ({ title, startTime, endTime, location, description, category }, config) => {
+  async ({ title, startTime, endTime, location, description, category, replaceConflicting = false }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -16,7 +16,7 @@ export const createEventTool = tool(
       throw new Error("Timezone is required for creating events");
     }
 
-    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category, timezone });
+    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category, timezone, replaceConflicting });
 
     // Initialize services
     const supabaseService = new SupabaseService();
@@ -47,7 +47,26 @@ export const createEventTool = tool(
 
       if (conflictingEvents.length > 0) {
         const conflictingEvent = conflictingEvents[0];
-        return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+
+        // If replaceConflicting is true, delete the conflicting event and continue
+        if (replaceConflicting) {
+          console.log(`🔄 [CREATE-EVENT TOOL] Auto-deleting conflicting event: "${conflictingEvent.title}"`);
+
+          const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id);
+
+          if (!deleteResult.success) {
+            throw new Error(`Failed to delete conflicting event "${conflictingEvent.title}": ${deleteResult.error}`);
+          }
+
+          console.log(`✅ [CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
+
+          // Delete from graph too (fire and forget)
+          zepGraphService.deleteCalendarEvent(conflictingEvent.id).catch(err =>
+            console.error('Failed to remove conflicting event from graph:', err)
+          );
+        } else {
+          return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+        }
       }
     } catch (error) {
       console.error('Error checking for conflicts:', error);
@@ -118,6 +137,7 @@ export const createEventTool = tool(
       location: z.string().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().nullable().describe("Event description. Leave empty if not specified"),
       category: z.string().nullable().describe("Category name for this event. Call list_categories first to see existing categories. For classes/projects/clients, create a SPECIFIC category first (e.g., 'CS173A' not 'School', 'Project Phoenix' not 'Work'). Generic categories are only for truly generic recurring activities. Required field - do not leave empty."),
+      replaceConflicting: z.boolean().default(false).describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
     }),
   }
 );;;;;;

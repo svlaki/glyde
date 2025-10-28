@@ -87,10 +87,27 @@ export const deleteEventTool = tool(
       throw new Error("Failed to identify event to delete - this should not happen");
     }
 
+    // Get event details before deletion for response
+    const eventToDelete = await supabaseService.getEventsForAgent(userId)
+      .then(events => events.find(e => e.id === targetEventId));
+
+    const eventTitle = eventToDelete?.title || 'Unknown event';
+
     const deleteResult = await supabaseService.deleteEvent(userId, targetEventId);
 
     if (!deleteResult.success) {
       throw new Error(`Failed to delete event: ${deleteResult.error}`);
+    }
+
+    console.log(`✅ [DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully from database`);
+
+    // Verify deletion by checking if event is gone
+    const verifyEvents = await supabaseService.getEvents(userId);
+    const stillExists = verifyEvents.some(e => e.id === targetEventId);
+
+    if (stillExists) {
+      console.error('❌ [DELETE-EVENT TOOL] Event still exists after deletion!');
+      throw new Error('Event deletion failed - event still exists in database');
     }
 
     // Remove from knowledge graph asynchronously (fire-and-forget for speed)
@@ -109,7 +126,7 @@ export const deleteEventTool = tool(
     // Fire and forget - don't await this
     removeFromGraph();
 
-    return `Event deleted successfully`;
+    return `✅ Event "${eventTitle}" has been deleted successfully. You can now schedule a new event at that time.`;
   },
   {
     name: "delete_event",

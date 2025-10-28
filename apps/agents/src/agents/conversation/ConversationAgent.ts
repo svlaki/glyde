@@ -8,7 +8,7 @@ import { SupabaseService } from '../../services/SupabaseService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
-import { toDate } from 'date-fns';
+import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { createEventTool } from '../../tools/calendar/create-event.js';
 import { updateEventTool } from '../../tools/calendar/update-event.js';
@@ -21,16 +21,7 @@ import { createTaskTool, updateTaskTool, deleteTaskTool, listTasksTool, complete
 import { createGoalTool, updateGoalTool, listGoalsTool, checkInGoalTool } from '../../tools/goals/index.js';
 import { getProfileTool, updateProfileTool } from '../../tools/profile/index.js';
 import { createCategoryTool, listCategoriesTool } from '../../tools/categories/index.js';
-
-// Utility functions
-
-// Helper function to format date for comparison using local timezone
-function formatDateForComparison(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+import { webSearchTool } from '../../tools/search/index.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -217,7 +208,10 @@ export class ConversationAgent extends BaseAgent {
       listCategoriesTool,
 
       // Memory search
-      searchMemoryTool
+      searchMemoryTool,
+
+      // Web search
+      webSearchTool
     ];
     const toolNode = new ToolNode(tools);
 
@@ -287,24 +281,32 @@ export class ConversationAgent extends BaseAgent {
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 
-      // Calculate temporal context for better understanding
-      const now = new Date();
-      const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const dayAfterTomorrow = new Date(now);
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-      
-      
+      // Calculate temporal context IN USER'S TIMEZONE (critical for correct "tomorrow" interpretation)
+      // Get current UTC time
+      const nowUtc = new Date();
+
+      // Format dates directly in user's timezone (this is the correct way)
+      const todayFormatted = formatInTimeZone(nowUtc, state.timezone, 'yyyy-MM-dd');
+      const tomorrowDayName = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'EEEE');
+      const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
+
       const systemMessage = new SystemMessage(`You are a friendly personal calendar and task assistant. Help users manage their time and tasks naturally and conversationally.
 
 YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-TIME CONTEXT:
-- Now: ${getCurrentTimeInTimezone(state.timezone)}
-- Today: ${formatDateForComparison(now)}
-- Tomorrow: ${formatDateForComparison(tomorrow)} (${formatInTimeZone(tomorrow, state.timezone, 'EEEE')})
+TIME CONTEXT (USER'S TIMEZONE: ${state.timezone}):
+- Current time: ${getCurrentTimeInTimezone(state.timezone)}
+- Today's date: ${todayFormatted}
+- Tomorrow's date: ${tomorrowFormatted} (${tomorrowDayName})
+- User timezone: ${state.timezone}
+
+CRITICAL TEMPORAL RULES:
+- When user says "tomorrow", they mean ${tomorrowFormatted} in their timezone (${state.timezone})
+- When user says "today", they mean ${todayFormatted} in their timezone
+- ALWAYS create timestamps in user's LOCAL timezone, never UTC
+- Example: "tomorrow at 7pm" = "${tomorrowFormatted}T19:00:00" (no Z suffix!)
 
 COMMUNICATION:
 - Be warm and conversational, not robotic
@@ -321,11 +323,15 @@ When showing events, filter based on user's intent:
 - "This week" → Current week
 - "Next week" → 7-14 days out
 
-TEMPORAL PARSING:
-- "tomorrow morning/afternoon/evening" → 8-12pm / 12-5pm / 5-9pm
-- "next [day]" → next occurrence of that weekday
-- "this weekend" → upcoming Sat/Sun
-- All times are LOCAL timezone, never UTC
+TEMPORAL PARSING EXAMPLES:
+- "tomorrow morning" → ${tomorrowFormatted}T09:00:00 (9am local time)
+- "tomorrow afternoon" → ${tomorrowFormatted}T14:00:00 (2pm local time)
+- "tomorrow at 7pm" → ${tomorrowFormatted}T19:00:00 (7pm local time)
+- "today at 3pm" → ${todayFormatted}T15:00:00 (3pm local time)
+- "next [day]" → next occurrence of that weekday in user's timezone
+- "this weekend" → upcoming Sat/Sun in user's timezone
+- NEVER add 'Z' suffix to timestamps (that means UTC!)
+- NEVER use UTC dates - always use dates shown above in TIME CONTEXT
 
 CRITICAL: WHEN TO CREATE EVENT vs TASK vs GOAL
 
@@ -379,6 +385,25 @@ TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
 - SEARCH/FIND events → search_events with text/category (for viewing only)
 - List range → list_events with dates
 
+CRITICAL: REPLACING/RESCHEDULING EVENTS
+When user wants to cancel an existing event and create a new one in its place:
+- Use create_event with replaceConflicting=true
+- This automatically deletes the conflicting event and creates the new one
+- Examples:
+  * "cancel rehearsal and schedule dinner" → create_event(replaceConflicting=true)
+  * "move the meeting and add workout" → create_event(replaceConflicting=true)
+  * "replace my 3pm with lunch" → create_event(replaceConflicting=true)
+
+DO NOT use replaceConflicting=true if:
+- User is just asking "when can I schedule X?" (they're not explicitly canceling)
+- User says "find time for X" (they want available time, not to replace)
+- No explicit intent to cancel/replace an existing event
+
+If create_event returns "⚠️ Time conflict detected":
+- The event was NOT created (important!)
+- User needs to explicitly say they want to cancel/replace the conflicting event
+- Don't assume - ask them: "You have [X] at that time. Would you like me to cancel it and schedule [Y] instead?"
+
 CATEGORY WORKFLOW (CRITICAL):
 1. ALWAYS call list_categories FIRST before creating events/tasks/goals
 2. For SPECIFIC named entities → create SPECIFIC categories:
@@ -421,6 +446,51 @@ Example: "move all mendicants things to mendicants category" should:
 
 CRITICAL: When searching for items to categorize, NEVER pass the destination category as a filter!
 You're searching for UNcategorized items that CONTAIN the search term, not items already IN that category.
+
+INTELLIGENT EVENT ENRICHMENT WITH WEB SEARCH:
+When creating events with restaurants, venues, or locations mentioned:
+1. Use web_search BEFORE creating the event to gather information:
+   - Search for: "[venue name] [city] address hours contact"
+   - Example: "Flour + Water San Francisco address hours phone"
+2. Extract key details from search results:
+   - Full street address for location field
+   - Phone number and hours for description
+   - Any relevant notes (parking, dress code, etc.)
+3. Populate event with enriched information:
+   - location: Full street address (not just venue name)
+   - description: Include phone, hours, and useful notes
+4. Proactively suggest useful additions:
+   - Travel time buffer before the event
+   - Parking information if relevant
+   - Preparation reminders
+
+WEB SEARCH USE CASES:
+✅ USE web_search for:
+- Restaurant/cafe details (address, hours, phone, menu)
+- Venue information (locations, addresses, directions)
+- Business information (hours, contact, services)
+- Event details (sports games, concerts, showtimes)
+- Current information user explicitly asks about
+- Recommendations when user asks "what's a good..."
+
+❌ DON'T use web_search for:
+- User's personal calendar/task/goal data (use existing tools)
+- Generic time/date calculations
+- Simple event creation without venue details
+- Information already available in conversation context
+
+EXAMPLE WORKFLOW:
+User: "Schedule dinner at Flour + Water tomorrow at 7pm"
+1. web_search("Flour + Water San Francisco address hours phone")
+2. Extract: Address, phone, hours from results
+3. create_event({
+     title: "Dinner at Flour + Water",
+     start_time: "2025-10-28T19:00:00",
+     end_time: "2025-10-28T21:00:00",
+     location: "2401 Harrison St, San Francisco, CA 94110",
+     description: "Italian restaurant • (415) 826-7000 • Hours: 5-10pm"
+   })
+4. Respond: "I've scheduled dinner at Flour + Water for tomorrow at 7pm at 2401 Harrison St. They're open until 10pm. Want me to add travel time?"
 
 Use tools proactively. When user wants multiple events or tasks, create them all using the appropriate tools multiple times.`);
 
