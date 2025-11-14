@@ -298,7 +298,7 @@ export class CategoryService {
       // Check if user already has categories
       const existing = await this.getCategories(userId);
       if (existing.length > 0) {
-        console.log(`⚠️ [CategoryService] User ${userId} already has ${existing.length} categories, skipping defaults`);
+        console.log(`[CategoryService] User ${userId} already has ${existing.length} categories, skipping defaults`);
         return;
       }
 

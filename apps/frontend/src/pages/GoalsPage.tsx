@@ -239,7 +239,7 @@ export default function GoalsPage() {
 
         {/* Long-term Goals Column */}
         <div>
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">🎯 Long-term Goals</h2>
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Long-term Goals</h2>
           <div className="space-y-4">
             {longTermGoals.length === 0 ? (
               <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">

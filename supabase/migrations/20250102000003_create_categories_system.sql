@@ -62,18 +62,18 @@ BEGIN
   INSERT INTO public.categories (user_id, name, color, icon, description, applies_to, display_order)
   VALUES
     -- Core life categories
-    (target_user_id, 'Work', '#3b82f6', '💼', 'Work-related activities', '["events", "tasks", "goals"]', 1),
-    (target_user_id, 'School', '#8b5cf6', '🎓', 'School and education', '["events", "tasks", "goals"]', 2),
-    (target_user_id, 'Health & Hygiene', '#ef4444', '❤️', 'Health, fitness, and personal hygiene', '["events", "tasks", "goals"]', 3),
-    (target_user_id, 'Social', '#f97316', '👥', 'Social activities and relationships', '["events", "tasks"]', 4),
-    (target_user_id, 'Family', '#ec4899', '👨‍👩‍👧‍👦', 'Family time and activities', '["events", "tasks"]', 5),
-    (target_user_id, 'Personal', '#10b981', '🏠', 'Personal errands and tasks', '["events", "tasks", "goals"]', 6),
-    (target_user_id, 'Fitness', '#f59e0b', '🏃', 'Exercise and physical activity', '["events", "tasks", "goals"]', 7),
-    (target_user_id, 'Hobbies', '#06b6d4', '🎨', 'Hobbies and creative pursuits', '["events", "tasks"]', 8),
-    (target_user_id, 'Finance', '#10b981', '💰', 'Financial planning and management', '["events", "tasks", "goals"]', 9),
-    (target_user_id, 'Shopping', '#78716c', '🛒', 'Shopping and errands', '["events", "tasks"]', 10),
-    (target_user_id, 'Travel', '#6366f1', '✈️', 'Travel and trips', '["events", "tasks", "goals"]', 11),
-    (target_user_id, 'Self-Care', '#ec4899', '💆', 'Relaxation and self-care', '["events", "tasks"]', 12)
+    (target_user_id, 'Work', '#3b82f6', NULL, 'Work-related activities', '["events", "tasks", "goals"]', 1),
+    (target_user_id, 'School', '#8b5cf6', NULL, 'School and education', '["events", "tasks", "goals"]', 2),
+    (target_user_id, 'Health & Hygiene', '#ef4444', NULL, 'Health, fitness, and personal hygiene', '["events", "tasks", "goals"]', 3),
+    (target_user_id, 'Social', '#f97316', NULL, 'Social activities and relationships', '["events", "tasks"]', 4),
+    (target_user_id, 'Family', '#ec4899', NULL, 'Family time and activities', '["events", "tasks"]', 5),
+    (target_user_id, 'Personal', '#10b981', NULL, 'Personal errands and tasks', '["events", "tasks", "goals"]', 6),
+    (target_user_id, 'Fitness', '#f59e0b', NULL, 'Exercise and physical activity', '["events", "tasks", "goals"]', 7),
+    (target_user_id, 'Hobbies', '#06b6d4', NULL, 'Hobbies and creative pursuits', '["events", "tasks"]', 8),
+    (target_user_id, 'Finance', '#10b981', NULL, 'Financial planning and management', '["events", "tasks", "goals"]', 9),
+    (target_user_id, 'Shopping', '#78716c', NULL, 'Shopping and errands', '["events", "tasks"]', 10),
+    (target_user_id, 'Travel', '#6366f1', NULL, 'Travel and trips', '["events", "tasks", "goals"]', 11),
+    (target_user_id, 'Self-Care', '#ec4899', NULL, 'Relaxation and self-care', '["events", "tasks"]', 12)
   ON CONFLICT (user_id, name) DO NOTHING;
 END;
 $$ LANGUAGE plpgsql;

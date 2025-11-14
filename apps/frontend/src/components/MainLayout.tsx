@@ -10,11 +10,11 @@ interface MainLayoutProps {
 }
 
 const navItems = [
-  { path: '/calendar', label: 'Calendar', icon: '📅' },
-  { path: '/tasks', label: 'Tasks', icon: '✅' },
-  { path: '/goals', label: 'Goals', icon: '🎯' },
-  { path: '/profile', label: 'Profile', icon: '👤' },
-  { path: '/categories', label: 'Categories', icon: '🏷️' }
+  { path: '/calendar', label: 'Calendar', icon: '' },
+  { path: '/tasks', label: 'Tasks', icon: '' },
+  { path: '/goals', label: 'Goals', icon: '' },
+  { path: '/profile', label: 'Profile', icon: '' },
+  { path: '/categories', label: 'Categories', icon: '' }
 ]
 
 export function MainLayout({ children }: MainLayoutProps) {
@@ -61,7 +61,6 @@ export function MainLayout({ children }: MainLayoutProps) {
         onClose={() => setMobileOpen(false)}
         title={
           <div className="flex items-center gap-2">
-            <span className="text-2xl">✨</span>
             <span className="text-lg font-bold">Navigation</span>
           </div>
         }

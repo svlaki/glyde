@@ -122,7 +122,7 @@ export default function CategoriesPage() {
             onClick={handleCreateClick}
             className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
           >
-            ➕ Create Category
+            Create Category
           </button>
         </div>
 
@@ -176,7 +176,7 @@ function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
       {/* Top content - icon, name, description */}
       <div className="flex-1 flex flex-col items-center justify-center">
         {/* Icon - large and centered */}
-        <div className="text-6xl mb-3">{category.icon || '📁'}</div>
+        <div className="text-6xl mb-3">{category.icon || ''}</div>
 
         {/* Category name */}
         <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2">
@@ -200,7 +200,7 @@ function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
           }}
           className="text-sm text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-md hover:bg-primary/10 transition-all bg-background/80"
         >
-          ✏️ Edit
+          Edit
         </button>
         <button
           onClick={(e) => {
@@ -209,7 +209,7 @@ function CategoryCard({ category, onEdit, onDelete }: CategoryCardProps) {
           }}
           className="text-sm text-red-500 hover:text-red-600 font-semibold px-3 py-1.5 rounded-md hover:bg-red-500/10 transition-all bg-background/80"
         >
-          🗑️ Delete
+          Delete
         </button>
       </div>
     </div>
@@ -266,7 +266,7 @@ function CategoryModal({ isOpen, onClose, category, onSave }: CategoryModalProps
       <DialogContent className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-foreground">
-            {category ? '✏️ Edit Category' : '➕ Create Category'}
+            {category ? 'Edit Category' : 'Create Category'}
           </DialogTitle>
         </DialogHeader>
 

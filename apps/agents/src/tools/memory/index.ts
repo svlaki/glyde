@@ -1,34 +1,28 @@
 /**
- * Memory Tools - Zep v3 Dual-Graph Knowledge System
+ * Memory Tools - Zep v3 Dual-Graph Knowledge System (Consolidated)
  *
- * Tools for searching and managing:
+ * Unified tools for searching and managing:
  * - User Graphs: Personal behavioral patterns, preferences, and history
  * - Central Graph: Cross-user insights and community patterns
+ *
+ * Tool Consolidation (Nov 2024):
+ * - 4 separate search tools → 1 unified search-memory-unified
+ * - 2 separate pattern tools → 1 unified manage-patterns
+ * - Added update-memory-advanced for proactive memory persistence (Jan 2025)
  */
 
-// Search tools
-export { searchMemoryTool } from './search-memory.js';
-export { searchUserMemoryTool } from './search-user-memory.js';
-export { searchUserGraphTool } from './search-user-graph.js';
-export { searchGroupPatternsTool } from './search-group-patterns.js';
+// Unified search tool (consolidates: search-memory, search-user-memory, search-user-graph, search-group-patterns)
+export { searchMemoryUnifiedTool } from './search-memory-unified.js';
 
-// Add/update tools
-export { addUserPatternTool } from './add-user-pattern.js';
-export { addCommunityPatternTool } from './add-community-pattern.js';
+// Unified pattern management (consolidates: add-user-pattern, add-community-pattern)
+export { managePatternsTool } from './manage-patterns.js';
+
+// Advanced memory update tool (proactive persistence with rich metadata)
+export { updateMemoryAdvancedTool } from './update-memory-advanced.js';
 
 // Export as collection for easy registration
 export const memoryTools = [
-  // Unified memory search (thread.get_user_context)
-  (await import('./search-user-memory.js')).searchUserMemoryTool,
-
-  // Legacy conversation memory search (threads)
-  (await import('./search-memory.js')).searchMemoryTool,
-
-  // Graph-based memory tools
-  (await import('./search-user-graph.js')).searchUserGraphTool,
-  (await import('./search-group-patterns.js')).searchGroupPatternsTool,
-
-  // Pattern management tools
-  (await import('./add-user-pattern.js')).addUserPatternTool,
-  (await import('./add-community-pattern.js')).addCommunityPatternTool,
+  (await import('./search-memory-unified.js')).searchMemoryUnifiedTool,
+  (await import('./manage-patterns.js')).managePatternsTool,
+  (await import('./update-memory-advanced.js')).updateMemoryAdvancedTool,
 ];

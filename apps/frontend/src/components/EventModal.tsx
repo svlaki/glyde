@@ -187,7 +187,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
       <DialogContent className="sm:max-w-md w-full max-h-[85vh] overflow-y-auto bg-card border border-border shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-foreground">
-            {event ? '✏️ Edit Event' : '➕ Create Event'}
+            {event ? 'Edit Event' : 'Create Event'}
           </DialogTitle>
         </DialogHeader>
 
@@ -205,7 +205,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span role="img" aria-hidden>📅</span> Date
+              Date
             </label>
             <Input
               type="date"
@@ -218,7 +218,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span role="img" aria-hidden>🕐</span> Start Time
+                Start Time
               </label>
               <Input
                 type="time"
@@ -229,7 +229,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
             </div>
             <div className="space-y-2">
               <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <span role="img" aria-hidden>🕐</span> End Time
+                End Time
               </label>
               <Input
                 type="time"
@@ -242,7 +242,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span role="img" aria-hidden>📝</span> Description
+              Description
             </label>
             <textarea
               placeholder="Add event details..."
@@ -255,7 +255,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span role="img" aria-hidden>🏷️</span> Category
+              Category
             </label>
             <select
               value={category}
@@ -285,7 +285,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
                 onClick={handleDelete}
                 className="h-11 px-6 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
               >
-                🗑️ Delete
+                Delete
               </Button>
             )}
           </div>
@@ -301,7 +301,7 @@ export function EventModal({ isOpen, onClose, event, date, onSave, user, toast }
               onClick={handleSave}
               className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg transition-all shadow-sm hover:shadow-md"
             >
-              {event ? '💾 Save' : '➕ Create'}
+              {event ? 'Save' : 'Create'}
             </Button>
           </div>
         </DialogFooter>

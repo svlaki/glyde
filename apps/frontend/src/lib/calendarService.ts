@@ -11,8 +11,14 @@ export interface CalendarEvent {
   description?: string
   created_at?: string
   updated_at?: string
+  // Old category fields (deprecated but kept for backward compatibility)
   category?: string
   color?: string
+  // New category fields from unified category system
+  category_id?: string
+  category_name?: string
+  category_color?: string
+  category_icon?: string
 }
 
 /**

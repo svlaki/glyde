@@ -6,9 +6,15 @@ export interface DatabaseEvent {
   start_time: string;
   end_time: string;
   location?: string;
-  category?: string;
+  category?: string;  // For backward compatibility
   created_at: string;
   updated_at: string;
+
+  // Extended category fields (populated by get_events_with_categories RPC)
+  category_id?: string;
+  category_name?: string;
+  category_color?: string;
+  category_icon?: string;
 }
 
 export interface DatabaseCategory {

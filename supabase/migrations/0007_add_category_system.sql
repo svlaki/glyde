@@ -34,11 +34,11 @@ ADD COLUMN IF NOT EXISTS energy_required TEXT CHECK (energy_required IN ('low', 
 
 -- Insert default system categories
 INSERT INTO public.categories (name, type, color, icon, display_order) VALUES
-  ('Work', 'system', '#3B82F6', '💼', 1),
-  ('Health', 'system', '#10B981', '💪', 2),
-  ('Personal', 'system', '#8B5CF6', '👤', 3),
-  ('Learning', 'system', '#F59E0B', '📚', 4),
-  ('Finance', 'system', '#EF4444', '💰', 5)
+  ('Work', 'system', '#3B82F6', NULL, 1),
+  ('Health', 'system', '#10B981', NULL, 2),
+  ('Personal', 'system', '#8B5CF6', NULL, 3),
+  ('Learning', 'system', '#F59E0B', NULL, 4),
+  ('Finance', 'system', '#EF4444', NULL, 5)
 ON CONFLICT DO NOTHING;
 
 -- Insert subcategories for Work
@@ -51,11 +51,11 @@ SELECT
   subcategory.icon,
   subcategory.display_order
 FROM (
-  VALUES 
-    ('Meeting', '#60A5FA', '🤝', 1),
-    ('Deep Work', '#2563EB', '🎯', 2),
-    ('Project', '#1E40AF', '📊', 3),
-    ('Deadline', '#DC2626', '⏰', 4)
+  VALUES
+    ('Meeting', '#60A5FA', NULL, 1),
+    ('Deep Work', '#2563EB', NULL, 2),
+    ('Project', '#1E40AF', NULL, 3),
+    ('Deadline', '#DC2626', NULL, 4)
 ) AS subcategory(name, color, icon, display_order)
 CROSS JOIN public.categories parent
 WHERE parent.name = 'Work' AND parent.parent_id IS NULL;
@@ -70,11 +70,11 @@ SELECT
   subcategory.icon,
   subcategory.display_order
 FROM (
-  VALUES 
-    ('Exercise', '#34D399', '🏃', 1),
-    ('Medical', '#059669', '🏥', 2),
-    ('Wellness', '#6EE7B7', '🧘', 3),
-    ('Nutrition', '#10B981', '🥗', 4)
+  VALUES
+    ('Exercise', '#34D399', NULL, 1),
+    ('Medical', '#059669', NULL, 2),
+    ('Wellness', '#6EE7B7', NULL, 3),
+    ('Nutrition', '#10B981', NULL, 4)
 ) AS subcategory(name, color, icon, display_order)
 CROSS JOIN public.categories parent
 WHERE parent.name = 'Health' AND parent.parent_id IS NULL;
@@ -89,11 +89,11 @@ SELECT
   subcategory.icon,
   subcategory.display_order
 FROM (
-  VALUES 
-    ('Family', '#A78BFA', '👨‍👩‍👧‍👦', 1),
-    ('Social', '#C084FC', '👥', 2),
-    ('Hobbies', '#9333EA', '🎨', 3),
-    ('Entertainment', '#7C3AED', '🎭', 4)
+  VALUES
+    ('Family', '#A78BFA', NULL, 1),
+    ('Social', '#C084FC', NULL, 2),
+    ('Hobbies', '#9333EA', NULL, 3),
+    ('Entertainment', '#7C3AED', NULL, 4)
 ) AS subcategory(name, color, icon, display_order)
 CROSS JOIN public.categories parent
 WHERE parent.name = 'Personal' AND parent.parent_id IS NULL;

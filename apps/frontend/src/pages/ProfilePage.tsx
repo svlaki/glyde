@@ -8,42 +8,42 @@ const PROFILE_SECTIONS = [
   {
     key: 'values',
     label: 'Values & Beliefs',
-    icon: '🌟',
+    icon: '',
     description: 'Your core values, life principles, and what matters most to you',
     isJsonb: true
   },
   {
     key: 'preferences',
     label: 'Preferences',
-    icon: '⚙️',
+    icon: '',
     description: 'How you like things done, work environment, communication style',
     isJsonb: true
   },
   {
     key: 'work_patterns',
     label: 'Work Patterns',
-    icon: '💼',
+    icon: '',
     description: 'Productivity habits, peak hours, work style, focus patterns',
     isJsonb: true
   },
   {
     key: 'personality_traits',
     label: 'Personality & Traits',
-    icon: '🧠',
+    icon: '',
     description: 'Communication style, OCEAN traits, how you approach problems',
     isJsonb: true
   },
   {
     key: 'context_data',
     label: 'Additional Context',
-    icon: '📋',
+    icon: '',
     description: 'Any other context that helps the AI understand you better',
     isJsonb: true
   },
   {
     key: 'goals_summary',
     label: 'Goals Summary',
-    icon: '🎯',
+    icon: '',
     description: 'High-level overview of your goals and aspirations',
     isJsonb: false // This is TEXT, not JSONB
   }
@@ -344,7 +344,7 @@ function SectionEditModal({
                           variant="light"
                           onClick={() => handleEdit(key, value)}
                         >
-                          ✏️ Edit
+                          Edit
                         </Button>
                         <Button
                           size="xs"
@@ -352,7 +352,7 @@ function SectionEditModal({
                           color="red"
                           onClick={() => handleDeleteField(key)}
                         >
-                          🗑️
+                          Delete
                         </Button>
                       </>
                     )}

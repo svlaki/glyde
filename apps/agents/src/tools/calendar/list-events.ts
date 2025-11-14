@@ -4,7 +4,7 @@ import { SupabaseService } from "../../services/SupabaseService.js";
 import { formatEventTime } from "../../utils/timezoneUtils.js";
 
 export const listEventsTool = tool(
-  async ({ startDate, endDate, limit }, config) => {
+  async ({ startDate, endDate, limit, includePast }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
     const effectiveLimit = limit ?? 20;
@@ -16,6 +16,8 @@ export const listEventsTool = tool(
       throw new Error("Timezone is required for listing events");
     }
 
+    console.log('📋 [LIST-EVENTS TOOL] Listing events:', { startDate, endDate, limit: effectiveLimit, includePast });
+
     // Initialize service
     const supabaseService = new SupabaseService();
 
@@ -25,6 +27,13 @@ export const listEventsTool = tool(
       events = await supabaseService.getEvents(userId, startDate, endDate);
     } else {
       events = await supabaseService.getEvents(userId);
+
+      // Filter out past events unless includePast is true (includes ongoing multi-day events)
+      if (!includePast) {
+        const now = new Date();
+        events = events.filter((event: any) => new Date(event.end_time) >= now);
+        console.log(`📋 [LIST-EVENTS TOOL] Filtered to ${events.length} future/ongoing events`);
+      }
     }
 
     if (events.length === 0) {
@@ -50,11 +59,12 @@ export const listEventsTool = tool(
   },
   {
     name: "list_events",
-    description: "List calendar events, optionally filtered by date range. Shows events in chronological order.",
+    description: "List calendar events, optionally filtered by date range. By default shows only future/ongoing events when no date range specified. Use includePast=true to show historical events. Shows events in chronological order.",
     schema: z.object({
       startDate: z.string().nullable().describe("Start date for filtering events (ISO format)"),
       endDate: z.string().nullable().describe("End date for filtering events (ISO format)"),
       limit: z.number().nullable().optional().describe("Maximum number of events to return (default: 20)"),
+      includePast: z.boolean().optional().describe("Optional: Set to true to include past events when no date range specified. Default is false (only future/ongoing events). Use true when user asks about history."),
     }),
   }
 );

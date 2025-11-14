@@ -21,11 +21,11 @@ import { Drawer, Button as MantineButton, NavLink, Divider, Menu } from '@mantin
 import { Link, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { path: '/calendar', label: 'Calendar', icon: '📅' },
-  { path: '/tasks', label: 'Tasks', icon: '✅' },
-  { path: '/goals', label: 'Goals', icon: '🎯' },
-  { path: '/profile', label: 'Profile', icon: '👤' },
-  { path: '/categories', label: 'Categories', icon: '🏷️' }
+  { path: '/calendar', label: 'Calendar', icon: '' },
+  { path: '/tasks', label: 'Tasks', icon: '' },
+  { path: '/goals', label: 'Goals', icon: '' },
+  { path: '/profile', label: 'Profile', icon: '' },
+  { path: '/categories', label: 'Categories', icon: '' }
 ];
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000';
@@ -499,7 +499,6 @@ export function CalendarPage() {
 
                       {task.due_date && (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <span>📅</span>
                           <span>{new Date(task.due_date).toLocaleDateString()}</span>
                         </div>
                       )}
@@ -750,7 +749,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
       >
         <DialogHeader className="space-y-1 pb-2">
           <DialogTitle className="text-2xl font-bold text-foreground">
-            {event ? '✏️ Edit Event' : '➕ Create Event'}
+            {event ? 'Edit Event' : 'Create Event'}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
             {event ? 'Refresh the details of your existing event with a cleaner, more focused layout.' : 'Craft a new calendar event with thoughtfully spaced inputs for easier scanning.'}
@@ -773,7 +772,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span>📅</span> Date
+              Date
             </label>
             <Input
               type="date"
@@ -823,7 +822,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <span>🏷️</span> Category
+              Category
             </label>
             <select
               value={category}
@@ -855,7 +854,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
                 onClick={handleDelete}
                 className="h-11 rounded-2xl border border-destructive/30 bg-destructive px-6 font-semibold text-destructive-foreground shadow-sm transition-all hover:bg-destructive/90 hover:shadow-md"
               >
-                🗑️ Delete
+                Delete
               </Button>
             )}
           </div>
@@ -871,7 +870,7 @@ function EventModal({ isOpen, onClose, event, date, onSave, user, toast, userTim
               onClick={handleSave}
               className="h-11 rounded-2xl border border-primary/40 bg-primary px-6 font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 hover:shadow-md"
             >
-              {event ? '💾 Save' : '➕ Create'}
+              {event ? 'Save' : 'Create'}
             </Button>
           </div>
         </DialogFooter>

@@ -120,7 +120,7 @@ export class EntityMappingService {
       }
 
       if (!data || data.length === 0) {
-        console.warn(`⚠️ [EntityMappingService] No existing mapping found to update: ${entityType}:${entityId}`);
+        console.warn(`[EntityMappingService] No existing mapping found to update: ${entityType}:${entityId}`);
       } else {
         console.log(`🔄 [EntityMappingService] Updated mapping: ${entityType}:${entityId} -> ${newGraphUuid}`);
       }
@@ -148,9 +148,9 @@ export class EntityMappingService {
       }
 
       if (!data || data.length === 0) {
-        console.warn(`⚠️ [EntityMappingService] No mapping found to delete: ${entityType}:${entityId}`);
+        console.warn(`[EntityMappingService] No mapping found to delete: ${entityType}:${entityId}`);
       } else {
-        console.log(`🗑️ [EntityMappingService] Deleted mapping: ${entityType}:${entityId}`);
+        console.log(`[EntityMappingService] Deleted mapping: ${entityType}:${entityId}`);
       }
     } catch (error) {
       console.error('❌ [EntityMappingService] Failed to delete mapping:', error);
@@ -183,7 +183,7 @@ export class EntityMappingService {
         updatedAt: row.updated_at
       }));
 
-      console.log(`📊 [EntityMappingService] Found ${mappings.length} mappings for user ${userId}`);
+      console.log(`[EntityMappingService] Found ${mappings.length} mappings for user ${userId}`);
       return mappings;
     } catch (error) {
       console.error('❌ [EntityMappingService] Failed to get user mappings:', error);
@@ -208,7 +208,7 @@ export class EntityMappingService {
       }
 
       const deletedCount = data?.length || 0;
-      console.log(`🧹 [EntityMappingService] Cleaned up ${deletedCount} mappings for user ${userId}`);
+      console.log(`[EntityMappingService] Cleaned up ${deletedCount} mappings for user ${userId}`);
     } catch (error) {
       console.error('❌ [EntityMappingService] Failed to cleanup user mappings:', error);
       throw error;

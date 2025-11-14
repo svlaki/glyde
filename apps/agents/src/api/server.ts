@@ -39,7 +39,6 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions, triggerProactiveAgent } from './interactions.js';
 import { processAgentMessage, addStartTime } from './agent.js';
-import { generateInteractionFromChat } from './chat-interactions.js';
 import { authenticateRequest } from './middleware/auth.js';
 
 const app = express();
@@ -258,9 +257,6 @@ app.post('/api/interactions/clear', clearUserInteractions);
 
 // Manual trigger for proactive agent
 app.post('/api/agents/proactive/run', triggerProactiveAgent);
-
-// Intelligent interactions
-app.post('/api/interactions/from-chat', generateInteractionFromChat);
 
 // Chat endpoints
 app.post('/api/chat/history', async (req, res) => {

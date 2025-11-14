@@ -37,6 +37,47 @@ export class SupabaseService {
     return 'public';
   }
 
+  /**
+   * Helper: Resolve category_id from either category_id or category name
+   * Eliminates 60+ lines of duplicate code across 6 methods
+   */
+  private async resolveCategoryId(userId: string, category?: string, category_id?: string): Promise<string | null> {
+    if (category_id) return category_id;
+    if (!category) return null;
+
+    const { data } = await this.client
+      .from('categories')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('name', category)
+      .single();
+
+    return data?.id || null;
+  }
+
+  /**
+   * Helper: Generic delete operation with consistent error handling
+   */
+  private async deleteRecord(table: string, userId: string, recordId: string, entityName: string): Promise<{ success: boolean, error: string | null }> {
+    try {
+      const { error } = await this.client
+        .from(table)
+        .delete()
+        .eq('id', recordId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error(`Error deleting ${entityName}:`, error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error(`Exception deleting ${entityName}:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
     const { data, error } = await this.client
       .from('profile')
@@ -56,7 +97,7 @@ export class SupabaseService {
   // DEPRECATED: Use getEvents() instead. This method is no longer needed.
   // Timezone conversion should happen in the Agent layer, not the Service layer.
   async getEventsForAgent(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
-    console.warn('⚠️ getEventsForAgent is deprecated. Use getEvents() instead.');
+    console.warn('getEventsForAgent is deprecated. Use getEvents() instead.');
     return this.getEvents(userId, startDate, endDate);
   }
 
@@ -110,8 +151,6 @@ export class SupabaseService {
   // NO timezone conversion - caller must provide UTC times
   async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
-      console.log('🔧 [SUPABASE SERVICE] Creating event for user:', userId);
-
       // Extract event data - times should already be in UTC
       const title = event.title || 'Untitled Event';
       const description = event.description || null;
@@ -119,20 +158,8 @@ export class SupabaseService {
       const startTime = event.start_time || new Date().toISOString();
       const endTime = event.end_time || new Date().toISOString();
 
-      // Handle category - prefer category_id, fallback to category name lookup
-      let categoryId = event.category_id || null;
-      
-      if (!categoryId && event.category) {
-        // Look up category by name
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', event.category)
-          .single();
-        
-        categoryId = categoryData?.id || null;
-      }
+      // Handle category using helper method
+      const categoryId = await this.resolveCategoryId(userId, event.category, event.category_id);
 
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -155,8 +182,6 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event created:', data.id);
-
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
       const createdEvent = eventsWithCategories.find(e => e.id === data.id);
@@ -172,10 +197,6 @@ export class SupabaseService {
   // NO timezone conversion - caller must provide UTC times
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
-      console.log('🔧 [SUPABASE SERVICE] Updating event for user:', userId);
-      console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
-      console.log('🔍 [SUPABASE SERVICE] Updates (must be UTC):', JSON.stringify(updates, null, 2));
-
       // Build update object with only provided fields
       // Note: start_time and end_time must already be in UTC format from caller
       const updateData: any = {
@@ -192,23 +213,10 @@ export class SupabaseService {
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
       
-      // Handle category - prefer category_id, fallback to category name lookup
-      if (updates.category_id !== undefined) {
-        updateData.category_id = updates.category_id;
-      } else if (updates.category !== undefined) {
-        updateData.category = updates.category; // Keep for backward compatibility
-        
-        // Look up category by name to set category_id
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', updates.category)
-          .single();
-        
-        if (categoryData?.id) {
-          updateData.category_id = categoryData.id;
-        }
+      // Handle category using helper method
+      if (updates.category_id !== undefined || updates.category !== undefined) {
+        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
+        if (updates.category) updateData.category = updates.category; // Backward compatibility
       }
 
       // Update in public schema (RLS handles user filtering)
@@ -225,8 +233,6 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('✅ [SUPABASE SERVICE] Event updated successfully');
-
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId);
       const updatedEvent = eventsWithCategories.find(e => e.id === eventId);
@@ -239,28 +245,7 @@ export class SupabaseService {
   }
 
   async deleteEvent(userId: string, eventId: string): Promise<{ success: boolean, error: string | null }> {
-    try {
-      console.log('🗑️ [SUPABASE SERVICE] Deleting event for user:', userId);
-      console.log('🔍 [SUPABASE SERVICE] Event ID:', eventId);
-
-      // Delete from public schema (RLS handles user filtering)
-      const { error } = await this.client
-        .from('events')
-        .delete()
-        .eq('id', eventId)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('Error deleting event:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ [SUPABASE SERVICE] Event deleted successfully');
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('Exception deleting event:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
+    return this.deleteRecord('events', userId, eventId, 'event');
   }
 
   // ============================================================================
@@ -286,22 +271,8 @@ export class SupabaseService {
     recurringPattern?: Record<string, any>;
   }): Promise<any> {
     try {
-      console.log('📝 [SUPABASE SERVICE] Creating task for user:', userId);
-
-      // Handle category - prefer category_id, fallback to category name lookup
-      let categoryId = taskData.category_id || null;
-      
-      if (!categoryId && taskData.category) {
-        // Look up category by name
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', taskData.category)
-          .single();
-        
-        categoryId = categoryData?.id || null;
-      }
+      // Handle category using helper method
+      const categoryId = await this.resolveCategoryId(userId, taskData.category, taskData.category_id);
 
       const { data, error } = await this.client
         .from('tasks')
@@ -445,7 +416,7 @@ export class SupabaseService {
 
       if (error) {
         if (error.code === '23505') {
-          console.warn('⚠️ [SUPABASE SERVICE] Duplicate interaction ignored:', interaction.question);
+          console.warn('[SUPABASE SERVICE] Duplicate interaction ignored:', interaction.question);
           return null;
         }
 
@@ -709,23 +680,10 @@ export class SupabaseService {
       if (updates.completionNotes !== undefined) updateData.completion_notes = updates.completionNotes;
       if (updates.recurringPattern !== undefined) updateData.recurring_pattern = updates.recurringPattern;
 
-      // Handle category - prefer category_id, fallback to category name lookup
-      if (updates.category_id !== undefined) {
-        updateData.category_id = updates.category_id;
-      } else if (updates.category !== undefined) {
-        updateData.category = updates.category; // Keep for backward compatibility
-        
-        // Look up category by name to set category_id
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', updates.category)
-          .single();
-        
-        if (categoryData?.id) {
-          updateData.category_id = categoryData.id;
-        }
+      // Handle category using helper method
+      if (updates.category_id !== undefined || updates.category !== undefined) {
+        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
+        if (updates.category) updateData.category = updates.category; // Backward compatibility
       }
 
       const { data, error } = await this.client
@@ -753,26 +711,7 @@ export class SupabaseService {
    * Delete a task
    */
   async deleteTask(userId: string, taskId: string): Promise<{ success: boolean, error: string | null }> {
-    try {
-      console.log('🗑️ [SUPABASE SERVICE] Deleting task:', taskId);
-
-      const { error } = await this.client
-        .from('tasks')
-        .delete()
-        .eq('id', taskId)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error deleting task:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ [SUPABASE SERVICE] Task deleted:', taskId);
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception deleting task:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
+    return this.deleteRecord('tasks', userId, taskId, 'task');
   }
 
   /**
@@ -780,8 +719,6 @@ export class SupabaseService {
    */
   async completeTask(userId: string, taskId: string, notes?: string, actualDuration?: number): Promise<any> {
     try {
-      console.log('✅ [SUPABASE SERVICE] Completing task:', taskId);
-
       const updateData: any = {
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -839,22 +776,10 @@ export class SupabaseService {
     reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
   }): Promise<any> {
     try {
-      console.log('🎯 [SUPABASE SERVICE] Creating goal for user:', userId);
+      console.log('[SUPABASE SERVICE] Creating goal for user:', userId);
 
-      // Handle category - prefer category_id, fallback to category name lookup
-      let categoryId = goalData.category_id || null;
-      
-      if (!categoryId && goalData.category) {
-        // Look up category by name
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', goalData.category)
-          .single();
-        
-        categoryId = categoryData?.id || null;
-      }
+      // Handle category using helper method
+      const categoryId = await this.resolveCategoryId(userId, goalData.category, goalData.category_id);
 
       const { data, error } = await this.client
         .from('goals')
@@ -906,8 +831,6 @@ export class SupabaseService {
     targetAfter?: string;
   }): Promise<any[]> {
     try {
-      console.log('🔍 [SUPABASE SERVICE] Getting goals for user:', userId, 'with filters:', filters);
-
       // Use the new function that joins category data
       const { data, error } = await this.client
         .rpc('get_goals_with_categories', {
@@ -1005,23 +928,10 @@ export class SupabaseService {
       if (updates.energyRequirement !== undefined) updateData.energy_requirement = updates.energyRequirement;
       if (updates.reviewFrequency !== undefined) updateData.review_frequency = updates.reviewFrequency;
 
-      // Handle category - prefer category_id, fallback to category name lookup
-      if (updates.category_id !== undefined) {
-        updateData.category_id = updates.category_id;
-      } else if (updates.category !== undefined) {
-        updateData.category = updates.category; // Keep for backward compatibility
-        
-        // Look up category by name to set category_id
-        const { data: categoryData } = await this.client
-          .from('categories')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('name', updates.category)
-          .single();
-        
-        if (categoryData?.id) {
-          updateData.category_id = categoryData.id;
-        }
+      // Handle category using helper method
+      if (updates.category_id !== undefined || updates.category !== undefined) {
+        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
+        if (updates.category) updateData.category = updates.category; // Backward compatibility
       }
 
       const { data, error } = await this.client
@@ -1049,26 +959,7 @@ export class SupabaseService {
    * Delete a goal
    */
   async deleteGoal(userId: string, goalId: string): Promise<{ success: boolean, error: string | null }> {
-    try {
-      console.log('🗑️ [SUPABASE SERVICE] Deleting goal:', goalId);
-
-      const { error } = await this.client
-        .from('goals')
-        .delete()
-        .eq('id', goalId)
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error deleting goal:', error);
-        return { success: false, error: error.message };
-      }
-
-      console.log('✅ [SUPABASE SERVICE] Goal deleted:', goalId);
-      return { success: true, error: null };
-    } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception deleting goal:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
+    return this.deleteRecord('goals', userId, goalId, 'goal');
   }
 
   /**

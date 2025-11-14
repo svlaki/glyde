@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS public.event_archetypes (
 
 -- Insert default archetypes
 INSERT INTO public.event_archetypes (id, name, description, default_color, icon, schema) VALUES
-('generic', 'Generic', 'Default event type', '#6B7280', '📅', '{}'),
-('workout', 'Workout', 'Exercise and fitness activities', '#EF4444', '💪', '{
+('generic', 'Generic', 'Default event type', '#6B7280', NULL, '{}'),
+('workout', 'Workout', 'Exercise and fitness activities', '#EF4444', NULL, '{
     "type": "object",
     "properties": {
         "exercises": {
@@ -35,7 +35,7 @@ INSERT INTO public.event_archetypes (id, name, description, default_color, icon,
         }
     }
 }'),
-('grocery', 'Grocery Run', 'Shopping and errands', '#10B981', '🛒', '{
+('grocery', 'Grocery Run', 'Shopping and errands', '#10B981', NULL, '{
     "type": "object",
     "properties": {
         "items": {
@@ -51,7 +51,7 @@ INSERT INTO public.event_archetypes (id, name, description, default_color, icon,
         }
     }
 }'),
-('meeting', 'Meeting', 'Professional meetings and calls', '#3B82F6', '👥', '{
+('meeting', 'Meeting', 'Professional meetings and calls', '#3B82F6', NULL, '{
     "type": "object",
     "properties": {
         "attendees": {
@@ -62,7 +62,7 @@ INSERT INTO public.event_archetypes (id, name, description, default_color, icon,
         "meeting_link": {"type": "string"}
     }
 }'),
-('appointment', 'Appointment', 'Medical, professional appointments', '#059669', '📋', '{
+('appointment', 'Appointment', 'Medical, professional appointments', '#059669', NULL, '{
     "type": "object",
     "properties": {
         "provider": {"type": "string"},
@@ -70,7 +70,7 @@ INSERT INTO public.event_archetypes (id, name, description, default_color, icon,
         "location": {"type": "string"}
     }
 }'),
-('travel', 'Travel', 'Transportation and travel plans', '#8B5CF6', '✈️', '{
+('travel', 'Travel', 'Transportation and travel plans', '#8B5CF6', NULL, '{
     "type": "object",
     "properties": {
         "destination": {"type": "string"},
@@ -78,13 +78,13 @@ INSERT INTO public.event_archetypes (id, name, description, default_color, icon,
         "transport": {"type": "string"}
     }
 }'),
-('personal', 'Personal', 'Personal activities and self-care', '#F472B6', '🏠', '{
+('personal', 'Personal', 'Personal activities and self-care', '#F472B6', NULL, '{
     "type": "object",
     "properties": {
         "notes": {"type": "string"}
     }
 }'),
-('work_focus', 'Work Focus', 'Deep work and focused tasks', '#F59E0B', '⚡', '{
+('work_focus', 'Work Focus', 'Deep work and focused tasks', '#F59E0B', NULL, '{
     "type": "object",
     "properties": {
         "tasks": {

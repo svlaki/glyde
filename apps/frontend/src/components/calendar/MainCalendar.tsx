@@ -18,7 +18,6 @@ import enUS from 'date-fns/locale/en-US';
 import { toZonedTime } from 'date-fns-tz';
 
 import type { ExtendedCalendarEvent } from '@/types/calendar';
-import { getCategoryColor } from '@/lib/calendarCategories';
 
 const locales = { 'en-US': enUS } as const;
 
@@ -186,8 +185,9 @@ export function MainCalendar({
   }, []);
 
   const eventPropGetter = useCallback((event: CalendarEventWithDates) => {
-    const fallbackColor = getCategoryColor(event.category);
-    const baseColor = event.color ?? fallbackColor;
+    // Use category_color from the backend (joined from categories table)
+    // Fallback to event.color for backward compatibility
+    const baseColor = event.category_color ?? event.color ?? '#6B7280';
     const textColor = event.textColor ?? toReadableTextColor(baseColor);
 
     return {
@@ -197,7 +197,7 @@ export function MainCalendar({
         color: textColor,
       },
     };
-  }, []);
+  }, []);;
 
   const components = useMemo(() => ({
     event: CustomEvent,

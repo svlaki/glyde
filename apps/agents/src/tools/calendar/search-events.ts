@@ -4,7 +4,7 @@ import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const searchEventsTool = tool(
-  async ({ query, category, limit }, config) => {
+  async ({ query, category, limit, includePast }, config) => {
     const userId = config?.configurable?.userId;
     const effectiveLimit = limit ?? 10;
 
@@ -12,11 +12,18 @@ export const searchEventsTool = tool(
       throw new Error("User ID is required for searching events");
     }
 
-    console.log('🔍 [SEARCH-EVENTS TOOL] Agent-based search:', { query, category, limit: effectiveLimit });
+    console.log('🔍 [SEARCH-EVENTS TOOL] Agent-based search:', { query, category, limit: effectiveLimit, includePast });
 
     try {
       const supabaseService = new SupabaseService();
       let events = await supabaseService.getEvents(userId);
+
+      // Filter out past events unless includePast is true (includes ongoing multi-day events)
+      if (!includePast) {
+        const now = new Date();
+        events = events.filter((event: any) => new Date(event.end_time) >= now);
+        console.log(`🔍 [SEARCH-EVENTS TOOL] Filtered to ${events.length} future/ongoing events`);
+      }
 
       // Apply category filter if specified (case-insensitive, strips emoji icons)
       if (category) {
@@ -53,11 +60,12 @@ export const searchEventsTool = tool(
   },
   {
     name: "search_events",
-    description: "Search for calendar events. Returns all events (optionally filtered by category) and relies on the agent to semantically match them to the search query.",
+    description: "Search for calendar events. By default shows only future/ongoing events. Use includePast=true to search historical events. Returns events (optionally filtered by category) and relies on the agent to semantically match them to the search query.",
     schema: z.object({
       query: z.string().describe("Search query to find events. The agent will semantically match this against event titles, descriptions, and context."),
       category: z.string().nullable().describe("Optional: Filter by specific category first. Examples: 'Work', 'School', 'Health & Hygiene', 'Social', 'Fitness'."),
       limit: z.number().nullable().optional().describe("Maximum number of results to return (default: 10)"),
+      includePast: z.boolean().optional().describe("Optional: Set to true to include past events in search. Default is false (only future/ongoing events). Use true when user asks about history like 'What did I do last week?'"),
     }),
   }
 );
