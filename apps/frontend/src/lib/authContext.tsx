@@ -8,7 +8,11 @@ interface AuthContextValue {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  loading: boolean
   session: Session | null
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<void>
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -73,7 +77,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Schema creation is no longer needed - using public tables with RLS
   function callUserSchemaCreation(session: Session) {
     // No-op: User schemas are deprecated in favor of public tables with RLS
-    console.log('✅ User authenticated - using public tables with RLS');
+    console.log('User authenticated - using public tables with RLS');
+  }
+
+  async function signIn(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+  }
+
+  async function signUp(email: string, password: string) {
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) throw error
+  }
+
+  async function signInWithGoogle() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/calendar`
+      }
+    })
+    if (error) throw error
   }
 
   async function signOut() {
@@ -87,7 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const value: AuthContextValue = { user, isAuthenticated, isLoading, session, signOut }
+  const value: AuthContextValue = {
+    user,
+    isAuthenticated,
+    isLoading,
+    loading: isLoading,
+    session,
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut
+  }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

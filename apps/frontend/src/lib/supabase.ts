@@ -13,6 +13,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     debug: true,
     persistSession: true,
     autoRefreshToken: true
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  },
+  global: {
+    headers: {
+      'x-client-info': 'glyde-calendar'
+    }
   }
 })
 

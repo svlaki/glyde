@@ -1,251 +1,166 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState } from 'react'
 import { useAuth } from '../lib/authContext'
-import { Card } from '../components/ui/card'
-import { Input } from '../components/ui/input'
-import { Button } from '../components/ui/button'
-import * as Switch from '@radix-ui/react-switch'
-import clsx from 'clsx'
-import { useNavigate } from 'react-router-dom'
 
 export function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [darkMode, setDarkMode] = useState(
-    typeof window !== 'undefined' ? document.documentElement.classList.contains('dark') : false
-  )
-  const { isAuthenticated, isLoading } = useAuth()
-  const navigate = useNavigate()
+  const [error, setError] = useState('')
+  const { signIn, signUp, signInWithGoogle } = useAuth()
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode)
-  }, [darkMode])
-
-  // Redirect to calendar if already authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      navigate('/calendar')
-    }
-  }, [isAuthenticated, isLoading, navigate])
-
-  function toggleDarkMode() {
-    setDarkMode(prev => !prev)
-  }
-
-  async function handleSignIn() {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
-    setError(null)
-    setMessage(null)
+    setError('')
+
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (signInError) {
-        console.error('❌ [AUTH] SignIn error:', signInError)
-        setError(signInError.message)
-      }
-      // No redirect here - the auth state change will trigger the redirect
-    } catch (err) {
-      console.error('❌ [AUTH] SignIn catch block error:', err)
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleSignUp() {
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
-
-      if (signUpError) {
-        console.error('❌ [AUTH] SignUp error:', signUpError)
-        setError(signUpError.message)
-      } else if (data?.user) {
-        setMessage('Registration successful! Please check your email to confirm your account.')
+      if (isSignUp) {
+        await signUp(email, password)
       } else {
-        setMessage('Registration request sent. Please check your email to continue.')
+        await signIn(email, password)
       }
-    } catch (err) {
-      console.error('❌ [AUTH] SignUp catch block error:', err)
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed')
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleOAuthLogin() {
+  const handleGoogleSignIn = async () => {
     setLoading(true)
-    setError(null)
+    setError('')
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ 
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/calendar`
-        }
-      })
-      if (error) setError(error.message)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
-    } finally {
+      await signInWithGoogle()
+    } catch (err: any) {
+      setError(err.message || 'Google sign in failed')
       setLoading(false)
     }
-  }
-
-  // Show loading indicator while checking auth state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-gray-100">Loading...</div>
-      </div>
-    )
-  }
-
-  // Don't render login form if already authenticated
-  if (isAuthenticated) {
-    return null
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 text-gray-100 font-sans px-4">
-      <Card className="w-full max-w-md p-8 sm:p-10 bg-gray-800 border-gray-700 rounded-2xl shadow-lg">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-semibold">Welcome to Glyde</h2>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <Switch.Root
-              checked={darkMode}
-              onCheckedChange={toggleDarkMode}
-              className={clsx(
-                'w-11 h-6 rounded-full relative transition-colors',
-                darkMode ? 'bg-indigo-500' : 'bg-gray-600'
-              )}
-              aria-label="Toggle dark mode"
-            >
-              <Switch.Thumb
-                className={clsx(
-                  'block w-5 h-5 bg-white rounded-full shadow transform transition-transform',
-                  darkMode ? 'translate-x-5' : 'translate-x-1'
-                )}
-              />
-            </Switch.Root>
-          </label>
-        </div>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#fafafa'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '400px',
+        padding: '40px',
+        background: '#fff',
+        borderRadius: '12px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+      }}>
+        <h1 style={{ marginBottom: '30px', fontSize: '24px', fontWeight: '600' }}>
+          {isSignUp ? 'Welcome to Glyde' : 'Welcome Back'}
+        </h1>
 
-        <div className="flex flex-col space-y-6">
-          <Button
-            variant="outline"
-            className="w-full py-3 font-medium border-gray-600 text-gray-100 hover:bg-gray-700"
-            onClick={handleOAuthLogin}
-            disabled={loading}
-          >
-            <span className="inline-flex items-center space-x-2">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 48 48"
-                fill="none"
-                className="h-5 w-5"
-              >
-                <path
-                  d="M47.532 24.5528C47.532 22.9214 47.3997 21.2811 47.1175 19.6761H24.48V28.9181H37.4434C36.9055 31.8988 35.177 34.5356 32.6461 36.2111V42.2078H40.3801C44.9217 38.0278 47.532 31.8547 47.532 24.5528Z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M24.48 48.0016C30.9529 48.0016 36.4116 45.8764 40.3888 42.2078L32.6549 36.2111C30.5031 37.675 27.7252 38.5039 24.4888 38.5039C18.2275 38.5039 12.9187 34.2798 11.0139 28.6006H3.03296V34.7825C7.10718 42.8868 15.4056 48.0016 24.48 48.0016Z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M11.0051 28.6006C9.99973 25.6199 9.99973 22.3922 11.0051 19.4115V13.2296H3.03298C-0.371021 20.0112 -0.371021 28.0009 3.03298 34.7825L11.0051 28.6006Z"
-                  fill="#FBBC04"
-                />
-                <path
-                  d="M24.48 9.49932C27.9016 9.44641 31.2086 10.7339 33.6866 13.0973L40.5387 6.24523C36.2 2.17101 30.4414 -0.068932 24.48 0.00161733C15.4055 0.00161733 7.10718 5.11644 3.03296 13.2296L11.005 19.4115C12.901 13.7235 18.2187 9.49932 24.48 9.49932Z"
-                  fill="#EA4335"
-                />
-              </svg>
-              <span>Sign in with Google</span>
-            </span>
-          </Button>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@example.com"
+            />
+          </div>
 
-          <div className="relative text-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-700"></div>
-            </div>
-            <span className="relative px-3 bg-gray-800 text-sm text-gray-500">
-              or continue with email
-            </span>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+            />
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-500/10 border border-red-500/40 text-red-200 px-3 py-2 text-sm">
+            <div style={{
+              padding: '10px',
+              marginBottom: '20px',
+              background: '#fee',
+              color: '#c00',
+              borderRadius: '6px',
+              fontSize: '14px'
+            }}>
               {error}
             </div>
           )}
-          {message && (
-            <div className="rounded-md bg-emerald-500/10 border border-emerald-500/40 text-emerald-200 px-3 py-2 text-sm">
-              {message}
-            </div>
-          )}
 
-          <form
-            className="space-y-4"
-            onSubmit={e => {
-              e.preventDefault()
-              handleSignIn()
-            }}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ width: '100%', marginBottom: '15px' }}
           >
-            <Input
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={loading}
-              required
-              className="bg-gray-700 border-gray-600 placeholder-gray-400 text-gray-100 focus:ring-indigo-500 focus:border-indigo-500"
-            />
+            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+          </button>
 
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={loading}
-              required
-              className="bg-gray-700 border-gray-600 placeholder-gray-400 text-gray-100 focus:ring-indigo-500 focus:border-indigo-500"
-            />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            margin: '20px 0',
+            gap: '10px'
+          }}>
+            <div style={{ flex: 1, height: '1px', background: '#e5e5e5' }} />
+            <span style={{ color: '#999', fontSize: '12px' }}>OR</span>
+            <div style={{ flex: 1, height: '1px', background: '#e5e5e5' }} />
+          </div>
 
-            <div className="flex space-x-4 pt-2">
-              <Button type="submit" className="flex-1 py-3 font-medium" disabled={loading}>
-                Sign in
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="flex-1 py-3 font-medium"
-                onClick={handleSignUp}
-                disabled={loading}
-              >
-                Register
-              </Button>
-            </div>
-          </form>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '10px 20px',
+              border: '1px solid #e5e5e5',
+              borderRadius: '6px',
+              background: '#fff',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              marginBottom: '15px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f9f9f9'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+              <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+            </svg>
+            Continue with Google
+          </button>
 
-          {error && (
-            <div className="text-sm text-red-400 bg-red-900/50 rounded-md p-2 text-center">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="text-sm text-green-400 bg-green-900/40 rounded-md p-2 text-center">
-              {success}
-            </div>
-          )}
-        </div>
-      </Card>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setIsSignUp(!isSignUp)}
+            style={{ width: '100%' }}
+          >
+            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

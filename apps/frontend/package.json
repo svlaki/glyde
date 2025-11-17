@@ -2,11 +2,9 @@
   "dependencies": {
     "@llm-ui/markdown": "^0.13.3",
     "@llm-ui/react": "^0.13.3",
-    "@mantine/core": "^7.17.8",
-    "@mantine/form": "^7.17.8",
-    "@mantine/hooks": "^7.17.8",
-    "@mantine/notifications": "^7.17.8",
     "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-progress": "^1.1.1",
+    "@radix-ui/react-separator": "^1.1.1",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.5",
     "@shadcn/ui": "^0.0.4",
@@ -25,7 +23,8 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.6.3",
     "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "vaul": "^0.9.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.11",
