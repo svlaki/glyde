@@ -1,26 +1,28 @@
+{/* This file controls the agent interaction panel on the calendar page */}
+
 import { useDarkMode } from '../lib/darkModeContext'
+import { getColors } from '../styles/colors'
 
 export function AgentInteractions() {
   const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
   const interactions = [
-    { id: '1', question: 'Schedule a meeting with the team?', type: 'yes_no' },
-    { id: '2', question: 'Move workout to tomorrow?', type: 'yes_no' }
+    { id: '1', question: 'Example question?', type: 'yes_no' },
+    { id: '2', question: 'Another question?', type: 'yes_no' }
   ]
 
   return (
     <div style={{
       height: '100%',
-      background: isDarkMode ? '#0a0a0a' : '#fafafa',
+      background: colors.bgPrimary,
       overflow: 'auto'
     }}>
       {/* Header */}
       <div style={{
-        padding: '15px 20px',
-        borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-        background: isDarkMode ? '#1a1a1a' : '#fff'
+        padding: '20px 20px 10px 20px'
       }}>
-        <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0, color: isDarkMode ? '#fff' : '#000' }}>
-          Agent Suggestions
+        <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: colors.textPrimary }}>
+          Interactions
         </h3>
       </div>
 
@@ -30,7 +32,7 @@ export function AgentInteractions() {
           <div style={{
             textAlign: 'center',
             padding: '20px',
-            color: '#999',
+            color: colors.textTertiary,
             fontSize: '13px'
           }}>
             No pending suggestions
@@ -40,13 +42,13 @@ export function AgentInteractions() {
             <div
               key={interaction.id}
               style={{
-                background: isDarkMode ? '#1a1a1a' : '#fff',
+                background: colors.bgSecondary,
                 padding: '12px',
                 borderRadius: '8px',
-                border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5'
+                border: `1px solid ${colors.border}`
               }}
             >
-              <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: isDarkMode ? '#fff' : '#000' }}>
+              <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: colors.textPrimary }}>
                 {interaction.question}
               </p>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -61,6 +63,12 @@ export function AgentInteractions() {
                   style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
                 >
                   No
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
+                >
+                  Uh
                 </button>
               </div>
             </div>

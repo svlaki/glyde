@@ -4,6 +4,8 @@ import { useCategories } from '../lib/categoryContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserEvents, updateEvent, deleteEvent, createEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
+import { getColors, hexToRgba } from '../styles/colors'
+import { EventForm } from './EventForm'
 
 interface CalendarEvent {
   id: string
@@ -19,15 +21,17 @@ type ViewType = 'day' | 'week' | 'month'
 
 export function Calendar() {
   const { user, session } = useAuth()
-  const { getCategoryColor, categories } = useCategories()
+  const { getCategoryColor, categories, refreshCategories } = useCategories()
   const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [view, setView] = useState<ViewType>('week')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedEvent, setEditedEvent] = useState<CalendarEvent | null>(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
+  const [dragPreview, setDragPreview] = useState<{ date: Date; hour: number; quarter: number } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Get current week dates
@@ -69,12 +73,10 @@ export function Calendar() {
       dates.push(new Date(year, month, i))
     }
 
-    // Add next month days to complete the grid
-    const remainingDays = 7 - (dates.length % 7)
-    if (remainingDays < 7) {
-      for (let i = 1; i <= remainingDays; i++) {
-        dates.push(new Date(year, month + 1, i))
-      }
+    // Add next month days to complete 6 weeks (42 days total)
+    const totalDays = 42
+    for (let i = 1; dates.length < totalDays; i++) {
+      dates.push(new Date(year, month + 1, i))
     }
 
     return dates
@@ -90,6 +92,53 @@ export function Calendar() {
     return event.color || '#3b82f6'
   }
 
+
+  // Parse time string flexibly (supports "2:30pm", "14:30", "2pm", etc.)
+  const parseTime = (timeStr: string): { hours: number; minutes: number } | null => {
+    const cleaned = timeStr.trim().toLowerCase()
+
+    // Try 24-hour format (14:30, 9:15)
+    const time24Match = cleaned.match(/^(\d{1,2}):(\d{2})$/)
+    if (time24Match) {
+      const hours = parseInt(time24Match[1])
+      const minutes = parseInt(time24Match[2])
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        return { hours, minutes }
+      }
+    }
+
+    // Try 12-hour format with am/pm (2:30pm, 2:30 pm, 9am)
+    const time12Match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/)
+    if (time12Match) {
+      let hours = parseInt(time12Match[1])
+      const minutes = time12Match[2] ? parseInt(time12Match[2]) : 0
+      const meridiem = time12Match[3]
+
+      if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
+        return null
+      }
+
+      if (meridiem === 'pm' && hours !== 12) {
+        hours += 12
+      } else if (meridiem === 'am' && hours === 12) {
+        hours = 0
+      }
+
+      return { hours, minutes }
+    }
+
+    // Try just hour number (assume next upcoming time in 24h format)
+    const hourMatch = cleaned.match(/^(\d{1,2})$/)
+    if (hourMatch) {
+      const hours = parseInt(hourMatch[1])
+      if (hours >= 0 && hours <= 23) {
+        return { hours, minutes: 0 }
+      }
+    }
+
+    return null
+  }
+
   const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getWeekDates(currentDate) : getMonthDates(currentDate)
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
@@ -100,7 +149,7 @@ export function Calendar() {
 
     async function loadEvents(forceRefresh = false) {
       if (!user) return
-      console.log('[Calendar] 📥 Loading events for user:', user.id, forceRefresh ? '(FORCED REFRESH)' : '')
+      console.log('[Calendar] Loading events for user:', user.id, forceRefresh ? '(FORCED REFRESH)' : '')
 
       try {
         // DIAGNOSTIC: Also fetch directly from Supabase to compare
@@ -110,7 +159,7 @@ export function Calendar() {
           .eq('user_id', user.id)
           .order('start_time', { ascending: true })
 
-        console.log('[Calendar] 🔍 DIRECT Supabase query result:', {
+        console.log('[Calendar] DIRECT Supabase query result:', {
           count: directEvents?.length,
           error: directError,
           events: directEvents
@@ -118,7 +167,7 @@ export function Calendar() {
 
         // Fetch through backend API
         const { events: userEvents } = await fetchUserEvents(user, session?.access_token)
-        console.log('[Calendar] 🌐 Backend API result:', {
+        console.log('[Calendar] Backend API result:', {
           count: userEvents?.length,
           events: userEvents
         })
@@ -126,10 +175,10 @@ export function Calendar() {
         // Only update if still subscribed (component not unmounted)
         if (isSubscribed) {
           setEvents(userEvents || [])
-          console.log('[Calendar] ✅ State updated with', userEvents?.length, 'events')
+          console.log('[Calendar] State updated with', userEvents?.length, 'events')
         }
       } catch (error) {
-        console.error('[Calendar] ❌ Error loading events:', error)
+        console.error('[Calendar] Error loading events:', error)
       }
     }
 
@@ -138,7 +187,7 @@ export function Calendar() {
     // Set up real-time subscription for events
     if (!user) return
 
-    console.log('[Calendar] 🔌 Setting up real-time subscription for user:', user.id)
+    console.log('[Calendar] Setting up real-time subscription for user:', user.id)
 
     const channel = supabase
       .channel(`calendar-events-${user.id}-${Date.now()}`) // Unique channel name
@@ -152,12 +201,12 @@ export function Calendar() {
         },
         (payload) => {
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('🔔 [Calendar] REALTIME EVENT RECEIVED!')
-          console.log('📌 Event Type:', payload.eventType)
-          console.log('📌 Table:', payload.table)
-          console.log('📌 Schema:', payload.schema)
-          console.log('📌 New Data:', payload.new)
-          console.log('📌 Old Data:', payload.old)
+          console.log('[Calendar] REALTIME EVENT RECEIVED!')
+          console.log('Event Type:', payload.eventType)
+          console.log('Table:', payload.table)
+          console.log('Schema:', payload.schema)
+          console.log('New Data:', payload.new)
+          console.log('Old Data:', payload.old)
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
           // Clear any existing refresh timer
@@ -167,27 +216,27 @@ export function Calendar() {
 
           // Force reload events with a delay to ensure DB is fully updated
           refreshTimer = setTimeout(() => {
-            console.log('🔄 [Calendar] Triggering refresh from real-time event...')
+            console.log('[Calendar] Triggering refresh from real-time event...')
             loadEvents(true)
           }, 500) // Increased delay to 500ms
         }
       )
       .subscribe((status, err) => {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log('📡 [Calendar] Subscription Status Change:', status)
+        console.log('[Calendar] Subscription Status Change:', status)
         if (status === 'SUBSCRIBED') {
-          console.log('✅ [Calendar] Successfully subscribed to real-time updates!')
-          console.log('📌 Listening for events on table: events')
-          console.log('📌 Filter: user_id =', user.id)
+          console.log('[Calendar] Successfully subscribed to real-time updates!')
+          console.log('Listening for events on table: events')
+          console.log('Filter: user_id =', user.id)
         }
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [Calendar] Channel error:', err)
+          console.error('[Calendar] Channel error:', err)
         }
         if (status === 'TIMED_OUT') {
-          console.error('⏱️ [Calendar] Subscription timed out - may need to check Supabase realtime settings')
+          console.error('[Calendar] Subscription timed out - may need to check Supabase realtime settings')
         }
         if (status === 'CLOSED') {
-          console.log('🔌 [Calendar] Channel closed')
+          console.log('[Calendar] Channel closed')
         }
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
       })
@@ -211,16 +260,11 @@ export function Calendar() {
     return () => clearInterval(timer)
   }, [])
 
-  // Auto-scroll to 8am when view changes to day/week
+  // Auto-scroll to 9am when view changes to day/week
   useEffect(() => {
     if ((view === 'day' || view === 'week') && scrollContainerRef.current) {
-      // Scroll to 8am: (8 hours * 60px per hour) + 40px header = 520px
-      setTimeout(() => {
-        scrollContainerRef.current?.scrollTo({
-          top: 520,
-          behavior: 'smooth'
-        })
-      }, 100)
+      // Scroll to 9am: (9 hours * 60px per hour) + 40px header = 580px
+      scrollContainerRef.current.scrollTop = 580
     }
   }, [view])
 
@@ -246,13 +290,59 @@ export function Calendar() {
 
   // Get events for a specific date and hour
   const getEventsForSlot = (date: Date, hour: number) => {
-    return events.filter(event => {
+    const filtered = events.filter(event => {
       const eventStart = new Date(event.start_time)
       const eventDate = eventStart.toDateString()
       const eventHour = eventStart.getHours()
 
-      return eventDate === date.toDateString() && eventHour === hour
+      const matches = eventDate === date.toDateString() && eventHour === hour
+
+      // Log only when we have events to help debug
+      if (matches && events.length > 0) {
+        console.log(`[getEventsForSlot] Found event for ${date.toDateString()} at ${hour}:00 -`, event.title)
+      }
+
+      return matches
     })
+    return filtered
+  }
+
+  // Calculate overlap layout for events in the same hour
+  const getEventLayout = (event: CalendarEvent, slotEvents: CalendarEvent[]) => {
+    // Sort events by start time
+    const sortedEvents = [...slotEvents].sort((a, b) =>
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
+
+    // Find overlapping events
+    const eventStart = new Date(event.start_time).getTime()
+    const eventEnd = new Date(event.end_time).getTime()
+
+    const overlapping = sortedEvents.filter(e => {
+      const start = new Date(e.start_time).getTime()
+      const end = new Date(e.end_time).getTime()
+      // Check if events overlap
+      return (start < eventEnd && end > eventStart)
+    })
+
+    if (overlapping.length <= 1) {
+      return { width: '100%', left: '2px', right: '2px', zIndex: 3 }
+    }
+
+    // Calculate position in overlap group
+    const index = overlapping.findIndex(e => e.id === event.id)
+    const totalOverlapping = overlapping.length
+
+    // Stagger horizontally
+    const widthPercent = Math.max(50, 100 / totalOverlapping) // Minimum 50% width
+    const offsetPercent = (index * (100 - widthPercent)) / Math.max(1, totalOverlapping - 1)
+
+    return {
+      width: `${widthPercent}%`,
+      left: `${offsetPercent}%`,
+      right: 'auto',
+      zIndex: 3 + index
+    }
   }
 
   // Get events for a specific date (for month view)
@@ -304,113 +394,95 @@ export function Calendar() {
     setCurrentDate(newDate)
   }
 
-  // Event editing handlers
-  const handleEditClick = () => {
-    if (selectedEvent) {
-      setEditedEvent({ ...selectedEvent })
-      setIsEditing(true)
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setIsEditing(false)
-    setEditedEvent(null)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editedEvent || !user) return
-
-    // Validate that title is not empty
-    if (!editedEvent.title.trim()) {
-      alert('Please enter a title for the event')
-      return
-    }
+  // Event save handler
+  const handleSaveEvent = async (eventData: Partial<CalendarEvent>) => {
+    if (!user) return
 
     try {
-      if (editedEvent.id) {
+      if (eventData.id) {
         // Update existing event
         const { error } = await updateEvent(
           user,
-          editedEvent.id,
+          eventData.id,
           {
-            title: editedEvent.title,
-            start_time: editedEvent.start_time,
-            end_time: editedEvent.end_time,
-            description: editedEvent.description,
-            category: editedEvent.category
+            title: eventData.title!,
+            start_time: eventData.start_time!,
+            end_time: eventData.end_time!,
+            description: eventData.description,
+            category: eventData.category
           },
           session?.access_token
         )
 
         if (error) {
           console.error('Failed to update event:', error)
-          alert('Failed to update event: ' + error)
+          throw new Error('Failed to update event: ' + error)
         } else {
           // Update local state
-          setEvents(events.map(e => e.id === editedEvent.id ? editedEvent : e))
-          setSelectedEvent(editedEvent)
-          setIsEditing(false)
-          setEditedEvent(null)
+          setEvents(events.map(e => {
+            if (e.id === eventData.id) {
+              return { ...e, ...eventData } as CalendarEvent
+            }
+            return e
+          }))
+          setSelectedEvent(null)
+          setIsFormOpen(false)
         }
       } else {
         // Create new event
         const { event: newEvent, error } = await createEvent(
           user,
           {
-            title: editedEvent.title,
-            start_time: editedEvent.start_time,
-            end_time: editedEvent.end_time,
-            description: editedEvent.description,
-            category: editedEvent.category
+            title: eventData.title!,
+            start_time: eventData.start_time!,
+            end_time: eventData.end_time!,
+            description: eventData.description,
+            category: eventData.category
           },
           session?.access_token
         )
 
         if (error) {
           console.error('Failed to create event:', error)
-          alert('Failed to create event: ' + error)
+          throw new Error('Failed to create event: ' + error)
         } else if (newEvent) {
           // Add to local state
           setEvents([...events, newEvent])
           setSelectedEvent(null)
-          setIsEditing(false)
-          setEditedEvent(null)
+          setIsFormOpen(false)
         }
       }
     } catch (error) {
       console.error('Error saving event:', error)
-      alert('Error saving event')
+      throw error
     }
   }
 
   const handleDeleteEvent = async () => {
     if (!selectedEvent || !user) return
 
-    if (!confirm('Are you sure you want to delete this event?')) return
-
     try {
       const { error } = await deleteEvent(user, selectedEvent.id, session?.access_token)
 
       if (error) {
         console.error('Failed to delete event:', error)
-        alert('Failed to delete event: ' + error)
+        throw new Error('Failed to delete event: ' + error)
       } else {
         // Update local state
         setEvents(events.filter(e => e.id !== selectedEvent.id))
         setSelectedEvent(null)
-        setIsEditing(false)
-        setEditedEvent(null)
+        setIsFormOpen(false)
       }
     } catch (error) {
       console.error('Error deleting event:', error)
-      alert('Error deleting event')
+      throw error
     }
   }
 
   // Handle clicking on calendar to create new event
-  const handleCalendarClick = (date: Date, hour: number, quarterHour: number) => {
+  const handleCalendarClick = (date: Date, hour: number, halfHour: number) => {
     const startTime = new Date(date)
-    startTime.setHours(hour, quarterHour * 15, 0, 0)
+    startTime.setHours(hour, halfHour * 30, 0, 0)
 
     const endTime = new Date(startTime)
     endTime.setHours(startTime.getHours() + 1) // Default 1 hour duration
@@ -424,47 +496,138 @@ export function Calendar() {
       category: ''
     }
 
-    setEditedEvent(newEventTemplate)
     setSelectedEvent(newEventTemplate)
-    setIsEditing(true)
+    setIsFormOpen(true)
+  }
+
+  // Handle drag start
+  const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
+    setDraggingEvent(event)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  // Handle drag over to allow drop and show preview
+  const handleDragOver = (e: React.DragEvent, date: Date, hour: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+
+    if (!draggingEvent) return
+
+    // Calculate which 15-minute interval we're hovering over (0, 1, 2, or 3)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetY = e.clientY - rect.top
+    const cellHeight = rect.height
+    const quarter = Math.max(0, Math.min(3, Math.floor((offsetY / cellHeight) * 4)))
+
+    setDragPreview({ date, hour, quarter })
+  }
+
+  // Handle drop with 15-minute snapping
+  const handleDrop = async (e: React.DragEvent, date: Date, hour: number) => {
+    e.preventDefault()
+
+    if (!draggingEvent || !user) return
+
+    // Get the mouse position within the hour cell
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetY = e.clientY - rect.top
+    const cellHeight = rect.height
+
+    // Calculate which 15-minute interval to snap to (0, 15, 30, or 45)
+    // Use percentage of cell height to determine quarter
+    const quarter = Math.floor((offsetY / cellHeight) * 4)
+    const snappedQuarter = Math.max(0, Math.min(3, quarter)) // Clamp to 0-3
+
+    console.log('[Drop] offsetY:', offsetY, 'cellHeight:', cellHeight, 'quarter:', quarter, 'snapped:', snappedQuarter)
+
+    // Calculate new start time with 15-minute snapping
+    const newStartTime = new Date(date)
+    newStartTime.setHours(hour, snappedQuarter * 15, 0, 0)
+
+    // Calculate duration of original event
+    const originalStart = new Date(draggingEvent.start_time)
+    const originalEnd = new Date(draggingEvent.end_time)
+    const duration = originalEnd.getTime() - originalStart.getTime()
+
+    // Calculate new end time (preserve duration)
+    const newEndTime = new Date(newStartTime.getTime() + duration)
+
+    // Update event
+    try {
+      const { error } = await updateEvent(
+        user,
+        draggingEvent.id,
+        {
+          ...draggingEvent,
+          start_time: newStartTime.toISOString(),
+          end_time: newEndTime.toISOString()
+        },
+        session?.access_token
+      )
+
+      if (error) {
+        console.error('Failed to update event:', error)
+        alert('Failed to move event: ' + error)
+      } else {
+        // Update local state
+        setEvents(events.map(e =>
+          e.id === draggingEvent.id
+            ? { ...e, start_time: newStartTime.toISOString(), end_time: newEndTime.toISOString() }
+            : e
+        ))
+      }
+    } catch (error) {
+      console.error('Error moving event:', error)
+      alert('Error moving event')
+    } finally {
+      setDraggingEvent(null)
+      setDragPreview(null)
+    }
+  }
+
+  // Handle drag end to clear preview
+  const handleDragEnd = () => {
+    setDraggingEvent(null)
+    setDragPreview(null)
   }
 
   return (
     <div style={{
       height: '100%',
-      background: isDarkMode ? '#1a1a1a' : '#fff',
-      borderRadius: '8px',
+      background: colors.bgSecondary,
       overflow: 'hidden',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      position: 'relative'
     }}>
       {/* Calendar Header */}
       <div style={{
-        padding: '12px 16px',
-        borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
+        padding: '0 20px 20px 20px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h2 style={{ fontSize: '16px', fontWeight: '600', color: isDarkMode ? '#fff' : '#000' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: '600', color: colors.textPrimary, letterSpacing: '0.02em' }}>
           {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h2>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {/* View Toggle */}
-          <div style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
+          <div style={{ display: 'flex', gap: '3px', marginRight: '6px' }}>
             {(['day', 'week', 'month'] as ViewType[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className="btn"
                 style={{
                   padding: '6px 12px',
                   fontSize: '12px',
-                  background: view === v ? (isDarkMode ? '#fff' : '#000') : (isDarkMode ? '#2a2a2a' : '#f5f5f5'),
-                  color: view === v ? (isDarkMode ? '#000' : '#fff') : (isDarkMode ? '#999' : '#666'),
-                  border: 'none',
+                  background: view === v ? (isDarkMode ? '#d0d0d0' : '#000') : colors.bgTertiary,
+                  color: view === v ? (isDarkMode ? '#2a2a2a' : '#fff') : colors.textSecondary,
+                  border: view === v ? 'none' : `1px solid ${colors.border}`,
                   cursor: 'pointer',
-                  textTransform: 'capitalize'
+                  textTransform: 'capitalize',
+                  borderRadius: '4px',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
                 }}
               >
                 {v}
@@ -501,13 +664,13 @@ export function Calendar() {
       <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {view === 'month' ? (
           // Month View
-          <div style={{ padding: '12px', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: '8px', height: '100%', overflow: 'hidden' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
               gridTemplateRows: 'auto repeat(6, 1fr)',
               gap: '1px',
-              background: isDarkMode ? '#2a2a2a' : '#e5e5e5',
+              background: colors.border,
               height: '100%'
             }}>
               {/* Week day headers */}
@@ -515,11 +678,13 @@ export function Calendar() {
                 <div key={day} style={{
                   padding: '6px',
                   textAlign: 'center',
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: '600',
-                  color: isDarkMode ? '#999' : '#666',
-                  background: isDarkMode ? '#0a0a0a' : '#fafafa',
-                  minWidth: 0
+                  letterSpacing: '0.05em',
+                  color: colors.textSecondary,
+                  background: colors.bgSecondary,
+                  minWidth: 0,
+                  textTransform: 'uppercase'
                 }}>
                   {day}
                 </div>
@@ -536,8 +701,8 @@ export function Calendar() {
                     onClick={() => handleDayClick(date)}
                     style={{
                       padding: '4px',
-                      background: isDarkMode ? '#1a1a1a' : '#fff',
-                      color: isCurrentMonth ? (isDarkMode ? '#fff' : '#000') : (isDarkMode ? '#555' : '#ccc'),
+                      background: colors.bgSecondary,
+                      color: isCurrentMonth ? colors.textPrimary : colors.textTertiary,
                       cursor: 'pointer',
                       position: 'relative',
                       transition: 'background 0.2s',
@@ -548,25 +713,25 @@ export function Calendar() {
                       overflow: 'hidden'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = isDarkMode ? '#2a2a2a' : '#f9f9f9'
+                      e.currentTarget.style.background = colors.bgHover
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = isDarkMode ? '#1a1a1a' : '#fff'
+                      e.currentTarget.style.background = colors.bgSecondary
                     }}
                   >
                     {/* Date number */}
                     <div style={{
-                      fontSize: '12px',
-                      fontWeight: isToday ? '600' : '400',
-                      color: isToday ? (isDarkMode ? '#000' : '#fff') : 'inherit',
-                      background: isToday ? (isDarkMode ? '#fff' : '#000') : 'transparent',
-                      width: '20px',
-                      height: '20px',
+                      fontSize: '14px',
+                      fontWeight: isToday ? '600' : '500',
+                      color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : 'inherit',
+                      background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : 'transparent',
+                      width: '25px',
+                      height: '25px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginBottom: '3px',
+                      marginBottom: '2px',
                       flexShrink: 0
                     }}>
                       {date.getDate()}
@@ -576,57 +741,48 @@ export function Calendar() {
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '1px',
+                      gap: '2px',
                       overflow: 'hidden',
                       flex: 1,
                       minHeight: 0
                     }}>
-                      {dayEvents.slice(0, 2).map((event) => (
-                        <div
-                          key={event.id}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedEvent(event)
-                          }}
-                          style={{
-                            background: getEventColor(event),
-                            color: '#fff',
-                            fontSize: '9px',
-                            padding: '2px 3px',
-                            borderRadius: '2px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            cursor: 'pointer',
-                            transition: 'opacity 0.2s',
-                            flexShrink: 0
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '0.8'
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.opacity = '1'
-                          }}
-                          title={`${event.title} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
-                        >
-                          {new Date(event.start_time).toLocaleTimeString([], {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })} {event.title}
-                        </div>
-                      ))}
-                      {dayEvents.length > 2 && (
-                        <div style={{
-                          fontSize: '9px',
-                          color: '#666',
-                          padding: '1px 3px',
-                          fontWeight: '500',
-                          flexShrink: 0
-                        }}>
-                          +{dayEvents.length - 2} more
-                        </div>
-                      )}
+                      {dayEvents.map((event) => {
+                        const eventColor = getEventColor(event)
+                        return (
+                          <div
+                            key={event.id}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedEvent(event)
+                              setIsFormOpen(true)
+                            }}
+                            style={{
+                              background: hexToRgba(eventColor, 0.15),
+                              borderLeft: `3px solid ${eventColor}`,
+                              color: colors.textPrimary,
+                              fontSize: '11px',
+                              padding: '2px 4px',
+                              borderRadius: '3px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              cursor: 'pointer',
+                              transition: 'background 0.15s ease',
+                              flexShrink: 0,
+                              fontWeight: '500'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = hexToRgba(eventColor, 0.25)
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
+                            }}
+                            title={`${event.title} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                          >
+                            {event.title}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
@@ -639,16 +795,15 @@ export function Calendar() {
             {/* Time Column */}
             <div style={{
               width: '50px',
-              borderRight: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
+              borderRight: `1px solid ${colors.border}`,
               flexShrink: 0,
-              background: isDarkMode ? '#0a0a0a' : '#fafafa'
+              background: colors.bgSecondary
             }}>
               <div style={{
                 height: '40px',
-                borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
+                borderBottom: `1px solid ${colors.border}`,
                 position: 'sticky',
                 top: 0,
-                background: isDarkMode ? '#0a0a0a' : '#fafafa',
                 zIndex: 20
               }} />
               {hours.map(hour => (
@@ -656,11 +811,11 @@ export function Calendar() {
                   key={hour}
                   style={{
                     height: '60px',
-                    borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #f0f0f0',
+                    borderBottom: `1px solid ${colors.border}`,
                     padding: '4px',
-                    fontSize: '10px',
-                    color: isDarkMode ? '#999' : '#666',
-                    textAlign: 'right'
+                    fontSize: '12px',
+                    color: colors.textSecondary,
+                    textAlign: 'center'
                   }}
                 >
                   {formatTime(hour)}
@@ -677,18 +832,17 @@ export function Calendar() {
                   key={dayIndex}
                   style={{
                     flex: 1,
-                    borderRight: dayIndex < displayDates.length - 1 ? (isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5') : 'none',
                     minWidth: view === 'day' ? '300px' : '100px'
                   }}
                 >
                   {/* Day Header */}
                   <div style={{
                     height: '40px',
-                    borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
+                    borderBottom: `1px solid ${colors.border}`,
                     padding: '6px',
                     textAlign: 'center',
-                    background: isToday ? (isDarkMode ? '#fff' : '#000') : (isDarkMode ? '#0a0a0a' : '#fafafa'),
-                    color: isToday ? (isDarkMode ? '#000' : '#fff') : (isDarkMode ? '#fff' : '#000'),
+                    background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : colors.bgSecondary,
+                    color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : colors.textPrimary,
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
@@ -707,79 +861,155 @@ export function Calendar() {
                   {/* Time Slots - 15 minute intervals */}
                   {hours.map(hour => {
                     const slotEvents = getEventsForSlot(date, hour)
+                    const isPreviewSlot = dragPreview &&
+                      dragPreview.date.toDateString() === date.toDateString() &&
+                      dragPreview.hour === hour
 
                     return (
-                      <div key={hour} style={{ position: 'relative' }}>
-                        {/* Four 15-minute blocks per hour */}
-                        {[0, 1, 2, 3].map(quarterHour => (
-                          <div
-                            key={quarterHour}
-                            style={{
-                              height: '15px',
-                              borderBottom: quarterHour === 3 ? (isDarkMode ? '1px solid #2a2a2a' : '1px solid #f0f0f0') : (isDarkMode ? '1px solid #1a1a1a' : '1px solid #f5f5f5'),
-                              background: isToday && hour === new Date().getHours() ? (isDarkMode ? '#1a1a1a' : '#f9f9f9') : 'transparent',
-                              cursor: 'pointer',
-                              transition: 'background 0.1s',
-                              position: 'relative'
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCalendarClick(date, hour, quarterHour)
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = isDarkMode ? '#2a3a4a' : '#e8f4ff'
-                            }}
-                            onMouseLeave={(e) => {
-                              if (isToday && hour === new Date().getHours()) {
-                                e.currentTarget.style.background = isDarkMode ? '#1a1a1a' : '#f9f9f9'
-                              } else {
+                      <div
+                        key={hour}
+                        style={{ position: 'relative' }}
+                        onDragOver={(e) => handleDragOver(e, date, hour)}
+                        onDrop={(e) => handleDrop(e, date, hour)}
+                      >
+                        {/* Four 15-minute blocks per hour for drag/drop precision */}
+                        {[0, 1, 2, 3].map(quarter => {
+                          // Only show borders at hour (:00) and half-hour (:30) marks
+                          let borderStyle
+                          if (quarter === 3) {
+                            // Hour boundary - solid line
+                            borderStyle = `1px solid ${colors.border}`
+                          } else if (quarter === 1) {
+                            // 30-minute mark - solid line
+                            borderStyle = `1px solid ${colors.border}`
+                          } else {
+                            // No border at :15 and :45
+                            borderStyle = 'none'
+                          }
+
+                          return (
+                            <div
+                              key={quarter}
+                              style={{
+                                height: '15px',
+                                borderBottom: borderStyle,
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                transition: 'background 0.1s',
+                                position: 'relative'
+                                // Allow pointer events even when dragging so drop zones work
+                              }}
+                              onClick={(e) => {
+                                // Only handle clicks when not dragging
+                                if (!draggingEvent) {
+                                  e.stopPropagation()
+                                  // Convert quarter to halfHour for compatibility with existing click handler
+                                  const halfHour = Math.floor(quarter / 2)
+                                  handleCalendarClick(date, hour, halfHour)
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!draggingEvent) {
+                                  e.currentTarget.style.background = colors.bgHover
+                                }
+                              }}
+                              onMouseLeave={(e) => {
                                 e.currentTarget.style.background = 'transparent'
-                              }
+                              }}
+                            />
+                          )
+                        })}
+
+                        {/* Drag preview indicator */}
+                        {isPreviewSlot && draggingEvent && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: `${(dragPreview!.quarter / 4) * 100}%`,
+                              left: '0',
+                              right: '0',
+                              height: '4px',
+                              background: '#000',
+                              zIndex: 100,
+                              pointerEvents: 'none',
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
                             }}
                           />
-                        ))}
+                        )}
 
                         {/* Render events */}
                         {slotEvents.map(event => {
                           const { top, height } = getEventStyle(event)
+                          const layout = getEventLayout(event, slotEvents)
+                          const eventColor = getEventColor(event)
+                          const startTime = new Date(event.start_time).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })
+
                           return (
                             <div
                               key={event.id}
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(e, event)}
+                              onDragEnd={handleDragEnd}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setSelectedEvent(event)
+                                setIsFormOpen(true)
                               }}
                               style={{
                                 position: 'absolute',
                                 top: `${top}px`,
-                                left: '2px',
-                                right: '2px',
+                                left: layout.left,
+                                right: layout.right,
+                                width: layout.width,
                                 height: `${height}px`,
-                                background: getEventColor(event),
-                                color: '#fff',
-                                borderRadius: '4px',
-                                padding: '4px 6px',
+                                background: hexToRgba(eventColor, 0.15),
+                                borderTop: `4px solid ${eventColor}`,
+                                color: colors.textPrimary,
+                                borderRadius: '0 0 3px 3px',
+                                padding: '2px 6px 3px 6px',
                                 fontSize: '11px',
                                 fontWeight: '500',
                                 overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                zIndex: 3,
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                cursor: 'pointer',
-                                transition: 'transform 0.1s, box-shadow 0.1s'
+                                zIndex: layout.zIndex,
+                                cursor: draggingEvent?.id === event.id ? 'grabbing' : 'grab',
+                                transition: 'background 0.15s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '1px'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.02)'
-                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)'
+                                e.currentTarget.style.background = hexToRgba(eventColor, 0.25)
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)'
-                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'
+                                e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
                               }}
                               title={`${event.title}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                             >
-                              {event.title}
+                              <div style={{
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color: colors.textPrimary,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {event.title}
+                              </div>
+                              {height > 25 && (
+                                <div style={{
+                                  fontSize: '10px',
+                                  color: colors.textSecondary,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {startTime}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -812,33 +1042,23 @@ export function Calendar() {
 
               return (
                 <>
-                  {/* Time text on the left */}
+                  {/* Time text with bubble background */}
                   <div style={{
                     position: 'absolute',
                     left: '2px',
                     top: `${topPosition}px`,
                     fontSize: '10px',
                     fontWeight: '600',
-                    color: '#ef4444',
+                    color: '#fff',
+                    background: '#ef4444',
+                    padding: '3px 6px',
+                    borderRadius: '10px',
                     zIndex: 10,
                     transform: 'translateY(-50%)',
                     whiteSpace: 'nowrap'
                   }}>
                     {timeString}
                   </div>
-
-                  {/* Red dot on time column */}
-                  <div style={{
-                    position: 'absolute',
-                    left: '45px',
-                    top: `${topPosition}px`,
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: '#ef4444',
-                    zIndex: 10,
-                    transform: 'translateY(-50%)'
-                  }} />
 
                   {/* Red line across entire calendar */}
                   <div style={{
@@ -858,410 +1078,17 @@ export function Calendar() {
         )}
       </div>
 
-      {/* Event Details Modal */}
-      {selectedEvent && (
-        <>
-          {/* Invisible overlay to detect outside clicks */}
-          <div
-            onClick={() => {
-              setSelectedEvent(null)
-              setIsEditing(false)
-              setEditedEvent(null)
-            }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 99
-            }}
-          />
-
-          {/* Modal Box */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: isDarkMode ? 'rgba(26, 26, 26, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              borderRadius: '12px',
-              boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.2)',
-              border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)',
-              zIndex: 100,
-              width: '420px',
-              maxHeight: '550px',
-              overflow: 'auto',
-              animation: 'popIn 0.2s ease-out',
-              backdropFilter: 'blur(8px)'
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{
-              padding: '20px',
-              borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <h2 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                margin: 0,
-                color: isDarkMode ? '#fff' : '#000'
-              }}>
-                {isEditing ? (editedEvent?.id ? 'Edit Event' : 'Create Event') : 'Event Details'}
-              </h2>
-              <button
-                onClick={() => {
-                  setSelectedEvent(null)
-                  setIsEditing(false)
-                  setEditedEvent(null)
-                }}
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  border: 'none',
-                  background: isDarkMode ? '#2a2a2a' : '#f5f5f5',
-                  color: isDarkMode ? '#fff' : '#000',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '18px',
-                  flexShrink: 0
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '20px' }}>
-              {isEditing && editedEvent ? (
-                // Edit Mode
-                <>
-                  {/* Title Input */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      TITLE
-                    </label>
-                    <input
-                      type="text"
-                      value={editedEvent.title}
-                      onChange={(e) => setEditedEvent({ ...editedEvent, title: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        background: isDarkMode ? '#1a1a1a' : '#fff',
-                        color: isDarkMode ? '#fff' : '#000'
-                      }}
-                    />
-                  </div>
-
-                  {/* Start Time Input */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      START TIME
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={new Date(editedEvent.start_time).toISOString().slice(0, 16)}
-                      onChange={(e) => setEditedEvent({
-                        ...editedEvent,
-                        start_time: new Date(e.target.value).toISOString()
-                      })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        background: isDarkMode ? '#1a1a1a' : '#fff',
-                        color: isDarkMode ? '#fff' : '#000',
-                        colorScheme: isDarkMode ? 'dark' : 'light'
-                      }}
-                    />
-                  </div>
-
-                  {/* End Time Input */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      END TIME
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={new Date(editedEvent.end_time).toISOString().slice(0, 16)}
-                      onChange={(e) => setEditedEvent({
-                        ...editedEvent,
-                        end_time: new Date(e.target.value).toISOString()
-                      })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        background: isDarkMode ? '#1a1a1a' : '#fff',
-                        color: isDarkMode ? '#fff' : '#000',
-                        colorScheme: isDarkMode ? 'dark' : 'light'
-                      }}
-                    />
-                  </div>
-
-                  {/* Category Select */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      CATEGORY
-                    </label>
-                    <select
-                      value={editedEvent.category || ''}
-                      onChange={(e) => setEditedEvent({ ...editedEvent, category: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        background: isDarkMode ? '#1a1a1a' : '#fff',
-                        color: isDarkMode ? '#fff' : '#000'
-                      }}
-                    >
-                      <option value="">No category</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Description Textarea */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      DESCRIPTION
-                    </label>
-                    <textarea
-                      value={editedEvent.description || ''}
-                      onChange={(e) => setEditedEvent({ ...editedEvent, description: e.target.value })}
-                      rows={3}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        resize: 'vertical',
-                        background: isDarkMode ? '#1a1a1a' : '#fff',
-                        color: isDarkMode ? '#fff' : '#000'
-                      }}
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
-                    <button
-                      onClick={handleSaveEdit}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: isDarkMode ? '#fff' : '#000',
-                        color: isDarkMode ? '#000' : '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {editedEvent?.id ? 'Save Changes' : 'Create Event'}
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: isDarkMode ? '#2a2a2a' : '#f5f5f5',
-                        color: isDarkMode ? '#999' : '#666',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                // View Mode
-                <>
-                  {/* Title */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <h3 style={{
-                      fontSize: '18px',
-                      fontWeight: '600',
-                      margin: 0,
-                      color: isDarkMode ? '#fff' : '#000'
-                    }}>
-                      {selectedEvent.title}
-                    </h3>
-                    {selectedEvent.category && (
-                      <div style={{
-                        display: 'inline-block',
-                        marginTop: '8px',
-                        padding: '4px 10px',
-                        background: getEventColor(selectedEvent),
-                        color: '#fff',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: '500'
-                      }}>
-                        {selectedEvent.category}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Date and Time */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: isDarkMode ? '#999' : '#666',
-                      marginBottom: '6px'
-                    }}>
-                      DATE & TIME
-                    </div>
-                    <div style={{ fontSize: '14px', color: isDarkMode ? '#fff' : '#000' }}>
-                      {new Date(selectedEvent.start_time).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </div>
-                    <div style={{ fontSize: '14px', color: isDarkMode ? '#999' : '#666', marginTop: '4px' }}>
-                      {new Date(selectedEvent.start_time).toLocaleTimeString([], {
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })} - {new Date(selectedEvent.end_time).toLocaleTimeString([], {
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {selectedEvent.description && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <div style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: isDarkMode ? '#999' : '#666',
-                        marginBottom: '6px'
-                      }}>
-                        DESCRIPTION
-                      </div>
-                      <div style={{
-                        fontSize: '14px',
-                        color: isDarkMode ? '#fff' : '#000',
-                        lineHeight: '1.5',
-                        whiteSpace: 'pre-wrap'
-                      }}>
-                        {selectedEvent.description}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
-                    <button
-                      onClick={handleEditClick}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: isDarkMode ? '#fff' : '#000',
-                        color: isDarkMode ? '#000' : '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Edit Event
-                    </button>
-                    <button
-                      onClick={handleDeleteEvent}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        background: '#ef4444',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          <style>{`
-            @keyframes popIn {
-              from {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.9);
-              }
-              to {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-              }
-            }
-          `}</style>
-        </>
-      )}
+      {/* Event Form */}
+      <EventForm
+        event={selectedEvent}
+        isOpen={isFormOpen}
+        onClose={() => {
+          setSelectedEvent(null)
+          setIsFormOpen(false)
+        }}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+      />
     </div>
   )
 }

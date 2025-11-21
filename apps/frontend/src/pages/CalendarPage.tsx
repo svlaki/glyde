@@ -1,19 +1,75 @@
-import { useAuth } from '../lib/authContext'
+import { useState, useEffect, useRef } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
+import { PageHeader } from '../components/PageHeader'
 import { Calendar } from '../components/Calendar'
 import { ChatBot } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
 import { TodoList } from '../components/TodoList'
+import { getColors } from '../styles/colors'
 
 export function CalendarPage() {
-  const { user, signOut } = useAuth()
-  const { isDarkMode, toggleDarkMode } = useDarkMode()
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
 
-  const navItems = [
-    { label: 'Tasks', path: '/tasks' },
-    { label: 'Goals', path: '/goals' },
-    { label: 'Profile', path: '/profile' }
-  ]
+  // Load saved widths from localStorage or use defaults
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const saved = localStorage.getItem('calendar-left-width')
+    return saved ? parseInt(saved) : 300
+  })
+
+  const [rightWidth, setRightWidth] = useState(() => {
+    const saved = localStorage.getItem('calendar-right-width')
+    return saved ? parseInt(saved) : 350
+  })
+
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [isResizingRight, setIsResizingRight] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Save to localStorage when widths change
+  useEffect(() => {
+    localStorage.setItem('calendar-left-width', leftWidth.toString())
+  }, [leftWidth])
+
+  useEffect(() => {
+    localStorage.setItem('calendar-right-width', rightWidth.toString())
+  }, [rightWidth])
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return
+
+      const containerRect = containerRef.current.getBoundingClientRect()
+
+      if (isResizingLeft) {
+        const newWidth = e.clientX - containerRect.left
+        // Min 200px, max 600px
+        setLeftWidth(Math.min(Math.max(newWidth, 200), 600))
+      }
+
+      if (isResizingRight) {
+        const newWidth = containerRect.right - e.clientX
+        // Min 250px, max 600px
+        setRightWidth(Math.min(Math.max(newWidth, 250), 600))
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false)
+      setIsResizingRight(false)
+    }
+
+    if (isResizingLeft || isResizingRight) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isResizingLeft, isResizingRight])
 
   return (
     <div style={{
@@ -21,109 +77,36 @@ export function CalendarPage() {
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      background: isDarkMode ? '#0a0a0a' : '#fafafa'
+      background: colors.bgSecondary
     }}>
-      {/* Header with Navigation */}
-      <header style={{
-        height: '60px',
-        background: isDarkMode ? '#1a1a1a' : '#fff',
-        borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 30px',
-        flexShrink: 0,
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
-          <a
-            href="/calendar"
-            style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              margin: 0,
-              textDecoration: 'none',
-              color: isDarkMode ? '#fff' : '#000',
-              cursor: 'pointer'
-            }}
-          >
-            Glyde
-          </a>
-          <nav style={{ display: 'flex', gap: '8px' }}>
-            {navItems.map(item => (
-              <a
-                key={item.path}
-                href={item.path}
-                style={{
-                  padding: '8px 16px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: isDarkMode ? '#999' : '#666',
-                  textDecoration: 'none',
-                  borderRadius: '6px',
-                  background: 'transparent',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = isDarkMode ? '#2a2a2a' : '#fafafa'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent'
-                }}
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ fontSize: '13px', color: isDarkMode ? '#999' : '#666' }}>{user?.email}</span>
-          <button
-            onClick={toggleDarkMode}
-            style={{
-              padding: '8px 12px',
-              background: isDarkMode ? '#2a2a2a' : '#f5f5f5',
-              color: isDarkMode ? '#fff' : '#666',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = isDarkMode ? '#3a3a3a' : '#e5e5e5'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = isDarkMode ? '#2a2a2a' : '#f5f5f5'
-            }}
-          >
-            {isDarkMode ? 'Light' : 'Dark'}
-          </button>
-          <button onClick={signOut} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
-            Sign Out
-          </button>
-        </div>
-      </header>
+      {/* Header */}
+      <PageHeader />
 
       {/* Main Layout */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden',
-        minHeight: 0
-      }}>
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          display: 'flex',
+          overflow: 'hidden',
+          minHeight: 0,
+          userSelect: (isResizingLeft || isResizingRight) ? 'none' : 'auto'
+        }}
+      >
         {/* Left Sidebar - Agent Interactions + Todo List */}
         <div style={{
-          width: '300px',
-          borderRight: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-          background: isDarkMode ? '#1a1a1a' : '#fff',
+          width: `${leftWidth}px`,
+          borderRight: `1px solid ${colors.border}`,
+          background: colors.bgSecondary,
           flexShrink: 0,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          position: 'relative'
         }}>
           {/* Agent Interactions */}
           <div style={{
             flex: 1,
-            borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
+            borderBottom: `1px solid ${colors.border}`,
             overflow: 'hidden',
             minHeight: 0
           }}>
@@ -138,6 +121,32 @@ export function CalendarPage() {
           }}>
             <TodoList />
           </div>
+
+          {/* Resize handle for left sidebar */}
+          <div
+            onMouseDown={() => setIsResizingLeft(true)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: -4,
+              bottom: 0,
+              width: '8px',
+              cursor: 'col-resize',
+              zIndex: 10,
+              background: isResizingLeft ? colors.border : 'transparent',
+              transition: 'background 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isResizingLeft) {
+                e.currentTarget.style.background = colors.border
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isResizingLeft) {
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          />
         </div>
 
         {/* Center - Calendar */}
@@ -152,13 +161,40 @@ export function CalendarPage() {
 
         {/* Right Sidebar - ChatBot */}
         <div style={{
-          width: '350px',
-          borderLeft: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-          background: isDarkMode ? '#1a1a1a' : '#fff',
+          width: `${rightWidth}px`,
+          borderLeft: `1px solid ${colors.border}`,
+          background: colors.bgSecondary,
           flexShrink: 0,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}>
           <ChatBot />
+
+          {/* Resize handle for right sidebar */}
+          <div
+            onMouseDown={() => setIsResizingRight(true)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: -4,
+              bottom: 0,
+              width: '8px',
+              cursor: 'col-resize',
+              zIndex: 10,
+              background: isResizingRight ? colors.border : 'transparent',
+              transition: 'background 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isResizingRight) {
+                e.currentTarget.style.background = colors.border
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isResizingRight) {
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
+          />
         </div>
       </div>
     </div>

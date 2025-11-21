@@ -59,7 +59,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     return categories.find(c => c.name === name)
   }
 
-  // 🎨 Custom Color Palette - Replace these with your favorite 30 colors!
+  // Custom Color Palette - Replace these with your favorite 30 colors!
   const colorPalette = [
     '#3b82f6', // Blue
     '#10b981', // Green

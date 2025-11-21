@@ -7,6 +7,8 @@ import { CategoryProvider } from './src/lib/categoryContext'
 import { DarkModeProvider } from './src/lib/darkModeContext'
 import { Auth } from './src/components/Auth'
 import { CalendarPage } from './src/pages/CalendarPage'
+import { ProfilePage } from './src/pages/ProfilePage'
+import { AspectsPage } from './src/pages/AspectsPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 
 function App() {
@@ -24,6 +26,26 @@ function App() {
                     <CalendarPage />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/aspects"
+                element={
+                  <ProtectedRoute>
+                    <AspectsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/goals"
+                element={<Navigate to="/profile" replace />}
               />
               <Route
                 path="/dashboard"

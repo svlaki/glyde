@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
+import { getColors } from '../styles/colors'
 
 interface Message {
   id: string
@@ -14,18 +15,74 @@ const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://loca
 export function ChatBot() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
-  const [messages, setMessages] = useState<Message[]>([])
+  const colors = getColors(isDarkMode)
+
+  // Load messages from localStorage or initialize with welcome message
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (!user?.id) return []
+
+    const savedMessages = localStorage.getItem(`chat_messages_${user.id}`)
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages)
+        // Convert timestamp strings back to Date objects
+        return parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      } catch (e) {
+        console.error('Failed to parse saved messages:', e)
+      }
+    }
+
+    // Default welcome message
+    return [{
+      id: '1',
+      text: 'Hello! Ask me anything about your schedule!',
+      sender: 'bot',
+      timestamp: new Date()
+    }]
+  })
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (user?.id && messages.length > 0) {
+      localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify(messages))
+    }
+  }, [messages, user?.id])
 
   // Reset messages when user changes
   useEffect(() => {
-    setMessages([
-      {
-        id: '1',
-        text: 'Hey! I\'m your AI assistant. Ask me anything about your schedule!',
-        sender: 'bot',
-        timestamp: new Date()
+    if (!user?.id) return
+
+    const savedMessages = localStorage.getItem(`chat_messages_${user.id}`)
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages)
+        setMessages(parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })))
+      } catch (e) {
+        setMessages([
+          {
+            id: '1',
+            text: 'Hello! Ask me anything about your schedule!',
+            sender: 'bot',
+            timestamp: new Date()
+          }
+        ])
       }
-    ])
+    } else {
+      setMessages([
+        {
+          id: '1',
+          text: 'Hello! Ask me anything about your schedule!',
+          sender: 'bot',
+          timestamp: new Date()
+        }
+      ])
+    }
   }, [user?.id])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -33,7 +90,7 @@ export function ChatBot() {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages])
 
   const handleSend = async () => {
@@ -108,7 +165,7 @@ export function ChatBot() {
 
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
-          errorText = '⚠️ Backend server is not running. Start the agent service at localhost:8000'
+          errorText = 'Backend server is not running. Start the agent service at localhost:8000'
         } else {
           errorText = `Error: ${error.message}`
         }
@@ -131,15 +188,20 @@ export function ChatBot() {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: isDarkMode ? '#1a1a1a' : '#fff'
     }}>
       {/* Header */}
       <div style={{
-        padding: '15px 20px',
-        borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-        background: isDarkMode ? '#0a0a0a' : '#fafafa'
+        padding: '20px 24px',
+        //borderBottom: `1px solid ${colors.borderLight}`,
+        background: colors.bgPrimary
       }}>
-        <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0, color: isDarkMode ? '#fff' : '#000' }}>
+        <h3 style={{
+          fontSize: '18px',
+          fontWeight: '600',
+          margin: 0,
+          color: colors.textPrimary,
+          letterSpacing: '0.02em'
+        }}>
           AI Assistant
         </h3>
       </div>
@@ -148,10 +210,11 @@ export function ChatBot() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '15px',
+        padding: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px'
+        gap: '16px',
+        background: colors.bgPrimary
       }}>
         {messages.map(message => (
           <div
@@ -162,13 +225,22 @@ export function ChatBot() {
             }}
           >
             <div style={{
-              maxWidth: '80%',
-              padding: '10px 14px',
+              maxWidth: '75%',
+              padding: '12px 16px',
               borderRadius: '12px',
-              background: message.sender === 'user' ? (isDarkMode ? '#fff' : '#000') : (isDarkMode ? '#2a2a2a' : '#f0f0f0'),
-              color: message.sender === 'user' ? (isDarkMode ? '#000' : '#fff') : (isDarkMode ? '#fff' : '#000'),
-              fontSize: '13px',
-              lineHeight: '1.4'
+              background: message.sender === 'user'
+                ? (isDarkMode ? '#f0f0f0' : '#000')
+                : colors.bgSecondary,
+              color: message.sender === 'user'
+                ? (isDarkMode ? '#000' : '#fff')
+                : colors.textPrimary,
+              fontSize: '14px',
+              lineHeight: '1.5',
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              boxShadow: isDarkMode
+                ? '0 1px 2px rgba(0,0,0,0.2)'
+                : '0 1px 2px rgba(0,0,0,0.06)',
+              border: message.sender === 'bot' ? `1px solid ${colors.borderLight}` : 'none'
             }}>
               {message.text}
             </div>
@@ -177,33 +249,36 @@ export function ChatBot() {
         {isLoading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
             <div style={{
-              padding: '10px 14px',
+              padding: '12px 16px',
               borderRadius: '12px',
-              background: isDarkMode ? '#2a2a2a' : '#f0f0f0',
-              fontSize: '13px'
+              background: colors.bgSecondary,
+              border: `1px solid ${colors.borderLight}`,
+              boxShadow: isDarkMode
+                ? '0 1px 2px rgba(0,0,0,0.2)'
+                : '0 1px 2px rgba(0,0,0,0.06)'
             }}>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                 <div style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
-                  background: '#999',
+                  background: colors.textSecondary,
                   animation: 'bounce 1.4s infinite ease-in-out both',
                   animationDelay: '-0.32s'
                 }} />
                 <div style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
-                  background: '#999',
+                  background: colors.textSecondary,
                   animation: 'bounce 1.4s infinite ease-in-out both',
                   animationDelay: '-0.16s'
                 }} />
                 <div style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '7px',
+                  height: '7px',
                   borderRadius: '50%',
-                  background: '#999',
+                  background: colors.textSecondary,
                   animation: 'bounce 1.4s infinite ease-in-out both'
                 }} />
               </div>
@@ -215,39 +290,84 @@ export function ChatBot() {
 
       {/* Input */}
       <div style={{
-        padding: '15px',
-        borderTop: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5'
+        padding: '16px 24px 20px 24px',
+        borderTop: `1px solid ${colors.borderLight}`,
+        background: colors.bgSecondary,
+        flexShrink: 0
       }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
             placeholder="Ask me anything..."
             disabled={isLoading}
+            rows={1}
             style={{
               flex: 1,
-              padding: '10px 12px',
-              border: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5',
-              borderRadius: '6px',
-              fontSize: '13px',
+              padding: '12px 14px',
+              border: `1px solid ${colors.border}`,
+              borderRadius: '8px',
+              fontSize: '14px',
               opacity: isLoading ? 0.6 : 1,
-              background: isDarkMode ? '#1a1a1a' : '#fff',
-              color: isDarkMode ? '#fff' : '#000'
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              resize: 'none',
+              height: '44px',
+              maxHeight: '120px',
+              overflowY: 'auto',
+              fontFamily: 'inherit',
+              lineHeight: '1.5',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s ease'
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = isDarkMode ? '#666' : '#ccc'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = colors.border
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement
+              target.style.height = '44px'
+              target.style.height = Math.min(target.scrollHeight, 120) + 'px'
             }}
           />
           <button
             onClick={handleSend}
-            className="btn btn-primary"
             disabled={isLoading || !input.trim()}
             style={{
-              padding: '10px 16px',
-              opacity: (isLoading || !input.trim()) ? 0.5 : 1,
-              cursor: (isLoading || !input.trim()) ? 'not-allowed' : 'pointer'
+              padding: '12px 20px',
+              background: (isLoading || !input.trim())
+                ? colors.bgTertiary
+                : (isDarkMode ? '#f0f0f0' : '#000'),
+              color: (isLoading || !input.trim())
+                ? colors.textSecondary
+                : (isDarkMode ? '#000' : '#fff'),
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: (isLoading || !input.trim()) ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+              height: '44px',
+              transition: 'opacity 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (!isLoading && input.trim()) {
+                e.currentTarget.style.opacity = '0.9'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
             }}
           >
-            {isLoading ? '...' : 'Send'}
+            {isLoading ? 'Sending...' : 'Send'}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap');
 
 * {
   margin: 0;
@@ -7,12 +8,25 @@
 }
 
 body {
-  font-family: 'Garamond', system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #ffffff;
-  color: #000000;
+  background: #fdfbf7;
+  color: #2c2825;
+  font-size: 15px;
 }
+
+/* Serif font for headings and large text */
+h1, h2, h3, h4, h5, h6, .serif {
+  font-family: 'EB Garamond', 'Garamond', 'Apple Garamond', 'Baskerville', Georgia, serif;
+}
+
+h1 { font-size: 28px; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+h4 { font-size: 15px; font-weight: 600; }
+h5 { font-size: 14px; font-weight: 600; }
+h6 { font-size: 13px; font-weight: 600; }
 
 /* Basic utility classes */
 .container {
