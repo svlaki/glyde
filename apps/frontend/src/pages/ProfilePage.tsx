@@ -2,68 +2,14 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { fetchUserProfile, updateProfileField } from '../lib/profileService'
 import { Loader, Text, Card, Grid, Progress, Button, Modal, Textarea, TextInput, Badge } from '@mantine/core'
-
-// New sections matching actual backend schema
-const PROFILE_SECTIONS = [
-  {
-    key: 'values',
-    label: 'Values & Beliefs',
-    icon: '',
-    description: 'Your core values, life principles, and what matters most to you',
-    isJsonb: true
-  },
-  {
-    key: 'preferences',
-    label: 'Preferences',
-    icon: '',
-    description: 'How you like things done, work environment, communication style',
-    isJsonb: true
-  },
-  {
-    key: 'work_patterns',
-    label: 'Work Patterns',
-    icon: '',
-    description: 'Productivity habits, peak hours, work style, focus patterns',
-    isJsonb: true
-  },
-  {
-    key: 'personality_traits',
-    label: 'Personality & Traits',
-    icon: '',
-    description: 'Communication style, OCEAN traits, how you approach problems',
-    isJsonb: true
-  },
-  {
-    key: 'context_data',
-    label: 'Additional Context',
-    icon: '',
-    description: 'Any other context that helps the AI understand you better',
-    isJsonb: true
-  },
-  {
-    key: 'goals_summary',
-    label: 'Goals Summary',
-    icon: '',
-    description: 'High-level overview of your goals and aspirations',
-    isJsonb: false // This is TEXT, not JSONB
-  }
-]
-
-interface ProfileData {
-  values?: Record<string, any>
-  preferences?: Record<string, any>
-  work_patterns?: Record<string, any>
-  personality_traits?: Record<string, any>
-  context_data?: Record<string, any>
-  goals_summary?: string
-}
+import { PROFILE_SECTIONS, type ProfileData, type ProfileSection } from '@/lib/profileSections'
 
 export default function ProfilePage() {
   const { user, session } = useAuth()
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedSection, setSelectedSection] = useState<typeof PROFILE_SECTIONS[number] | null>(null)
+  const [selectedSection, setSelectedSection] = useState<ProfileSection | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -227,7 +173,7 @@ function SectionEditModal({
   onClose,
   onUpdate
 }: {
-  section: typeof PROFILE_SECTIONS[number]
+  section: ProfileSection
   data: any
   onClose: () => void
   onUpdate: (field: string, value: any) => void

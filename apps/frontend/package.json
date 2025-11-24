@@ -18,7 +18,7 @@
     "date-fns-tz": "^3.2.0",
     "lucide-react": "^0.523.0",
     "react": "^19.1.0",
-    "react-big-calendar": "^1.12.1",
+    "react-big-calendar": "^1.19.4",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.1.0",
