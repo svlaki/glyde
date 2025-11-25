@@ -1,15 +1,44 @@
 {/* This file controls the agent interaction panel on the calendar page */}
 
+import { useState } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
+import { useInteractions } from '../hooks/useInteractions'
 import { getColors } from '../styles/colors'
 
 export function AgentInteractions() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const interactions = [
-    { id: '1', question: 'Example question?', type: 'yes_no' },
-    { id: '2', question: 'Another question?', type: 'yes_no' }
-  ]
+  const { interactions, respondToInteraction } = useInteractions()
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+
+  const handleResponse = async (interactionId: string, response: string) => {
+    setLoadingId(interactionId)
+    try {
+      await respondToInteraction(interactionId, response)
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  const getButtonOptions = (interaction: any) => {
+    if (interaction.type === 'yes_no') {
+      return [
+        { label: 'Yes', value: 'yes' },
+        { label: 'No', value: 'no' }
+      ]
+    } else if (interaction.type === 'multiple_choice' && interaction.options) {
+      return interaction.options.map((option: string) => ({
+        label: option,
+        value: option
+      }))
+    } else if (interaction.type === 'confirmation') {
+      return [
+        { label: 'Confirm', value: 'confirmed' },
+        { label: 'Cancel', value: 'cancelled' }
+      ]
+    }
+    return []
+  }
 
   return (
     <div style={{
@@ -38,41 +67,43 @@ export function AgentInteractions() {
             No pending suggestions
           </div>
         ) : (
-          interactions.map(interaction => (
-            <div
-              key={interaction.id}
-              style={{
-                background: colors.bgSecondary,
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${colors.border}`
-              }}
-            >
-              <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: colors.textPrimary }}>
-                {interaction.question}
-              </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  className="btn btn-primary"
-                  style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
-                >
-                  Yes
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
-                >
-                  No
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '6px 12px', fontSize: '12px' }}
-                >
-                  Uh
-                </button>
+          interactions.map(interaction => {
+            const buttons = getButtonOptions(interaction)
+            return (
+              <div
+                key={interaction.id}
+                style={{
+                  background: colors.bgSecondary,
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: colors.textPrimary }}>
+                  {interaction.question}
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {buttons.map(button => (
+                    <button
+                      key={button.value}
+                      onClick={() => handleResponse(interaction.id, button.value)}
+                      disabled={loadingId === interaction.id}
+                      className="btn btn-primary"
+                      style={{
+                        flex: buttons.length <= 2 ? 1 : 'auto',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        opacity: loadingId === interaction.id ? 0.6 : 1,
+                        cursor: loadingId === interaction.id ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {loadingId === interaction.id ? '...' : button.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>

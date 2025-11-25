@@ -37,7 +37,7 @@ import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeU
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
-import { getPendingInteractions, respondToInteraction, clearUserInteractions, triggerProactiveAgent } from './interactions.js';
+import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { authenticateRequest } from './middleware/auth.js';
 
@@ -254,9 +254,6 @@ app.post('/api/categories/color', getCategoryColor);
 app.post('/api/interactions/pending', getPendingInteractions);
 app.post('/api/interactions/respond', respondToInteraction);
 app.post('/api/interactions/clear', clearUserInteractions);
-
-// Manual trigger for proactive agent
-app.post('/api/agents/proactive/run', triggerProactiveAgent);
 
 // Chat endpoints
 app.post('/api/chat/history', async (req, res) => {

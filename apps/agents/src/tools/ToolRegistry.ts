@@ -10,6 +10,7 @@ import { goalTools } from './goals/index.js';
 import { profileTools } from './profile/index.js';
 import { searchTools } from './search/index.js';
 import { memoryTools } from './memory/index.js';
+import { interactionTools } from './interactions/index.js';
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -62,6 +63,11 @@ export class ToolRegistry {
     memoryTools.forEach(tool => {
       this.tools.set(tool.name, tool);
     });
+
+    // Register all interaction tools
+    interactionTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
   }
 
   // Register a single tool
@@ -92,7 +98,7 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search'): any[] {
+  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'find_free_time', 'analyze_schedule'],
       categories: ['create_category', 'list_categories', 'update_category', 'delete_category'],
@@ -100,7 +106,8 @@ export class ToolRegistry {
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],
       memory: ['search_memory_unified', 'manage_patterns'],
-      search: ['web_search']
+      search: ['web_search'],
+      interactions: ['create_interaction']
     };
 
     const toolNames = categoryPrefixes[category] || [];
@@ -108,7 +115,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search'): string[] {
+  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

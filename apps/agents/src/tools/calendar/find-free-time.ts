@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { findFreeSlot } from "../../agents/proactive/utils/timeSlotFinder.js";
+import { findFreeSlot } from "../../utils/timeSlotFinder.js";
 import { formatInTimeZone } from "date-fns-tz";
 import { addDays } from "date-fns";
 

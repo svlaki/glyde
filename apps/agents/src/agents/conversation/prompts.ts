@@ -12,6 +12,7 @@ export interface PromptContext {
   tomorrowFormatted: string;
   tomorrowDayName: string;
   toolCount?: number; // Optional: number of available tools
+  zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
 }
 
 /**
@@ -25,7 +26,7 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount } = context;
+  const { timezone, eventContext, taskContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
@@ -34,7 +35,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
 
 YOUR CALENDAR:${eventContext}
 
-YOUR TASKS:${taskContext}
+YOUR TASKS:${taskContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
@@ -265,6 +266,31 @@ Assistant: → Calls update_memory_advanced({
   category: "values",
   triggerEarlyPersistence: true
 }) → "I've noted this important shift in your priorities. This will help me suggest better work-life balance in the future."
+
+INTERACTION METADATA (CRITICAL FOR ACTION):
+When creating interactions, ALWAYS include actionable metadata that specifies what to do when the user responds.
+Example fields: action ("create_event"), eventTitle, startDate, suggestedTime, duration, category, timeOptions (for multiple_choice).
+
+When you create an interaction with metadata like:
+create_interaction({
+  question: "Should I exercise tomorrow?",
+  type: "yes_no",
+  metadata: { action: "create_event", eventTitle: "Exercise", startDate: "2025-01-26", suggestedTime: "09:00", duration: 60, category: "Health" }
+})
+
+You will later receive the user's response WITH that metadata included, so you can immediately execute the action.
+For example, if user clicks "yes", you'll get that metadata and should create the event with those details.
+
+For multiple_choice interactions, include a timeOptions map to convert option labels to times:
+metadata: {
+  action: "create_event",
+  eventTitle: "Workout",
+  startDate: "2025-01-26",
+  duration: 60,
+  category: "Health",
+  timeOptions: { "Morning (6-7am)": "06:00", "Afternoon (2-3pm)": "14:00", "Evening (6-7pm)": "18:00" }
+}
+When user picks "Morning", look up "Morning (6-7am)" in timeOptions to get "06:00" and create the event.
 
 Use tools proactively. When user wants multiple events or tasks, create them all using the appropriate tools multiple times.`);
 }

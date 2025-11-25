@@ -15,18 +15,20 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
   try {
     const zepService = new ZepMemoryService();
 
-    // Search for conversation history using the public searchMemory method
-    const messages = await zepService.searchMemory(user_id, 'conversation history messages', limit);
+    // Get context for the thread (session_id is the threadId)
+    // Zep's thread.getUserContext() returns structured context including conversation history
+    const context = await zepService.getThreadContext(session_id);
 
-    // Format messages for frontend
-    const formattedMessages = messages.map((msg: any) => ({
-      id: msg.id || `msg_${Date.now()}_${Math.random()}`,
-      content: msg.content || '',
-      sender: msg.role === 'user' ? 'user' : 'assistant',
-      timestamp: msg.timestamp || new Date().toISOString()
-    }));
+    // For now, return a simple message with the context
+    // In a full implementation, you'd parse Zep's structured response
+    const message = {
+      id: `context_${Date.now()}`,
+      content: context || 'No context found for this thread',
+      sender: 'system',
+      timestamp: new Date().toISOString()
+    };
 
-    res.json({ success: true, messages: formattedMessages });
+    res.json({ success: true, messages: [message] });
   } catch (error) {
     console.error('Error fetching chat history:', error);
     res.status(500).json({

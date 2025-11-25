@@ -36,11 +36,12 @@ export abstract class BaseAgent {
   // Shared utility methods using Zep for memory
   protected async loadMemoryContext(context: AgentContext, contextType: 'conversation' | 'task_planning' | 'goal_coaching' = 'conversation'): Promise<MemoryContext> {
     try {
-      // Use Zep for memory context loading
-      const zepContext = await this.zepService.getMemoryContext(context.userId);
-      console.log(`Loaded memory context from Zep for user ${context.userId}`);
+      // Use Zep's thread.getUserContext() API for memory context loading
+      // sessionId is the threadId created during conversation
+      const zepContext = await this.zepService.getMemoryContext(context.sessionId, context.userId);
+      console.log(`Loaded memory context from Zep for thread ${context.sessionId}`);
       return zepContext;
-      
+
     } catch (error) {
       console.warn('Failed to load memory context from Zep, falling back to basic context:', error);
       return this.loadBasicMemoryContext(context);

@@ -1,9 +1,11 @@
 /**
- * ZepMemoryService - Manages conversation threads and chat memory
+ * ZepMemoryService - Manages conversation threads and context retrieval
+ *
+ * Uses Zep's built-in thread.getUserContext() API for efficient context retrieval.
  *
  * RESPONSIBILITIES:
- * - Thread/conversation management (create, add messages, search)
- * - User context from conversational history
+ * - Thread/conversation management (create, add messages)
+ * - User context retrieval via thread.getUserContext() (Zep's built-in API)
  * - Message-based memory operations
  *
  * DOES NOT HANDLE:
@@ -38,17 +40,13 @@ export interface ZepMessage {
   metadata?: Record<string, any>;
 }
 
-// REMOVED: Use CalendarEventEntity from ZepGraphService instead
-
-// REMOVED: Use TaskEntity and GoalEntity from ZepGraphService instead
-
 export class ZepMemoryService {
   private client: ZepClient;
   private userSessions: Map<string, string> = new Map();
 
   constructor() {
     const apiKey = env.ZEP_API_KEY;
-    
+
     if (!apiKey) {
       throw new Error('ZEP_API_KEY environment variable is required');
     }
@@ -56,8 +54,8 @@ export class ZepMemoryService {
     this.client = new ZepClient({
       apiKey
     });
-    
-    console.log('ZepMemoryService initialized with API key');
+
+    console.log('ZepMemoryService initialized');
   }
 
   /**
@@ -94,7 +92,7 @@ export class ZepMemoryService {
   /**
    * Get or create a thread for a user
    */
-  private async getOrCreateSession(userId: string): Promise<string> {
+  async getOrCreateSession(userId: string): Promise<string> {
     const existingThreadId = this.userSessions.get(userId);
     if (existingThreadId) {
       return existingThreadId;
@@ -119,11 +117,67 @@ export class ZepMemoryService {
   }
 
   /**
+   * Add a user message to the thread (called before context retrieval to include current message in context)
+   */
+  async addUserMessage(userId: string, userMessage: string, metadata?: Record<string, any>): Promise<void> {
+    try {
+      await this.initUser(userId);
+      const threadId = await this.getOrCreateSession(userId);
+
+      await this.client.thread.addMessages(threadId, {
+        messages: [
+          {
+            content: userMessage,
+            role: 'user' as any,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              ...metadata
+            }
+          } as any
+        ]
+      });
+
+      console.log(`Added user message to Zep thread ${threadId} for user ${userId}`);
+    } catch (error) {
+      console.error('Failed to add user message to Zep:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add an assistant message to the thread (called after generating response)
+   */
+  async addAssistantMessage(userId: string, assistantResponse: string, metadata?: Record<string, any>): Promise<void> {
+    try {
+      await this.initUser(userId);
+      const threadId = await this.getOrCreateSession(userId);
+
+      await this.client.thread.addMessages(threadId, {
+        messages: [
+          {
+            content: assistantResponse,
+            role: 'assistant' as any,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              ...metadata
+            }
+          } as any
+        ]
+      });
+
+      console.log(`Added assistant message to Zep thread ${threadId} for user ${userId}`);
+    } catch (error) {
+      console.error('Failed to add assistant message to Zep:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Add a conversation exchange to memory
    */
   async addConversation(
-    userId: string, 
-    userMessage: string, 
+    userId: string,
+    userMessage: string,
     assistantResponse: string,
     metadata?: Record<string, any>
   ): Promise<void> {
@@ -194,88 +248,48 @@ export class ZepMemoryService {
   }
 
   /**
-   * Get user context from Zep (replaces old getMemoryContext)
+   * Get user context from Zep using thread.getUserContext() API
+   * Returns pre-formatted context block with user summary and relevant facts
+   * Zep automatically determines relevance based on recent messages
    */
-  async getUserContext(userId: string): Promise<string> {
+  async getThreadContext(threadId: string): Promise<string> {
     try {
-      // Use Zep graph search to get user context from recent conversations
-      const memoryResults = await this.searchMemory(userId, 'user preferences goals habits context', 5);
+      const memory = await this.client.thread.getUserContext(threadId);
 
-      if (memoryResults.length === 0) {
-        console.log(`📭 [ZepMemoryService] No memory context found for ${userId}`);
+      if (!memory?.context) {
+        console.log(`[ZepMemoryService] No context found for thread ${threadId}`);
         return '';
       }
 
-      const contextString = memoryResults
-        .map(result => result.content)
-        .join('\n');
-
-      console.log(`✅ [ZepMemoryService] Retrieved ${memoryResults.length} memory items for ${userId}`);
-      return contextString;
+      console.log(`[ZepMemoryService] Retrieved context for thread ${threadId}`);
+      return memory.context;
     } catch (error) {
-      console.error(`❌ [ZepMemoryService] Failed to get user context for ${userId}:`, error);
+      console.error(`[ZepMemoryService] Failed to get thread context for ${threadId}:`, error);
       return '';
     }
   }
 
   /**
-   * Search memory for relevant conversational information
-   * Note: For structured entity search, use ZepGraphService.searchEntities() instead
-   */
-  async searchMemory(userId: string, query: string, limit: number = 10): Promise<any[]> {
-    try {
-      await this.initUser(userId);
-
-      // For now, use graph search for memory content since the thread search API
-      // may have different patterns in v3.x. This should be revisited.
-      const searchResponse = await this.client.graph.search({
-        query: query,
-        userId: userId,
-        limit: limit
-      });
-
-      // Filter for conversation-related content from episodes
-      const episodes = searchResponse.episodes || [];
-      const results = episodes
-        .filter((episode: any) =>
-          episode.content?.includes('conversation') ||
-          episode.content?.includes('message') ||
-          episode.metadata?.type === 'conversation'
-        )
-        .map((episode: any) => ({
-          content: episode.content || '',
-          relevance: 1.0, // Episodes don't have scores directly
-          timestamp: episode.createdAt || new Date().toISOString()
-        }));
-
-      return results;
-    } catch (error) {
-      console.error('Failed to search memory:', error);
-      return [];
-    }
-  }
-
-  /**
    * Get formatted memory context for agents (compatible with existing MemoryContext interface)
+   * Now uses thread.getUserContext() internally
    */
-  async getMemoryContext(userId: string): Promise<MemoryContext> {
+  async getMemoryContext(threadId: string, userId?: string): Promise<MemoryContext> {
     try {
-      const contextString = await this.getUserContext(userId);
-      const sessionId = this.userSessions.get(userId) || '';
+      const contextString = await this.getThreadContext(threadId);
 
       // Create a compatible memory context structure
       const memoryContext: MemoryContext = {
         shortTerm: {
-          sessionId,
+          sessionId: threadId,
           messages: [], // Zep handles this internally
           context: contextString,
           summary: contextString.substring(0, 200), // Brief summary
           lastUpdated: new Date().toISOString()
         },
         longTerm: {
-          userId,
+          userId: userId || '',
           profile: {
-            id: userId,
+            id: userId || '',
             email: '',
             timezone: '',
             preferences: {}
@@ -302,15 +316,15 @@ export class ZepMemoryService {
       // Return empty context structure on error
       return {
         shortTerm: {
-          sessionId: '',
+          sessionId: threadId,
           messages: [],
           context: '',
           lastUpdated: new Date().toISOString()
         },
         longTerm: {
-          userId,
+          userId: userId || '',
           profile: {
-            id: userId,
+            id: userId || '',
             email: '',
             timezone: '',
             preferences: {}
@@ -338,9 +352,8 @@ export class ZepMemoryService {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      // Try to perform a simple operation to check if Zep is available
-      const testUserId = 'health-check-test';
-      await this.searchMemory(testUserId, 'test', 1);
+      // Simple check - try to get a test user
+      await this.initUser('health-check-test');
       return true;
     } catch (error) {
       console.error('Zep health check failed:', error);

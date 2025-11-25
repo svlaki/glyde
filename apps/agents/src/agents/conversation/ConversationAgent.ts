@@ -63,6 +63,13 @@ export class ConversationAgent extends BaseAgent {
 
       console.log(`🌍 [CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
 
+      // Add current message to Zep BEFORE context retrieval so it's included in context
+      try {
+        await this.zepService.addUserMessage(context.userId, message);
+      } catch (error) {
+        console.warn('Failed to add user message to Zep:', error);
+      }
+
       // Get events as UTC - we'll format them for display in the agent prompt
       // Filter to only include events that haven't ended yet (including ongoing multi-day events)
       const now = new Date();
@@ -117,6 +124,13 @@ export class ConversationAgent extends BaseAgent {
 
       let response = lastAiMessage?.content || "Let me work on that for you...";
 
+      // Add assistant response to Zep (user message was already added before context retrieval)
+      try {
+        await this.zepService.addAssistantMessage(context.userId, response);
+      } catch (error) {
+        console.warn('Failed to add assistant message to Zep:', error);
+      }
+
       // Persist conversation to Graphiti memory
       try {
         await this.persistConversationToMemory(context, message, response);
@@ -169,7 +183,7 @@ export class ConversationAgent extends BaseAgent {
     const callModel = async (state: ConversationStateType) => {
       // Load recent events for context using SupabaseService
       let recentEvents: any[] = [];
-      
+
       // Use pre-loaded events if available, otherwise fetch them
       if (state.userEvents && state.userEvents.length > 0) {
         recentEvents = state.userEvents;
@@ -192,7 +206,7 @@ export class ConversationAgent extends BaseAgent {
           console.error('Error loading recent events for context:', error);
         }
       }
-      
+
       const eventContext = recentEvents.length > 0
         ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
             // Events are UTC from database - format for user's timezone display
@@ -228,6 +242,22 @@ export class ConversationAgent extends BaseAgent {
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 
+      // Load Zep thread context using built-in API
+      // This returns Zep's pre-formatted context block with user summary + relevant facts
+      let zepThreadContext = '';
+      try {
+        // Ensure thread exists in Zep before retrieving context
+        const threadId = await this.zepService.getOrCreateSession(state.userId);
+        zepThreadContext = await this.zepService.getThreadContext(threadId);
+        if (zepThreadContext) {
+          console.log(`[CONVERSATION AGENT] Zep context loaded for thread ${threadId}`);
+        } else {
+          console.log(`[CONVERSATION AGENT] No Zep context found for thread`);
+        }
+      } catch (error) {
+        console.error('Error loading Zep context:', error);
+      }
+
       // Calculate temporal context IN USER'S TIMEZONE (critical for correct "tomorrow" interpretation)
       // Get current UTC time
       const nowUtc = new Date();
@@ -239,6 +269,7 @@ export class ConversationAgent extends BaseAgent {
 
       // Build system prompt from extracted function (was 200+ lines inline)
       // Pass tool count from ToolRegistry for dynamic prompt generation
+      // Include Zep's pre-formatted context block with user summary and relevant facts
       const systemMessage = buildSystemPrompt({
         timezone: state.timezone,
         eventContext,
@@ -246,7 +277,8 @@ export class ConversationAgent extends BaseAgent {
         todayFormatted,
         tomorrowFormatted,
         tomorrowDayName,
-        toolCount: tools.length
+        toolCount: tools.length,
+        zepGraphContext: zepThreadContext // Use Zep's built-in context block
       });
 
 
