@@ -5,18 +5,44 @@ import { useDarkMode } from '../lib/darkModeContext'
 import { useInteractions } from '../hooks/useInteractions'
 import { getColors } from '../styles/colors'
 
-export function AgentInteractions() {
+interface AgentInteractionsProps {
+  onInteractionResponse?: ((message: string) => void) | null;
+}
+
+export function AgentInteractions({ onInteractionResponse }: AgentInteractionsProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { interactions, respondToInteraction } = useInteractions()
+  const { interactions, respondToInteraction, generateSuggestions, dismissInteraction } = useInteractions()
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [generatingId, setGeneratingId] = useState<'generating' | null>(null)
+  const [dismissingId, setDismissingId] = useState<string | null>(null)
 
   const handleResponse = async (interactionId: string, response: string) => {
     setLoadingId(interactionId)
     try {
-      await respondToInteraction(interactionId, response)
+      console.log('[AgentInteractions] Responding to interaction:', interactionId, 'response:', response)
+      console.log('[AgentInteractions] Chat callback available?', !!onInteractionResponse)
+      await respondToInteraction(interactionId, response, onInteractionResponse || undefined)
     } finally {
       setLoadingId(null)
+    }
+  }
+
+  const handleDismiss = async (interactionId: string) => {
+    setDismissingId(interactionId)
+    try {
+      await dismissInteraction(interactionId)
+    } finally {
+      setDismissingId(null)
+    }
+  }
+
+  const handleGenerateSuggestions = async () => {
+    setGeneratingId('generating')
+    try {
+      await generateSuggestions()
+    } finally {
+      setGeneratingId(null)
     }
   }
 
@@ -48,11 +74,32 @@ export function AgentInteractions() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '20px 20px 10px 20px'
+        padding: '20px 20px 10px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
         <h3 style={{ fontSize: '20px', fontWeight: '600', margin: 0, color: colors.textPrimary }}>
           Interactions
         </h3>
+        <button
+          onClick={handleGenerateSuggestions}
+          disabled={generatingId === 'generating'}
+          style={{
+            padding: '6px 12px',
+            fontSize: '12px',
+            backgroundColor: '#4f46e5',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: generatingId === 'generating' ? 'not-allowed' : 'pointer',
+            opacity: generatingId === 'generating' ? 0.6 : 1,
+            fontWeight: '500'
+          }}
+          title="Generate new suggestions based on your calendar, tasks, and goals"
+        >
+          {generatingId === 'generating' ? 'Generating...' : 'Generate'}
+        </button>
       </div>
 
       {/* Interactions */}
@@ -76,10 +123,32 @@ export function AgentInteractions() {
                   background: colors.bgSecondary,
                   padding: '12px',
                   borderRadius: '8px',
-                  border: `1px solid ${colors.border}`
+                  border: `1px solid ${colors.border}`,
+                  position: 'relative'
                 }}
               >
-                <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: colors.textPrimary }}>
+                {/* Dismiss button */}
+                <button
+                  onClick={() => handleDismiss(interaction.id)}
+                  disabled={dismissingId === interaction.id}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: colors.textTertiary,
+                    cursor: dismissingId === interaction.id ? 'not-allowed' : 'pointer',
+                    fontSize: '16px',
+                    padding: '4px 8px',
+                    opacity: dismissingId === interaction.id ? 0.5 : 0.7
+                  }}
+                  title="Dismiss this suggestion"
+                >
+                  ✕
+                </button>
+
+                <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: colors.textPrimary, paddingRight: '20px' }}>
                   {interaction.question}
                 </p>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

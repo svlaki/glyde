@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react'
 import { supabase } from './supabase'
 import type { User, Session } from '@supabase/supabase-js'
 
@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const startupTriggeredRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     // Check for existing session on mount
@@ -74,10 +75,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
   
-  // Schema creation is no longer needed - using public tables with RLS
-  function callUserSchemaCreation(session: Session) {
-    // No-op: User schemas are deprecated in favor of public tables with RLS
+  // Trigger startup interactions when user authenticates or app opens
+  async function callUserSchemaCreation(session: Session) {
+    // User schemas are deprecated in favor of public tables with RLS
     console.log('User authenticated - using public tables with RLS');
+
+    // Deduplicate: only trigger startup once per session
+    if (startupTriggeredRef.current.has(session.user.id)) {
+      console.log('ℹ️ Startup interactions already triggered for this session');
+      return;
+    }
+    startupTriggeredRef.current.add(session.user.id);
+
+    // Generate proactive startup interactions
+    try {
+      const token = session.access_token;
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/interactions/generate-startup`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Proactive interactions generation initiated:', data.message);
+      } else {
+        console.warn('⚠️ Failed to generate startup interactions:', response.status);
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not trigger startup interactions (non-critical):', error);
+    }
   }
 
   async function signIn(email: string, password: string) {

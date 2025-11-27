@@ -55,7 +55,16 @@ export function useInteractions() {
       // Then fetch pending interactions
       const pending = await interactionService.getPendingInteractions();
       const transformed = pending.map(transformInteraction);
-      setInteractions(transformed);
+
+      // Merge with existing interactions, avoiding duplicates
+      setInteractions(prev => {
+        // Create a map of existing IDs for quick lookup
+        const existingIds = new Set(prev.map(i => i.id));
+        // Filter out any incoming interactions that already exist
+        const newInteractions = transformed.filter(i => !existingIds.has(i.id));
+        // Combine and sort
+        return [...prev, ...newInteractions].sort((a, b) => b.priority - a.priority);
+      });
     } catch (err) {
       console.error('Error loading interactions:', err);
       setError('Failed to load interactions');
@@ -65,12 +74,26 @@ export function useInteractions() {
   }, [user?.id, transformInteraction]);
 
   // Handle interaction response
-  const respondToInteraction = useCallback(async (interactionId: string, response: string) => {
+  const respondToInteraction = useCallback(async (interactionId: string, response: string, onChatMessage?: (message: string) => void) => {
     try {
-      await interactionService.respondToInteraction(interactionId, response);
+      console.log('[useInteractions] Responding to interaction:', interactionId, 'response:', response);
+      const result = await interactionService.respondToInteraction(interactionId, response);
+      console.log('[useInteractions] Interaction response result:', result);
 
       // Remove from UI immediately for better UX
       setInteractions(prev => prev.filter(i => i.id !== interactionId));
+
+      // If agent provided a response and callback is provided, send to chat
+      if (result.agentResponse) {
+        console.log('[useInteractions] Got agent response, calling callback:', result.agentResponse);
+        if (onChatMessage) {
+          onChatMessage(result.agentResponse);
+        } else {
+          console.warn('[useInteractions] onChatMessage callback not provided, response will not appear in chat');
+        }
+      } else {
+        console.warn('[useInteractions] No agentResponse in result');
+      }
     } catch (err) {
       console.error('Error responding to interaction:', err);
       setError('Failed to save response');
@@ -106,9 +129,16 @@ export function useInteractions() {
       const { type, interaction } = event.detail;
 
       if (type === 'INSERT' && interaction.status === 'pending') {
-        // Add new interaction
-        const transformed = transformInteraction(interaction);
-        setInteractions(prev => [...prev, transformed].sort((a, b) => b.priority - a.priority));
+        // Add new interaction only if not already present
+        setInteractions(prev => {
+          // Check if interaction already exists
+          if (prev.some(i => i.id === interaction.id)) {
+            console.log('[useInteractions] Ignoring duplicate interaction:', interaction.id);
+            return prev;
+          }
+          const transformed = transformInteraction(interaction);
+          return [...prev, transformed].sort((a, b) => b.priority - a.priority);
+        });
       } else if (type === 'UPDATE') {
         if (interaction.status !== 'pending') {
           // Remove if no longer pending
@@ -136,17 +166,43 @@ export function useInteractions() {
     };
   }, [user?.id, loadInteractions, transformInteraction]);
 
-  // Periodic check for expired interactions (every minute)
+  // Periodic refresh: check for new interactions every 10 seconds initially, then every 60 seconds
   useEffect(() => {
     if (!user?.id) return;
 
-    const interval = setInterval(async () => {
+    // Fast poll for first 2 minutes (catch startup interactions quickly)
+    let fastPollInterval: NodeJS.Timeout | null = setInterval(async () => {
       await interactionService.expireOldInteractions();
       await loadInteractions();
-    }, 60000);
+    }, 10000); // 10 seconds
 
-    return () => clearInterval(interval);
+    // After 2 minutes, switch to slower polling
+    const slowPollTimer = setTimeout(() => {
+      if (fastPollInterval) clearInterval(fastPollInterval);
+      fastPollInterval = setInterval(async () => {
+        await interactionService.expireOldInteractions();
+        await loadInteractions();
+      }, 60000); // 60 seconds
+    }, 120000); // 2 minutes
+
+    return () => {
+      if (fastPollInterval) clearInterval(fastPollInterval);
+      clearTimeout(slowPollTimer);
+    };
   }, [user?.id, loadInteractions]);
+
+  const generateSuggestions = useCallback(async () => {
+    try {
+      await interactionService.generateSuggestions();
+      // After generation, wait a moment then refresh to pick up new interactions
+      setTimeout(() => {
+        loadInteractions();
+      }, 500);
+    } catch (err) {
+      console.error('Error generating suggestions:', err);
+      setError('Failed to generate suggestions');
+    }
+  }, [loadInteractions]);
 
   return {
     interactions,
@@ -155,5 +211,6 @@ export function useInteractions() {
     respondToInteraction,
     dismissInteraction,
     refreshInteractions: loadInteractions,
+    generateSuggestions,
   };
 }

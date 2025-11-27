@@ -28,23 +28,10 @@ export const createTaskTool = tool(
         return "❌ Failed to create task";
       }
 
-      // Add to Zep knowledge graph asynchronously
-      const addToGraph = async () => {
-        try {
-          await zepGraphService.addTask(userId, {
-            taskId: task.id,
-            title,
-            priority: priority || 'medium',
-            category: category || 'personal',
-            estimated_duration: estimatedDuration ?? undefined,
-            energy_required: energyRequired || 'medium',
-          });
-          console.log(`✅ [create-task] Task added to knowledge graph: ${title}`);
-        } catch (error) {
-          console.error('⚠️ [create-task] Failed to add to knowledge graph (non-critical):', error);
-        }
-      };
-      addToGraph(); // Fire and forget
+      // Note: Graph sync disabled to prevent Zep graph bloat
+      // Individual task creation creates too many nodes
+      // Graph should only contain summary patterns, not every action
+      // TODO: Implement selective sync only for significant tasks or via periodic aggregation
 
       const dueDateStr = dueDate ? ` (Due: ${new Date(dueDate).toLocaleDateString()})` : '';
       return `✅ Task created: "${title}"${dueDateStr}`;

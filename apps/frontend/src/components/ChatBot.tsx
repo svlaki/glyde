@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
@@ -10,9 +10,13 @@ interface Message {
   timestamp: Date
 }
 
+interface ChatBotProps {
+  onSetResponseCallback?: (callback: (message: string) => void) => void;
+}
+
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-export function ChatBot() {
+export function ChatBot({ onSetResponseCallback }: ChatBotProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -84,9 +88,34 @@ export function ChatBot() {
       ])
     }
   }, [user?.id])
+
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Set up callback for interaction responses to be added to chat
+  // Only register once on mount - don't re-register when callback changes
+  useEffect(() => {
+    if (onSetResponseCallback) {
+      const addResponseToChat = (message: string) => {
+        console.log('[ChatBot] Received message from interaction callback:', message, 'type:', typeof message, 'length:', message?.length)
+        if (!message || (typeof message === 'string' && message.trim().length === 0)) {
+          console.warn('[ChatBot] Received empty/null message from interaction response')
+          return
+        }
+        const botMessage: Message = {
+          id: Date.now().toString(),
+          text: String(message),
+          sender: 'bot',
+          timestamp: new Date()
+        }
+        console.log('[ChatBot] Adding bot message to chat:', botMessage.text)
+        setMessages(prev => [...prev, botMessage])
+      }
+      console.log('[ChatBot] Registering callback with parent')
+      onSetResponseCallback(addResponseToChat)
+    }
+  }, [])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

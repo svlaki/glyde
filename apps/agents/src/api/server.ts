@@ -254,6 +254,9 @@ app.post('/api/categories/color', getCategoryColor);
 app.post('/api/interactions/pending', getPendingInteractions);
 app.post('/api/interactions/respond', respondToInteraction);
 app.post('/api/interactions/clear', clearUserInteractions);
+// DISABLED: Automatic startup interaction generation removed
+// Interactions are now created directly by the agent via create_interaction tool
+// app.post('/api/interactions/generate-startup', generateStartupInteractions);
 
 // Chat endpoints
 app.post('/api/chat/history', async (req, res) => {

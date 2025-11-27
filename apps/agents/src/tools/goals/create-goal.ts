@@ -29,24 +29,10 @@ export const createGoalTool = tool(
         return "❌ Failed to create goal";
       }
 
-      // Add to Zep knowledge graph asynchronously
-      const addToGraph = async () => {
-        try {
-          await zepGraphService.addGoal(userId, {
-            goalId: goal.id,
-            title,
-            goal_type: goalType || 'SMART',
-            status: 'active',
-            progress_percentage: 0,
-            deadline: targetDate,
-            time_invested_minutes: 0,
-          });
-          console.log(`✅ [create-goal] Goal added to knowledge graph: ${title}`);
-        } catch (error) {
-          console.error('⚠️ [create-goal] Failed to add to knowledge graph (non-critical):', error);
-        }
-      };
-      addToGraph(); // Fire and forget
+      // Note: Graph sync disabled to prevent Zep graph bloat
+      // Individual goal creation creates too many nodes
+      // Graph should only contain summary patterns, not every action
+      // TODO: Implement selective sync only for significant goals or via periodic aggregation
 
       const targetStr = targetDate ? ` (Target: ${new Date(targetDate).toLocaleDateString()})` : '';
       return `✅ Goal created: "${title}"${targetStr}`;

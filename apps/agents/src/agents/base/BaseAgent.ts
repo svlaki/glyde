@@ -3,17 +3,14 @@ import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepMemoryService } from "../../services/ZepMemoryService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { env } from "../../utils/env.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
   protected supabaseService: SupabaseService;
   protected zepService: ZepMemoryService;
-  protected zepGraphService: ZepGraphService;
   protected agentType: AgentType;
   protected tools: any[] = [];
-  protected userNodeCache: Map<string, string> = new Map(); // Cache user node UUIDs
 
   constructor(agentType: AgentType, modelName: string = "gpt-4o-mini") {
     this.agentType = agentType;
@@ -24,7 +21,6 @@ export abstract class BaseAgent {
     });
     this.supabaseService = new SupabaseService();
     this.zepService = new ZepMemoryService();
-    this.zepGraphService = new ZepGraphService();
   }
 
   // Abstract methods that each agent must implement
@@ -165,21 +161,11 @@ export abstract class BaseAgent {
     actualDuration?: number,
     completionNotes?: string
   ): Promise<void> {
-    try {
-      await this.zepGraphService.addTask(userId, {
-        taskId: `task-${Date.now()}`,
-        title: taskTitle,
-        priority: 'medium',
-        category: undefined,
-        estimated_duration: actualDuration,
-        actual_duration: actualDuration,
-        satisfaction_rating: undefined,
-        energy_required: energyUsed || 'medium'
-      });
-      console.log(`Persisted task completion to Zep Graph for user ${userId}: ${taskTitle}`);
-    } catch (error) {
-      console.error('Failed to persist task completion to Zep Graph:', error);
-    }
+    // Note: Graph sync disabled to prevent Zep graph bloat
+    // Task completion sync creates too many nodes
+    // Graph should only contain summary patterns, not every action
+    // TODO: Implement periodic aggregation of task completions as patterns instead
+    console.log(`Task completion tracked for user ${userId}: ${taskTitle}`);
   }
 
   protected async persistGoalProgressToMemory(
@@ -190,13 +176,11 @@ export abstract class BaseAgent {
     moodRating?: number,
     confidenceLevel?: number
   ): Promise<void> {
-    try {
-      // Note: ZepGraphService doesn't have addGoal method yet, so we'll skip this for now
-      // This should be implemented when goal tracking is added to ZepGraphService
-      console.log(`Goal progress tracking not yet implemented in ZepGraphService for user ${userId}: ${goalTitle} (${currentProgress}%)`);
-    } catch (error) {
-      console.error('Failed to persist goal progress to Zep Graph:', error);
-    }
+    // Note: Graph sync disabled to prevent Zep graph bloat
+    // Goal progress sync creates too many nodes
+    // Graph should only contain summary patterns, not every action
+    // TODO: Implement periodic aggregation of goal progress as patterns instead
+    console.log(`Goal progress tracked for user ${userId}: ${goalTitle} (${currentProgress}%)`);
   }
 
   protected async persistCalendarEventToMemory(
@@ -210,20 +194,11 @@ export abstract class BaseAgent {
     energy_level?: 'low' | 'medium' | 'high',
     category?: string
   ): Promise<void> {
-    try {
-      await this.zepGraphService.addCalendarEvent(userId, {
-        eventId: `event-${Date.now()}`,
-        title: eventTitle,
-        category: category || 'personal',
-        duration_minutes: endTime ? Math.round((endTime.getTime() - startTime.getTime()) / 60000) : undefined,
-        energy_level: energy_level || 'medium',
-        location,
-        attendee_count: attendees?.length || 0
-      });
-      console.log(`Persisted calendar event to Zep Graph for user ${userId}: ${eventTitle} (${category || 'Personal'})`);
-    } catch (error) {
-      console.error('Failed to persist calendar event to Zep Graph:', error);
-    }
+    // Note: Graph sync disabled to prevent Zep graph bloat
+    // Calendar event sync creates too many nodes
+    // Graph should only contain summary patterns, not every action
+    // TODO: Implement periodic aggregation of calendar patterns instead
+    console.log(`Calendar event tracked for user ${userId}: ${eventTitle} (${category || 'Personal'})`);
   }
 
   // Utility method for other agents to call this agent

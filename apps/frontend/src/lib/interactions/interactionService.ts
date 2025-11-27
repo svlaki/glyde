@@ -101,7 +101,7 @@ class InteractionService {
     return data || [];
   }
 
-  async respondToInteraction(interactionId: string, response: string): Promise<void> {
+  async respondToInteraction(interactionId: string, response: string): Promise<{ agentResponse?: string; metadata?: any }> {
     if (!this.userId) throw new Error('User not initialized');
 
     const session = await supabase.auth.getSession();
@@ -111,7 +111,9 @@ class InteractionService {
       throw new Error('No active session found');
     }
 
-    const apiResponse = await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
+    // Save the interaction response and get agent response in one call
+    // The backend handles all the context-aware processing
+    const respondResponse = await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -123,10 +125,16 @@ class InteractionService {
       })
     });
 
-    if (!apiResponse.ok) {
-      const errorBody = await apiResponse.json().catch(() => ({}));
+    if (!respondResponse.ok) {
+      const errorBody = await respondResponse.json().catch(() => ({}));
       throw new Error(errorBody.error || 'Failed to respond to interaction');
     }
+
+    const result = await respondResponse.json();
+    return {
+      agentResponse: result.agentResponse,
+      metadata: result.metadata
+    };
   }
 
   async dismissInteraction(interactionId: string): Promise<void> {
@@ -198,6 +206,45 @@ class InteractionService {
 
     if (error) {
       console.error('Error expiring interactions:', error);
+    }
+  }
+
+  async generateSuggestions(): Promise<void> {
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    if (!token) {
+      throw new Error('No active session found');
+    }
+
+    if (!this.userId) {
+      throw new Error('User not initialized');
+    }
+
+    // Call the agent to generate suggestions
+    // The agent will use create_interaction tool to create interactive prompts
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const apiResponse = await fetch(`${AGENT_SERVICE_URL}/api/agent/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        context: {
+          userId: this.userId,
+          sessionId: `suggestions-${Date.now()}`,
+          timezone: userTimezone,
+          conversationHistory: []
+        },
+        message: 'Generate some personalized suggestions or interactions based on my calendar, tasks, and goals. Create interactive prompts that I can respond to.',
+        isInternal: true // Internal message - don't store in chat
+      })
+    });
+
+    if (!apiResponse.ok) {
+      const errorBody = await apiResponse.json().catch(() => ({}));
+      throw new Error(errorBody.error || 'Failed to generate suggestions');
     }
   }
 

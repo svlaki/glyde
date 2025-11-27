@@ -62,10 +62,10 @@ export class ConversationAgent extends BaseAgent {
       const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
       if (!userProfile?.timezone) {
-        console.warn(`⚠️ [CONVERSATION AGENT] User profile missing timezone, falling back to ${userTimezone}`);
+        console.warn(`[CONVERSATION AGENT] User profile missing timezone, falling back to ${userTimezone}`);
       }
 
-      console.log(`🌍 [CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
+      console.log(`[CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
 
       // Add current message to Zep BEFORE context retrieval so it's included in context
       try {
@@ -140,13 +140,6 @@ export class ConversationAgent extends BaseAgent {
         console.warn('Failed to add assistant message to Zep:', error);
       }
 
-      // Persist conversation to Graphiti memory
-      try {
-        await this.persistConversationToMemory(context, message, response);
-      } catch (error) {
-        console.warn('Failed to persist conversation to memory:', error);
-      }
-
       return {
         content: response,
         type: 'text'
@@ -161,7 +154,13 @@ export class ConversationAgent extends BaseAgent {
   }
 
   getSystemPrompt(): string {
-    return "You are a helpful personal assistant that helps users manage their calendar and tasks through natural language commands.";
+    return `You are a helpful personal assistant that helps users manage their calendar and tasks through natural language commands.
+
+IMPORTANT INSTRUCTIONS:
+- Do NOT use emojis in any output, logging, or generated content
+- Do NOT suggest or create category names with emojis
+- Keep all responses and category names plain text without emoji characters
+- When processing categories, remove any emoji characters if provided by the user`;
   }
 
   getCapabilities(): string[] {
@@ -313,9 +312,17 @@ export class ConversationAgent extends BaseAgent {
 
 
       const messages = [systemMessage, ...state.messages];
-      
+
+      console.log(`[AGENT NODE] Invoking model with ${messages.length} messages (${state.messages.length} state messages)`);
       const response = await modelWithTools.invoke(messages);
-      
+      console.log(`[AGENT NODE] Model response type: ${response._getType()}`);
+      console.log(`[AGENT NODE] Model response has tool_calls: ${(response as any).tool_calls ? (response as any).tool_calls.length : 0}`);
+      if ((response as any).tool_calls && (response as any).tool_calls.length > 0) {
+        console.log(`[AGENT NODE] Tool calls requested:`, (response as any).tool_calls.map((t: any) => ({ name: t.name || t.tool, args: t.args })));
+      } else {
+        console.log(`[AGENT NODE] Model response content:`, response.content);
+      }
+
       return {
         messages: [response],
       };
@@ -323,17 +330,21 @@ export class ConversationAgent extends BaseAgent {
 
     const executeTools = async (state: ConversationStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
+      console.log(`[TOOLS NODE] Checking last message type: ${lastMessage._getType()}`);
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls && (lastMessage as any).tool_calls.length > 0) {
+        console.log(`[TOOLS NODE] Found ${(lastMessage as any).tool_calls.length} tool calls to execute:`, (lastMessage as any).tool_calls.map((t: any) => t.name || t.tool));
         const toolResults = await toolNode.invoke(state, {
           configurable: {
             userId: state.userId,
             timezone: state.timezone
           }
         });
+        console.log(`[TOOLS NODE] Tool execution completed, results:`, toolResults.messages);
         return {
           messages: toolResults.messages,
         };
       }
+      console.log(`[TOOLS NODE] No tool calls found in message`);
       return {};
     };
 

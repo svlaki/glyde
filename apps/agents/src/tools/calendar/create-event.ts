@@ -2,7 +2,9 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { CategoryService } from "../../services/CategoryService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
+import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 
 export const createEventTool = tool(
   async ({ title, startTime, endTime, location, description, category, replaceConflicting = false }, config) => {
@@ -16,17 +18,54 @@ export const createEventTool = tool(
       throw new Error("Timezone is required for creating events");
     }
 
-    console.log('🔧 [CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category, timezone, replaceConflicting });
+    console.log('[CREATE-EVENT TOOL] Starting event creation:', { title, startTime, endTime, category, timezone, replaceConflicting });
 
     // Initialize services
     const supabaseService = new SupabaseService();
     const zepGraphService = new ZepGraphService();
+    const categoryService = new CategoryService();
+
+    // Validate and ensure category exists
+    let validatedCategory = category;
+    if (category && category.trim().length > 0) {
+      try {
+        console.log(`[CREATE-EVENT TOOL] Validating category: "${category}"`);
+
+        // Check if category exists
+        let existingCategory = await categoryService.getCategoryByName(userId, category.trim());
+
+        if (!existingCategory) {
+          // Category doesn't exist, create it with a default color
+          console.log(`[CREATE-EVENT TOOL] Category "${category}" does not exist, creating it...`);
+          const defaultColor = '#3b82f6'; // Blue
+          existingCategory = await categoryService.createCategory(userId, {
+            name: category.trim(),
+            color: defaultColor,
+            icon: undefined,
+            description: `Auto-created for event: ${title}`
+          });
+
+          if (!existingCategory) {
+            console.warn(`[CREATE-EVENT TOOL] Failed to create category "${category}", will use it anyway`);
+          } else {
+            console.log(`[CREATE-EVENT TOOL] Successfully created category: "${category}"`);
+          }
+        } else {
+          console.log(`[CREATE-EVENT TOOL] Category "${category}" already exists`);
+        }
+
+        validatedCategory = category.trim();
+      } catch (error) {
+        console.warn(`[CREATE-EVENT TOOL] Error validating/creating category "${category}":`, error);
+        // Continue with event creation even if category validation fails - the category name itself is valid
+      }
+    }
 
     // Convert local times to UTC for storage
     const startTimeUTC = convertToUTC(startTime, timezone);
     const endTimeUTC = convertToUTC(endTime, timezone);
 
-    console.log(`🌍 [CREATE-EVENT TOOL] Converted times - Local: ${startTime} → UTC: ${startTimeUTC}`);
+    console.log(`[CREATE-EVENT TOOL] Converted times - Local: ${startTime} -> UTC: ${startTimeUTC}`);
 
     // Check for conflicts using UTC times
     try {
@@ -50,7 +89,7 @@ export const createEventTool = tool(
 
         // If replaceConflicting is true, delete the conflicting event and continue
         if (replaceConflicting) {
-          console.log(`🔄 [CREATE-EVENT TOOL] Auto-deleting conflicting event: "${conflictingEvent.title}"`);
+          console.log(`[CREATE-EVENT TOOL] Auto-deleting conflicting event: "${conflictingEvent.title}"`);
 
           const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id);
 
@@ -58,14 +97,27 @@ export const createEventTool = tool(
             throw new Error(`Failed to delete conflicting event "${conflictingEvent.title}": ${deleteResult.error}`);
           }
 
-          console.log(`✅ [CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
+          console.log(`[CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
 
-          // Delete from graph too (fire and forget)
-          zepGraphService.deleteCalendarEvent(conflictingEvent.id).catch(err =>
-            console.error('Failed to remove conflicting event from graph:', err)
-          );
+          // Delete from graph with intentional sync tracking
+          // Don't block event creation if graph deletion fails - it's non-critical
+          executeZepOperation(
+            {
+              userId,
+              entityType: 'event',
+              entityId: conflictingEvent.id,
+              operation: 'delete',
+              maxRetries: 2
+            },
+            async () => {
+              await zepGraphService.deleteCalendarEvent(conflictingEvent.id);
+              return conflictingEvent.id;
+            }
+          ).catch(err => {
+            console.warn('[CREATE-EVENT TOOL] Non-critical: Failed to remove conflicting event from graph:', err);
+          });
         } else {
-          return `⚠️ Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+          return `Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
         }
       }
     } catch (error) {
@@ -80,52 +132,29 @@ export const createEventTool = tool(
       end_time: endTimeUTC,
       location: location || "",
       description: description || "",
-      category: category || ''
+      category: validatedCategory || ''
     });
 
-    console.log('📋 [CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
-    
+    console.log('[CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
+
     if (!event) {
-      console.error('❌ [CREATE-EVENT TOOL] Event creation failed - supabaseService.createEvent returned null');
+      console.error('[CREATE-EVENT TOOL] Event creation failed - supabaseService.createEvent returned null');
       throw new Error("Failed to create event - database operation returned null. Check server logs for details.");
     }
 
-    console.log('✅ [CREATE-EVENT TOOL] Event created successfully:', event.id);
+    console.log('[CREATE-EVENT TOOL] Event created successfully:', event.id);
 
-    // Add to knowledge graph asynchronously (fire-and-forget for speed)
-    const addToGraph = async () => {
-      try {
-        console.log('🧠 [CREATE-EVENT TOOL] Adding to knowledge graph (async)...');
-
-        const startDate = new Date(startTimeUTC);
-        const endDate = new Date(endTimeUTC);
-        const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-
-        await zepGraphService.addCalendarEvent(userId, {
-          eventId: event.id,
-          title,
-          category: category || '',
-          duration_minutes: durationMinutes,
-          energy_level: 'medium',
-          location: location || undefined,
-          attendee_count: 0
-        });
-
-        console.log(`✅ [CREATE-EVENT TOOL] Event added to knowledge graph with category: ${category}`);
-      } catch (error) {
-        console.error('⚠️ [CREATE-EVENT TOOL] Failed to add event to knowledge graph (non-critical):', error);
-      }
-    };
-
-    // Fire and forget - don't await this
-    addToGraph();
+    // Note: Automatic graph sync disabled to prevent Zep graph bloat
+    // Individual event creation creates too many nodes
+    // Graph should only contain summary patterns, not every action
+    // TODO: Implement selective sync only for significant events or via periodic aggregation
 
     // Add context about category in response
-    const categoryContext = category
-      ? ` in category "${category}"`
+    const categoryContext = validatedCategory
+      ? ` in category "${validatedCategory}"`
       : '';
 
-    return `✅ Event created successfully: "${title}" at ${formatEventTime(startTimeUTC, timezone)}${categoryContext}`;
+    return `Event created successfully: "${title}" at ${formatEventTime(startTimeUTC, timezone)}${categoryContext}`;
   },
   {
     name: "create_event",
