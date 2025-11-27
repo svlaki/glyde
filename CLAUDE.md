@@ -49,12 +49,12 @@ We're implementing a unified LangChain/LangGraph system with centralized tool ar
 - **Centralized Tool System**: All tools are centralized in `/tools/` directory
 - **Tool-Based Communication**: Agents use standardized tool calls for actions
 - **Shared Memory**: Vector embeddings and persistent memory shared across agents
-- **Streaming Interface**: Real-time updates via Vercel AI SDK
+- **Streaming Interface**: Real-time LLM responses via @llm-ui/react
 - **Type Safety**: Full TypeScript interfaces for all agent interactions
 
 ### Technical Stack for Agents
 - **LangChain.js**: Core agent functionality and tool calling
-- **Vercel AI SDK**: Streaming responses to React frontend
+- **@llm-ui/react**: Streaming LLM responses to React frontend
 - **OpenAI GPT-4**: Primary LLM (with option for local models)
 - **Supabase**: Persistent memory, vector search, and real-time updates
 
@@ -86,7 +86,7 @@ src/tools/
 1. User sends message → **Conversation Agent** (orchestrator)
 2. Conversation Agent determines which specialized agents to involve
 3. Agents execute via **centralized tool calls**
-4. Results stream back to frontend via **Vercel AI SDK**
+4. Results stream back to frontend via **@llm-ui/react**
 5. All actions persisted to **Supabase** with vector embeddings
 
 ## Key Features to Implement
@@ -321,7 +321,7 @@ mcp__serena__write_memory({
 - Centralized tool definitions in /tools/ directory
 - Each tool exports standardized schema with input/output types
 - Tools registered in AgentRegistry for cross-agent access
-- Streaming support via Vercel AI SDK integration
+- Streaming support via @llm-ui/react integration
 
 ## Key Files
 - src/tools/registry.ts - Central tool registration
@@ -341,7 +341,7 @@ mcp__serena__read_memory({ memory_file_name: "architecture-agent-communication-f
 Integration Points
 
 Supabase Realtime: Subscribe to table changes
-OpenAI Streaming: Use Vercel AI SDK
+OpenAI Streaming: Use @llm-ui/react for real-time LLM responses
 Vector Search: Use pgvector for similarity
 Calendar Sync: Google Calendar API (future)
 Serena MCP: Semantic code analysis and precise editing
@@ -375,7 +375,7 @@ Development Workflow
 3. **Create centralized tools** in `/tools/` directory with proper schemas
 4. **Implement agent** using BaseAgent class and documented patterns
 5. **Register agent** in AgentRegistry with full type safety
-6. **Add streaming support** via Vercel AI SDK integration
+6. **Add streaming support** via @llm-ui/react integration
 7. **Test tool integration** and memory persistence
 8. **Update TypeScript interfaces** and document in memory
 9. **Write memory** documenting the new agent's capabilities and integration

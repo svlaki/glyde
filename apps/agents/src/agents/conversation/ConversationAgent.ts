@@ -29,6 +29,10 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  userGoals: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -81,6 +85,10 @@ export class ConversationAgent extends BaseAgent {
       const userTasks = await supabaseService.getTasks(context.userId);
       console.log(`Loading ${userTasks?.length || 0} tasks for user ${context.userId}`);
 
+      // Get user goals
+      const userGoals = await supabaseService.getGoals(context.userId);
+      console.log(`Loading ${userGoals?.length || 0} goals for user ${context.userId}`);
+
       // Build conversation history from context
       const messages: BaseMessage[] = [];
       
@@ -110,6 +118,7 @@ export class ConversationAgent extends BaseAgent {
         timezone: userTimezone, // Use resolved timezone from profile, context, or UTC fallback
         userEvents: userEvents || [],
         userTasks: userTasks || [],
+        userGoals: userGoals || [],
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -242,6 +251,26 @@ export class ConversationAgent extends BaseAgent {
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 
+      // Load user goals for context
+      let userGoals: any[] = [];
+      if (state.userGoals && state.userGoals.length > 0) {
+        userGoals = state.userGoals;
+        console.log(`Using ${userGoals.length} pre-loaded goals for context`);
+      }
+
+      const goalContext = userGoals.length > 0
+        ? `\n\nUSER'S GOALS (${userGoals.length} total):\n${userGoals.map((g, idx) => {
+            const targetStr = g.target_date ? ` (Target: ${formatInTimeZone(toDate(g.target_date), state.timezone, 'MMM d, yyyy')})` : '';
+            const progressStr = g.progress !== null && g.progress !== undefined ? ` - ${g.progress}% complete` : '';
+            const statusStr = g.status ? ` [${g.status.toUpperCase()}]` : '';
+            const categoryStr = g.category ? ` (${g.category})` : '';
+            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${categoryStr}`;
+          }).join('\n')}`
+        : `\n\nUSER'S GOALS: No goals set`;
+
+      // Log the actual goal context being sent to the LLM
+      console.log(`📊 [GOAL CONTEXT] ${goalContext}`);
+
       // Load Zep thread context using built-in API
       // This returns Zep's pre-formatted context block with user summary + relevant facts
       let zepThreadContext = '';
@@ -274,6 +303,7 @@ export class ConversationAgent extends BaseAgent {
         timezone: state.timezone,
         eventContext,
         taskContext,
+        goalContext,
         todayFormatted,
         tomorrowFormatted,
         tomorrowDayName,

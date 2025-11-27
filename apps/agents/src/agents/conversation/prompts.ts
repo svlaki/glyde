@@ -8,6 +8,7 @@ export interface PromptContext {
   timezone: string;
   eventContext: string;
   taskContext: string;
+  goalContext: string;
   todayFormatted: string;
   tomorrowFormatted: string;
   tomorrowDayName: string;
@@ -26,7 +27,7 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext } = context;
+  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
@@ -35,7 +36,9 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
 
 YOUR CALENDAR:${eventContext}
 
-YOUR TASKS:${taskContext}${zepGraphContext || ''}
+YOUR TASKS:${taskContext}
+
+YOUR GOALS:${goalContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
