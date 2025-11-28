@@ -166,11 +166,127 @@ IMPORTANT INSTRUCTIONS:
   getCapabilities(): string[] {
     return [
       "Create, update, delete calendar events",
-      "Search and list calendar events", 
+      "Search and list calendar events",
       "Create tasks",
       "Natural language date/time parsing",
       "Smart defaults for event creation"
     ];
+  }
+
+  /**
+   * Stream message processing for token-by-token output.
+   * Uses LangGraph's streamEvents() method.
+   */
+  async *streamMessage(context: AgentContext, message: string): AsyncGenerator<{
+    type: 'text-delta' | 'tool-start' | 'tool-end' | 'error' | 'status';
+    content?: string;
+    toolName?: string;
+    toolResult?: any;
+  }> {
+    try {
+      // Immediately yield status so user sees activity
+      yield { type: 'status', content: 'Loading your context...' };
+
+      const supabaseService = new SupabaseService();
+
+      // Parallel data fetching - run all async operations concurrently
+      // This significantly reduces time-to-first-token
+      const [memoryContext, userProfile, allEvents, userTasks] = await Promise.all([
+        this.loadMemoryContext(context, 'conversation'),
+        supabaseService.getProfile(context.userId),
+        supabaseService.getEvents(context.userId),
+        supabaseService.getTasks(context.userId),
+      ]);
+
+      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+      console.log(`🌊 [CONVERSATION AGENT] Streaming with timezone: ${userTimezone}`);
+
+      // Filter to only include events that haven't ended yet
+      const now = new Date();
+      const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
+
+      // Build conversation history from context
+      const messages: BaseMessage[] = [];
+
+      // Add conversation history if available
+      if (context.conversationHistory && context.conversationHistory.length > 0) {
+        // Keep last 10 messages for context (5 exchanges)
+        const recentHistory = context.conversationHistory.slice(-10);
+        for (const msg of recentHistory) {
+          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+
+          if (msg.role === 'user') {
+            messages.push(new HumanMessage(content));
+          } else if (msg.role === 'assistant') {
+            messages.push(new AIMessage(content));
+          }
+        }
+      }
+
+      // Add the current message
+      messages.push(new HumanMessage(message));
+
+      // Build initial state
+      const initialState = {
+        messages: messages,
+        userId: context.userId,
+        timezone: userTimezone,
+        userEvents: userEvents || [],
+        userTasks: userTasks || [],
+        memoryContext: memoryContext.graphiti ? {
+          userNodeUuid: memoryContext.graphiti.userNodeUuid,
+          relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
+          totalFacts: memoryContext.graphiti.totalFacts
+        } : null
+      };
+
+      // Signal that we're about to start generating
+      yield { type: 'status', content: 'Thinking...' };
+
+      // Stream events from LangGraph
+      const eventStream = this.graph.streamEvents(initialState, {
+        version: 'v2',
+      });
+
+      let fullResponse = '';
+
+      for await (const event of eventStream) {
+        // Handle text streaming from the model
+        if (event.event === 'on_chat_model_stream') {
+          const chunk = event.data?.chunk;
+          if (chunk && chunk.content && typeof chunk.content === 'string') {
+            fullResponse += chunk.content;
+            yield { type: 'text-delta', content: chunk.content };
+          }
+        }
+
+        // Handle tool execution start
+        else if (event.event === 'on_tool_start') {
+          console.log(`🔧 [STREAM] Tool starting: ${event.name}`);
+          yield { type: 'tool-start', toolName: event.name };
+        }
+
+        // Handle tool execution end
+        else if (event.event === 'on_tool_end') {
+          console.log(`✅ [STREAM] Tool completed: ${event.name}`);
+          yield { type: 'tool-end', toolName: event.name, toolResult: event.data?.output };
+        }
+      }
+
+      // Persist conversation to memory after streaming completes
+      try {
+        await this.persistConversationToMemory(context, message, fullResponse);
+      } catch (error) {
+        console.warn('Failed to persist conversation to memory:', error);
+      }
+
+    } catch (error) {
+      console.error('Error in streamMessage:', error);
+      yield {
+        type: 'error',
+        content: error instanceof Error ? error.message : 'Unknown streaming error'
+      };
+    }
   }
 
   private createGraph(): any {

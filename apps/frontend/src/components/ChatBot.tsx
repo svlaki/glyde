@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { getColors } from '../styles/colors'
+import { getColors, hexToRgba } from '../styles/colors'
 
 interface Message {
   id: string
@@ -16,22 +17,99 @@ interface ChatBotProps {
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-export function ChatBot({ onSetResponseCallback }: ChatBotProps) {
+// Sparkle icon for AI assistant
+const SparkleIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3v18M5.5 8.5l13 7M5.5 15.5l13-7" />
+    <circle cx="12" cy="12" r="1" fill={color} />
+  </svg>
+)
+
+// Send arrow icon
+const SendIcon = ({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 2L11 13" />
+    <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+  </svg>
+)
+
+// Clear/trash icon
+const ClearIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+  </svg>
+)
+
+// Stop icon for stopping generation
+const StopIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="6" y="6" width="12" height="12" rx="2" fill={color} />
+  </svg>
+)
+
+// Format timestamp
+const formatTime = (date: Date): string => {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+// Check if two dates are within the same minute group (5 min)
+const isSameTimeGroup = (date1: Date, date2: Date): boolean => {
+  const diff = Math.abs(date1.getTime() - date2.getTime())
+  return diff < 5 * 60 * 1000 // 5 minutes
+}
+
+// Suggestion chips data
+const SUGGESTIONS = [
+  { label: "What's on today?", icon: "📅" },
+  { label: "Schedule a meeting", icon: "✨" },
+  { label: "Find free time", icon: "🔍" },
+]
+
+export function ChatBot() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 
-  // Load messages from localStorage or initialize with welcome message
-  const [messages, setMessages] = useState<Message[]>(() => {
+  // Accent colors for user messages (warm terracotta/amber)
+  const accentColors = {
+    light: {
+      userBubble: '#3d3633',
+      userText: '#fdfbf7',
+    },
+    dark: {
+      userBubble: '#e8e4de',
+      userText: '#1c1b1a',
+    }
+  }
+  const accent = isDarkMode ? accentColors.dark : accentColors.light
+
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
+
+  // Input state - managed locally since AI SDK v5 doesn't manage input internally
+  const [input, setInput] = useState('')
+
+  // Messages state - managed locally with native fetch streaming
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [streamingMessage, setStreamingMessage] = useState<string>('')
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Load initial messages from localStorage
+  const loadInitialMessages = useCallback((): Message[] => {
     if (!user?.id) return []
 
     const savedMessages = localStorage.getItem(`chat_messages_${user.id}`)
     if (savedMessages) {
       try {
         const parsed = JSON.parse(savedMessages)
-        // Convert timestamp strings back to Date objects
         return parsed.map((msg: any) => ({
-          ...msg,
+          id: msg.id,
+          text: msg.text,
+          sender: msg.sender,
           timestamp: new Date(msg.timestamp)
         }))
       } catch (e) {
@@ -39,376 +117,919 @@ export function ChatBot({ onSetResponseCallback }: ChatBotProps) {
       }
     }
 
-    // Default welcome message
+    // Return welcome message
     return [{
       id: '1',
-      text: 'Hello! Ask me anything about your schedule!',
+      text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
       sender: 'bot',
       timestamp: new Date()
     }]
-  })
+  }, [user?.id, user?.user_metadata?.full_name])
 
-  // Save messages to localStorage whenever they change
+  // Initialize messages on mount
   useEffect(() => {
-    if (user?.id && messages.length > 0) {
-      localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify(messages))
+    if (user?.id) {
+      setMessages(loadInitialMessages())
     }
-  }, [messages, user?.id])
+  }, [user?.id, loadInitialMessages])
 
-  // Reset messages when user changes
-  useEffect(() => {
+  // Save messages to localStorage
+  const saveMessagesToStorage = useCallback((msgs: Message[]) => {
     if (!user?.id) return
-
-    const savedMessages = localStorage.getItem(`chat_messages_${user.id}`)
-    if (savedMessages) {
-      try {
-        const parsed = JSON.parse(savedMessages)
-        setMessages(parsed.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        })))
-      } catch (e) {
-        setMessages([
-          {
-            id: '1',
-            text: 'Hello! Ask me anything about your schedule!',
-            sender: 'bot',
-            timestamp: new Date()
-          }
-        ])
-      }
-    } else {
-      setMessages([
-        {
-          id: '1',
-          text: 'Hello! Ask me anything about your schedule!',
-          sender: 'bot',
-          timestamp: new Date()
-        }
-      ])
-    }
+    localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify(msgs))
   }, [user?.id])
 
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Set up callback for interaction responses to be added to chat
-  // Only register once on mount - don't re-register when callback changes
+  // Save messages whenever they change
   useEffect(() => {
-    if (onSetResponseCallback) {
-      const addResponseToChat = (message: string) => {
-        console.log('[ChatBot] Received message from interaction callback:', message, 'type:', typeof message, 'length:', message?.length)
-        if (!message || (typeof message === 'string' && message.trim().length === 0)) {
-          console.warn('[ChatBot] Received empty/null message from interaction response')
-          return
-        }
-        const botMessage: Message = {
-          id: Date.now().toString(),
-          text: String(message),
-          sender: 'bot',
-          timestamp: new Date()
-        }
-        console.log('[ChatBot] Adding bot message to chat:', botMessage.text)
-        setMessages(prev => [...prev, botMessage])
-      }
-      console.log('[ChatBot] Registering callback with parent')
-      onSetResponseCallback(addResponseToChat)
+    if (user?.id && messages.length > 0 && !isLoading) {
+      saveMessagesToStorage(messages)
     }
-  }, [])
+  }, [messages, user?.id, isLoading, saveMessagesToStorage])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or streaming updates
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isLoading, streamingMessage])
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading || !user || !session) return
+  // Clear chat handler
+  const handleClearChat = () => {
+    const welcomeMessage: Message = {
+      id: '1',
+      text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
+      sender: 'bot',
+      timestamp: new Date()
+    }
+    setMessages([welcomeMessage])
+    setStreamingMessage('')
+    if (user?.id) {
+      localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify([welcomeMessage]))
+    }
+  }
 
+  // Stop streaming handler
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    // If there was partial streaming content, save it as a message
+    if (streamingMessage) {
+      const botMessage: Message = {
+        id: `msg_${Date.now()}`,
+        text: streamingMessage + ' [stopped]',
+        sender: 'bot',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, botMessage])
+      setStreamingMessage('')
+    }
+    setIsLoading(false)
+  }
+
+  // Suggestion click handler
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion)
+    inputRef.current?.focus()
+  }
+
+  // Send message with native fetch streaming
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const trimmedInput = input.trim()
+    if (!trimmedInput || isLoading || !user || !session) return
+
+    // Add user message to chat
     const userMessage: Message = {
-      id: Date.now().toString(),
-      text: input,
+      id: `msg_${Date.now()}`,
+      text: trimmedInput,
       sender: 'user',
       timestamp: new Date()
     }
-
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
+    setStreamingMessage('')
+
+    // Reset textarea height
+    if (inputRef.current) {
+      inputRef.current.style.height = '36px'
+    }
+
+    // Build conversation history
+    const conversationHistory = messages
+      .filter(msg => msg.id !== '1')
+      .map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.text
+      }))
 
     try {
-      console.log('Sending chat message to:', `${AGENT_SERVICE_URL}/api/agent/process`)
-      console.log('Message:', userMessage.text)
+      // Create abort controller for cancellation
+      abortControllerRef.current = new AbortController()
 
-      // Build conversation history from messages (excluding the welcome message and current message)
-      const conversationHistory = messages
-        .filter(msg => msg.id !== '1') // Exclude welcome message
-        .map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        }))
-
-      console.log('Conversation history length:', conversationHistory.length)
-
-      const response = await fetch(`${AGENT_SERVICE_URL}/api/agent/process`, {
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/agent/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
+          messages: [
+            ...conversationHistory,
+            { role: 'user', content: trimmedInput }
+          ],
           context: {
             userId: user.id,
             sessionId: 'default',
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            conversationHistory: conversationHistory
-          },
-          message: userMessage.text,
-          isInternal: false
-        })
+            conversationHistory
+          }
+        }),
+        signal: abortControllerRef.current.signal
       })
 
-      console.log('Response status:', response.status)
-
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API Error:', response.status, errorText)
-        throw new Error(`API returned ${response.status}: ${errorText}`)
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const data = await response.json()
-      console.log('API Response:', data)
-
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: data.response || 'I received your message!',
-        sender: 'bot',
-        timestamp: new Date()
+      // Read the stream
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No reader available')
       }
 
-      setMessages(prev => [...prev, botMessage])
-    } catch (error) {
-      console.error('Chat error details:', error)
+      const decoder = new TextDecoder()
+      let fullText = ''
 
-      let errorText = 'Sorry, I\'m having trouble connecting to the AI service.'
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
 
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch')) {
-          errorText = 'Backend server is not running. Start the agent service at localhost:8000'
+        const chunk = decoder.decode(value, { stream: true })
+
+        // Parse status updates from the stream
+        // Format: [STATUS:message] - extract and show in toolStatus
+        const statusMatch = chunk.match(/\[STATUS:([^\]]+)\]/g)
+        if (statusMatch) {
+          // Extract the last status message
+          const lastStatus = statusMatch[statusMatch.length - 1]
+          const statusContent = lastStatus.replace(/\[STATUS:|\]/g, '')
+          setToolStatus(statusContent)
+
+          // Remove status markers from the text content
+          const cleanChunk = chunk.replace(/\[STATUS:[^\]]+\]/g, '')
+          if (cleanChunk) {
+            fullText += cleanChunk
+            setStreamingMessage(fullText)
+          }
         } else {
-          errorText = `Error: ${error.message}`
+          // No status markers, just regular text
+          fullText += chunk
+          setStreamingMessage(fullText)
+          // Clear status once we start getting actual text
+          if (fullText.length > 0) {
+            setToolStatus(null)
+          }
         }
       }
 
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: errorText,
+      // Add the complete bot message
+      const botMessage: Message = {
+        id: `msg_${Date.now()}`,
+        text: fullText,
         sender: 'bot',
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => [...prev, botMessage])
+      setStreamingMessage('')
+      setToolStatus(null)
+
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        console.log('Stream was aborted')
+      } else {
+        console.error('Streaming error:', error)
+        // Add error message
+        const errorMessage: Message = {
+          id: `msg_${Date.now()}`,
+          text: 'Sorry, I encountered an error. Please try again.',
+          sender: 'bot',
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMessage])
+        setStreamingMessage('')
+      }
     } finally {
       setIsLoading(false)
+      setToolStatus(null)
+      abortControllerRef.current = null
     }
   }
+
+  // Determine if we should show timestamp for a message
+  const shouldShowTimestamp = (index: number): boolean => {
+    if (index === 0) return true
+    const prevMessage = messages[index - 1]
+    const currentMessage = messages[index]
+
+    // Safety check for undefined messages
+    if (!prevMessage || !currentMessage) return true
+
+    // Show timestamp if sender changed or time gap > 5 min
+    if (prevMessage.sender !== currentMessage.sender) return false
+    return !isSameTimeGroup(prevMessage.timestamp, currentMessage.timestamp)
+  }
+
+  // Determine if message is first in a group from same sender
+  const isFirstInGroup = (index: number): boolean => {
+    if (index === 0) return true
+    const prevMessage = messages[index - 1]
+    const currentMessage = messages[index]
+    if (!prevMessage || !currentMessage) return true
+    return prevMessage.sender !== currentMessage.sender
+  }
+
+  // Determine if message is last in a group from same sender
+  const isLastInGroup = (index: number): boolean => {
+    if (index === messages.length - 1) return true
+    const nextMessage = messages[index + 1]
+    const currentMessage = messages[index]
+    if (!nextMessage || !currentMessage) return true
+    return nextMessage.sender !== currentMessage.sender
+  }
+
+  const showSuggestions = messages.length <= 1 && !isLoading
+
+  // Check if we're currently streaming
+  const isStreaming = isLoading && streamingMessage.length > 0
 
   return (
     <div style={{
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
+      background: colors.bgPrimary,
     }}>
       {/* Header */}
       <div style={{
-        padding: '20px 24px',
-        //borderBottom: `1px solid ${colors.borderLight}`,
-        background: colors.bgPrimary
+        padding: '16px 20px',
+        borderBottom: `1px solid ${colors.borderLight}`,
+        background: colors.bgPrimary,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
       }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          margin: 0,
-          color: colors.textPrimary,
-          letterSpacing: '0.02em'
-        }}>
-          AI Assistant
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '10px',
+            background: `linear-gradient(135deg, ${hexToRgba(colors.textSecondary, 0.1)}, ${hexToRgba(colors.textSecondary, 0.05)})`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: `1px solid ${colors.borderLight}`,
+          }}>
+            <SparkleIcon size={16} color={colors.textSecondary} />
+          </div>
+          <div>
+            <h3 style={{
+              fontSize: '15px',
+              fontWeight: '600',
+              margin: 0,
+              color: colors.textPrimary,
+              fontFamily: '"EB Garamond", Georgia, serif',
+              letterSpacing: '0.01em',
+            }}>
+              Assistant
+            </h3>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              marginTop: '1px',
+            }}>
+              <div style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: isLoading ? '#fbbf24' : '#4ade80',
+                boxShadow: isLoading
+                  ? '0 0 6px rgba(251, 191, 36, 0.4)'
+                  : '0 0 6px rgba(74, 222, 128, 0.4)',
+              }} />
+              <span style={{
+                fontSize: '11px',
+                color: colors.textTertiary,
+                fontWeight: '500',
+              }}>
+                {isLoading ? 'Typing...' : 'Online'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleClearChat}
+          title="Clear conversation"
+          style={{
+            padding: '8px',
+            background: 'transparent',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: colors.textTertiary,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = colors.bgTertiary
+            e.currentTarget.style.color = colors.textSecondary
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = colors.textTertiary
+          }}
+        >
+          <ClearIcon size={16} />
+        </button>
       </div>
 
       {/* Messages */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '24px',
+        padding: '20px 16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px',
-        background: colors.bgPrimary
+        gap: '4px',
       }}>
-        {messages.map(message => (
-          <div
-            key={message.id}
-            style={{
-              display: 'flex',
-              justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start'
-            }}
-          >
-            <div style={{
-              maxWidth: '75%',
-              padding: '12px 16px',
-              borderRadius: '12px',
-              background: message.sender === 'user'
-                ? (isDarkMode ? '#f0f0f0' : '#000')
-                : colors.bgSecondary,
-              color: message.sender === 'user'
-                ? (isDarkMode ? '#000' : '#fff')
-                : colors.textPrimary,
-              fontSize: '14px',
-              lineHeight: '1.5',
-              fontFamily: 'Georgia, "Times New Roman", serif',
-              boxShadow: isDarkMode
-                ? '0 1px 2px rgba(0,0,0,0.2)'
-                : '0 1px 2px rgba(0,0,0,0.06)',
-              border: message.sender === 'bot' ? `1px solid ${colors.borderLight}` : 'none'
-            }}>
-              {message.text}
+        {messages.map((message, index) => {
+          const isUser = message.sender === 'user'
+          const isFirst = isFirstInGroup(index)
+          const isLast = isLastInGroup(index)
+          const showTime = shouldShowTimestamp(index)
+          const isHovered = hoveredMessageId === message.id
+          const isLastMessage = index === messages.length - 1
+          const showCursor = isStreaming && isLastMessage && !isUser
+
+          return (
+            <div key={message.id}>
+              {/* Time separator for long gaps */}
+              {showTime && index > 0 && (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '12px 0',
+                }}>
+                  <span style={{
+                    fontSize: '11px',
+                    color: colors.textTertiary,
+                    background: colors.bgPrimary,
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    border: `1px solid ${colors.borderLight}`,
+                  }}>
+                    {formatTime(message.timestamp)}
+                  </span>
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: isUser ? 'flex-end' : 'flex-start',
+                  alignItems: 'flex-end',
+                  gap: '8px',
+                  marginTop: isFirst ? '8px' : '2px',
+                  paddingLeft: isUser ? '48px' : '0',
+                  paddingRight: isUser ? '0' : '48px',
+                  animation: index === messages.length - 1 && !isStreaming ? 'messageSlideIn 0.25s ease-out' : 'none',
+                }}
+                onMouseEnter={() => setHoveredMessageId(message.id)}
+                onMouseLeave={() => setHoveredMessageId(null)}
+              >
+                {/* Bot avatar - only show for first message in group */}
+                {!isUser && (
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    background: isFirst ? colors.bgTertiary : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    opacity: isFirst ? 1 : 0,
+                    border: isFirst ? `1px solid ${colors.borderLight}` : 'none',
+                  }}>
+                    <SparkleIcon size={14} color={colors.textSecondary} />
+                  </div>
+                )}
+
+                {/* Message bubble */}
+                <div style={{
+                  position: 'relative',
+                  maxWidth: '85%',
+                }}>
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: isUser
+                      ? `14px 14px ${isLast ? '4px' : '14px'} 14px`
+                      : `14px 14px 14px ${isLast ? '4px' : '14px'}`,
+                    background: isUser ? accent.userBubble : colors.bgSecondary,
+                    color: isUser ? accent.userText : colors.textPrimary,
+                    fontSize: '14px',
+                    lineHeight: '1.55',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    boxShadow: isUser
+                      ? 'none'
+                      : `0 1px 2px ${hexToRgba(colors.textPrimary, 0.04)}`,
+                    border: isUser ? 'none' : `1px solid ${colors.borderLight}`,
+                    wordBreak: 'break-word',
+                  }}>
+                    {isUser ? (
+                      message.text
+                    ) : (
+                      <div className="chat-markdown">
+                        <ReactMarkdown
+                          components={{
+                            // Paragraphs
+                            p: ({ children }) => (
+                              <p style={{ margin: '0 0 8px 0' }}>{children}</p>
+                            ),
+                            // Bold text
+                            strong: ({ children }) => (
+                              <strong style={{
+                                fontWeight: 600,
+                                color: colors.textPrimary,
+                              }}>{children}</strong>
+                            ),
+                            // Unordered lists
+                            ul: ({ children }) => (
+                              <ul style={{
+                                margin: '8px 0',
+                                paddingLeft: '20px',
+                                listStyleType: 'disc',
+                              }}>{children}</ul>
+                            ),
+                            // Ordered lists
+                            ol: ({ children }) => (
+                              <ol style={{
+                                margin: '8px 0',
+                                paddingLeft: '20px',
+                                listStyleType: 'decimal',
+                              }}>{children}</ol>
+                            ),
+                            // List items
+                            li: ({ children }) => (
+                              <li style={{
+                                margin: '4px 0',
+                                lineHeight: '1.5',
+                                paddingLeft: '4px',
+                              }}>
+                                {children}
+                              </li>
+                            ),
+                            // Horizontal rules (for --- separators)
+                            hr: () => (
+                              <hr style={{
+                                border: 'none',
+                                borderTop: `1px solid ${colors.borderLight}`,
+                                margin: '12px 0',
+                              }} />
+                            ),
+                            // Code blocks (inline)
+                            code: ({ children }) => (
+                              <code style={{
+                                background: colors.bgTertiary,
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                fontFamily: 'monospace',
+                              }}>{children}</code>
+                            ),
+                          }}
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                        {/* Blinking cursor during streaming */}
+                        {showCursor && (
+                          <span className="streaming-cursor" style={{
+                            display: 'inline-block',
+                            width: '2px',
+                            height: '1em',
+                            background: colors.textSecondary,
+                            marginLeft: '2px',
+                            verticalAlign: 'text-bottom',
+                            animation: 'blink 1s infinite',
+                          }} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Timestamp on hover */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-18px',
+                    [isUser ? 'right' : 'left']: '4px',
+                    fontSize: '10px',
+                    color: colors.textTertiary,
+                    opacity: isHovered ? 1 : 0,
+                    transition: 'opacity 0.15s ease',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {formatTime(message.timestamp)}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          )
+        })}
+
+        {/* Streaming message - show text as it streams in */}
+        {isStreaming && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            marginTop: '8px',
+            animation: 'messageSlideIn 0.25s ease-out',
+          }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '8px',
+              background: colors.bgTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `1px solid ${colors.borderLight}`,
+              flexShrink: 0,
+            }}>
+              <SparkleIcon size={14} color={colors.textSecondary} />
+            </div>
             <div style={{
               padding: '12px 16px',
-              borderRadius: '12px',
+              borderRadius: '14px 14px 14px 4px',
               background: colors.bgSecondary,
               border: `1px solid ${colors.borderLight}`,
-              boxShadow: isDarkMode
-                ? '0 1px 2px rgba(0,0,0,0.2)'
-                : '0 1px 2px rgba(0,0,0,0.06)'
+              maxWidth: '85%',
             }}>
-              <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                <div style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
+              <div className="chat-markdown" style={{
+                fontSize: '14px',
+                color: colors.textPrimary,
+                lineHeight: '1.5',
+              }}>
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{children}</p>,
+                    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                    ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: '20px', listStyleType: 'disc' }}>{children}</ul>,
+                    ol: ({ children }) => <ol style={{ margin: '8px 0', paddingLeft: '20px', listStyleType: 'decimal' }}>{children}</ol>,
+                    li: ({ children }) => <li style={{ margin: '4px 0', lineHeight: '1.5', paddingLeft: '4px' }}>{children}</li>,
+                  }}
+                >
+                  {streamingMessage}
+                </ReactMarkdown>
+                <span style={{
+                  display: 'inline-block',
+                  width: '6px',
+                  height: '14px',
                   background: colors.textSecondary,
-                  animation: 'bounce 1.4s infinite ease-in-out both',
-                  animationDelay: '-0.32s'
-                }} />
-                <div style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: colors.textSecondary,
-                  animation: 'bounce 1.4s infinite ease-in-out both',
-                  animationDelay: '-0.16s'
-                }} />
-                <div style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: colors.textSecondary,
-                  animation: 'bounce 1.4s infinite ease-in-out both'
+                  marginLeft: '2px',
+                  animation: 'blink 1s infinite',
+                  verticalAlign: 'middle',
                 }} />
               </div>
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
+
+        {/* Loading indicator - only show when waiting for first token */}
+        {isLoading && !isStreaming && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '8px',
+            marginTop: '8px',
+            animation: 'messageSlideIn 0.25s ease-out',
+          }}>
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '8px',
+              background: colors.bgTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `1px solid ${colors.borderLight}`,
+            }}>
+              <SparkleIcon size={14} color={colors.textSecondary} />
+            </div>
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: '14px 14px 14px 4px',
+              background: colors.bgSecondary,
+              border: `1px solid ${colors.borderLight}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <span style={{
+                fontSize: '13px',
+                color: colors.textSecondary,
+                fontStyle: 'italic',
+              }}>
+                {toolStatus || 'Thinking'}
+              </span>
+              <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      background: colors.textTertiary,
+                      animation: 'pulse 1.4s infinite ease-in-out both',
+                      animationDelay: `${i * 0.16}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tool status indicator during streaming */}
+        {isStreaming && toolStatus && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '4px',
+            marginLeft: '36px',
+            animation: 'fadeIn 0.2s ease-out',
+          }}>
+            <div style={{
+              padding: '6px 12px',
+              borderRadius: '12px',
+              background: hexToRgba(colors.textTertiary, 0.1),
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <div style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#fbbf24',
+                animation: 'pulse 1s infinite',
+              }} />
+              <span style={{
+                fontSize: '12px',
+                color: colors.textSecondary,
+              }}>
+                {toolStatus}
+              </span>
+            </div>
+          </div>
+        )}
+
+
+        <div ref={messagesEndRef} style={{ height: '8px' }} />
       </div>
 
-      {/* Input */}
+      {/* Suggestion chips */}
+      {showSuggestions && (
+        <div style={{
+          padding: '0 16px 12px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          animation: 'fadeIn 0.3s ease-out',
+        }}>
+          {SUGGESTIONS.map((suggestion) => (
+            <button
+              key={suggestion.label}
+              onClick={() => handleSuggestionClick(suggestion.label)}
+              style={{
+                padding: '8px 14px',
+                background: colors.bgSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '20px',
+                fontSize: '13px',
+                color: colors.textSecondary,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.borderColor = colors.textTertiary
+                e.currentTarget.style.color = colors.textPrimary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgSecondary
+                e.currentTarget.style.borderColor = colors.border
+                e.currentTarget.style.color = colors.textSecondary
+              }}
+            >
+              <span>{suggestion.icon}</span>
+              <span>{suggestion.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input area */}
       <div style={{
-        padding: '16px 24px 20px 24px',
+        padding: '12px 16px 16px',
         borderTop: `1px solid ${colors.borderLight}`,
         background: colors.bgSecondary,
-        flexShrink: 0
+        flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSend()
-              }
-            }}
-            placeholder="Ask me anything..."
-            disabled={isLoading}
-            rows={1}
-            style={{
-              flex: 1,
-              padding: '12px 14px',
-              border: `1px solid ${colors.border}`,
-              borderRadius: '8px',
-              fontSize: '14px',
-              opacity: isLoading ? 0.6 : 1,
-              background: colors.bgPrimary,
-              color: colors.textPrimary,
-              resize: 'none',
-              height: '44px',
-              maxHeight: '120px',
-              overflowY: 'auto',
-              fontFamily: 'inherit',
-              lineHeight: '1.5',
-              boxSizing: 'border-box',
-              transition: 'border-color 0.15s ease'
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = isDarkMode ? '#666' : '#ccc'
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = colors.border
-            }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement
-              target.style.height = '44px'
-              target.style.height = Math.min(target.scrollHeight, 120) + 'px'
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={isLoading || !input.trim()}
-            style={{
-              padding: '12px 20px',
-              background: (isLoading || !input.trim())
-                ? colors.bgTertiary
-                : (isDarkMode ? '#f0f0f0' : '#000'),
-              color: (isLoading || !input.trim())
-                ? colors.textSecondary
-                : (isDarkMode ? '#000' : '#fff'),
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: (isLoading || !input.trim()) ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
-              height: '44px',
-              transition: 'opacity 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading && input.trim()) {
-                e.currentTarget.style.opacity = '0.9'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1'
-            }}
-          >
-            {isLoading ? 'Sending...' : 'Send'}
-          </button>
+        <form onSubmit={handleSend}>
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-end',
+            background: colors.bgPrimary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '14px',
+            padding: '4px 4px 4px 14px',
+            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend(e)
+                }
+              }}
+              placeholder="Ask me anything..."
+              disabled={isLoading}
+              rows={1}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                border: 'none',
+                fontSize: '14px',
+                background: 'transparent',
+                color: colors.textPrimary,
+                resize: 'none',
+                height: '36px',
+                maxHeight: '100px',
+                overflowY: 'auto',
+                fontFamily: 'inherit',
+                lineHeight: '1.5',
+                outline: 'none',
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement
+                target.style.height = '36px'
+                target.style.height = Math.min(target.scrollHeight, 100) + 'px'
+              }}
+            />
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                title="Stop generating"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: 0,
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                <StopIcon size={14} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!(input ?? '').trim()}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: 0,
+                  background: !(input ?? '').trim()
+                    ? colors.bgTertiary
+                    : accent.userBubble,
+                  color: !(input ?? '').trim()
+                    ? colors.textTertiary
+                    : accent.userText,
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: !(input ?? '').trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if ((input ?? '').trim()) {
+                    e.currentTarget.style.transform = 'scale(1.05)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                }}
+              >
+                <SendIcon size={16} />
+              </button>
+            )}
+          </div>
+        </form>
+        <div style={{
+          marginTop: '8px',
+          textAlign: 'center',
+        }}>
+          <span style={{
+            fontSize: '11px',
+            color: colors.textTertiary,
+          }}>
+            Press Enter to send · Shift + Enter for new line
+          </span>
         </div>
       </div>
 
       <style>{`
-        @keyframes bounce {
+        @keyframes pulse {
           0%, 80%, 100% {
-            transform: scale(0);
+            transform: scale(0.6);
+            opacity: 0.4;
           }
           40% {
-            transform: scale(1.0);
+            transform: scale(1);
+            opacity: 1;
           }
+        }
+
+        @keyframes messageSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes blink {
+          0%, 50% {
+            opacity: 1;
+          }
+          51%, 100% {
+            opacity: 0;
+          }
+        }
+
+        /* Markdown styling for chat messages */
+        .chat-markdown p:last-child {
+          margin-bottom: 0;
+        }
+        .chat-markdown ul:last-child {
+          margin-bottom: 0;
+        }
+        .chat-markdown hr:last-child {
+          display: none;
         }
       `}</style>
     </div>

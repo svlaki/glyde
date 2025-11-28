@@ -100,7 +100,7 @@ export class ToolRegistry {
   // Get tools by category
   getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions'): any[] {
     const categoryPrefixes = {
-      calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'find_free_time', 'analyze_schedule'],
+      calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
       categories: ['create_category', 'list_categories', 'update_category', 'delete_category'],
       tasks: ['create_task', 'update_task', 'delete_task', 'list_tasks', 'complete_task', 'search_tasks'],
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],

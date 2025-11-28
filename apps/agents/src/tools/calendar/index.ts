@@ -6,7 +6,6 @@ export { deleteMultipleEventsTool } from './delete-multiple-events.js';
 export { bulkUpdateEventsTool } from './bulk-update-events.js';
 export { searchEventsTool } from './search-events.js';
 export { listEventsTool } from './list-events.js';
-export { findFreeTimeTool } from './find-free-time.js';
 export { analyzeScheduleTool } from './analyze-schedule.js';
 
 // Export all calendar tools as an array for easy registration
@@ -17,7 +16,6 @@ import { deleteMultipleEventsTool } from './delete-multiple-events.js';
 import { bulkUpdateEventsTool } from './bulk-update-events.js';
 import { searchEventsTool } from './search-events.js';
 import { listEventsTool } from './list-events.js';
-import { findFreeTimeTool } from './find-free-time.js';
 import { analyzeScheduleTool } from './analyze-schedule.js';
 
 export const calendarTools = [
@@ -28,6 +26,5 @@ export const calendarTools = [
   bulkUpdateEventsTool,
   searchEventsTool,
   listEventsTool,
-  findFreeTimeTool,
   analyzeScheduleTool,
 ];

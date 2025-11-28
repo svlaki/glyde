@@ -37,12 +37,14 @@ export function Calendar() {
   // Get current week dates
   const getWeekDates = (date: Date) => {
     const week = []
-    const current = new Date(date)
-    const day = current.getDay()
-    const diff = current.getDate() - day // Adjust to Sunday
+    // Find the Sunday of the week containing 'date'
+    const startOfWeek = new Date(date)
+    startOfWeek.setDate(date.getDate() - date.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
 
     for (let i = 0; i < 7; i++) {
-      const weekDate = new Date(current.setDate(diff + i))
+      const weekDate = new Date(startOfWeek)
+      weekDate.setDate(startOfWeek.getDate() + i)
       week.push(weekDate)
     }
     return week

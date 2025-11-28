@@ -12,7 +12,9 @@ export async function getPendingInteractions(req: Request, res: Response): Promi
 
     const supabaseService = getSupabaseService();
 
-    const pending = await supabaseService.getPendingUserInteractions(userId);
+    // Just fetch existing pending interactions - do NOT generate new ones
+    // Generation should only happen via triggerProactiveAgent (manual refresh button)
+    const pending = await supabaseService.getPendingUserInteractions(userId, 'proactive');
 
     return res.json({
       success: true,

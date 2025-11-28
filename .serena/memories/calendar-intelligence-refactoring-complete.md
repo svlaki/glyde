@@ -14,16 +14,7 @@ Successfully migrated from hardcoded CalendarIntelligenceService and deprecated 
   - Buffer time recommendations
 - **Key Benefits**: More flexible than hardcoded logic, learns user preferences
 
-### 2. Find Free Time Tool (`find-free-time.ts`)
-- **Purpose**: Intelligent free time slot discovery
-- **Features**:
-  - Quality scoring based on energy levels and activity types
-  - Working hours optimization
-  - Pattern-based recommendations
-  - Weekend/weekday preferences
-- **Key Benefits**: Personalized time slot recommendations
-
-### 3. Calendar Insights Tool (`calendar-insights.ts`)
+### 2. Calendar Insights Tool (`calendar-insights.ts`)
 - **Purpose**: Generate intelligent calendar analysis and reports
 - **Features**:
   - Daily briefings and weekly summaries
@@ -32,7 +23,7 @@ Successfully migrated from hardcoded CalendarIntelligenceService and deprecated 
   - Historical trend analysis
 - **Key Benefits**: Data-driven insights for better time management
 
-### 4. Schedule Optimizer Tool (`schedule-optimizer.ts`)
+### 3. Schedule Optimizer Tool (`schedule-optimizer.ts`)
 - **Purpose**: AI-powered schedule optimization
 - **Features**:
   - Multiple optimization types (time blocking, energy matching, focus maximization)

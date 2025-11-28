@@ -14,6 +14,10 @@ export const updateGoalTool = tool(
       const supabaseService = getSupabaseService();
       const zepGraphService = new ZepGraphService();
 
+      // Get original goal to compare changes
+      const goals = await supabaseService.getGoals(userId);
+      const originalGoal = goals.find((g: any) => g.id === goalId);
+
       const updates: any = {};
 
       if (title !== undefined) updates.title = title;
@@ -49,7 +53,39 @@ export const updateGoalTool = tool(
       };
       updateGraph(); // Fire and forget
 
-      return `✅ Goal updated: "${goal.title}"${progress !== undefined ? ` (Progress: ${progress}%)` : ''}`;
+      // Build detailed change description
+      const changes: string[] = [];
+      const goalTitle = title || goal.title || originalGoal?.title || 'Goal';
+
+      if (title && originalGoal?.title !== title) {
+        changes.push(`renamed to "${title}"`);
+      }
+      if (progress !== undefined) {
+        changes.push(`progress updated to ${progress}%`);
+      }
+      if (status !== undefined && originalGoal?.status !== status) {
+        if (status === 'completed') {
+          changes.push('marked as complete');
+        } else {
+          changes.push(`status changed to ${status}`);
+        }
+      }
+      if (targetDate !== undefined) {
+        if (targetDate === null) {
+          changes.push('target date removed');
+        } else {
+          const newDate = new Date(targetDate);
+          const dateStr = newDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          changes.push(`target date changed to ${dateStr}`);
+        }
+      }
+      if (category !== undefined && originalGoal?.category !== category) {
+        changes.push(`category changed to "${category}"`);
+      }
+
+      const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
+
+      return `✅ GOAL: "${goalTitle}" has been updated${changeDescription}`;
     } catch (error) {
       console.error('❌ [update-goal] Error:', error);
       return `❌ Error updating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
