@@ -163,9 +163,9 @@ export const createEventTool = tool(
       title: z.string().describe("Event title extracted from user input or inferred from context. Make it descriptive and clear."),
       startTime: z.string().describe("Start time in ISO format. Parse relative dates like 'tomorrow', '1pm', 'Friday' into proper timestamps. Use intelligent time defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
       endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
-      location: z.string().nullable().describe("Event location. Leave empty if not specified"),
-      description: z.string().nullable().describe("Event description. Leave empty if not specified"),
-      category: z.string().nullable().describe("Category name for this event. Call list_categories first to see existing categories. For classes/projects/clients, create a SPECIFIC category first (e.g., 'CS173A' not 'School', 'Project Phoenix' not 'Work'). Generic categories are only for truly generic recurring activities. Required field - do not leave empty."),
+      location: z.string().optional().describe("Event location. Leave empty if not specified"),
+      description: z.string().optional().describe("Event description. Leave empty if not specified"),
+      category: z.string().optional().describe("Category name for this event. Call list_categories first to see existing categories. For classes/projects/clients, create a SPECIFIC category first (e.g., 'CS173A' not 'School', 'Project Phoenix' not 'Work'). Generic categories are only for truly generic recurring activities. Required field - do not leave empty."),
       replaceConflicting: z.boolean().default(false).describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
     }),
   }

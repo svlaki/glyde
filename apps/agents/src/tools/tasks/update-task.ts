@@ -39,14 +39,14 @@ export const updateTaskTool = tool(
     description: "Update an existing task. Use this to modify task details, change priority, reschedule, or update status.",
     schema: z.object({
       taskId: z.string().describe("Task ID to update"),
-      title: z.string().nullable().optional().describe("New task title"),
-      description: z.string().nullable().optional().describe("New task description"),
-      dueDate: z.string().nullable().optional().describe("New due date (ISO format)"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).nullable().optional().describe("New priority level"),
-      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).nullable().optional().describe("New status"),
-      category: z.string().nullable().optional().describe("New category name"),
-      energyRequired: z.enum(["low", "medium", "high"]).nullable().optional().describe("Energy level required"),
-      estimatedDuration: z.number().nullable().optional().describe("Estimated duration in minutes"),
+      title: z.string().optional().describe("New task title"),
+      description: z.string().optional().describe("New task description"),
+      dueDate: z.string().optional().describe("New due date (ISO format)"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("New priority level"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().describe("New status"),
+      category: z.string().optional().describe("New category name"),
+      energyRequired: z.enum(["low", "medium", "high"]).optional().describe("Energy level required"),
+      estimatedDuration: z.number().optional().describe("Estimated duration in minutes"),
     }),
   }
 );

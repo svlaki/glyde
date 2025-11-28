@@ -40,9 +40,9 @@ export const createInteractionTool = tool(
     schema: z.object({
       question: z.string().describe("The question or prompt to show the user"),
       type: z.enum(["yes_no", "multiple_choice", "confirmation"]).describe("Type of interaction"),
-      options: z.array(z.string()).nullable().optional().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
-      priority: z.number().min(1).max(5).nullable().optional().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
-      metadata: z.record(z.any()).nullable().optional().describe("Optional metadata object for storing context about the interaction"),
+      options: z.array(z.string()).optional().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
+      priority: z.number().min(1).max(5).optional().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
+      metadata: z.record(z.any()).optional().describe("Optional metadata object for storing context about the interaction"),
     }),
   }
 );

@@ -183,14 +183,14 @@ export const updateEventTool = tool(
     name: "update_event",
     description: "Update an existing calendar event. If eventId is not provided, use semantic search to find the event by description. Can update event category and details.",
     schema: z.object({
-      eventId: z.string().nullable().describe("Event ID to update (optional - if not provided, search by description)"),
-      searchQuery: z.string().nullable().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
-      title: z.string().nullable().describe("New event title - leave empty to keep existing"),
-      startTime: z.string().nullable().describe("New start time in ISO format - leave empty to keep existing"),
-      endTime: z.string().nullable().describe("New end time in ISO format - leave empty to keep existing"),
-      location: z.string().nullable().describe("New event location - leave empty to keep existing"),
-      description: z.string().nullable().describe("New event description - leave empty to keep existing"),
-      category: z.string().nullable().describe("Update event category (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing category."),
+      eventId: z.string().optional().describe("Event ID to update (optional - if not provided, search by description)"),
+      searchQuery: z.string().optional().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
+      title: z.string().optional().describe("New event title - leave empty to keep existing"),
+      startTime: z.string().optional().describe("New start time in ISO format - leave empty to keep existing"),
+      endTime: z.string().optional().describe("New end time in ISO format - leave empty to keep existing"),
+      location: z.string().optional().describe("New event location - leave empty to keep existing"),
+      description: z.string().optional().describe("New event description - leave empty to keep existing"),
+      category: z.string().optional().describe("Update event category (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing category."),
     }),
   }
 );

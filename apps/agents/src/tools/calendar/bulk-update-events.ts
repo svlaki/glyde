@@ -148,12 +148,12 @@ export const bulkUpdateEventsTool = tool(
     name: "bulk_update_events",
     description: "Update multiple events at once based on search criteria or event IDs. Perfect for bulk category changes, mass edits, or moving groups of events to a category. IMPORTANT: Includes both past and future events in the search.",
     schema: z.object({
-      searchQuery: z.string().nullable().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
-      eventIds: z.array(z.string()).nullable().optional().describe("Optional: Array of specific event IDs to update instead of using search"),
-      category: z.string().nullable().describe("New category to assign to all matching events (e.g., 'Work', 'Personal', 'Mendicants', 'Health & Hygiene')"),
-      title: z.string().nullable().optional().describe("Optional: New title for all matching events (use cautiously)"),
-      location: z.string().nullable().optional().describe("Optional: New location for all matching events"),
-      description: z.string().nullable().optional().describe("Optional: New description for all matching events"),
+      searchQuery: z.string().optional().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
+      eventIds: z.array(z.string()).optional().describe("Optional: Array of specific event IDs to update instead of using search"),
+      category: z.string().optional().describe("New category to assign to all matching events (e.g., 'Work', 'Personal', 'Mendicants', 'Health & Hygiene')"),
+      title: z.string().optional().describe("Optional: New title for all matching events (use cautiously)"),
+      location: z.string().optional().describe("Optional: New location for all matching events"),
+      description: z.string().optional().describe("Optional: New description for all matching events"),
     }),
   }
 );

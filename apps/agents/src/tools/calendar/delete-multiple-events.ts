@@ -88,8 +88,8 @@ export const deleteMultipleEventsTool = tool(
     name: "delete_multiple_events",
     description: "Delete multiple events based on date or search criteria. Use this when user wants to delete 'all events on a day' or multiple events matching criteria.",
     schema: z.object({
-      date: z.string().nullable().describe("Date to delete all events from (ISO format)"),
-      searchQuery: z.string().nullable().describe("Search query to find multiple events to delete. Use '*' to delete ALL events (dangerous!)"),
+      date: z.string().optional().describe("Date to delete all events from (ISO format)"),
+      searchQuery: z.string().optional().describe("Search query to find multiple events to delete. Use '*' to delete ALL events (dangerous!)"),
     }),
   }
 );
