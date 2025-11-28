@@ -238,6 +238,7 @@ class InteractionService {
           conversationHistory: []
         },
         message: 'Generate some personalized suggestions or interactions based on my calendar, tasks, and goals. Create interactive prompts that I can respond to.',
+        targetAgent: 'interaction',
         isInternal: true // Internal message - don't store in chat
       })
     });

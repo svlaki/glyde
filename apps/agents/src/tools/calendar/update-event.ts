@@ -29,26 +29,73 @@ export const updateEventTool = tool(
       console.log('[UPDATE-EVENT TOOL] Searching for event to update:', searchQuery);
 
       try {
-        // Search knowledge graph for relevant events
-        const graphResults = await zepGraphService.searchEntities(userId,
-          `calendar event ${searchQuery}`,
-          undefined, // entityType
-          5 // limit
-        );
+        // Get all events and filter to recent ones (today + 14 days)
+        const allEvents = await supabaseService.getEvents(userId);
+        const now = new Date();
+        const todayStart = new Date(now.toISOString().split('T')[0]);
 
-        // Also search directly in database (use getEvents instead of deprecated getEventsForAgent)
-        const events = await supabaseService.getEvents(userId);
-        const matchingEvents = events.filter((event: any) => {
-          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-          return searchText.includes(searchQuery.toLowerCase());
+        // Include events from today onwards only
+        const recentEvents = allEvents.filter((event: any) => {
+          const eventDate = new Date(event.start_time);
+          return eventDate >= todayStart;
         });
 
-        if (matchingEvents.length > 0) {
-          targetEventId = matchingEvents[0].id;
-          console.log('[UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
-        } else {
+        console.log(`[UPDATE-EVENT TOOL] Searching in ${recentEvents.length} recent events (today + 14 days)`);
+
+        // Find matching events using fuzzy matching
+        const normalizedQuery = searchQuery.toLowerCase().trim();
+        const queryWords = normalizedQuery.split(/\s+/).filter(word =>
+          word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
+        );
+
+        const matchingEvents = recentEvents.filter((event: any) => {
+          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
+          const hasMatch = queryWords.some(word => searchText.includes(word));
+          const hasFullMatch = searchText.includes(normalizedQuery);
+          return hasMatch || hasFullMatch;
+        });
+
+        // Sort by relevance and date
+        matchingEvents.sort((a, b) => {
+          const aTitle = a.title.toLowerCase();
+          const bTitle = b.title.toLowerCase();
+          const aMatches = queryWords.filter(word => aTitle.includes(word)).length;
+          const bMatches = queryWords.filter(word => bTitle.includes(word)).length;
+
+          if (bMatches === aMatches) {
+            return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+          }
+          return bMatches - aMatches;
+        });
+
+        if (matchingEvents.length === 0) {
+          // Check if there are older matching events
+          const olderMatches = allEvents.filter((event: any) => {
+            const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
+            const hasMatch = queryWords.some(word => searchText.includes(word));
+            const hasFullMatch = searchText.includes(normalizedQuery);
+            return (hasMatch || hasFullMatch) && new Date(event.start_time) < todayStart;
+          });
+
+          if (olderMatches.length > 0) {
+            throw new Error(`No upcoming events found matching "${searchQuery}". I found ${olderMatches.length} older event(s) with that name. Did you mean one of those? Please specify the date if you want to update an old event.`);
+          }
+
           throw new Error(`No event found matching: "${searchQuery}"`);
         }
+
+        if (matchingEvents.length > 1) {
+          // Multiple matches - ask for clarification
+          const eventsList = matchingEvents.slice(0, 5).map(e => {
+            const eventDate = new Date(e.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return `- ${e.title} on ${eventDate} at ${new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+          }).join('\n');
+
+          throw new Error(`Found ${matchingEvents.length} events matching "${searchQuery}". Which one should I update?\n${eventsList}`);
+        }
+
+        targetEventId = matchingEvents[0].id;
+        console.log('[UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
       } catch (error) {
         console.error('[UPDATE-EVENT TOOL] Search error:', error);
         throw new Error(`Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`);

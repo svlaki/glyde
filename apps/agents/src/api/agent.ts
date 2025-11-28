@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
+import { InteractionAgent } from '../agents/interaction/InteractionAgent.js';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 
 // Initialize the agent registry
@@ -11,10 +12,13 @@ let initializationPromise: Promise<void> | null = null;
 async function initializeAgents(): Promise<void> {
   const conversationAgent = new ConversationAgent();
   await agentRegistry.registerAgent(conversationAgent);
+
+  const interactionAgent = new InteractionAgent();
+  await agentRegistry.registerAgent(interactionAgent);
 }
 
 async function ensureAgentsInitialized(): Promise<void> {
-  if (agentRegistry.hasAgent('conversation')) {
+  if (agentRegistry.hasAgent('conversation') && agentRegistry.hasAgent('interaction')) {
     return;
   }
 

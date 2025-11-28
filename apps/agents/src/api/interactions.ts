@@ -60,45 +60,49 @@ export async function respondToInteraction(req: Request, res: Response): Promise
 
     // Call the agent to process the user's response
     const agentRegistry = AgentRegistry.getInstance();
-    const conversationAgent = agentRegistry.getAgent('conversation');
+    const interactionAgent = agentRegistry.getAgent('interaction');
 
-    if (conversationAgent) {
+    if (interactionAgent) {
       try {
         // Get user context
         const sessionId = `session-${userId}-${Date.now()}`;
         const userProfile = await supabaseService.getProfile(userId);
         const timezone = userProfile?.timezone || 'UTC';
 
-        // Determine if user said "yes" or "no" (case-insensitive)
-        const userSaidYes = response.trim().toLowerCase() === 'yes' || response.trim().toLowerCase() === 'y';
-
-        // Build a meaningful message based on the interaction action and user's response
+        // Build a message that includes the interaction metadata and user's response
+        // Let the agent decide what to do based on the metadata action and user's response
         let userMessage = '';
 
         if (interaction.metadata && typeof interaction.metadata === 'object') {
           const metadata = interaction.metadata;
           const action = metadata.action;
 
-          if (userSaidYes && action === 'check_goal_progress') {
-            // For goal progress check-ins, use the follow-up prompt from metadata
-            userMessage = metadata.followUpPrompt || `Let's check progress on "${metadata.goalTitle || 'your goal'}"`;
-          } else if (userSaidYes && action === 'create_event') {
-            // For event creation, pass the full event details
-            userMessage = `Create an event: ${metadata.eventTitle}. ${JSON.stringify(metadata)}`;
-          } else if (userSaidYes) {
-            // Generic yes - just acknowledge and ask for action
-            userMessage = `User wants to proceed with: ${metadata.reasoning || 'your suggestion'}. ${metadata.followUpPrompt || 'What would you like to do?'}`;
-          } else {
-            // User said no
-            userMessage = `User declined the suggestion: "${interaction.question}". That's fine, let's move on.`;
-          }
-
           console.log(`[INTERACTION RESPONSE] Interaction metadata:`, JSON.stringify(metadata));
+          console.log(`[INTERACTION RESPONSE] Action type: ${action}`);
+          console.log(`[INTERACTION RESPONSE] User response: "${response}"`);
+
+          // Build message that includes full context for the agent to decide
+          userMessage = `User responded to an interactive prompt.
+
+Original Question: "${interaction.question}"
+User's Response: "${response}"
+
+Metadata:
+${JSON.stringify(metadata, null, 2)}
+
+Based on the metadata action (if present), execute the appropriate action using the details from metadata and interpreting the user's response.
+For example:
+- If action is "schedule_tasks" and response is "both", create events/tasks for both items
+- If action is "check_goal_progress", use the followUpPrompt to guide the conversation
+- If response indicates a choice from options, map the response to the correct metadata parameters
+
+Execute the action now.`;
         } else {
-          // Fallback if no metadata
-          userMessage = userSaidYes
-            ? `User wants to proceed with the suggestion: "${interaction.question}". What should we do?`
-            : `User declined the suggestion: "${interaction.question}". That's fine.`;
+          // Fallback if no metadata - just ask what to do
+          userMessage = `User responded to an interactive prompt: "${interaction.question}"
+Their response was: "${response}"
+
+What would you like to do with this response?`;
         }
 
         const context = {
@@ -111,12 +115,12 @@ export async function respondToInteraction(req: Request, res: Response): Promise
           // This won't create a duplicate message in chat since it's not stored in conversation
         };
 
-        console.log(`[INTERACTION RESPONSE] Invoking conversation agent with message: "${userMessage}"`);
+        console.log(`[INTERACTION RESPONSE] Invoking interaction agent with message: "${userMessage}"`);
 
         // Wait for agent response and return it to the user
         try {
           console.log(`[INTERACTION RESPONSE] About to invoke agent with message length: ${userMessage.length}`);
-          const agentResponse = await conversationAgent.processMessage(context, userMessage);
+          const agentResponse = await interactionAgent.processMessage(context, userMessage);
           console.log(`[INTERACTION RESPONSE] Agent response type:`, typeof agentResponse);
           console.log(`[INTERACTION RESPONSE] Agent response:`, JSON.stringify(agentResponse));
 
@@ -158,18 +162,13 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         });
       }
     } else {
-      console.warn(`[INTERACTION RESPONSE] Conversation agent not found in registry`);
+      console.warn(`[INTERACTION RESPONSE] Interaction agent not found in registry`);
       return res.json({
         success: true,
         message: 'Response saved successfully',
-        warning: 'Agent not available'
+        warning: 'Interaction agent not available'
       });
     }
-
-    return res.json({
-      success: true,
-      message: 'Response saved successfully'
-    });
   } catch (error) {
     console.error('[INTERACTION RESPONSE] Error responding to interaction:', error);
     res.status(500).json({ error: 'Failed to process interaction response' });
