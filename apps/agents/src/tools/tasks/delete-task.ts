@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const deleteTaskTool = tool(
   async ({ taskId, searchQuery }, config) => {
@@ -75,6 +76,15 @@ export const deleteTaskTool = tool(
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;
+      }
+
+      // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
+      try {
+        const zepGraphService = new ZepGraphService();
+        await zepGraphService.deleteTask(targetTaskId);
+      } catch (graphError) {
+        console.warn(`⚠️ [DELETE-TASK TOOL] Failed to remove task from graph (non-critical): ${graphError}`);
+        // Non-critical - task is deleted from DB which is what matters
       }
 
       return `✅ Task deleted successfully`;

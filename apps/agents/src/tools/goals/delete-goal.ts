@@ -1,6 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 /**
  * Delete Goal Tool
@@ -88,8 +89,14 @@ export const deleteGoalTool = tool(
         return `❌ Failed to delete goal: ${result.error}`;
       }
 
-      // Note: Knowledge graph cleanup could be added here if needed
-      // For now, goals remain in the graph as historical context
+      // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
+      try {
+        const zepGraphService = new ZepGraphService();
+        await zepGraphService.deleteGoal(targetGoalId);
+      } catch (graphError) {
+        console.warn(`⚠️ [DELETE-GOAL TOOL] Failed to remove goal from graph (non-critical): ${graphError}`);
+        // Non-critical - goal is deleted from DB which is what matters
+      }
 
       return `✅ Goal deleted successfully`;
     } catch (error) {

@@ -25,6 +25,11 @@ export const createInteractionTool = tool(
         return "❌ Failed to create interaction";
       }
 
+      // NOTE: Interactions use thread history only, NOT Zep graph nodes
+      // This prevents graph bloat from accumulating nodes for every user interaction
+      // If future use case requires semantic search over interactions, create aggregate
+      // "interaction_summary" node per session instead of per-interaction nodes
+
       // Log interaction creation for debugging
       console.log(`✅ [create-interaction] Interaction created: ${question} (ID: ${interaction.id})`);
 

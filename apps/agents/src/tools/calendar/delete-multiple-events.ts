@@ -72,6 +72,14 @@ export const deleteMultipleEventsTool = tool(
       const deleteResult = await supabaseService.deleteEvent(userId, event.id);
       if (deleteResult.success) {
         deletedCount++;
+
+        // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
+        try {
+          await zepGraphService.deleteCalendarEvent(event.id);
+        } catch (graphError) {
+          console.warn(`⚠️ [DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
+          // Non-critical - event is deleted from DB which is what matters
+        }
       } else {
         errors.push(`Failed to delete "${event.title}": ${deleteResult.error}`);
       }

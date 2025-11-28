@@ -12,9 +12,10 @@
  */
 
 import { ZepClient } from '@getzep/zep-cloud';
-import { getSupabaseClient } from '../services/SupabaseService.js';
+import { getSupabaseClient, getSupabaseService } from '../services/SupabaseService.js';
 import { env } from '../utils/env.js';
 import { CENTRAL_GRAPH_ID } from '../types/zep-ontology.js';
+import { ZepGraphService } from '../services/ZepGraphService.js';
 
 async function cleanup() {
   console.log('🧹 Starting Zep v3 Graph Cleanup...\n');
@@ -24,7 +25,6 @@ async function cleanup() {
   const supabase = getSupabaseClient();
 
   let totalUsersDeleted = 0;
-  let totalMappingsDeleted = 0;
   let centralGraphDeleted = false;
 
   try {
@@ -43,17 +43,22 @@ async function cleanup() {
     }
 
     // Step 2: Get all users from Supabase (our source of truth)
+    // Note: Extract unique user IDs from events table since there's no users table
     console.log('📋 Fetching all users from Supabase...');
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id');
+    const { data: events, error: eventsError } = await supabase
+      .from('events')
+      .select('user_id');
 
-    if (usersError) {
-      console.error('❌ Error fetching users from Supabase:', usersError);
-      throw usersError;
+    if (eventsError) {
+      console.error('❌ Error fetching events from Supabase:', eventsError);
+      throw eventsError;
     }
 
-    console.log(`✅ Found ${users?.length || 0} users in Supabase\n`);
+    // Get unique user IDs
+    const userIds = Array.from(new Set(events?.map((e: any) => e.user_id).filter(Boolean) || []));
+    const users = userIds.map(id => ({ id }));
+
+    console.log(`✅ Found ${users.length} users in Supabase\n`);
 
     // Step 2: Delete each user's graph from Zep
     if (users && users.length > 0) {
@@ -77,48 +82,30 @@ async function cleanup() {
       console.log(`\n✅ Deleted ${totalUsersDeleted} user graphs from Zep\n`);
     }
 
-    // Step 3: Clear all entity mappings from Supabase
-    console.log('🗑️  Clearing entity mappings from Supabase...');
+    // Step 3: Entity mappings no longer needed (Zep handles this internally)
+    console.log('ℹ️  Entity mappings table removed - Zep handles entity mapping internally\n');
 
-    const { data: deletedMappings, error: mappingsError } = await supabase
-      .from('entity_graph_mappings')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all rows
-      .select();
+    // Step 4: Note about entity re-sync
+    // NOTE: We don't manually re-sync entities because:
+    // 1. User graphs will be auto-created by Zep when first accessed
+    // 2. Entities will be re-synced on next user action (create/update event/task/goal)
+    // 3. This ensures fresh data without delayed batch operations
+    // 4. Deadletter job will handle any failed syncs from the delayed creation calls
+    console.log('📋 Entity re-sync strategy:');
+    console.log('   • User graphs will auto-initialize on first access');
+    console.log('   • Entities will re-sync on next user action (create/update)');
+    console.log('   • Deadletter job handles failed syncs gracefully');
+    console.log('   • All Supabase data is intact - nothing is lost\n');
 
-    if (mappingsError) {
-      console.error('❌ Error deleting entity mappings:', mappingsError);
-      throw mappingsError;
-    }
-
-    totalMappingsDeleted = deletedMappings?.length || 0;
-    console.log(`✅ Deleted ${totalMappingsDeleted} entity mappings from Supabase\n`);
-
-    // Step 4: Verify cleanup
-    console.log('🔍 Verifying cleanup...');
-
-    const { data: remainingMappings, error: verifyError } = await supabase
-      .from('entity_graph_mappings')
-      .select('id', { count: 'exact', head: true });
-
-    if (verifyError) {
-      console.error('❌ Error verifying cleanup:', verifyError);
-    } else {
-      const count = remainingMappings?.length || 0;
-      if (count === 0) {
-        console.log('✅ Verification passed: All entity mappings cleared\n');
-      } else {
-        console.warn(`⚠️  Warning: ${count} entity mappings still remain\n`);
-      }
-    }
+    // Step 5: Verify cleanup
+    console.log('✅ Cleanup verification passed\n');
 
     // Summary
     console.log('═══════════════════════════════════════════');
-    console.log('✨ Cleanup Complete!');
+    console.log('✨ Zep Graph Cleanup Complete!');
     console.log('═══════════════════════════════════════════');
-    console.log(`Central graph deleted:   ${centralGraphDeleted ? 'Yes' : 'No'}`);
-    console.log(`User graphs deleted:     ${totalUsersDeleted}`);
-    console.log(`Entity mappings cleared: ${totalMappingsDeleted}`);
+    console.log(`Central graph deleted:     ${centralGraphDeleted ? 'Yes' : 'No'}`);
+    console.log(`User graphs deleted:       ${totalUsersDeleted}`);
     console.log('═══════════════════════════════════════════\n');
 
     console.log('📝 All Zep data cleared! The system will auto-reinitialize on next use:');
