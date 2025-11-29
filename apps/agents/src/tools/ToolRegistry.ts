@@ -11,6 +11,9 @@ import { profileTools } from './profile/index.js';
 import { searchTools } from './search/index.js';
 import { memoryTools } from './memory/index.js';
 import { interactionTools } from './interactions/index.js';
+// NOTE: interactionTools imported but NOT registered in default tools
+// Interactions should only be created by the dedicated InteractionAgent, not ConversationAgent
+// This prevents accidental duplicate/proactive suggestions from the conversation flow
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -64,10 +67,9 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
-    // Register all interaction tools
-    interactionTools.forEach(tool => {
-      this.tools.set(tool.name, tool);
-    });
+    // NOTE: Interaction tools NOT registered here
+    // The InteractionAgent has its own tool registry for proactive suggestions
+    // This separation prevents ConversationAgent from accidentally creating interactions
   }
 
   // Register a single tool
@@ -112,6 +114,13 @@ export class ToolRegistry {
 
     const toolNames = categoryPrefixes[category] || [];
     return this.getTools(toolNames);
+  }
+
+  // Get tools specifically for InteractionAgent (restricted set - ONLY create_interaction)
+  // InteractionAgent should ONLY create interactions, not query or search
+  // NOTE: Returns interactionTools directly since they're not registered in main registry
+  getInteractionAgentTools(): any[] {
+    return interactionTools;
   }
 
   // Get tool names for a specific category
