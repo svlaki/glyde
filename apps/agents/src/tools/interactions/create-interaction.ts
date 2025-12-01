@@ -13,7 +13,7 @@ export const createInteractionTool = tool(
       const supabaseService = getSupabaseService();
 
       const interaction = await supabaseService.createUserInteraction(userId, {
-        agentId: "conversation",
+        agentId: "interaction",
         question,
         interactionType: type,
         options: options || undefined,

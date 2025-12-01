@@ -146,14 +146,23 @@ export function AgentInteractions() {
     setError(null)
 
     try {
-      const response = await fetch(`${AGENT_SERVICE_URL}/api/agents/proactive/run`, {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/agent/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          context: {
+            userId: user.id,
+            sessionId: `interactions-${Date.now()}`,
+            timezone: timezone,
+            conversationHistory: []
+          },
+          message: 'Generate 2-3 proactive suggestions based on my calendar, tasks, and goals. Create interactive prompts that I can respond to.',
+          targetAgent: 'interaction',
+          isInternal: true
         })
       })
 

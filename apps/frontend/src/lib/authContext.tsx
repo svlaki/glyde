@@ -82,31 +82,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Deduplicate: only trigger startup once per session
     if (startupTriggeredRef.current.has(session.user.id)) {
-      console.log('ℹ️ Startup interactions already triggered for this session');
+      console.log('ℹ️ Session already initialized for this user');
       return;
     }
     startupTriggeredRef.current.add(session.user.id);
 
-    // Generate proactive startup interactions
-    try {
-      const token = session.access_token;
-      const response = await fetch(`${AGENT_SERVICE_URL}/api/interactions/generate-startup`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Proactive interactions generation initiated:', data.message);
-      } else {
-        console.warn('⚠️ Failed to generate startup interactions:', response.status);
-      }
-    } catch (error) {
-      console.warn('⚠️ Could not trigger startup interactions (non-critical):', error);
-    }
+    // Interactions are now created directly by the agent via create_interaction tool
+    // They can be generated on-demand via the refresh button in the UI
+    console.log('✅ Ready to generate interactions on-demand');
   }
 
   async function signIn(email: string, password: string) {
