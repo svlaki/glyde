@@ -43,7 +43,7 @@ export const listGoalsTool = tool(
         const targetStr = goal.target_date ? ` (Target: ${new Date(goal.target_date).toLocaleDateString()})` : '';
         const progressStr = goal.progress ? ` - ${goal.progress}% complete` : '';
         const statusStr = goal.status ? ` [${goal.status.toUpperCase()}]` : '';
-        return `${index + 1}. ${goal.title}${statusStr}${progressStr}${targetStr}`;
+        return `${index + 1}. ${goal.title}${statusStr}${progressStr}${targetStr}\n   ID: ${goal.id}`;
       }).join('\n');
 
       return `Found ${goals.length} goal(s):\n${goalList}`;

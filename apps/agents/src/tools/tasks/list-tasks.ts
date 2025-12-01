@@ -30,7 +30,7 @@ export const listTasksTool = tool(
         const priorityStr = task.priority ? ` [${task.priority.toUpperCase()}]` : '';
         const statusStr = task.status ? ` - ${task.status}` : '';
         const categoryStr = task.category_name ? ` [${task.category_name}]` : (task.category ? ` [${task.category}]` : '');
-        return `${index + 1}. ${task.title}${priorityStr}${categoryStr}${dueStr}${statusStr}`;
+        return `${index + 1}. ${task.title}${priorityStr}${categoryStr}${dueStr}${statusStr}\n   ID: ${task.id}`;
       }).join('\n');
 
       return `Found ${tasks.length} task(s):\n${taskList}`;

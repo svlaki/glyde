@@ -20,13 +20,14 @@ export const updateGoalTool = tool(
 
       const updates: any = {};
 
-      if (title !== undefined) updates.title = title;
-      if (description !== undefined) updates.description = description;
-      if (targetDate !== undefined) updates.targetDate = targetDate;
+      // Only include fields that are actually provided with non-empty values
+      if (title !== undefined && title.trim() !== '') updates.title = title;
+      if (description !== undefined && description.trim() !== '') updates.description = description;
+      if (targetDate !== undefined && targetDate.trim() !== '') updates.targetDate = targetDate;
       if (status !== undefined) updates.status = status;
-      if (progress !== undefined) updates.progress = progress;
-      if (category !== undefined) updates.category = category;
-      if (priorityScore !== undefined) updates.priorityScore = priorityScore;
+      if (progress !== undefined && progress !== null) updates.progress = progress;
+      if (category !== undefined && category.trim() !== '') updates.category = category;
+      if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
 
       const goal = await supabaseService.updateGoal(userId, goalId, updates);
 

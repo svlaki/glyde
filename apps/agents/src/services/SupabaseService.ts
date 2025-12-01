@@ -56,10 +56,27 @@ export class SupabaseService {
   }
 
   /**
+   * Helper: Validate UUID format to prevent database errors
+   * Returns true if the ID is a valid UUID, false otherwise
+   */
+  private isValidUUID(id: any): boolean {
+    if (typeof id !== 'string') return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  }
+
+  /**
    * Helper: Generic delete operation with consistent error handling
    */
   private async deleteRecord(table: string, userId: string, recordId: string, entityName: string): Promise<{ success: boolean, error: string | null }> {
     try {
+      // Validate recordId format
+      if (!this.isValidUUID(recordId)) {
+        const errorMsg = `Invalid ${entityName} ID format: "${recordId}" is not a valid UUID`;
+        console.error(`❌ Invalid UUID for ${entityName}:`, recordId);
+        return { success: false, error: errorMsg };
+      }
+
       const { error } = await this.client
         .from(table)
         .delete()
@@ -197,6 +214,12 @@ export class SupabaseService {
   // NO timezone conversion - caller must provide UTC times
   async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
     try {
+      // Validate eventId format
+      if (!this.isValidUUID(eventId)) {
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', eventId);
+        return null;
+      }
+
       // Build update object with only provided fields
       // Note: start_time and end_time must already be in UTC format from caller
       const updateData: any = {
@@ -608,6 +631,12 @@ export class SupabaseService {
    */
   async getUserInteractionById(interactionId: string): Promise<any | null> {
     try {
+      // Validate interactionId format
+      if (!this.isValidUUID(interactionId)) {
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', interactionId);
+        return null;
+      }
+
       const { data, error } = await this.client
         .from('user_interactions')
         .select('*')
@@ -637,6 +666,12 @@ export class SupabaseService {
     const respondedAt = new Date().toISOString();
 
     try {
+      // Validate interactionId format
+      if (!this.isValidUUID(interactionId)) {
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', interactionId);
+        return null;
+      }
+
       const { data: interaction, error: interactionError } = await this.client
         .from('user_interactions')
         .select('*')
@@ -773,6 +808,13 @@ export class SupabaseService {
     recurringPattern?: Record<string, any>;
   }): Promise<any> {
     try {
+      // Validate taskId format
+      if (!this.isValidUUID(taskId)) {
+        const error = new Error(`Invalid task ID format: "${taskId}" is not a valid UUID`);
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', taskId);
+        throw error;
+      }
+
       console.log('🔄 [SUPABASE SERVICE] Updating task:', taskId);
 
       const updateData: any = {
@@ -837,6 +879,13 @@ export class SupabaseService {
    */
   async completeTask(userId: string, taskId: string, notes?: string, actualDuration?: number): Promise<any> {
     try {
+      // Validate taskId format
+      if (!this.isValidUUID(taskId)) {
+        const error = new Error(`Invalid task ID format: "${taskId}" is not a valid UUID`);
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', taskId);
+        throw error;
+      }
+
       const updateData: any = {
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -1018,6 +1067,13 @@ export class SupabaseService {
     reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
   }): Promise<any> {
     try {
+      // Validate goalId format
+      if (!this.isValidUUID(goalId)) {
+        const error = new Error(`Invalid goal ID format: "${goalId}" is not a valid UUID`);
+        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', goalId);
+        throw error;
+      }
+
       console.log('🔄 [SUPABASE SERVICE] Updating goal:', goalId);
 
       const updateData: any = {

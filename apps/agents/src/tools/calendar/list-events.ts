@@ -51,7 +51,7 @@ export const listEventsTool = tool(
       // Format UTC times for user's timezone
       const eventTime = formatEventTime(event.start_time, timezone);
 
-      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}`;
+      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}\n   ID: ${event.id}`;
     });
 
     const totalText = events.length > effectiveLimit ? ` (showing first ${effectiveLimit} of ${events.length})` : '';

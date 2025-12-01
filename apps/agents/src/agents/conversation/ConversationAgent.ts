@@ -362,7 +362,7 @@ IMPORTANT INSTRUCTIONS:
             const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
             const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
             const statusStr = t.status === 'completed' ? ' ✓' : t.status === 'in_progress' ? ' 🔄' : '';
-            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}`;
+            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr} (ID: ${t.id})`;
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 
@@ -379,7 +379,7 @@ IMPORTANT INSTRUCTIONS:
             const progressStr = g.progress !== null && g.progress !== undefined ? ` - ${g.progress}% complete` : '';
             const statusStr = g.status ? ` [${g.status.toUpperCase()}]` : '';
             const categoryStr = g.category ? ` (${g.category})` : '';
-            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${categoryStr}`;
+            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${categoryStr} (ID: ${g.id})`;
           }).join('\n')}`
         : `\n\nUSER'S GOALS: No goals set`;
 
