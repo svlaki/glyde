@@ -376,7 +376,7 @@ export class SupabaseService {
     interaction: {
       agentId: AgentType | string;
       question: string;
-      interactionType: 'yes_no' | 'multiple_choice' | 'confirmation';
+      interactionType: 'yes_no' | 'multiple_choice' | 'confirmation' | 'choice';
       options?: string[] | null;
       priority?: number;
       categoryId?: string | null;
@@ -443,6 +443,7 @@ export class SupabaseService {
 
   /**
    * Get all pending interactions for a user (optionally filtered by agent)
+   * Filters out interactions for deleted entities and removes duplicates
    */
   async getPendingUserInteractions(userId: string, agentId?: string): Promise<any[]> {
     try {
@@ -471,7 +472,131 @@ export class SupabaseService {
         return [];
       }
 
-      return data || [];
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Get all entity IDs that need validation
+      const taskIds = new Set<string>();
+      const eventIds = new Set<string>();
+      const goalIds = new Set<string>();
+
+      for (const interaction of data) {
+        const entityId = interaction.entity_id;
+        const actionType = interaction.metadata?.actionType;
+
+        if (!entityId) continue;
+
+        // Categorize by action type
+        if (actionType === 'schedule_task_focus' || actionType === 'fill_gap') {
+          taskIds.add(entityId);
+        } else if (actionType === 'prepare_event') {
+          eventIds.add(entityId);
+        } else if (actionType === 'schedule_goal_activity') {
+          goalIds.add(entityId);
+        }
+      }
+
+      // Fetch existing entities to validate
+      const existingTaskIds = new Set<string>();
+      const existingEventIds = new Set<string>();
+      const existingGoalIds = new Set<string>();
+
+      // Check which tasks still exist
+      if (taskIds.size > 0) {
+        const { data: tasks } = await this.client
+          .from('tasks')
+          .select('id')
+          .eq('user_id', userId)
+          .in('id', Array.from(taskIds));
+
+        if (tasks) {
+          tasks.forEach((t: any) => existingTaskIds.add(t.id));
+        }
+      }
+
+      // Check which events still exist
+      if (eventIds.size > 0) {
+        const { data: events } = await this.client
+          .from('events')
+          .select('id')
+          .eq('user_id', userId)
+          .in('id', Array.from(eventIds));
+
+        if (events) {
+          events.forEach((e: any) => existingEventIds.add(e.id));
+        }
+      }
+
+      // Check which goals still exist
+      if (goalIds.size > 0) {
+        const { data: goals } = await this.client
+          .from('goals')
+          .select('id')
+          .eq('user_id', userId)
+          .in('id', Array.from(goalIds));
+
+        if (goals) {
+          goals.forEach((g: any) => existingGoalIds.add(g.id));
+        }
+      }
+
+      // Filter out interactions for deleted entities and track seen entities to prevent duplicates
+      const seenEntityKeys = new Set<string>();
+      const interactionsToDelete: string[] = [];
+
+      const validInteractions = data.filter((interaction: any) => {
+        const entityId = interaction.entity_id;
+        const actionType = interaction.metadata?.actionType;
+
+        // If no entity_id, keep the interaction
+        if (!entityId) return true;
+
+        // Check if entity still exists based on action type
+        let entityExists = true;
+        if (actionType === 'schedule_task_focus' || actionType === 'fill_gap') {
+          entityExists = existingTaskIds.has(entityId);
+        } else if (actionType === 'prepare_event') {
+          entityExists = existingEventIds.has(entityId);
+        } else if (actionType === 'schedule_goal_activity') {
+          entityExists = existingGoalIds.has(entityId);
+        }
+
+        // Mark for deletion if entity doesn't exist
+        if (!entityExists) {
+          console.log(`[SUPABASE SERVICE] Filtering out interaction for deleted entity: ${actionType}:${entityId}`);
+          interactionsToDelete.push(interaction.id);
+          return false;
+        }
+
+        // Check for duplicates - only keep the first (oldest) interaction per entity+actionType
+        const entityKey = `${actionType}:${entityId}`;
+        if (seenEntityKeys.has(entityKey)) {
+          console.log(`[SUPABASE SERVICE] Filtering out duplicate interaction: ${entityKey}`);
+          interactionsToDelete.push(interaction.id);
+          return false;
+        }
+        seenEntityKeys.add(entityKey);
+
+        return true;
+      });
+
+      // Clean up invalid/duplicate interactions in the background (don't await)
+      if (interactionsToDelete.length > 0) {
+        (async () => {
+          try {
+            await this.client
+              .from('user_interactions')
+              .update({ status: 'expired' })
+              .in('id', interactionsToDelete);
+            console.log(`[SUPABASE SERVICE] Marked ${interactionsToDelete.length} stale interactions as expired`);
+          } catch (err) {
+            console.warn('[SUPABASE SERVICE] Failed to clean up stale interactions:', err);
+          }
+        })();
+      }
+
+      return validInteractions;
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception fetching pending interactions:', error);
       return [];

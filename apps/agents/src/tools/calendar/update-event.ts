@@ -11,10 +11,10 @@ export const updateEventTool = tool(
     const timezone = config?.configurable?.timezone;
 
     if (!userId) {
-      throw new Error("User ID is required for updating events");
+      return "❌ User ID is required for updating events. Please try again.";
     }
     if (!timezone) {
-      throw new Error("Timezone is required for updating events");
+      return "❌ Timezone is required for updating events. Please try again.";
     }
 
     let targetEventId = eventId;
@@ -40,8 +40,6 @@ export const updateEventTool = tool(
           return eventDate >= todayStart;
         });
 
-        console.log(`[UPDATE-EVENT TOOL] Searching in ${recentEvents.length} recent events (today + 14 days)`);
-
         // Find matching events using fuzzy matching
         const normalizedQuery = searchQuery.toLowerCase().trim();
         const queryWords = normalizedQuery.split(/\s+/).filter(word =>
@@ -55,33 +53,11 @@ export const updateEventTool = tool(
           return hasMatch || hasFullMatch;
         });
 
-        // Sort by relevance and date
-        matchingEvents.sort((a, b) => {
-          const aTitle = a.title.toLowerCase();
-          const bTitle = b.title.toLowerCase();
-          const aMatches = queryWords.filter(word => aTitle.includes(word)).length;
-          const bMatches = queryWords.filter(word => bTitle.includes(word)).length;
-
-          if (bMatches === aMatches) {
-            return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-          }
-          return bMatches - aMatches;
-        });
-
-        if (matchingEvents.length === 0) {
-          // Check if there are older matching events
-          const olderMatches = allEvents.filter((event: any) => {
-            const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-            const hasMatch = queryWords.some(word => searchText.includes(word));
-            const hasFullMatch = searchText.includes(normalizedQuery);
-            return (hasMatch || hasFullMatch) && new Date(event.start_time) < todayStart;
-          });
-
-          if (olderMatches.length > 0) {
-            throw new Error(`No upcoming events found matching "${searchQuery}". I found ${olderMatches.length} older event(s) with that name. Did you mean one of those? Please specify the date if you want to update an old event.`);
-          }
-
-          throw new Error(`No event found matching: "${searchQuery}"`);
+        if (matchingEvents.length > 0) {
+          targetEventId = matchingEvents[0].id;
+          console.log('✅ [UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
+        } else {
+          return `❌ No event found matching: "${searchQuery}". Please check the event name and try again.`;
         }
 
         if (matchingEvents.length > 1) {
@@ -97,50 +73,18 @@ export const updateEventTool = tool(
         targetEventId = matchingEvents[0].id;
         console.log('[UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
       } catch (error) {
-        console.error('[UPDATE-EVENT TOOL] Search error:', error);
-        throw new Error(`Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('❌ [UPDATE-EVENT TOOL] Search error:', error);
+        return `❌ Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     }
 
     if (!targetEventId) {
-      throw new Error("No event ID provided and no search query given");
+      return "❌ No event ID provided and no search query given. Please specify which event to update.";
     }
 
-    // Validate and ensure category exists (same as create-event)
-    let validatedCategory = category;
-    if (category && category.trim().length > 0) {
-      try {
-        console.log(`[UPDATE-EVENT TOOL] Validating category: "${category}"`);
-
-        // Check if category exists
-        let existingCategory = await categoryService.getCategoryByName(userId, category.trim());
-
-        if (!existingCategory) {
-          // Category doesn't exist, create it with a default color
-          console.log(`[UPDATE-EVENT TOOL] Category "${category}" does not exist, creating it...`);
-          const defaultColor = '#3b82f6'; // Blue
-          existingCategory = await categoryService.createCategory(userId, {
-            name: category.trim(),
-            color: defaultColor,
-            icon: undefined,
-            description: `Auto-created for event: ${title || 'Event'}`
-          });
-
-          if (!existingCategory) {
-            console.warn(`[UPDATE-EVENT TOOL] Failed to create category "${category}", will use it anyway`);
-          } else {
-            console.log(`[UPDATE-EVENT TOOL] Successfully created category: "${category}"`);
-          }
-        } else {
-          console.log(`[UPDATE-EVENT TOOL] Category "${category}" already exists`);
-        }
-
-        validatedCategory = category.trim();
-      } catch (error) {
-        console.warn(`[UPDATE-EVENT TOOL] Error validating/creating category "${category}":`, error);
-        // Continue with event update even if category validation fails
-      }
-    }
+    // Get original event to compare changes
+    const events = await supabaseService.getEvents(userId);
+    const originalEvent = events.find((e: any) => e.id === targetEventId);
 
     // Convert local times to UTC for storage (same as create-event)
     const startTimeUTC = startTime ? convertToUTC(startTime, timezone) : undefined;
@@ -159,12 +103,13 @@ export const updateEventTool = tool(
         end_time: endTimeUTC,
         location: location || undefined,
         description: description || undefined,
-        category: validatedCategory || undefined,
+        category: category || undefined,
       }
     );
 
     if (!updatedEvent) {
-      throw new Error("Failed to update event");
+      // Return error message instead of throwing to prevent LLM retry loops
+      return "❌ Failed to update event. The event may have been deleted or you may not have permission to modify it.";
     }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat
@@ -172,12 +117,31 @@ export const updateEventTool = tool(
     // Graph should only contain summary patterns, not every action
     // TODO: Implement selective sync only for significant events or via periodic aggregation
 
-    // Add context about category updates in response
-    const categoryContext = category
-      ? ` (category: ${category})`
-      : '';
+    // Build detailed change description
+    const changes: string[] = [];
+    const eventTitle = title || updatedEvent.title || originalEvent?.title || 'Event';
 
-    return `Event updated: "${title || updatedEvent.title}"${categoryContext}`;
+    if (title && originalEvent?.title !== title) {
+      changes.push(`renamed to "${title}"`);
+    }
+    if (startTimeUTC || endTimeUTC) {
+      const newStartDate = new Date(updatedEvent.start_time);
+      const newEndDate = new Date(updatedEvent.end_time);
+      const dateStr = newStartDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const startTimeStr = newStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const endTimeStr = newEndDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      changes.push(`moved to ${dateStr} from ${startTimeStr} to ${endTimeStr}`);
+    }
+    if (category && originalEvent?.category !== category) {
+      changes.push(`category changed to "${category}"`);
+    }
+    if (location && originalEvent?.location !== location) {
+      changes.push(`location changed to "${location}"`);
+    }
+
+    const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
+
+    return `✅ EVENT: "${eventTitle}" has been updated${changeDescription}`;
   },
   {
     name: "update_event",

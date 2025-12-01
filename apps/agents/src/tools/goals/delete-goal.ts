@@ -67,7 +67,18 @@ export const deleteGoalTool = tool(
 
         if (matchingGoals.length > 0) {
           targetGoalId = matchingGoals[0].id;
-          console.log('✅ [DELETE-GOAL TOOL] Found goal to delete:', matchingGoals[0].title);
+          const goalToDelete = matchingGoals[0];
+          console.log('✅ [DELETE-GOAL TOOL] Found goal to delete:', goalToDelete.title);
+
+          // Delete the goal
+          const supabaseService = getSupabaseService();
+          const result = await supabaseService.deleteGoal(userId, goalToDelete.id);
+
+          if (!result.success) {
+            return `❌ Failed to delete goal: ${result.error}`;
+          }
+
+          return `✅ GOAL: "${goalToDelete.title}" has been deleted`;
         } else {
           return `❌ No goal found matching: "${searchQuery}". Available goals: ${goals.map((g: any) => g.title).join(', ')}`;
         }
@@ -81,21 +92,23 @@ export const deleteGoalTool = tool(
       return "❌ Failed to identify goal to delete - this should not happen";
     }
 
+    // Direct goalId provided - fetch goal details first, then delete
     try {
       const supabaseService = getSupabaseService();
+
+      // Get goal details before deleting
+      const goals = await supabaseService.getGoals(userId);
+      const goalToDelete = goals.find((g: any) => g.id === targetGoalId);
+
       const result = await supabaseService.deleteGoal(userId, targetGoalId);
 
       if (!result.success) {
         return `❌ Failed to delete goal: ${result.error}`;
       }
 
-      // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
-      try {
-        const zepGraphService = new ZepGraphService();
-        await zepGraphService.deleteGoal(targetGoalId);
-      } catch (graphError) {
-        console.warn(`⚠️ [DELETE-GOAL TOOL] Failed to remove goal from graph (non-critical): ${graphError}`);
-        // Non-critical - goal is deleted from DB which is what matters
+      // Format response with goal details
+      if (goalToDelete) {
+        return `✅ GOAL: "${goalToDelete.title}" has been deleted`;
       }
 
       return `✅ Goal deleted successfully`;

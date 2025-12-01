@@ -56,7 +56,28 @@ export const deleteTaskTool = tool(
 
         if (matchingTasks.length > 0) {
           targetTaskId = matchingTasks[0].id;
-          console.log('✅ [DELETE-TASK TOOL] Found task to delete:', matchingTasks[0].title);
+          // Store task details for the response
+          const taskToDelete = matchingTasks[0];
+          console.log('✅ [DELETE-TASK TOOL] Found task to delete:', taskToDelete.title);
+
+          // Delete the task
+          const supabaseService = getSupabaseService();
+          const result = await supabaseService.deleteTask(userId, taskToDelete.id);
+
+          if (!result.success) {
+            return `❌ Failed to delete task: ${result.error}`;
+          }
+
+          // Format due date for response
+          let dueInfo = '';
+          if (taskToDelete.due_date) {
+            const dueDate = new Date(taskToDelete.due_date);
+            const dateStr = dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const timeStr = dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            dueInfo = ` (was due ${dateStr} at ${timeStr})`;
+          }
+
+          return `✅ TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
         } else {
           return `❌ No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
         }
@@ -70,21 +91,30 @@ export const deleteTaskTool = tool(
       return "❌ Failed to identify task to delete - this should not happen";
     }
 
+    // Direct taskId provided - fetch task details first, then delete
     try {
       const supabaseService = getSupabaseService();
+
+      // Get task details before deleting
+      const tasks = await supabaseService.getTasks(userId);
+      const taskToDelete = tasks.find((t: any) => t.id === targetTaskId);
+
       const result = await supabaseService.deleteTask(userId, targetTaskId);
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;
       }
 
-      // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
-      try {
-        const zepGraphService = new ZepGraphService();
-        await zepGraphService.deleteTask(targetTaskId);
-      } catch (graphError) {
-        console.warn(`⚠️ [DELETE-TASK TOOL] Failed to remove task from graph (non-critical): ${graphError}`);
-        // Non-critical - task is deleted from DB which is what matters
+      // Format response with task details
+      if (taskToDelete) {
+        let dueInfo = '';
+        if (taskToDelete.due_date) {
+          const dueDate = new Date(taskToDelete.due_date);
+          const dateStr = dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          const timeStr = dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+          dueInfo = ` (was due ${dateStr} at ${timeStr})`;
+        }
+        return `✅ TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
       }
 
       return `✅ Task deleted successfully`;

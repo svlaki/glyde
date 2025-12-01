@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@ai-sdk/react": "^2.0.104",
     "@llm-ui/markdown": "^0.13.3",
     "@llm-ui/react": "^0.13.3",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -11,6 +12,7 @@
     "@supabase/supabase-js": "^2.50.2",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react-datepicker": "^6.2.0",
+    "ai": "^5.0.104",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

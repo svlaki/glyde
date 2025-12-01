@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { getSupabaseClient } from '../../services/SupabaseService.js';
 
-const AUTH_EXEMPT_PATHS = ['/health', '/api/agent/process'];
+const AUTH_EXEMPT_PATHS = ['/health', '/api/agent/process', '/api/agent/stream'];
 
 function isAuthExempt(req: Request): boolean {
   return (

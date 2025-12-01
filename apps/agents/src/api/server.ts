@@ -39,6 +39,7 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { processAgentMessage, addStartTime } from './agent.js';
+import { streamAgentMessage } from './stream.js';
 import { authenticateRequest } from './middleware/auth.js';
 
 const app = express();
@@ -99,8 +100,8 @@ app.use(authenticateRequest);
 
 // Input sanitization middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
-  // Skip sanitization for health check and agent endpoint
-  if (req.url.includes('/health') || req.url.includes('/api/agent/process')) {
+  // Skip sanitization for health check and agent endpoints (process and stream)
+  if (req.url.includes('/health') || req.url.includes('/api/agent/')) {
     next();
     return;
   }
@@ -141,8 +142,8 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 
 // Input validation middleware
 app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
-  // Skip validation for health check and agent endpoint
-  if (req.url.includes('/health') || req.url.includes('/api/agent/process')) {
+  // Skip validation for health check and agent endpoints (process and stream)
+  if (req.url.includes('/health') || req.url.includes('/api/agent/')) {
     next();
     return;
   }
@@ -283,6 +284,7 @@ app.post('/api/chat/history', async (req, res) => {
 
 // Agent endpoints - for LangGraph agent system
 app.post('/api/agent/process', addStartTime, processAgentMessage);
+app.post('/api/agent/stream', addStartTime, streamAgentMessage);
 
 // Centralized error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

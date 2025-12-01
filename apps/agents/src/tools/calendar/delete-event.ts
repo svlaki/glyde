@@ -151,7 +151,16 @@ export const deleteEventTool = tool(
     // Fire and forget - don't await this
     removeFromGraph();
 
-    return `✅ Event "${eventTitle}" has been deleted successfully. You can now schedule a new event at that time.`;
+    // Format event time for response
+    let timeInfo = '';
+    if (eventToDelete?.start_time) {
+      const startDate = new Date(eventToDelete.start_time);
+      const dateStr = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const timeStr = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      timeInfo = ` from ${dateStr} at ${timeStr}`;
+    }
+
+    return `✅ EVENT: "${eventTitle}" has been deleted${timeInfo}`;
   },
   {
     name: "delete_event",

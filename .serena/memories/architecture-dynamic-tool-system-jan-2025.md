@@ -22,13 +22,13 @@ Complete refactoring of the agent tool system to enable dynamic tool management,
 
 **Key Changes**:
 - Added memory tools import and registration
-- Updated category mapping to include all 28 tools (calendar: 9, tasks: 6, goals: 5, profile: 2, categories: 4, memory: 3, search: 1)
+- Updated category mapping to include all 27 tools (calendar: 8, tasks: 6, goals: 5, profile: 2, categories: 4, memory: 3, search: 1)
 - Serves as the ONLY source of tool definitions
 
 **Tool Categories**:
 ```typescript
 {
-  calendar: 9 tools (create, update, delete, bulk, search, list, find-free-time, analyze-schedule, delete-multiple)
+  calendar: 8 tools (create, update, delete, bulk, search, list, analyze-schedule, delete-multiple)
   tasks: 6 tools (create, update, delete, list, complete, search)
   goals: 5 tools (create, update, list, check-in, delete)
   profile: 2 tools (get, update)
@@ -165,7 +165,7 @@ console.log(registry.hasTool('update_memory_advanced')); // Should be true
 - ✅ Centralized tool management
 
 **Agent Capabilities**:
-- ✅ 28 total tools (was 27)
+- ✅ 27 total tools
 - ✅ Proactive memory management
 - ✅ Better insight preservation
 - ✅ Dynamic tool discovery
