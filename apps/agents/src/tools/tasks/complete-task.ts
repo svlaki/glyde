@@ -1,7 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const completeTaskTool = tool(
   async ({ taskId, notes, actualDuration }, config) => {
@@ -12,7 +11,6 @@ export const completeTaskTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
-      const zepGraphService = new ZepGraphService();
 
       const task = await supabaseService.completeTask(
         userId,
@@ -25,24 +23,12 @@ export const completeTaskTool = tool(
         return "❌ Failed to complete task";
       }
 
-      // Update task completion in Zep knowledge graph asynchronously
-      const updateGraph = async () => {
-        try {
-          await zepGraphService.addTask(userId, {
-            taskId: task.id,
-            title: task.title,
-            priority: task.priority || 'medium',
-            category: task.category || 'personal',
-            actual_duration: actualDuration ?? undefined,
-            satisfaction_rating: 4, // Default good rating, can be enhanced later
-            energy_required: task.energy_required || 'medium',
-          });
-          console.log(`✅ [complete-task] Task completion added to knowledge graph: ${task.title}`);
-        } catch (error) {
-          console.error('⚠️ [complete-task] Failed to update knowledge graph (non-critical):', error);
-        }
-      };
-      updateGraph(); // Fire and forget
+      // NOTE: We don't sync completed tasks to Zep because:
+      // 1. Task completion is already tracked in Supabase (status='completed')
+      // 2. Zep's temporal system automatically handles task invalidation when new data arrives
+      // 3. Adding "completed" versions creates duplicate/orphaned nodes in the graph
+      // 4. Completion metadata (duration, notes, rating) is accessed from task status in Supabase
+      // Only task DELETION should trigger graph cleanup (via deleteTask tool)
 
       return `✅ Task completed: "${task.title}"`;
     } catch (error) {
@@ -55,8 +41,8 @@ export const completeTaskTool = tool(
     description: "Mark a task as completed. Use this when the user finishes a task or says they're done with something.",
     schema: z.object({
       taskId: z.string().describe("Task ID to complete"),
-      notes: z.string().nullable().optional().describe("Completion notes or comments"),
-      actualDuration: z.number().nullable().optional().describe("Actual time spent in minutes"),
+      notes: z.string().optional().describe("Completion notes or comments"),
+      actualDuration: z.number().optional().describe("Actual time spent in minutes"),
     }),
   }
 );

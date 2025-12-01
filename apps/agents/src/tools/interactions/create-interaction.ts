@@ -25,6 +25,11 @@ export const createInteractionTool = tool(
         return "❌ Failed to create interaction";
       }
 
+      // NOTE: Interactions use thread history only, NOT Zep graph nodes
+      // This prevents graph bloat from accumulating nodes for every user interaction
+      // If future use case requires semantic search over interactions, create aggregate
+      // "interaction_summary" node per session instead of per-interaction nodes
+
       // Log interaction creation for debugging
       console.log(`✅ [create-interaction] Interaction created: ${question} (ID: ${interaction.id})`);
 
@@ -40,9 +45,9 @@ export const createInteractionTool = tool(
     schema: z.object({
       question: z.string().describe("The question or prompt to show the user"),
       type: z.enum(["yes_no", "multiple_choice", "confirmation"]).describe("Type of interaction"),
-      options: z.array(z.string()).nullable().optional().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
-      priority: z.number().min(1).max(5).nullable().optional().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
-      metadata: z.record(z.any()).nullable().optional().describe("Optional metadata object for storing context about the interaction"),
+      options: z.array(z.string()).optional().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
+      priority: z.number().min(1).max(5).optional().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
+      metadata: z.record(z.any()).optional().describe("Optional metadata object for storing context about the interaction"),
     }),
   }
 );

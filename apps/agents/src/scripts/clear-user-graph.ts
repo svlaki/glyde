@@ -56,7 +56,7 @@ async function clearUserGraph(userId: string) {
     // Step 3: Clear user's entity mappings from Supabase
     console.log('🗑️  Clearing entity mappings from Supabase...');
     const { data: deletedMappings, error: mappingsError } = await supabase
-      .from('entity_graph_mappings')
+      .from('events -- DEPRECATED: entity_graph_mappings removed')
       .delete()
       .eq('user_id', userId)
       .select();

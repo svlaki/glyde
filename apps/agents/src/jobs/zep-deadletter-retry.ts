@@ -135,12 +135,22 @@ async function retryItem(
 
     // Attempt the operation
     const zepGraphService = new ZepGraphService();
+    const svc = new SupabaseService();
     let operationSucceeded = false;
 
     try {
       switch (operation) {
         case 'create_event':
           if (payload.eventId && user_id) {
+            // CRITICAL: Check if event still exists in DB before retrying
+            const events = await svc.getEvents(user_id);
+            const eventExists = events.some((e: any) => e.id === payload.eventId);
+            if (!eventExists) {
+              console.log(`[DLQ-RETRY] ⏭️  Event ${payload.eventId} was deleted, skipping retry`);
+              operationSucceeded = true; // Mark as success to remove from queue
+              break;
+            }
+
             await zepGraphService.addCalendarEvent(user_id, {
               eventId: payload.eventId,
               title: payload.title,
@@ -156,6 +166,15 @@ async function retryItem(
 
         case 'create_task':
           if (payload.taskId && user_id) {
+            // CRITICAL: Check if task still exists in DB before retrying
+            const tasks = await svc.getTasks(user_id);
+            const taskExists = tasks.some((t: any) => t.id === payload.taskId);
+            if (!taskExists) {
+              console.log(`[DLQ-RETRY] ⏭️  Task ${payload.taskId} was deleted, skipping retry`);
+              operationSucceeded = true; // Mark as success to remove from queue
+              break;
+            }
+
             await zepGraphService.addTask(user_id, {
               taskId: payload.taskId,
               title: payload.title,
@@ -172,6 +191,15 @@ async function retryItem(
 
         case 'create_goal':
           if (payload.goalId && user_id) {
+            // CRITICAL: Check if goal still exists in DB before retrying
+            const goals = await svc.getGoals(user_id);
+            const goalExists = goals.some((g: any) => g.id === payload.goalId);
+            if (!goalExists) {
+              console.log(`[DLQ-RETRY] ⏭️  Goal ${payload.goalId} was deleted, skipping retry`);
+              operationSucceeded = true; // Mark as success to remove from queue
+              break;
+            }
+
             await zepGraphService.addGoal(user_id, {
               goalId: payload.goalId,
               title: payload.title,

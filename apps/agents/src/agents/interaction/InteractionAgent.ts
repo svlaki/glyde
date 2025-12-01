@@ -108,7 +108,7 @@ export class InteractionAgent extends BaseAgent {
         userEvents: userEvents || [],
         userTasks: userTasks || [],
       }, {
-        recursionLimit: 10  // Prevent infinite loops in tool execution
+        recursionLimit: 20  // Allow up to 20 steps: search + 3 interactions + responses
       });
 
       // Get the last AI message
@@ -138,14 +138,10 @@ export class InteractionAgent extends BaseAgent {
   }
 
   getSystemPrompt(): string {
-    return `You are a proactive suggestion engine and interaction executor. Your job is to:
-1. Generate intelligent, personalized suggestions based on the user's calendar, tasks, and goals
-2. Execute actions when users respond to interactive prompts (yes/no, multiple choice, etc.)
-
-IMPORTANT INSTRUCTIONS:
-- Do NOT use emojis in any output, logging, or generated content
-- Keep all responses and names plain text without emoji characters
-- Focus on interaction workflows, not general conversation`;
+    // This method is required by BaseAgent abstract class but is not used.
+    // The actual system prompt is built dynamically in createGraph() using buildSystemPrompt() from prompts.ts
+    // which includes runtime context like user events, tasks, and timezone.
+    return "UNUSED - See buildSystemPrompt in prompts.ts";
   }
 
   getCapabilities(): string[] {
@@ -159,9 +155,10 @@ IMPORTANT INSTRUCTIONS:
   }
 
   private createGraph(): any {
-    // Get all tools from ToolRegistry (InteractionAgent needs access to all tools for execution)
+    // Get restricted tool set for InteractionAgent (NO action tools)
+    // InteractionAgent should only suggest interactions and query state, never take direct action
     const toolRegistry = ToolRegistry.getInstance();
-    const tools = toolRegistry.getAllTools();
+    const tools = toolRegistry.getInteractionAgentTools();
     const toolNode = new ToolNode(tools);
 
     // Bind tools to the model
@@ -170,60 +167,43 @@ IMPORTANT INSTRUCTIONS:
     // Register tools with the base agent
     this.registerTools(tools);
 
-    console.log(`🔧 [INTERACTION AGENT] Loaded ${tools.length} tools from ToolRegistry`);
+    console.log(`🔧 [INTERACTION AGENT] Loaded ${tools.length} tools from ToolRegistry (restricted set - suggestions only)`);
 
     // Define the workflow nodes
     const callModel = async (state: InteractionStateType) => {
-      // Load recent events for context
+      // Use pre-loaded events (already filtered to future/ongoing in processMessage)
       let recentEvents: any[] = [];
 
       if (state.userEvents && state.userEvents.length > 0) {
         recentEvents = state.userEvents;
         console.log(`Using ${recentEvents.length} pre-loaded events for context`);
-      } else {
-        try {
-          const supabaseService = new SupabaseService();
-          const now = new Date();
-          const allEventsData = await supabaseService.getEventsForAgent(state.userId);
-          const eventsData = allEventsData.filter(event => new Date(event.end_time) >= now);
-
-          if (eventsData && eventsData.length > 0) {
-            recentEvents = eventsData;
-            console.log(`Found ${recentEvents.length} future/ongoing events for user context`);
-          }
-        } catch (error) {
-          console.error('Error loading recent events for context:', error);
-        }
       }
 
       const eventContext = recentEvents.length > 0
-        ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
+        ? `\n\nUSER'S CALENDAR (next few days):\n${recentEvents.map((e) => {
             const startDate = toDate(e.start_time);
             const endDate = toDate(e.end_time);
             const dateStr = formatInTimeZone(startDate, state.timezone, 'EEE, MMM d');
             const startTime = formatInTimeZone(startDate, state.timezone, 'h:mm a');
             const endTime = formatInTimeZone(endDate, state.timezone, 'h:mm a');
-            const localHour = parseInt(formatInTimeZone(startDate, state.timezone, 'H'));
-            const timeOfDay = localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening';
-            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}]`;
+            return `- "${e.title}" on ${dateStr} from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''}`;
           }).join('\n')}`
         : `\n\nUSER'S CALENDAR: No events found`;
 
-      // Load user tasks for context
-      let userTasks: any[] = [];
+      // Filter tasks to only show pending/in-progress (not completed)
+      let pendingTasks: any[] = [];
       if (state.userTasks && state.userTasks.length > 0) {
-        userTasks = state.userTasks;
-        console.log(`Using ${userTasks.length} pre-loaded tasks for context`);
+        pendingTasks = state.userTasks.filter(t => t.status !== 'completed');
+        console.log(`Using ${pendingTasks.length} pending tasks for context (filtered from ${state.userTasks.length} total)`);
       }
 
-      const taskContext = userTasks.length > 0
-        ? `\n\nUSER'S TASKS (${userTasks.length} total):\n${userTasks.map((t, idx) => {
-            const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
+      const taskContext = pendingTasks.length > 0
+        ? `\n\nPENDING TASKS:\n${pendingTasks.map((t, idx) => {
+            const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'MMM d')})` : '';
             const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
-            const statusStr = t.status === 'completed' ? ' ✓' : t.status === 'in_progress' ? ' 🔄' : '';
-            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}`;
+            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}`;
           }).join('\n')}`
-        : `\n\nUSER'S TASKS: No tasks found`;
+        : `\n\nPENDING TASKS: None`;
 
       // Calculate temporal context
       const nowUtc = new Date();

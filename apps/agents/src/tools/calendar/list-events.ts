@@ -61,9 +61,9 @@ export const listEventsTool = tool(
     name: "list_events",
     description: "List calendar events, optionally filtered by date range. By default shows only future/ongoing events when no date range specified. Use includePast=true to show historical events. Shows events in chronological order.",
     schema: z.object({
-      startDate: z.string().nullable().describe("Start date for filtering events (ISO format)"),
-      endDate: z.string().nullable().describe("End date for filtering events (ISO format)"),
-      limit: z.number().nullable().optional().describe("Maximum number of events to return (default: 20)"),
+      startDate: z.string().optional().describe("Start date for filtering events (ISO format)"),
+      endDate: z.string().optional().describe("End date for filtering events (ISO format)"),
+      limit: z.number().optional().describe("Maximum number of events to return (default: 20)"),
       includePast: z.boolean().optional().describe("Optional: Set to true to include past events when no date range specified. Default is false (only future/ongoing events). Use true when user asks about history."),
     }),
   }

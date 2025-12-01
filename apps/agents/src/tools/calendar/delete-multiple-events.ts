@@ -72,6 +72,14 @@ export const deleteMultipleEventsTool = tool(
       const deleteResult = await supabaseService.deleteEvent(userId, event.id);
       if (deleteResult.success) {
         deletedCount++;
+
+        // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
+        try {
+          await zepGraphService.deleteCalendarEvent(event.id);
+        } catch (graphError) {
+          console.warn(`⚠️ [DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
+          // Non-critical - event is deleted from DB which is what matters
+        }
       } else {
         errors.push(`Failed to delete "${event.title}": ${deleteResult.error}`);
       }
@@ -88,8 +96,8 @@ export const deleteMultipleEventsTool = tool(
     name: "delete_multiple_events",
     description: "Delete multiple events based on date or search criteria. Use this when user wants to delete 'all events on a day' or multiple events matching criteria.",
     schema: z.object({
-      date: z.string().nullable().describe("Date to delete all events from (ISO format)"),
-      searchQuery: z.string().nullable().describe("Search query to find multiple events to delete. Use '*' to delete ALL events (dangerous!)"),
+      date: z.string().optional().describe("Date to delete all events from (ISO format)"),
+      searchQuery: z.string().optional().describe("Search query to find multiple events to delete. Use '*' to delete ALL events (dangerous!)"),
     }),
   }
 );

@@ -224,30 +224,6 @@ export class ZepMemoryService {
   }
 
   /**
-   * Add calendar event as structured business data
-   */
-  async addCalendarEvent(userId: string, event: any): Promise<void> {
-    // REMOVED: Calendar events are now handled by ZepGraphService
-    throw new Error('addCalendarEvent is deprecated. Use ZepGraphService.addCalendarEvent() instead.');
-  }
-
-  /**
-   * Add task completion as structured data
-   */
-  async addTaskCompletion(userId: string, task: any): Promise<void> {
-    // REMOVED: Task completions are now handled by ZepGraphService
-    throw new Error('addTaskCompletion is deprecated. Use ZepGraphService.addTask() instead.');
-  }
-
-  /**
-   * Add goal progress as a fact
-   */
-  async addGoalProgress(userId: string, goalProgress: any): Promise<void> {
-    // REMOVED: Goal progress is now handled by ZepGraphService
-    throw new Error('addGoalProgress is deprecated. Use ZepGraphService.addGoal() instead.');
-  }
-
-  /**
    * Get user context from Zep using thread.getUserContext() API
    * Returns pre-formatted context block with user summary and relevant facts
    * Zep automatically determines relevance based on recent messages

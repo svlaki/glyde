@@ -83,7 +83,7 @@ async function resetUserGraphs() {
     console.log('🗑️  Clearing entity mappings from Supabase...');
 
     const { data: deletedMappings, error: mappingsError } = await supabase
-      .from('entity_graph_mappings')
+      .from('events -- DEPRECATED: entity_graph_mappings removed')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all rows
       .select();
@@ -100,7 +100,7 @@ async function resetUserGraphs() {
     console.log('🔍 Verifying cleanup...');
 
     const { count: remainingCount, error: verifyError } = await supabase
-      .from('entity_graph_mappings')
+      .from('events -- DEPRECATED: entity_graph_mappings removed')
       .select('id', { count: 'exact', head: true });
 
     if (verifyError) {
