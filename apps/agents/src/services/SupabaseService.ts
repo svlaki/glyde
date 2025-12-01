@@ -788,6 +788,28 @@ export class SupabaseService {
   }
 
   /**
+   * Update a single interaction status
+   */
+  async updateInteractionStatus(interactionId: string, status: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('user_interactions')
+        .update({ status })
+        .eq('id', interactionId);
+
+      if (error) {
+        console.error('❌ [SUPABASE SERVICE] Error updating interaction status:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ [SUPABASE SERVICE] Exception updating interaction status:', error);
+      return false;
+    }
+  }
+
+  /**
    * Update a task
    */
   async updateTask(userId: string, taskId: string, updates: {

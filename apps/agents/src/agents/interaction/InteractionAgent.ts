@@ -108,7 +108,7 @@ export class InteractionAgent extends BaseAgent {
         userEvents: userEvents || [],
         userTasks: userTasks || [],
       }, {
-        recursionLimit: 20  // Allow up to 20 steps: search + 3 interactions + responses
+        recursionLimit: 4  // Max 4 steps: agent -> tools -> agent -> end (prevents excessive looping)
       });
 
       // Get the last AI message

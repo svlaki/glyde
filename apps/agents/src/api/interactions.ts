@@ -42,135 +42,147 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     }
 
     const supabaseService = getSupabaseService();
-    const saved = await supabaseService.saveInteractionResponse(userId, interactionId, response.trim());
+    const trimmedResponse = response.trim();
 
-    if (!saved) {
-      console.log(`[INTERACTION RESPONSE] Failed to save interaction response`);
-      return res.status(404).json({ error: 'Interaction not found' });
-    }
-
-    console.log(`[INTERACTION RESPONSE] Response saved to database`);
-
-    // Get the interaction to understand the context
+    // Get the interaction first to check for direct actions
     const interaction = await supabaseService.getUserInteractionById(interactionId);
     if (!interaction) {
       console.log(`[INTERACTION RESPONSE] Interaction not found by ID`);
       return res.status(404).json({ error: 'Interaction not found' });
     }
 
+    // DISMISS PATH: If user dismissed interaction, just cancel it
+    if (trimmedResponse === 'dismissed') {
+      console.log(`[INTERACTION RESPONSE] User dismissed interaction ${interactionId}`);
+      const dismissed = await supabaseService.updateInteractionStatus(interactionId, 'cancelled');
+
+      if (!dismissed) {
+        return res.status(500).json({ error: 'Failed to dismiss interaction' });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Interaction dismissed'
+      });
+    }
+
+    // Save the response
+    const saved = await supabaseService.saveInteractionResponse(userId, interactionId, trimmedResponse);
+    if (!saved) {
+      console.log(`[INTERACTION RESPONSE] Failed to save interaction response`);
+      return res.status(404).json({ error: 'Interaction not found' });
+    }
+
+    console.log(`[INTERACTION RESPONSE] Response saved to database`);
     console.log(`[INTERACTION RESPONSE] Got interaction context: "${interaction.question}"`);
 
-    // Call the agent to process the user's response
-    const agentRegistry = AgentRegistry.getInstance();
-    const interactionAgent = agentRegistry.getAgent('interaction');
+    // DIRECT ACTION PATH: Check if metadata has directAction instructions
+    if (interaction.metadata && typeof interaction.metadata === 'object') {
+      const metadata = interaction.metadata as any;
+      if (metadata.directAction) {
+        console.log(`[INTERACTION RESPONSE] Executing direct action`);
+        console.log(`[INTERACTION RESPONSE] Action type: ${metadata.directAction.type}`);
 
-    if (interactionAgent) {
-      try {
-        // Get user context
-        const sessionId = `session-${userId}-${Date.now()}`;
-        const userProfile = await supabaseService.getProfile(userId);
-        const timezone = userProfile?.timezone || 'UTC';
-
-        // Build a message that includes the interaction metadata and user's response
-        // Let the agent decide what to do based on the metadata action and user's response
-        let userMessage = '';
-
-        if (interaction.metadata && typeof interaction.metadata === 'object') {
-          const metadata = interaction.metadata;
-          const action = metadata.action;
-
-          console.log(`[INTERACTION RESPONSE] Interaction metadata:`, JSON.stringify(metadata));
-          console.log(`[INTERACTION RESPONSE] Action type: ${action}`);
-          console.log(`[INTERACTION RESPONSE] User response: "${response}"`);
-
-          // Build message that includes full context for the agent to decide
-          userMessage = `User responded to an interactive prompt.
-
-Original Question: "${interaction.question}"
-User's Response: "${response}"
-
-Metadata:
-${JSON.stringify(metadata, null, 2)}
-
-Based on the metadata action (if present), execute the appropriate action using the details from metadata and interpreting the user's response.
-For example:
-- If action is "schedule_tasks" and response is "both", create events/tasks for both items
-- If action is "check_goal_progress", use the followUpPrompt to guide the conversation
-- If response indicates a choice from options, map the response to the correct metadata parameters
-
-Execute the action now.`;
-        } else {
-          // Fallback if no metadata - just ask what to do
-          userMessage = `User responded to an interactive prompt: "${interaction.question}"
-Their response was: "${response}"
-
-What would you like to do with this response?`;
-        }
-
-        const context = {
-          userId,
-          sessionId,
-          userSchema: 'public',
-          timezone,
-          conversationHistory: []
-          // Note: NOT marked as internal so agent can store in memory/Zep for future context
-          // This won't create a duplicate message in chat since it's not stored in conversation
-        };
-
-        console.log(`[INTERACTION RESPONSE] Invoking interaction agent with message: "${userMessage}"`);
-
-        // Wait for agent response and return it to the user
         try {
-          console.log(`[INTERACTION RESPONSE] About to invoke agent with message length: ${userMessage.length}`);
-          const agentResponse = await interactionAgent.processMessage(context, userMessage);
-          console.log(`[INTERACTION RESPONSE] Agent response type:`, typeof agentResponse);
-          console.log(`[INTERACTION RESPONSE] Agent response:`, JSON.stringify(agentResponse));
+          const actionType = metadata.directAction.type;
+          let actionResult = null;
 
-          const responseContent = agentResponse?.content || agentResponse;
-          console.log(`[INTERACTION RESPONSE] Final response content:`, responseContent);
+          // Execute the appropriate action based on type
+          if (actionType === 'create_event') {
+            console.log(`[INTERACTION RESPONSE] Creating event from metadata`);
+            if (!metadata.directAction.eventData) {
+              throw new Error('eventData required for create_event action');
+            }
+            const eventData = metadata.directAction.eventData;
 
-          const responseStr = typeof responseContent === 'string' ? responseContent : String(responseContent || '');
-          if (!responseStr || responseStr.trim().length === 0) {
-            console.warn(`[INTERACTION RESPONSE] Agent returned empty response!`);
-            return res.json({
-              success: true,
-              message: 'Response saved successfully',
-              agentResponse: 'I processed your response, but couldn\'t generate a reply. Please continue the conversation in chat.'
+            // Calculate start and end times
+            const startTime = eventData.startTime ? new Date(eventData.startTime).toISOString() : new Date().toISOString();
+            const duration = eventData.duration || 60; // minutes
+            const endDate = new Date(new Date(startTime).getTime() + duration * 60000);
+            const endTime = endDate.toISOString();
+
+            actionResult = await supabaseService.createEvent(userId, {
+              title: eventData.title || 'Event',
+              description: eventData.description || '',
+              start_time: startTime,
+              end_time: endTime,
+              category_id: eventData.categoryId || null,
+              location: eventData.location || null,
             });
+            console.log(`[INTERACTION RESPONSE] Event created: ${actionResult?.id}`);
+
+          } else if (actionType === 'create_task') {
+            console.log(`[INTERACTION RESPONSE] Creating task from metadata`);
+            if (!metadata.directAction.taskData) {
+              throw new Error('taskData required for create_task action');
+            }
+            const taskData = metadata.directAction.taskData;
+            actionResult = await supabaseService.createTask(userId, {
+              title: taskData.title || 'Task',
+              description: taskData.description || '',
+              dueDate: taskData.dueDate || null,
+              category_id: taskData.categoryId || null,
+            });
+            console.log(`[INTERACTION RESPONSE] Task created: ${actionResult?.id}`);
+
+          } else if (actionType === 'update_task') {
+            console.log(`[INTERACTION RESPONSE] Updating task from metadata`);
+            if (!metadata.directAction.taskId || !metadata.directAction.taskData) {
+              throw new Error('taskId and taskData required for update_task action');
+            }
+            const taskId = metadata.directAction.taskId;
+            const taskData = metadata.directAction.taskData;
+            actionResult = await supabaseService.updateTask(userId, taskId, {
+              title: taskData.title,
+              description: taskData.description,
+              dueDate: taskData.dueDate,
+              category_id: taskData.categoryId,
+              status: taskData.status as any,
+            });
+            console.log(`[INTERACTION RESPONSE] Task updated: ${taskId}`);
+
+          } else {
+            throw new Error(`Unknown action type: ${actionType}`);
+          }
+
+          // Mark interaction as completed/cancelled
+          const completed = await supabaseService.updateInteractionStatus(interactionId, 'cancelled');
+
+          if (!completed) {
+            throw new Error('Failed to update interaction status');
           }
 
           return res.json({
             success: true,
-            message: 'Response saved successfully',
-            agentResponse: responseStr
+            message: `Action executed: ${actionType}`,
+            actionResult
           });
         } catch (error) {
-          console.error('[INTERACTION RESPONSE] Error processing interaction response in agent:', error);
-          console.error('[INTERACTION RESPONSE] Error details:', error instanceof Error ? error.message : String(error));
-          // Still return success since we saved the response, but include error info
+          console.error(`[INTERACTION RESPONSE] Error executing direct action:`, error);
+          console.error(`[INTERACTION RESPONSE] Error details:`, error instanceof Error ? error.message : String(error));
+          // Don't fall through - return error since we already saved the response
           return res.json({
-            success: true,
-            message: 'Response saved successfully',
-            error: 'Failed to generate agent response',
-            agentResponse: 'I processed your response but encountered an error generating a reply. Please continue in chat.'
+            success: false,
+            message: 'Failed to execute interaction action',
+            error: error instanceof Error ? error.message : 'Unknown error'
           });
         }
-      } catch (agentError) {
-        // Log but don't fail the response - the interaction was already saved
-        console.error('[INTERACTION RESPONSE] Failed to invoke agent on interaction response:', agentError);
-        return res.json({
-          success: true,
-          message: 'Response saved successfully'
-        });
       }
-    } else {
-      console.warn(`[INTERACTION RESPONSE] Interaction agent not found in registry`);
-      return res.json({
-        success: true,
-        message: 'Response saved successfully',
-        warning: 'Interaction agent not available'
-      });
     }
+
+    // For now, just return success - the response has been saved to the database
+    // NOTE: This is a temporary simplification until directAction metadata is fully implemented
+    // In the future, responses will be processed via:
+    // 1. Direct actions (instant, from metadata.directAction)
+    // 2. Agent processing (with proper tools for creating events/tasks)
+    // 3. Zep memory integration (store response context for future conversations)
+
+    console.log(`[INTERACTION RESPONSE] Response processed successfully (direct action path not yet implemented)`);
+    return res.json({
+      success: true,
+      message: 'Your response has been recorded',
+      agentResponse: 'Thanks for responding! Your feedback helps me understand your preferences better.'
+    });
   } catch (error) {
     console.error('[INTERACTION RESPONSE] Error responding to interaction:', error);
     res.status(500).json({ error: 'Failed to process interaction response' });
@@ -225,12 +237,12 @@ export async function generateStartupInteractions(req: Request, res: Response): 
       });
     }
 
-    // Invoke the conversation agent to generate proactive interactions
+    // Invoke the interaction agent to generate proactive interactions
     const agentRegistry = AgentRegistry.getInstance();
-    const conversationAgent = agentRegistry.getAgent('conversation');
+    const interactionAgent = agentRegistry.getAgent('interaction');
 
-    if (!conversationAgent) {
-      console.warn('[STARTUP] Conversation agent not available');
+    if (!interactionAgent) {
+      console.warn('[STARTUP] Interaction agent not available');
       return res.status(500).json({ error: 'Agent not available' });
     }
 
@@ -245,13 +257,13 @@ export async function generateStartupInteractions(req: Request, res: Response): 
     };
 
     // Send message requesting proactive analysis
-    const analyzeMessage = `Generate 2-3 proactive suggestions based on my calendar, tasks, and goals. Use the analyze_context_for_interactions tool to generate context-aware recommendations. Then present them as interactive options.`;
+    const analyzeMessage = `Analyze the user's calendar and tasks. Generate 0-2 proactive interaction suggestions using the create_interaction tool. Focus on scheduling time for high-priority tasks or preparing for upcoming events.`;
 
     console.log(`[STARTUP] Generating proactive interactions for user ${userId}`);
     console.log(`[STARTUP] Message to agent: "${analyzeMessage}"`);
 
     // Run asynchronously without blocking the response
-    conversationAgent.processMessage(context, analyzeMessage)
+    interactionAgent.processMessage(context, analyzeMessage)
       .then((result) => {
         console.log(`[STARTUP] Agent response received:`, result);
       })

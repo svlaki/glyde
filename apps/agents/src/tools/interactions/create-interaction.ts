@@ -12,6 +12,13 @@ export const createInteractionTool = tool(
     try {
       const supabaseService = getSupabaseService();
 
+      // Check how many pending interactions the user already has
+      const existingPending = await supabaseService.getPendingUserInteractions(userId);
+      if (existingPending && existingPending.length >= 2) {
+        console.log(`⚠️ [create-interaction] User ${userId} already has ${existingPending.length} pending interactions (limit: 2), skipping creation`);
+        return `⚠️ Cannot create interaction - user already has ${existingPending.length} pending interactions (maximum: 2)`;
+      }
+
       const interaction = await supabaseService.createUserInteraction(userId, {
         agentId: "interaction",
         question,

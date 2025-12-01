@@ -11,9 +11,6 @@ export function CalendarPage() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 
-  // Callback to send interaction responses to chat
-  const [chatCallback, setChatCallback] = useState<((message: string) => void) | null>(null)
-
   // Load saved widths from localStorage or use defaults
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('calendar-left-width')
@@ -113,7 +110,7 @@ export function CalendarPage() {
             overflow: 'hidden',
             minHeight: 0
           }}>
-            <AgentInteractions onInteractionResponse={chatCallback} />
+            <AgentInteractions />
           </div>
 
           {/* Todo List */}
@@ -171,7 +168,7 @@ export function CalendarPage() {
           overflow: 'hidden',
           position: 'relative'
         }}>
-          <ChatBot onSetResponseCallback={setChatCallback} />
+          <ChatBot />
 
           {/* Resize handle for right sidebar */}
           <div
