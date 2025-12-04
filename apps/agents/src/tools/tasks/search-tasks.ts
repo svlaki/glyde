@@ -98,11 +98,11 @@ export const searchTasksTool = tool(
     description: "Search tasks by text content in title and description. Use this to find tasks containing specific keywords or phrases. Supports optional filters for status, category, priority, and due dates.",
     schema: z.object({
       query: z.string().describe("Search query to match in task title or description (case-insensitive, partial matching)"),
-      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().describe("Optional: Filter by status"),
-      category: z.string().optional().describe("Optional: Filter by category"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("Optional: Filter by priority"),
-      dueBefore: z.string().optional().describe("Optional: Show tasks due before this date (ISO format)"),
-      dueAfter: z.string().optional().describe("Optional: Show tasks due after this date (ISO format)"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Optional: Filter by status"),
+      category: z.string().optional().nullable().describe("Optional: Filter by category"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Optional: Filter by priority"),
+      dueBefore: z.string().optional().nullable().describe("Optional: Show tasks due before this date (ISO format)"),
+      dueAfter: z.string().optional().nullable().describe("Optional: Show tasks due after this date (ISO format)"),
     }),
   }
 );

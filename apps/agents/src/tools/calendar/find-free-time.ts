@@ -87,10 +87,10 @@ export const findFreeTimeTool = tool(
     description: "Find available time slots in the user's calendar for a specified duration. Scans upcoming days and returns suggestions. Use this when users ask 'when am I free?' or 'find time for X'.",
     schema: z.object({
       durationMinutes: z.number().min(15).describe("Duration needed in minutes (e.g., 30 for 30 minutes, 60 for 1 hour, 120 for 2 hours)"),
-      daysToSearch: z.number().min(1).max(30).optional().describe("Number of days to search ahead (default: 7 days)"),
-      earliestHour: z.number().min(0).max(23).optional().describe("Earliest hour to consider (0-23, default: 9 for 9 AM)"),
-      latestHour: z.number().min(0).max(23).optional().describe("Latest hour to consider (0-23, default: 19 for 7 PM)"),
-      startDate: z.string().optional().describe("Start searching from this date (ISO format, default: today)"),
+      daysToSearch: z.number().min(1).max(30).optional().nullable().describe("Number of days to search ahead (default: 7 days)"),
+      earliestHour: z.number().min(0).max(23).optional().nullable().describe("Earliest hour to consider (0-23, default: 9 for 9 AM)"),
+      latestHour: z.number().min(0).max(23).optional().nullable().describe("Latest hour to consider (0-23, default: 19 for 7 PM)"),
+      startDate: z.string().optional().nullable().describe("Start searching from this date (ISO format, default: today)"),
     }),
   }
 );

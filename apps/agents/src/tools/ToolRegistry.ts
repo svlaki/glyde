@@ -123,6 +123,30 @@ export class ToolRegistry {
     return interactionTools;
   }
 
+  // Get expanded tools for InteractionAgentGerald
+  // Gerald can create interactions AND directly create tasks/events/goals
+  getGeraldAgentTools(): any[] {
+    // Include interaction tools
+    const tools = [...interactionTools];
+
+    // Add creation tools for tasks, events, goals
+    const creationToolNames = [
+      'create_task',
+      'create_event',
+      'create_goal',
+    ];
+
+    creationToolNames.forEach(name => {
+      const tool = this.tools.get(name);
+      if (tool) {
+        tools.push(tool);
+      }
+    });
+
+    console.log(`🤖 [GERALD TOOLS] Loaded ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
+    return tools;
+  }
+
   // Get tool names for a specific category
   getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions'): string[] {
     if (category) {

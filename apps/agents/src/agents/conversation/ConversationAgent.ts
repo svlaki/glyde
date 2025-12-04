@@ -346,7 +346,8 @@ IMPORTANT INSTRUCTIONS:
             const localHour = parseInt(formatInTimeZone(startDate, state.timezone, 'H'));
             const timeOfDay = localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening';
 
-            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}]`;
+            const categoryStr = e.category ? ` [${e.category}]` : '';
+            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''}${categoryStr} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}] (ID: ${e.id})`;
           }).join('\n')}`
         : `\n\nUSER'S CALENDAR: No events found`;
 
@@ -362,7 +363,8 @@ IMPORTANT INSTRUCTIONS:
             const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
             const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
             const statusStr = t.status === 'completed' ? ' ✓' : t.status === 'in_progress' ? ' 🔄' : '';
-            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr} (ID: ${t.id})`;
+            const categoryStr = t.category ? ` {${t.category}}` : '';
+            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}${categoryStr} (ID: ${t.id})`;
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 

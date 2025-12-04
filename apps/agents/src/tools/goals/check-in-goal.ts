@@ -36,13 +36,13 @@ export const checkInGoalTool = tool(
     description: "Record a check-in for a goal. Use this when the user provides a progress update, reflects on their goal, or reviews their progress.",
     schema: z.object({
       goalId: z.string().describe("Goal ID to check in on"),
-      progressUpdate: z.string().optional().describe("Progress update description"),
-      moodRating: z.number().min(1).max(5).optional().describe("Mood rating (1-5)"),
-      confidenceLevel: z.number().min(1).max(5).optional().describe("Confidence level (1-5)"),
-      obstaclesEncountered: z.array(z.string()).optional().describe("List of obstacles encountered"),
-      winsAndProgress: z.array(z.string()).optional().describe("List of wins and progress made"),
-      nextSteps: z.array(z.string()).optional().describe("List of next steps"),
-      reflectionNotes: z.string().optional().describe("Reflection notes"),
+      progressUpdate: z.string().optional().nullable().describe("Progress update description"),
+      moodRating: z.number().min(1).max(5).optional().nullable().describe("Mood rating (1-5)"),
+      confidenceLevel: z.number().min(1).max(5).optional().nullable().describe("Confidence level (1-5)"),
+      obstaclesEncountered: z.array(z.string()).optional().nullable().describe("List of obstacles encountered"),
+      winsAndProgress: z.array(z.string()).optional().nullable().describe("List of wins and progress made"),
+      nextSteps: z.array(z.string()).optional().nullable().describe("List of next steps"),
+      reflectionNotes: z.string().optional().nullable().describe("Reflection notes"),
     }),
   }
 );

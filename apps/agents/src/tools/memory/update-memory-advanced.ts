@@ -10,7 +10,7 @@ import { z } from "zod";
  * immediately with rich metadata.
  */
 export const updateMemoryAdvancedTool = tool(
-  async ({ insights, importance, category, triggerEarlyPersistence, metadata }, config) => {
+  async ({ insights, importance, category, triggerEarlyPersistence = false, metadata }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       throw new Error("User ID is required for memory updates");
@@ -106,8 +106,8 @@ I've recorded ${insights.length} insight${insights.length > 1 ? 's' : ''} about 
       insights: z.array(z.string()).describe("List of key insights to persist (e.g., ['Prefers morning deep work 9-11am', 'Dislikes meetings after 4pm'])"),
       importance: z.enum(["low", "medium", "high"]).describe("How important these insights are for future personalization"),
       category: z.string().describe("Category of insights (e.g., 'preferences', 'goals', 'patterns', 'scheduling', 'productivity', 'wellness')"),
-      triggerEarlyPersistence: z.boolean().default(false).describe("If true, save immediately. If false, queue for batch save at conversation end."),
-      metadata: z.record(z.any()).optional().describe("Optional additional context (e.g., {confidence: 0.95, detectedFrom: 'repeated behavior'})")
+      triggerEarlyPersistence: z.boolean().default(false).nullable().describe("If true, save immediately. If false, queue for batch save at conversation end."),
+      metadata: z.record(z.any()).optional().nullable().describe("Optional additional context (e.g., {confidence: 0.95, detectedFrom: 'repeated behavior'})")
     }),
   }
 );

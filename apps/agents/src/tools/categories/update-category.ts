@@ -41,11 +41,11 @@ export const updateCategoryTool = tool(
     description: "Update an existing category's properties. Use this to change category colors, icons, descriptions, or AI context based on user preferences or learned patterns.",
     schema: z.object({
       name: z.string().describe("Current category name to update"),
-      newName: z.string().optional().describe("New name for the category"),
-      color: z.string().optional().describe("New hex color code"),
-      icon: z.string().optional().describe("New emoji icon"),
-      description: z.string().optional().describe("New description"),
-      context: z.record(z.any()).optional().describe("Updated AI context object"),
+      newName: z.string().optional().nullable().describe("New name for the category"),
+      color: z.string().optional().nullable().describe("New hex color code"),
+      icon: z.string().optional().nullable().describe("New emoji icon"),
+      description: z.string().optional().nullable().describe("New description"),
+      context: z.record(z.any()).optional().nullable().describe("Updated AI context object"),
     }),
   }
 );

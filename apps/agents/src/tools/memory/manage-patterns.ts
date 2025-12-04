@@ -31,8 +31,8 @@ export const managePatternsTool = tool(
         await graphService.addUserPattern(userId, {
           pattern_type: patternType,
           description,
-          confidence_score: confidence,
-          frequency
+          confidence_score: confidence!,
+          frequency: frequency!
         });
 
         return `✅ Pattern recorded: "${description}" (${patternType}, ${frequency}, confidence: ${confidence})`;
@@ -47,12 +47,12 @@ export const managePatternsTool = tool(
         await graphService.addCommunityPattern({
           pattern_type: patternType,
           description,
-          user_count: userCount,
-          avg_confidence: avgConfidence,
-          pattern_category: category
+          user_count: userCount!,
+          avg_confidence: avgConfidence!,
+          pattern_category: category!
         });
 
-        return `✅ Added community pattern: "${patternType}" (observed in ${userCount} users, ${Math.round(avgConfidence * 100)}% confidence)`;
+        return `✅ Added community pattern: "${patternType}" (observed in ${userCount} users, ${Math.round(avgConfidence! * 100)}% confidence)`;
       }
 
       return `❌ Invalid action: ${action}`;
@@ -83,13 +83,13 @@ Use this to remember long-term behaviors and improve recommendations.`,
       description: z.string().describe("Human-readable description of the pattern"),
 
       // User pattern parameters (required for add-user)
-      frequency: z.enum(["daily", "weekly", "monthly", "rare"]).optional().describe("How often pattern occurs (required for add-user)"),
-      confidence: z.number().min(0).max(1).optional().describe("Confidence in pattern 0-1 (required for add-user)"),
+      frequency: z.enum(["daily", "weekly", "monthly", "rare"]).optional().nullable().describe("How often pattern occurs (required for add-user)"),
+      confidence: z.number().min(0).max(1).optional().nullable().describe("Confidence in pattern 0-1 (required for add-user)"),
 
       // Community pattern parameters (required for add-community)
-      userCount: z.number().optional().describe("Number of users exhibiting pattern (required for add-community)"),
-      avgConfidence: z.number().min(0).max(1).optional().describe("Average confidence across users (required for add-community)"),
-      category: z.string().optional().describe("Pattern category like 'productivity', 'scheduling' (required for add-community)")
+      userCount: z.number().optional().nullable().describe("Number of users exhibiting pattern (required for add-community)"),
+      avgConfidence: z.number().min(0).max(1).optional().nullable().describe("Average confidence across users (required for add-community)"),
+      category: z.string().optional().nullable().describe("Pattern category like 'productivity', 'scheduling' (required for add-community)")
     }),
   }
 );

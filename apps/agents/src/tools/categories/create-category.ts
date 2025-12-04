@@ -19,9 +19,9 @@ export const createCategoryTool = tool(
       const category = await CategoryService.createCategory(userId, {
         name,
         color: color || '#3b82f6',
-        icon: icon,
-        description: description,
-        context: context,
+        icon: icon || undefined,
+        description: description || undefined,
+        context: context || undefined,
       });
 
       if (!category) {
@@ -39,10 +39,10 @@ export const createCategoryTool = tool(
     description: "Create a new category for organizing events, tasks, and goals. Categories are universal and can be used by all entity types. CRITICAL: Create SPECIFIC, GRANULAR categories for specific entities - individual classes (e.g., 'CS173A', 'PHIL 1'), projects (e.g., 'Project Phoenix'), clients (e.g., 'Client Acme'). Generic categories (Personal, Fitness, Social) should ONLY be used for truly generic recurring activities. Always check existing categories with list_categories before creating.",
     schema: z.object({
       name: z.string().describe("Category name (e.g., 'Gym', 'Project X', 'Doctor Appointments')"),
-      color: z.string().optional().describe("Hex color code (e.g., '#3b82f6'). Use meaningful colors that match the category type."),
-      icon: z.string().optional().describe("Emoji icon (e.g., '🏋️', '📊', '🏥')"),
-      description: z.string().optional().describe("Description of what this category is for"),
-      context: z.record(z.any()).optional().describe("AI context object with preferences and patterns for this category"),
+      color: z.string().optional().nullable().describe("Hex color code (e.g., '#3b82f6'). Use meaningful colors that match the category type."),
+      icon: z.string().optional().nullable().describe("Emoji icon (e.g., '🏋️', '📊', '🏥')"),
+      description: z.string().optional().nullable().describe("Description of what this category is for"),
+      context: z.record(z.any()).optional().nullable().describe("AI context object with preferences and patterns for this category"),
     }),
   }
 );

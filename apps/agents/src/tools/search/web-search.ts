@@ -25,7 +25,7 @@ export const webSearchTool = tool(
       // Perform search with optimized settings
       const searchResponse = await tvly.search(query, {
         searchDepth: "basic",
-        maxResults: maxResults,
+        maxResults: maxResults ?? 5,
         includeAnswer: true,
         includeImages: false,
       });
@@ -80,7 +80,7 @@ Use this tool when:
 Returns: AI-generated answer summary (when available) with supporting search results including titles, content snippets, and source URLs.`,
     schema: z.object({
       query: z.string().describe("The search query. Be specific. Examples: 'Flour + Water restaurant San Francisco address hours', 'Stanford vs Cal football game 2025 date', 'Coupa Cafe Palo Alto location menu'"),
-      maxResults: z.number().default(5).describe("Maximum number of results to return (default: 5)"),
+      maxResults: z.number().default(5).optional().nullable().describe("Maximum number of results to return (default: 5)"),
     }),
   }
 );

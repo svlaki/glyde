@@ -50,8 +50,9 @@ export const listEventsTool = tool(
     const eventList = limitedEvents.map(event => {
       // Format UTC times for user's timezone
       const eventTime = formatEventTime(event.start_time, timezone);
+      const categoryLabel = event.category ? `\n   🏷️ ${event.category}` : '';
 
-      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}\n   ID: ${event.id}`;
+      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}${categoryLabel}\n   ID: ${event.id}`;
     });
 
     const totalText = events.length > effectiveLimit ? ` (showing first ${effectiveLimit} of ${events.length})` : '';
@@ -61,10 +62,10 @@ export const listEventsTool = tool(
     name: "list_events",
     description: "List calendar events, optionally filtered by date range. By default shows only future/ongoing events when no date range specified. Use includePast=true to show historical events. Shows events in chronological order.",
     schema: z.object({
-      startDate: z.string().optional().describe("Start date for filtering events (ISO format)"),
-      endDate: z.string().optional().describe("End date for filtering events (ISO format)"),
-      limit: z.number().optional().describe("Maximum number of events to return (default: 20)"),
-      includePast: z.boolean().optional().describe("Optional: Set to true to include past events when no date range specified. Default is false (only future/ongoing events). Use true when user asks about history."),
+      startDate: z.string().optional().nullable().describe("Start date for filtering events (ISO format)"),
+      endDate: z.string().optional().nullable().describe("End date for filtering events (ISO format)"),
+      limit: z.number().optional().nullable().describe("Maximum number of events to return (default: 20)"),
+      includePast: z.boolean().optional().nullable().describe("Optional: Set to true to include past events when no date range specified. Default is false (only future/ongoing events). Use true when user asks about history."),
     }),
   }
 );

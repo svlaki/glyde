@@ -12,7 +12,7 @@ export abstract class BaseAgent {
   protected agentType: AgentType;
   protected tools: any[] = [];
 
-  constructor(agentType: AgentType, modelName: string = "gpt-4o-mini") {
+  constructor(agentType: AgentType, modelName: string = "gpt-5.1") {
     this.agentType = agentType;
     this.model = new ChatOpenAI({
       modelName,

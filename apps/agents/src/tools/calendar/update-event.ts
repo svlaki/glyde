@@ -29,16 +29,26 @@ export const updateEventTool = tool(
       console.log('[UPDATE-EVENT TOOL] Searching for event to update:', searchQuery);
 
       try {
-        // Get all events and filter to recent ones (today + 14 days)
+        // Get all events and filter to upcoming ones
+        // We include ALL future events to ensure "tomorrow" events are found regardless of timezone
         const allEvents = await supabaseService.getEvents(userId);
         const now = new Date();
-        const todayStart = new Date(now.toISOString().split('T')[0]);
 
-        // Include events from today onwards only
+        // Use current UTC time minus 24 hours to ensure we don't miss events
+        // that might appear as "today" in the user's timezone but are technically
+        // "yesterday" in UTC (e.g., late night events in US timezones)
+        const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        console.log(`[UPDATE-EVENT TOOL] Filtering events from ${cutoffTime.toISOString()} onwards`);
+        console.log(`[UPDATE-EVENT TOOL] Total events before filter: ${allEvents.length}`);
+
+        // Include events from cutoff onwards (gives 24h buffer for timezone differences)
         const recentEvents = allEvents.filter((event: any) => {
           const eventDate = new Date(event.start_time);
-          return eventDate >= todayStart;
+          return eventDate >= cutoffTime;
         });
+
+        console.log(`[UPDATE-EVENT TOOL] Events after filter: ${recentEvents.length}`);
 
         // Find matching events using fuzzy matching
         const normalizedQuery = searchQuery.toLowerCase().trim();
@@ -160,15 +170,15 @@ export const updateEventTool = tool(
     name: "update_event",
     description: "Update an existing calendar event. Use eventId for precision when available. If eventId is not provided, use searchQuery with optional currentStartTime to disambiguate same-named events. Can update event category and details.",
     schema: z.object({
-      eventId: z.string().optional().describe("Event ID to update (preferred - use this when you have the ID from a previous search or list)"),
-      searchQuery: z.string().optional().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
-      currentStartTime: z.string().optional().describe("Current start time of the event in ISO format - use this to disambiguate when multiple events have the same name (e.g., '2024-01-15T21:56:00')"),
-      title: z.string().optional().describe("New event title - leave empty to keep existing"),
-      startTime: z.string().optional().describe("New start time in ISO format - leave empty to keep existing"),
-      endTime: z.string().optional().describe("New end time in ISO format - leave empty to keep existing"),
-      location: z.string().optional().describe("New event location - leave empty to keep existing"),
-      description: z.string().optional().describe("New event description - leave empty to keep existing"),
-      category: z.string().optional().describe("Update event category (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing category."),
+      eventId: z.string().optional().nullable().describe("Event ID to update (preferred - use this when you have the ID from a previous search or list)"),
+      searchQuery: z.string().optional().nullable().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
+      currentStartTime: z.string().optional().nullable().describe("Current start time of the event in ISO format - use this to disambiguate when multiple events have the same name (e.g., '2024-01-15T21:56:00')"),
+      title: z.string().optional().nullable().describe("New event title - leave empty to keep existing"),
+      startTime: z.string().optional().nullable().describe("New start time in ISO format - leave empty to keep existing"),
+      endTime: z.string().optional().nullable().describe("New end time in ISO format - leave empty to keep existing"),
+      location: z.string().optional().nullable().describe("New event location - leave empty to keep existing"),
+      description: z.string().optional().nullable().describe("New event description - leave empty to keep existing"),
+      category: z.string().optional().nullable().describe("Update event category (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing category."),
     }),
   }
 );

@@ -34,7 +34,7 @@ export class InteractionAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('interaction', "gpt-4o-mini"); // Use gpt-4o-mini for interactions (faster, focused task)
+    super('interaction', "gpt-5.1"); // Use GPT-5.1 for interactions
     this.graph = this.createGraph();
   }
 

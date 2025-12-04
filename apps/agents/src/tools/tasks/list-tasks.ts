@@ -43,11 +43,11 @@ export const listTasksTool = tool(
     name: "list_tasks",
     description: "List tasks with optional filters. Use this to show the user their tasks, find specific tasks, or check what they need to do.",
     schema: z.object({
-      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().describe("Filter by status"),
-      category: z.string().optional().describe("Filter by category"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("Filter by priority"),
-      dueBefore: z.string().optional().describe("Show tasks due before this date (ISO format)"),
-      dueAfter: z.string().optional().describe("Show tasks due after this date (ISO format)"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Filter by status"),
+      category: z.string().optional().nullable().describe("Filter by category"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Filter by priority"),
+      dueBefore: z.string().optional().nullable().describe("Show tasks due before this date (ISO format)"),
+      dueAfter: z.string().optional().nullable().describe("Show tasks due after this date (ISO format)"),
     }),
   }
 );

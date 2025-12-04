@@ -110,6 +110,29 @@ export class SupabaseService {
     return data;
   }
 
+  /**
+   * Get categories for a user
+   */
+  async getCategories(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .from('categories')
+        .select('*')
+        .eq('user_id', userId)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching categories:', error);
+      return [];
+    }
+  }
+
   // Method for agents - includes timezone conversion for proper local time display
   // DEPRECATED: Use getEvents() instead. This method is no longer needed.
   // Timezone conversion should happen in the Agent layer, not the Service layer.

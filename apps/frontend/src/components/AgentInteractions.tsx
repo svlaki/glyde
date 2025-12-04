@@ -110,8 +110,16 @@ export function AgentInteractions() {
         throw new Error(`Failed to respond: ${res.status}`)
       }
 
+      const responseData = await res.json()
+
       // Remove the interaction from the list
       setInteractions(prev => prev.filter(i => i.id !== interactionId))
+
+      // If there's a follow-up interaction, refetch to show it
+      if (responseData.hasFollowUp) {
+        console.log('[AgentInteractions] Follow-up created, refetching interactions')
+        await fetchInteractions()
+      }
 
       // Clear any inputs for this interaction
       setTextInputs(prev => {

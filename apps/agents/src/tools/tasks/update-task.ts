@@ -141,8 +141,8 @@ export const updateTaskTool = tool(
     name: "update_task",
     description: "Update an existing task by searching for it with a text query. Finds the task using fuzzy matching on title and description. Use this to modify task details, change priority, reschedule, or update status.",
     schema: z.object({
-      taskId: z.string().optional().describe("Task ID to update (optional - rarely used, prefer searchQuery)"),
-      searchQuery: z.string().optional().describe("Search query to find and update the task. Examples: 'cs 221', 'grocery shopping', 'workout'. The tool will fuzzy match against task titles and descriptions."),
+      taskId: z.string().optional().nullable().describe("Task ID to update (optional - rarely used, prefer searchQuery)"),
+      searchQuery: z.string().optional().nullable().describe("Search query to find and update the task. Examples: 'cs 221', 'grocery shopping', 'workout'. The tool will fuzzy match against task titles and descriptions."),
       title: z.string().nullable().optional().describe("New task title"),
       description: z.string().nullable().optional().describe("New task description"),
       dueDate: z.string().nullable().optional().describe("New due date (ISO format)"),

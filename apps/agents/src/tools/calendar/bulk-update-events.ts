@@ -10,9 +10,14 @@ export const bulkUpdateEventsTool = tool(
       throw new Error("User ID is required for bulk updating events");
     }
 
-    // Validate that at least one update field is provided
-    if (!category && !title && !location && !description) {
-      throw new Error("At least one field to update must be provided (category, title, location, or description)");
+    // Validate that at least one update field is provided (empty strings don't count)
+    const hasCategory = category !== undefined && category !== '';
+    const hasTitle = title !== undefined && title !== '';
+    const hasLocation = location !== undefined && location !== '';
+    const hasDescription = description !== undefined && description !== '';
+
+    if (!hasCategory && !hasTitle && !hasLocation && !hasDescription) {
+      throw new Error("At least one non-empty field to update must be provided (category, title, location, or description)");
     }
 
     // Initialize services
@@ -56,12 +61,13 @@ export const bulkUpdateEventsTool = tool(
       return `No events found ${criteria}. Please check your search criteria.`;
     }
 
-    // Prepare update data
+    // Prepare update data - only include non-empty values
+    // Empty strings should NOT be applied as updates
     const updateData: any = {};
-    if (category !== undefined) updateData.category = category;
-    if (title !== undefined) updateData.title = title;
-    if (location !== undefined) updateData.location = location;
-    if (description !== undefined) updateData.description = description;
+    if (category !== undefined && category !== '') updateData.category = category;
+    if (title !== undefined && title !== '') updateData.title = title;
+    if (location !== undefined && location !== '') updateData.location = location;
+    if (description !== undefined && description !== '') updateData.description = description;
 
     let updatedCount = 0;
     const errors: string[] = [];
@@ -148,12 +154,12 @@ export const bulkUpdateEventsTool = tool(
     name: "bulk_update_events",
     description: "Update multiple events at once based on search criteria or event IDs. Perfect for bulk category changes, mass edits, or moving groups of events to a category. IMPORTANT: Includes both past and future events in the search.",
     schema: z.object({
-      searchQuery: z.string().optional().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
-      eventIds: z.array(z.string()).optional().describe("Optional: Array of specific event IDs to update instead of using search"),
-      category: z.string().optional().describe("New category to assign to all matching events (e.g., 'Work', 'Personal', 'Mendicants', 'Health & Hygiene')"),
-      title: z.string().optional().describe("Optional: New title for all matching events (use cautiously)"),
-      location: z.string().optional().describe("Optional: New location for all matching events"),
-      description: z.string().optional().describe("Optional: New description for all matching events"),
+      searchQuery: z.string().optional().nullable().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
+      eventIds: z.array(z.string()).optional().nullable().describe("Optional: Array of specific event IDs to update instead of using search"),
+      category: z.string().optional().nullable().describe("New category to assign to all matching events (e.g., 'Work', 'Personal', 'Mendicants', 'Health & Hygiene')"),
+      title: z.string().optional().nullable().describe("Optional: New title for all matching events (use cautiously)"),
+      location: z.string().optional().nullable().describe("Optional: New location for all matching events"),
+      description: z.string().optional().nullable().describe("Optional: New description for all matching events"),
     }),
   }
 );

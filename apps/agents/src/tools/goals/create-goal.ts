@@ -46,13 +46,13 @@ export const createGoalTool = tool(
     description: "Create a new goal. Use this when the user wants to set a long-term objective, ambition, or something they want to achieve.",
     schema: z.object({
       title: z.string().describe("Goal title"),
-      description: z.string().optional().describe("Goal description"),
-      targetDate: z.string().optional().describe("Target completion date (ISO format)"),
-      category: z.string().optional().describe("Category name (e.g., 'Career', 'Health', 'Learning')"),
-      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().describe("Type of goal"),
-      priorityScore: z.number().min(1).max(10).optional().describe("Priority score (1-10)"),
-      energyRequirement: z.enum(["low", "medium", "high"]).optional().describe("Energy requirement"),
-      reviewFrequency: z.enum(["daily", "weekly", "monthly", "quarterly"]).optional().describe("How often to review"),
+      description: z.string().optional().nullable().describe("Goal description"),
+      targetDate: z.string().optional().nullable().describe("Target completion date (ISO format)"),
+      category: z.string().optional().nullable().describe("Category name (e.g., 'Career', 'Health', 'Learning')"),
+      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Type of goal"),
+      priorityScore: z.number().min(1).max(10).optional().nullable().describe("Priority score (1-10)"),
+      energyRequirement: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy requirement"),
+      reviewFrequency: z.enum(["daily", "weekly", "monthly", "quarterly"]).optional().nullable().describe("How often to review"),
     }),
   }
 );

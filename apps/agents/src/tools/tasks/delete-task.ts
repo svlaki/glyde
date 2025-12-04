@@ -127,7 +127,7 @@ export const deleteTaskTool = tool(
     name: "delete_task",
     description: "Delete a task by searching for it with a text query. Finds the task using fuzzy matching on title and description.",
     schema: z.object({
-      taskId: z.string().optional().describe("Task ID to delete (optional - rarely used, prefer searchQuery)"),
+      taskId: z.string().optional().nullable().describe("Task ID to delete (optional - rarely used, prefer searchQuery)"),
       searchQuery: z.string().describe("Search query to find and delete the task. Examples: 'cs 221', 'buy groceries', 'workout'. The tool will fuzzy match against task titles and descriptions."),
     }),
   }

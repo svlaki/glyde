@@ -2,18 +2,35 @@ import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
 import { InteractionAgent } from '../agents/interaction/InteractionAgent.js';
+import { InteractionAgentGerald } from '../agents/interaction-gerald/InteractionAgentGerald.js';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
+import { ACTIVE_INTERACTION_AGENT } from '../config/agents.js';
 
 // Initialize the agent registry
 const agentRegistry = AgentRegistry.getInstance();
 
 let initializationPromise: Promise<void> | null = null;
 
+/**
+ * Factory function to create the active interaction agent based on config
+ */
+function createInteractionAgent() {
+  switch (ACTIVE_INTERACTION_AGENT) {
+    case 'gerald':
+      console.log('🤖 Using InteractionAgentGerald (enhanced)');
+      return new InteractionAgentGerald();
+    case 'default':
+    default:
+      console.log('🤖 Using InteractionAgent (default)');
+      return new InteractionAgent();
+  }
+}
+
 async function initializeAgents(): Promise<void> {
   const conversationAgent = new ConversationAgent();
   await agentRegistry.registerAgent(conversationAgent);
 
-  const interactionAgent = new InteractionAgent();
+  const interactionAgent = createInteractionAgent();
   await agentRegistry.registerAgent(interactionAgent);
 }
 

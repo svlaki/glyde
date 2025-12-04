@@ -25,19 +25,26 @@ export const deleteEventTool = tool(
       console.log('🔍 [DELETE-EVENT TOOL] Searching for event to delete:', searchQuery);
 
       try {
-        // Get all events and filter to recent ones (today + 14 days)
+        // Get all events and filter to upcoming ones
+        // We include ALL future events to ensure "tomorrow" events are found regardless of timezone
         const allEvents = await supabaseService.getEventsForAgent(userId);
         const now = new Date();
-        const futureDate = new Date(now);
-        futureDate.setDate(futureDate.getDate() + 14);
 
-        // Include events from today onwards only
+        // Use current UTC time minus 24 hours to ensure we don't miss events
+        // that might appear as "today" in the user's timezone but are technically
+        // "yesterday" in UTC (e.g., late night events in US timezones)
+        const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        console.log(`🔍 [DELETE-EVENT TOOL] Filtering events from ${cutoffTime.toISOString()} onwards`);
+        console.log(`🔍 [DELETE-EVENT TOOL] Total events before filter: ${allEvents.length}`);
+
+        // Include events from cutoff onwards (gives 24h buffer for timezone differences)
         const recentEvents = allEvents.filter((event: any) => {
           const eventDate = new Date(event.start_time);
-          return eventDate >= new Date(now.toISOString().split('T')[0]); // Start of today
+          return eventDate >= cutoffTime;
         });
 
-        console.log(`🔍 [DELETE-EVENT TOOL] Searching in ${recentEvents.length} recent events (today + 14 days)`);
+        console.log(`🔍 [DELETE-EVENT TOOL] Searching in ${recentEvents.length} recent events`);
 
         // Normalize search query - remove common words and split
         const normalizedQuery = searchQuery.toLowerCase().trim();
@@ -166,7 +173,7 @@ export const deleteEventTool = tool(
     name: "delete_event",
     description: "Delete a calendar event by searching for it with a text query. Finds the event using fuzzy matching on title and description.",
     schema: z.object({
-      eventId: z.string().optional().describe("Event ID to delete (optional - rarely used, prefer searchQuery)"),
+      eventId: z.string().optional().nullable().describe("Event ID to delete (optional - rarely used, prefer searchQuery)"),
       searchQuery: z.string().describe("Search query to find and delete the event. Examples: 'cs 221', 'meeting with john', 'workout'. The tool will fuzzy match against event titles and descriptions."),
     }),
   }

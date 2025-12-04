@@ -21,12 +21,12 @@ export const updateGoalTool = tool(
       const updates: any = {};
 
       // Only include fields that are actually provided with non-empty values
-      if (title !== undefined && title.trim() !== '') updates.title = title;
-      if (description !== undefined && description.trim() !== '') updates.description = description;
-      if (targetDate !== undefined && targetDate.trim() !== '') updates.targetDate = targetDate;
-      if (status !== undefined) updates.status = status;
+      if (title !== undefined && title !== null && title.trim() !== '') updates.title = title;
+      if (description !== undefined && description !== null && description.trim() !== '') updates.description = description;
+      if (targetDate !== undefined && targetDate !== null && targetDate.trim() !== '') updates.targetDate = targetDate;
+      if (status !== undefined && status !== null) updates.status = status;
       if (progress !== undefined && progress !== null) updates.progress = progress;
-      if (category !== undefined && category.trim() !== '') updates.category = category;
+      if (category !== undefined && category !== null && category.trim() !== '') updates.category = category;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
 
       const goal = await supabaseService.updateGoal(userId, goalId, updates);
@@ -97,13 +97,13 @@ export const updateGoalTool = tool(
     description: "Update an existing goal. Use this to modify goal details, update progress, change status, or reschedule target dates.",
     schema: z.object({
       goalId: z.string().describe("Goal ID to update"),
-      title: z.string().optional().describe("New goal title"),
-      description: z.string().optional().describe("New goal description"),
-      targetDate: z.string().optional().describe("New target date (ISO format)"),
-      status: z.enum(["active", "completed", "paused", "abandoned"]).optional().describe("New status"),
-      progress: z.number().min(0).max(100).optional().describe("Progress percentage (0-100)"),
-      category: z.string().optional().describe("New category name"),
-      priorityScore: z.number().min(1).max(10).optional().describe("New priority score (1-10)"),
+      title: z.string().optional().nullable().describe("New goal title"),
+      description: z.string().optional().nullable().describe("New goal description"),
+      targetDate: z.string().optional().nullable().describe("New target date (ISO format)"),
+      status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("New status"),
+      progress: z.number().min(0).max(100).optional().nullable().describe("Progress percentage (0-100)"),
+      category: z.string().optional().nullable().describe("New category name"),
+      priorityScore: z.number().min(1).max(10).optional().nullable().describe("New priority score (1-10)"),
     }),
   }
 );

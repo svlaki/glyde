@@ -56,9 +56,9 @@ export const listGoalsTool = tool(
     name: "list_goals",
     description: "List goals with optional filters. Use this to show the user their goals, check progress, or find specific objectives.",
     schema: z.object({
-      status: z.enum(["active", "completed", "paused", "abandoned"]).optional().describe("Filter by status"),
-      category: z.string().optional().describe("Filter by category"),
-      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().describe("Filter by goal type"),
+      status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("Filter by status"),
+      category: z.string().optional().nullable().describe("Filter by category"),
+      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Filter by goal type"),
     }),
   }
 );
