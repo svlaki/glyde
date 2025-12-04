@@ -399,7 +399,7 @@ export class SupabaseService {
     interaction: {
       agentId: AgentType | string;
       question: string;
-      interactionType: 'yes_no' | 'multiple_choice' | 'confirmation' | 'choice';
+      interactionType: 'yes_no' | 'multiple_choice';
       options?: string[] | null;
       priority?: number;
       categoryId?: string | null;

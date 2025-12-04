@@ -48,10 +48,10 @@ export const createInteractionTool = tool(
   },
   {
     name: "create_interaction",
-    description: "Create an interactive prompt with options for the user to choose from. Use this when you need to present the user with multiple options to select from, such as yes/no questions, time selections, or multiple choice options.",
+    description: "Create an interactive prompt with options for the user to choose from. Use this when you need to present the user with yes/no questions or multiple choice options.",
     schema: z.object({
       question: z.string().describe("The question or prompt to show the user"),
-      type: z.enum(["yes_no", "multiple_choice", "confirmation"]).describe("Type of interaction"),
+      type: z.enum(["yes_no", "multiple_choice"]).describe("Type of interaction"),
       options: z.array(z.string()).optional().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
       priority: z.number().min(1).max(5).optional().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
       metadata: z.record(z.any()).optional().describe("Optional metadata object for storing context about the interaction"),

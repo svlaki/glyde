@@ -8,7 +8,7 @@ import { getColors, hexToRgba } from '../styles/colors'
 interface Interaction {
   id: string
   question: string
-  interaction_type: 'yes_no' | 'choice' | 'multiple_choice' | 'text' | 'rating' | 'time_suggestion'
+  interaction_type: 'yes_no' | 'multiple_choice'
   options?: string[]
   priority: number
   category?: {
@@ -188,456 +188,108 @@ export function AgentInteractions() {
     }
   }
 
-  // Render response options based on interaction type
-  const renderResponseOptions = (interaction: Interaction) => {
-    const isResponding = respondingTo === interaction.id
 
-    switch (interaction.interaction_type) {
-      case 'yes_no':
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleRespond(interaction.id, 'yes')}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: isDarkMode ? '#4ade80' : '#22c55e',
-                  color: '#fff',
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s, transform 0.1s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isResponding) e.currentTarget.style.opacity = '0.9'
-                }}
-                onMouseLeave={(e) => {
-                  if (!isResponding) e.currentTarget.style.opacity = '1'
-                }}
-              >
-                Yes
-              </button>
-              <button
-                onClick={() => handleRespond(interaction.id, 'dismissed')}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: colors.bgTertiary,
-                  color: colors.textPrimary,
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isResponding) e.currentTarget.style.background = colors.bgHover
-                }}
-                onMouseLeave={(e) => {
-                  if (!isResponding) e.currentTarget.style.background = colors.bgTertiary
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
+// Render response options based on interaction type
+const renderResponseOptions = (interaction: Interaction) => {
+  const isResponding = respondingTo === interaction.id
+
+  if (interaction.interaction_type === 'yes_no') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => handleRespond(interaction.id, 'yes')}
+            disabled={isResponding}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              fontSize: '13px',
+              fontWeight: '500',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: isResponding ? 'not-allowed' : 'pointer',
+              background: isDarkMode ? '#4ade80' : '#22c55e',
+              color: '#fff',
+              opacity: isResponding ? 0.6 : 1,
+              transition: 'opacity 0.15s, transform 0.1s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isResponding) e.currentTarget.style.opacity = '0.9'
+            }}
+            onMouseLeave={(e) => {
+              if (!isResponding) e.currentTarget.style.opacity = '1'
+            }}
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => handleRespond(interaction.id, 'dismissed')}
+            disabled={isResponding}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              fontSize: '13px',
+              fontWeight: '500',
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px',
+              cursor: isResponding ? 'not-allowed' : 'pointer',
+              background: colors.bgTertiary,
+              color: colors.textPrimary,
+              opacity: isResponding ? 0.6 : 1,
+              transition: 'opacity 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isResponding) e.currentTarget.style.background = colors.bgHover
+            }}
+            onMouseLeave={(e) => {
+              if (!isResponding) e.currentTarget.style.background = colors.bgTertiary
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (interaction.interaction_type === 'multiple_choice') {
+    const isShowingCustomTime = showCustomTimeInput === interaction.id
+    const customTimeValue = customTimeInputs[interaction.id] || ''
+
+    if (isShowingCustomTime) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '12px', color: colors.textSecondary }}>
+            Enter your preferred time (e.g., "tomorrow at 3pm", "Friday 10am"):
           </div>
-        )
-
-      case 'choice':
-      case 'multiple_choice':
-        const isShowingCustomTime = showCustomTimeInput === interaction.id
-        const customTimeValue = customTimeInputs[interaction.id] || ''
-
-        // If showing custom time input for this interaction
-        if (isShowingCustomTime) {
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '12px', color: colors.textSecondary }}>
-                Enter your preferred time (e.g., "tomorrow at 3pm", "Friday 10am"):
-              </div>
-              <input
-                type="text"
-                value={customTimeValue}
-                onChange={(e) => setCustomTimeInputs(prev => ({ ...prev, [interaction.id]: e.target.value }))}
-                placeholder="e.g., tomorrow at 3pm"
-                disabled={isResponding}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && customTimeValue.trim()) {
-                    handleCustomTimeSubmit(interaction.id)
-                  } else if (e.key === 'Escape') {
-                    setShowCustomTimeInput(null)
-                  }
-                }}
-                style={{
-                  padding: '10px 12px',
-                  fontSize: '13px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  outline: 'none'
-                }}
-              />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => handleCustomTimeSubmit(interaction.id)}
-                  disabled={isResponding || !customTimeValue.trim()}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: (isResponding || !customTimeValue.trim()) ? 'not-allowed' : 'pointer',
-                    background: (isResponding || !customTimeValue.trim())
-                      ? colors.bgTertiary
-                      : (isDarkMode ? '#4ade80' : '#22c55e'),
-                    color: (isResponding || !customTimeValue.trim())
-                      ? colors.textTertiary
-                      : '#fff',
-                    opacity: isResponding ? 0.6 : 1
-                  }}
-                >
-                  Schedule
-                </button>
-                <button
-                  onClick={() => setShowCustomTimeInput(null)}
-                  disabled={isResponding}
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    cursor: isResponding ? 'not-allowed' : 'pointer',
-                    background: colors.bgTertiary,
-                    color: colors.textPrimary
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-            </div>
-          )
-        }
-
-        // Normal multiple choice rendering
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {(interaction.options || []).map((option, idx) => {
-              const isOtherTime = option.toLowerCase() === 'other time'
-
-              return (
-                <button
-                  key={idx}
-                  onClick={() => isOtherTime ? handleOtherTimeClick(interaction.id) : handleRespond(interaction.id, option)}
-                  disabled={isResponding}
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '400',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    cursor: isResponding ? 'not-allowed' : 'pointer',
-                    background: colors.bgTertiary,
-                    color: colors.textPrimary,
-                    textAlign: 'left',
-                    opacity: isResponding ? 0.6 : 1,
-                    transition: 'background 0.15s, border-color 0.15s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isResponding) {
-                      e.currentTarget.style.background = colors.bgHover
-                      e.currentTarget.style.borderColor = colors.textTertiary
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isResponding) {
-                      e.currentTarget.style.background = colors.bgTertiary
-                      e.currentTarget.style.borderColor = colors.border
-                    }
-                  }}
-                >
-                  {option}
-                </button>
-              )
-            })}
-            {/* Dismiss button for choice/multiple_choice */}
-            <button
-              onClick={() => dismissInteraction(interaction.id)}
-              disabled={isResponding}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: isResponding ? 'not-allowed' : 'pointer',
-                background: colors.bgTertiary,
-                color: colors.textTertiary,
-                textAlign: 'center',
-                opacity: isResponding ? 0.6 : 1,
-                transition: 'background 0.15s, border-color 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = colors.bgTertiary
-                }
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )
-
-      case 'text':
-        const textValue = textInputs[interaction.id] || ''
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <textarea
-              value={textValue}
-              onChange={(e) => setTextInputs(prev => ({ ...prev, [interaction.id]: e.target.value }))}
-              placeholder="Type your response..."
-              disabled={isResponding}
-              style={{
-                padding: '10px 12px',
-                fontSize: '13px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                resize: 'none',
-                minHeight: '60px',
-                fontFamily: 'inherit',
-                lineHeight: '1.4'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleRespond(interaction.id, textValue)}
-                disabled={isResponding || !textValue.trim()}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: (isResponding || !textValue.trim()) ? 'not-allowed' : 'pointer',
-                  background: (isResponding || !textValue.trim())
-                    ? colors.bgTertiary
-                    : (isDarkMode ? '#f0f0f0' : '#000'),
-                  color: (isResponding || !textValue.trim())
-                    ? colors.textTertiary
-                    : (isDarkMode ? '#000' : '#fff'),
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-              >
-                Submit
-              </button>
-              <button
-                onClick={() => dismissInteraction(interaction.id)}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: colors.bgTertiary,
-                  color: colors.textTertiary,
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'background 0.15s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isResponding) {
-                    e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isResponding) {
-                    e.currentTarget.style.background = colors.bgTertiary
-                  }
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )
-
-      case 'rating':
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-              {[1, 2, 3, 4, 5].map((rating) => (
-                <button
-                  key={rating}
-                  onClick={() => handleRespond(interaction.id, rating.toString())}
-                  disabled={isResponding}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '8px',
-                    cursor: isResponding ? 'not-allowed' : 'pointer',
-                    background: colors.bgTertiary,
-                    color: colors.textPrimary,
-                    opacity: isResponding ? 0.6 : 1,
-                    transition: 'background 0.15s, transform 0.1s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isResponding) {
-                      e.currentTarget.style.background = isDarkMode ? '#4ade80' : '#22c55e'
-                      e.currentTarget.style.color = '#fff'
-                      e.currentTarget.style.transform = 'scale(1.1)'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isResponding) {
-                      e.currentTarget.style.background = colors.bgTertiary
-                      e.currentTarget.style.color = colors.textPrimary
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }
-                  }}
-                >
-                  {rating}
-                </button>
-              ))}
-            </div>
-            {/* Dismiss button for rating */}
-            <button
-              onClick={() => dismissInteraction(interaction.id)}
-              disabled={isResponding}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: isResponding ? 'not-allowed' : 'pointer',
-                background: colors.bgTertiary,
-                color: colors.textTertiary,
-                opacity: isResponding ? 0.6 : 1,
-                transition: 'background 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = colors.bgTertiary
-                }
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )
-
-      case 'time_suggestion':
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleRespond(interaction.id, 'accept')}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: isDarkMode ? '#4ade80' : '#22c55e',
-                  color: '#fff',
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => handleRespond(interaction.id, 'reschedule')}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: colors.bgTertiary,
-                  color: colors.textPrimary,
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-              >
-                Suggest Different
-              </button>
-            </div>
-            {/* Dismiss button for time_suggestion */}
-            <button
-              onClick={() => dismissInteraction(interaction.id)}
-              disabled={isResponding}
-              style={{
-                padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: isResponding ? 'not-allowed' : 'pointer',
-                background: colors.bgTertiary,
-                color: colors.textTertiary,
-                opacity: isResponding ? 0.6 : 1,
-                transition: 'background 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = colors.bgTertiary
-                }
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )
-
-      default:
-        return (
+          <input
+            type="text"
+            value={customTimeValue}
+            onChange={(e) => setCustomTimeInputs(prev => ({ ...prev, [interaction.id]: e.target.value }))}
+            placeholder="e.g., tomorrow at 3pm"
+            disabled={isResponding}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && customTimeValue.trim()) {
+                handleCustomTimeSubmit(interaction.id)
+              } else if (e.key === 'Escape') {
+                setShowCustomTimeInput(null)
+              }
+            }}
+            style={{
+              padding: '10px 12px',
+              fontSize: '13px',
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              outline: 'none'
+            }}
+          />
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={() => handleRespond(interaction.id, 'acknowledged')}
-              disabled={isResponding}
+              onClick={() => handleCustomTimeSubmit(interaction.id)}
+              disabled={isResponding || !customTimeValue.trim()}
               style={{
                 flex: 1,
                 padding: '8px 12px',
@@ -645,19 +297,163 @@ export function AgentInteractions() {
                 fontWeight: '500',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: isResponding ? 'not-allowed' : 'pointer',
-                background: isDarkMode ? '#f0f0f0' : '#000',
-                color: isDarkMode ? '#000' : '#fff',
-                opacity: isResponding ? 0.6 : 1,
-                transition: 'opacity 0.15s'
+                cursor: (isResponding || !customTimeValue.trim()) ? 'not-allowed' : 'pointer',
+                background: (isResponding || !customTimeValue.trim())
+                  ? colors.bgTertiary
+                  : (isDarkMode ? '#4ade80' : '#22c55e'),
+                color: (isResponding || !customTimeValue.trim())
+                  ? colors.textTertiary
+                  : '#fff',
+                opacity: isResponding ? 0.6 : 1
               }}
             >
-              Got it
+              Schedule
+            </button>
+            <button
+              onClick={() => setShowCustomTimeInput(null)}
+              disabled={isResponding}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                fontWeight: '500',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                cursor: isResponding ? 'not-allowed' : 'pointer',
+                background: colors.bgTertiary,
+                color: colors.textPrimary
+              }}
+            >
+              Back
             </button>
           </div>
-        )
+        </div>
+      )
     }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {(interaction.options || []).map((option, idx) => {
+          const isOtherTime = option.toLowerCase() === 'other time'
+
+          return (
+            <button
+              key={idx}
+              onClick={() => isOtherTime ? handleOtherTimeClick(interaction.id) : handleRespond(interaction.id, option)}
+              disabled={isResponding}
+              style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                fontWeight: '400',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                cursor: isResponding ? 'not-allowed' : 'pointer',
+                background: colors.bgTertiary,
+                color: colors.textPrimary,
+                textAlign: 'left',
+                opacity: isResponding ? 0.6 : 1,
+                transition: 'background 0.15s, border-color 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                if (!isResponding) {
+                  e.currentTarget.style.background = colors.bgHover
+                  e.currentTarget.style.borderColor = colors.textTertiary
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isResponding) {
+                  e.currentTarget.style.background = colors.bgTertiary
+                  e.currentTarget.style.borderColor = colors.border
+                }
+              }}
+            >
+              {option}
+            </button>
+          )
+        })}
+        <button
+          onClick={() => dismissInteraction(interaction.id)}
+          disabled={isResponding}
+          style={{
+            padding: '8px 12px',
+            fontSize: '13px',
+            fontWeight: '400',
+            border: `1px solid ${colors.border}`,
+            borderRadius: '6px',
+            cursor: isResponding ? 'not-allowed' : 'pointer',
+            background: colors.bgTertiary,
+            color: colors.textTertiary,
+            opacity: isResponding ? 0.6 : 1,
+            transition: 'background 0.15s'
+          }}
+          onMouseEnter={(e) => {
+            if (!isResponding) {
+              e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isResponding) {
+              e.currentTarget.style.background = colors.bgTertiary
+            }
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
+    )
   }
+
+  return (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        onClick={() => handleRespond(interaction.id, 'acknowledged')}
+        disabled={isResponding}
+        style={{
+          flex: 1,
+          padding: '8px 12px',
+          fontSize: '13px',
+          fontWeight: '500',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: isResponding ? 'not-allowed' : 'pointer',
+          background: isDarkMode ? '#4ade80' : '#22c55e',
+          color: '#fff',
+          opacity: isResponding ? 0.6 : 1,
+          transition: 'opacity 0.15s'
+        }}
+      >
+        Got it
+      </button>
+      <button
+        onClick={() => dismissInteraction(interaction.id)}
+        disabled={isResponding}
+        style={{
+          padding: '8px 12px',
+          fontSize: '13px',
+          fontWeight: '500',
+          border: `1px solid ${colors.border}`,
+          borderRadius: '6px',
+          cursor: isResponding ? 'not-allowed' : 'pointer',
+          background: colors.bgTertiary,
+          color: colors.textTertiary,
+          opacity: isResponding ? 0.6 : 1,
+          transition: 'background 0.15s'
+        }}
+        onMouseEnter={(e) => {
+          if (!isResponding) {
+            e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isResponding) {
+            e.currentTarget.style.background = colors.bgTertiary
+          }
+        }}
+      >
+        Dismiss
+      </button>
+    </div>
+  )
+}
 
   // Get priority indicator color
   const getPriorityColor = (priority: number) => {

@@ -7,7 +7,7 @@ export interface DBInteraction {
   id: string;
   user_id: string;
   agent_id: string;
-  interaction_type: 'yes_no' | 'multiple_choice' | 'confirmation' | 'input';
+  interaction_type: 'yes_no' | 'multiple_choice';
   question: string;
   options?: string[];
   priority: number;

@@ -6,7 +6,7 @@ import { useCategories } from '../lib/categoryContext';
 export interface UIInteraction {
   id: string;
   question: string;
-  type: 'yes_no' | 'multiple_choice' | 'confirmation';
+  type: 'yes_no' | 'multiple_choice';
   options?: string[];
   priority: number;
   category?: string;
