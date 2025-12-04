@@ -29,7 +29,8 @@ COMMENT ON COLUMN public.events.parent_event_id IS 'References the original recu
 COMMENT ON COLUMN public.events.is_recurring IS 'Flag to quickly identify recurring events';
 
 -- Update get_events_with_categories to include recurrence fields
-CREATE OR REPLACE FUNCTION get_events_with_categories(p_user_id UUID, p_start_date TIMESTAMPTZ DEFAULT NULL, p_end_date TIMESTAMPTZ DEFAULT NULL)
+DROP FUNCTION IF EXISTS get_events_with_categories(UUID, TIMESTAMPTZ, TIMESTAMPTZ);
+CREATE FUNCTION get_events_with_categories(p_user_id UUID, p_start_date TIMESTAMPTZ DEFAULT NULL, p_end_date TIMESTAMPTZ DEFAULT NULL)
 RETURNS TABLE (
   id UUID,
   user_id UUID,

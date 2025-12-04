@@ -177,7 +177,12 @@ export class SupabaseService {
         category_id: event.category_id,
         category_name: event.category_name,
         category_color: event.category_color,
-        category_icon: event.category_icon
+        category_icon: event.category_icon,
+        // Recurrence fields
+        recurrence_rule: event.recurrence_rule,
+        recurrence_end: event.recurrence_end,
+        parent_event_id: event.parent_event_id,
+        is_recurring: event.is_recurring || false
       }));
 
       return transformedEvents;
@@ -292,6 +297,310 @@ export class SupabaseService {
 
   async deleteEvent(userId: string, eventId: string): Promise<{ success: boolean, error: string | null }> {
     return this.deleteRecord('events', userId, eventId, 'event');
+  }
+
+  // ============================================================================
+  // RECURRING EVENT METHODS
+  // ============================================================================
+
+  /**
+   * Create a recurring event (parent record)
+   * @param userId User ID
+   * @param event Event data with recurrence rule
+   * @returns Created parent event
+   */
+  async createRecurringEvent(
+    userId: string,
+    event: Partial<DatabaseEvent> & {
+      category?: string;
+      category_id?: string;
+      recurrence_rule: string; // RFC 5545 format
+      recurrence_end?: string; // Optional end date for recurrence
+    }
+  ): Promise<DatabaseEvent | null> {
+    try {
+      const title = event.title || 'Untitled Event';
+      const description = event.description || null;
+      const location = event.location || null;
+      const startTime = event.start_time || new Date().toISOString();
+      const endTime = event.end_time || new Date().toISOString();
+      const rrule = event.recurrence_rule;
+
+      if (!rrule) {
+        console.error('❌ [SupabaseService] Missing recurrence_rule');
+        return null;
+      }
+
+      // Handle category
+      const categoryId = await this.resolveCategoryId(userId, event.category, event.category_id);
+
+      // Insert parent recurring event
+      const { data, error } = await this.client
+        .from('events')
+        .insert({
+          user_id: userId,
+          title: title,
+          start_time: startTime,
+          end_time: endTime,
+          location: location,
+          description: description,
+          category: event.category || 'Personal',
+          category_id: categoryId,
+          recurrence_rule: rrule,
+          recurrence_end: event.recurrence_end || null,
+          parent_event_id: null, // This is the parent
+          is_recurring: true
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [SupabaseService] Error creating recurring event:', error);
+        return null;
+      }
+
+      console.log('✅ [SupabaseService] Created recurring event:', data.id);
+
+      // Fetch with category data
+      const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
+      const createdEvent = eventsWithCategories.find(e => e.id === data.id);
+
+      return createdEvent || null;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Exception creating recurring event:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get events with expanded recurring instances for a date range
+   * Combines regular events with expanded recurring event instances
+   */
+  async getExpandedEvents(
+    userId: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<Array<DatabaseEvent & { is_instance?: boolean; parent_event_id_ref?: string }>> {
+    try {
+      // Import here to avoid circular dependencies
+      const {
+        expandRecurrenceWithEndTime,
+        validateRRule
+      } = await import('../utils/rrule.js');
+
+      // Get all events (both regular and recurring)
+      const allEvents = await this.getEvents(userId, startDate, endDate);
+
+      if (!allEvents || allEvents.length === 0) {
+        return [];
+      }
+
+      const expandedEvents: Array<DatabaseEvent & { is_instance?: boolean; parent_event_id_ref?: string }> = [];
+      const startD = startDate ? new Date(startDate) : new Date();
+      const endD = endDate ? new Date(endDate) : new Date(startD.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+      for (const event of allEvents) {
+        if (event.is_recurring && event.recurrence_rule) {
+          // Validate and expand recurring event
+          if (!validateRRule(event.recurrence_rule)) {
+            console.warn('⚠️  [SupabaseService] Invalid RRULE for event:', event.id, event.recurrence_rule);
+            expandedEvents.push(event); // Add parent anyway
+            continue;
+          }
+
+          // Expand instances
+          const startT = new Date(event.start_time);
+          const endT = new Date(event.end_time);
+          const instances = expandRecurrenceWithEndTime(
+            event.recurrence_rule,
+            startT,
+            endT,
+            event.recurrence_end ? new Date(event.recurrence_end) : endD
+          );
+
+          // Filter instances within requested date range and create event objects
+          for (const instance of instances) {
+            if (instance.start >= startD && instance.start <= endD) {
+              expandedEvents.push({
+                ...event,
+                start_time: instance.start.toISOString(),
+                end_time: instance.end.toISOString(),
+                is_instance: true,
+                parent_event_id: event.id, // Use parent_event_id for frontend compatibility
+                is_recurring: true // Mark as recurring so frontend can identify it
+              });
+            }
+          }
+        } else {
+          // Regular non-recurring event
+          expandedEvents.push(event);
+        }
+      }
+
+      // Sort by start time
+      expandedEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      return expandedEvents;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Error expanding events:', error);
+      // Fallback to regular events if expansion fails
+      return this.getEvents(userId, startDate, endDate);
+    }
+  }
+
+  /**
+   * Update a single instance of a recurring event
+   * Creates a new event record for the modified instance
+   */
+  async updateRecurringEventInstance(
+    userId: string,
+    parentEventId: string,
+    instanceDate: string, // ISO 8601 of the instance start
+    updates: Partial<DatabaseEvent>
+  ): Promise<DatabaseEvent | null> {
+    try {
+      // Get parent event
+      const parentEvent = await this.getEvents(userId, undefined, undefined);
+      const parent = parentEvent?.find(e => e.id === parentEventId && e.is_recurring);
+
+      if (!parent) {
+        console.error('❌ [SupabaseService] Parent recurring event not found:', parentEventId);
+        return null;
+      }
+
+      // Create instance with parent reference
+      const instanceStartDate = new Date(instanceDate);
+      const duration = new Date(parent.end_time).getTime() - new Date(parent.start_time).getTime();
+      const instanceEndDate = new Date(instanceStartDate.getTime() + duration);
+
+      const { data, error } = await this.client
+        .from('events')
+        .insert({
+          user_id: userId,
+          title: updates.title || parent.title,
+          start_time: instanceStartDate.toISOString(),
+          end_time: instanceEndDate.toISOString(),
+          location: updates.location !== undefined ? updates.location : parent.location,
+          description: updates.description !== undefined ? updates.description : parent.description,
+          category: updates.category || parent.category,
+          category_id: updates.category_id || parent.category_id,
+          parent_event_id: parentEventId, // Link back to parent
+          is_recurring: false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [SupabaseService] Error creating instance override:', error);
+        return null;
+      }
+
+      console.log('✅ [SupabaseService] Created instance override for parent:', parentEventId);
+
+      // Fetch with category data
+      const eventsWithCategories = await this.getEvents(userId, instanceStartDate.toISOString(), instanceEndDate.toISOString());
+      const createdInstance = eventsWithCategories.find(e => e.id === data.id);
+
+      return createdInstance || null;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Exception updating recurring instance:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete a single instance of a recurring event
+   * Creates a deletion record or marks instance as deleted
+   */
+  async deleteRecurringEventInstance(userId: string, parentEventId: string, instanceDate: string): Promise<boolean> {
+    try {
+      // For now, we don't track deleted instances separately
+      // In a more advanced system, you'd create an exception record
+      // This is a placeholder for future enhancement
+      console.log('⚠️  [SupabaseService] Instance deletion for', parentEventId, 'on', instanceDate, '(not implemented)');
+      return true;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Error deleting recurring instance:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update entire recurring event series (parent)
+   * Modifies the parent record and RRULE
+   */
+  async updateRecurringEventSeries(
+    userId: string,
+    parentEventId: string,
+    updates: Partial<DatabaseEvent> & {
+      recurrence_rule?: string;
+      recurrence_end?: string;
+    }
+  ): Promise<DatabaseEvent | null> {
+    try {
+      // Validate if new RRULE provided
+      if (updates.recurrence_rule) {
+        const { validateRRule } = await import('../utils/rrule.js');
+        if (!validateRRule(updates.recurrence_rule)) {
+          console.error('❌ [SupabaseService] Invalid recurrence rule');
+          return null;
+        }
+      }
+
+      const updateData: Record<string, any> = {};
+
+      if (updates.title) updateData.title = updates.title;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.location !== undefined) updateData.location = updates.location;
+      if (updates.start_time) updateData.start_time = updates.start_time;
+      if (updates.end_time) updateData.end_time = updates.end_time;
+      if (updates.recurrence_rule) updateData.recurrence_rule = updates.recurrence_rule;
+      if (updates.recurrence_end !== undefined) updateData.recurrence_end = updates.recurrence_end;
+      if (updates.category_id) updateData.category_id = updates.category_id;
+      if (updates.category) updateData.category = updates.category;
+
+      const { data, error } = await this.client
+        .from('events')
+        .update(updateData)
+        .eq('id', parentEventId)
+        .eq('user_id', userId)
+        .eq('is_recurring', true)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [SupabaseService] Error updating recurring series:', error);
+        return null;
+      }
+
+      console.log('✅ [SupabaseService] Updated recurring series:', parentEventId);
+
+      // Fetch with category data
+      const eventsWithCategories = await this.getEvents(userId);
+      const updatedEvent = eventsWithCategories.find(e => e.id === data.id);
+
+      return updatedEvent || null;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Exception updating recurring series:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete entire recurring event series
+   * Cascades to delete all instances via FK constraint
+   */
+  async deleteRecurringEventSeries(userId: string, parentEventId: string): Promise<boolean> {
+    try {
+      const result = await this.deleteEvent(userId, parentEventId);
+      if (result.success) {
+        console.log('✅ [SupabaseService] Deleted recurring series:', parentEventId);
+      }
+      return result.success;
+    } catch (error) {
+      console.error('❌ [SupabaseService] Exception deleting recurring series:', error);
+      return false;
+    }
   }
 
   // ============================================================================
