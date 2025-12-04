@@ -21,12 +21,12 @@ export const listEventsTool = tool(
     // Initialize service
     const supabaseService = new SupabaseService();
 
-    // Get events as UTC
+    // Get events as UTC (with recurring events expanded)
     let events;
     if (startDate && endDate) {
-      events = await supabaseService.getEvents(userId, startDate, endDate);
+      events = await supabaseService.getExpandedEvents(userId, startDate, endDate);
     } else {
-      events = await supabaseService.getEvents(userId);
+      events = await supabaseService.getExpandedEvents(userId);
 
       // Filter out past events unless includePast is true (includes ongoing multi-day events)
       if (!includePast) {

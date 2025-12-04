@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useCategories } from '../lib/categoryContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { fetchUserEvents, updateEvent, deleteEvent, createEvent } from '../lib/calendarService'
+import { fetchUserEvents, fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
 import { getColors, hexToRgba } from '../styles/colors'
 import { EventForm } from './EventForm'
+import { RecurringEventView } from './RecurringEventView'
+import { EditRecurringEventModal } from './EditRecurringEventModal'
+import { getRecurrenceBadge } from '../lib/recurrenceUtils'
 
 interface CalendarEvent {
   id: string
@@ -15,6 +18,11 @@ interface CalendarEvent {
   description?: string
   category?: string
   color?: string
+  // Recurrence fields
+  recurrence_rule?: string
+  parent_event_id?: string
+  is_recurring?: boolean
+  is_instance?: boolean
 }
 
 type ViewType = 'day' | 'week' | 'month'
@@ -33,6 +41,14 @@ export function Calendar() {
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragPreview, setDragPreview] = useState<{ date: Date; hour: number; quarter: number } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Recurring event view state
+  const [recurringEventToView, setRecurringEventToView] = useState<CalendarEvent | null>(null)
+  const [isRecurringViewOpen, setIsRecurringViewOpen] = useState(false)
+
+  // Recurring event edit state
+  const [recurringEventToEdit, setRecurringEventToEdit] = useState<CalendarEvent | null>(null)
+  const [isRecurringEditOpen, setIsRecurringEditOpen] = useState(false)
 
   // Get current week dates
   const getWeekDates = (date: Date) => {
@@ -167,9 +183,9 @@ export function Calendar() {
           events: directEvents
         })
 
-        // Fetch through backend API
-        const { events: userEvents } = await fetchUserEvents(user, session?.access_token)
-        console.log('[Calendar] Backend API result:', {
+        // Fetch through backend API with recurring events expanded
+        const { events: userEvents } = await fetchExpandedEvents(user, session?.access_token)
+        console.log('[Calendar] Backend API result (with expanded recurring events):', {
           count: userEvents?.length,
           events: userEvents
         })
@@ -593,6 +609,61 @@ export function Calendar() {
     setDragPreview(null)
   }
 
+  // Handle recurring event edit
+  const handleRecurringEventEdit = async (event: CalendarEvent, scope: 'this_instance' | 'entire_series') => {
+    if (scope === 'entire_series') {
+      // Close the view modal and open the edit modal
+      setIsRecurringViewOpen(false)
+      setRecurringEventToView(null)
+      setRecurringEventToEdit(event)
+      setIsRecurringEditOpen(true)
+    } else {
+      // Instance edit - not yet supported
+      alert('Instance editing will be available in a future update.')
+    }
+  }
+
+  // Handle recurring event edit success
+  const handleRecurringEditSuccess = async () => {
+    // Refresh events
+    if (user) {
+      const { events: refreshedEvents } = await fetchExpandedEvents(user, session?.access_token)
+      if (refreshedEvents) {
+        setEvents(refreshedEvents)
+      }
+    }
+    setIsRecurringEditOpen(false)
+    setRecurringEventToEdit(null)
+  }
+
+  // Handle recurring event delete
+  const handleRecurringEventDelete = async (event: CalendarEvent, scope: 'this_instance' | 'entire_series') => {
+    if (!user) return
+
+    // For entire series, use parent_event_id if this is an instance
+    const eventId = scope === 'entire_series' && event.parent_event_id
+      ? event.parent_event_id
+      : event.id
+
+    try {
+      const { success, error } = await deleteRecurringEvent(user, eventId, scope, session?.access_token)
+      if (success) {
+        // Refresh events
+        const { events: refreshedEvents } = await fetchExpandedEvents(user, session?.access_token)
+        if (refreshedEvents) {
+          setEvents(refreshedEvents)
+        }
+        setIsRecurringViewOpen(false)
+        setRecurringEventToView(null)
+      } else {
+        alert('Failed to delete recurring event: ' + error)
+      }
+    } catch (err) {
+      console.error('Error deleting recurring event:', err)
+      alert('Error deleting recurring event')
+    }
+  }
+
   return (
     <div style={{
       height: '100%',
@@ -755,8 +826,14 @@ export function Calendar() {
                             key={event.id}
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedEvent(event)
-                              setIsFormOpen(true)
+                              // Check if this is a recurring event
+                              if (event.is_recurring || event.parent_event_id) {
+                                setRecurringEventToView(event)
+                                setIsRecurringViewOpen(true)
+                              } else {
+                                setSelectedEvent(event)
+                                setIsFormOpen(true)
+                              }
                             }}
                             style={{
                               background: hexToRgba(eventColor, 0.15),
@@ -779,9 +856,10 @@ export function Calendar() {
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
                             }}
-                            title={`${event.title} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                            title={`${event.title}${getRecurrenceBadge(event) ? ' ♻️' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                           >
                             {event.title}
+                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px' }}>♻️</span>}
                           </div>
                         )
                       })}
@@ -958,8 +1036,14 @@ export function Calendar() {
                               onDragEnd={handleDragEnd}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setSelectedEvent(event)
-                                setIsFormOpen(true)
+                                // Check if this is a recurring event
+                                if (event.is_recurring || event.parent_event_id) {
+                                  setRecurringEventToView(event)
+                                  setIsRecurringViewOpen(true)
+                                } else {
+                                  setSelectedEvent(event)
+                                  setIsFormOpen(true)
+                                }
                               }}
                               style={{
                                 position: 'absolute',
@@ -989,7 +1073,7 @@ export function Calendar() {
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
                               }}
-                              title={`${event.title}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                              title={`${event.title}${getRecurrenceBadge(event) ? ' ♻️' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                             >
                               <div style={{
                                 fontSize: '11px',
@@ -997,9 +1081,13 @@ export function Calendar() {
                                 color: colors.textPrimary,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px'
                               }}>
-                                {event.title}
+                                <span>{event.title}</span>
+                                {getRecurrenceBadge(event) && <span style={{ fontSize: '10px', flexShrink: 0 }}>♻️</span>}
                               </div>
                               {height > 25 && (
                                 <div style={{
@@ -1090,6 +1178,31 @@ export function Calendar() {
         }}
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
+      />
+
+      {/* Recurring Event View */}
+      <RecurringEventView
+        event={recurringEventToView}
+        isOpen={isRecurringViewOpen}
+        onClose={() => {
+          setRecurringEventToView(null)
+          setIsRecurringViewOpen(false)
+        }}
+        onEdit={handleRecurringEventEdit}
+        onDelete={handleRecurringEventDelete}
+      />
+
+      {/* Edit Recurring Event Modal */}
+      <EditRecurringEventModal
+        isOpen={isRecurringEditOpen}
+        onClose={() => {
+          setIsRecurringEditOpen(false)
+          setRecurringEventToEdit(null)
+        }}
+        onSuccess={handleRecurringEditSuccess}
+        event={recurringEventToEdit}
+        user={user}
+        accessToken={session?.access_token}
       />
     </div>
   )

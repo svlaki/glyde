@@ -19,6 +19,12 @@ export interface CalendarEvent {
   category_name?: string
   category_color?: string
   category_icon?: string
+  // Recurring event fields
+  recurrence_rule?: string
+  recurrence_end?: string
+  parent_event_id?: string
+  is_recurring?: boolean
+  is_instance?: boolean
 }
 
 /**
@@ -255,6 +261,263 @@ export async function deleteEvent(
     }
   } catch (err: any) {
     console.error('Unexpected error in deleteEvent:', err);
+    return { success: false, error: err.message || 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Fetch expanded events (with recurring events expanded into instances)
+ * @param user The authenticated user
+ * @param startDate Optional start date to filter events
+ * @param endDate Optional end date to filter events
+ * @returns Array of calendar events with recurring events expanded
+ */
+export async function fetchExpandedEvents(
+  user: User,
+  accessToken?: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<{ events: CalendarEvent[], error: string | null }> {
+  try {
+    if (!user) {
+      console.error('[calendarService] No user provided');
+      return { events: [], error: 'User not authenticated' }
+    }
+
+    const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/expanded`;
+    const body = {
+      user_id: user.id,
+      start_date: startDate ? startDate.toISOString() : null,
+      end_date: endDate ? endDate.toISOString() : null
+    };
+
+    console.log('[calendarService] Fetching expanded events:', { url, body });
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      cache: 'no-store'
+    });
+
+    console.log('[calendarService] Response status:', response.status, response.ok);
+
+    if (!response.ok) {
+      console.error('[calendarService] Failed to fetch expanded events:', response.status);
+      return { events: [], error: 'Failed to fetch expanded events from backend' }
+    }
+
+    const data = await response.json();
+
+    console.log('[calendarService] Response data:', { success: data.success, eventCount: data.events?.length });
+
+    if (data.success) {
+      return { events: data.events || [], error: null }
+    } else {
+      console.error('[calendarService] API returned error:', data.error);
+      return { events: [], error: data.error || 'Unknown error' }
+    }
+  } catch (err: any) {
+    console.error('[calendarService] Exception in fetchExpandedEvents:', err)
+    return { events: [], error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+/**
+ * Create a recurring event
+ * @param user The authenticated user
+ * @param title Event title
+ * @param startTime Start time in ISO format
+ * @param recurrenceRule RFC 5545 RRULE format
+ * @param category Optional category
+ * @param description Optional description
+ * @param location Optional location
+ * @param recurrenceEnd Optional end date for recurrence
+ * @returns The created recurring event or error
+ */
+export async function createRecurringEvent(
+  user: User,
+  title: string,
+  startTime: string,
+  recurrenceRule: string,
+  category?: string,
+  description?: string,
+  location?: string,
+  recurrenceEnd?: string,
+  accessToken?: string
+): Promise<{ event: CalendarEvent | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { event: null, error: 'User not authenticated' }
+    }
+
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${agentServiceUrl}/api/events/create-recurring`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        title,
+        start_time: startTime,
+        recurrence_rule: recurrenceRule,
+        category: category || 'Personal',
+        description: description || '',
+        location: location || '',
+        recurrence_end: recurrenceEnd || null
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Agent service error: ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      console.error('Error creating recurring event:', data.error)
+      return { event: null, error: data.error }
+    }
+
+    return { event: data.event, error: null };
+
+  } catch (err: any) {
+    console.error('Unexpected error in createRecurringEvent:', err)
+    return { event: null, error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+/**
+ * Update a recurring event series or single instance
+ * @param user The authenticated user
+ * @param eventId The ID of the event to update
+ * @param scope 'entire_series' or 'this_instance'
+ * @param updates The fields to update
+ * @returns The updated event or error
+ */
+export async function updateRecurringEvent(
+  user: User,
+  eventId: string,
+  scope: 'entire_series' | 'this_instance',
+  updates: Partial<Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>>,
+  accessToken?: string
+): Promise<{ event: CalendarEvent | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { event: null, error: 'User not authenticated' };
+    }
+
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${agentServiceUrl}/api/events/update-recurring`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        event_id: eventId,
+        scope,
+        ...updates
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Agent service error: ${errorText}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      console.error('Error updating recurring event:', data.error);
+      return { event: null, error: data.error };
+    }
+
+    return { event: data.event, error: null };
+  } catch (err: any) {
+    console.error('Unexpected error in updateRecurringEvent:', err);
+    return { event: null, error: err.message || 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Delete a recurring event series or single instance
+ * @param user The authenticated user
+ * @param eventId The ID of the event to delete
+ * @param scope 'entire_series' or 'this_instance'
+ * @returns Success boolean or error
+ */
+export async function deleteRecurringEvent(
+  user: User,
+  eventId: string,
+  scope: 'entire_series' | 'this_instance' = 'entire_series',
+  accessToken?: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const agentServiceUrl = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${agentServiceUrl}/api/events/delete-recurring`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        event_id: eventId,
+        scope
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      return { success: false, error: `Backend error: ${errorText}` };
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      return { success: true, error: null };
+    } else {
+      return { success: false, error: data.error || 'Unknown error' };
+    }
+  } catch (err: any) {
+    console.error('Unexpected error in deleteRecurringEvent:', err);
     return { success: false, error: err.message || 'An unexpected error occurred' };
   }
 }

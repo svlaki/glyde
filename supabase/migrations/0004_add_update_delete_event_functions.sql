@@ -48,7 +48,7 @@ BEGIN
   RETURN result;
 EXCEPTION
   WHEN OTHERS THEN
-    RAISE EXCEPTION 'Error updating event: %'', SQLERRM;
+    RAISE EXCEPTION 'Error updating event: %', SQLERRM;
 END;
 $$;
 
@@ -73,7 +73,7 @@ BEGIN
   RETURN FOUND;
 EXCEPTION
   WHEN OTHERS THEN
-    RAISE EXCEPTION 'Error deleting event: %'', SQLERRM;
+    RAISE EXCEPTION 'Error deleting event: %', SQLERRM;
 END;
 $$;
 

@@ -1,0 +1,82 @@
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+import { SupabaseService } from "../../services/SupabaseService.js";
+import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
+
+export const updateRecurringEventTool = tool(
+  async ({ eventId, scope, title, description, location, startTime }, config) => {
+    const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
+
+    if (!userId) {
+      throw new Error("User ID is required");
+    }
+
+    console.log('[UPDATE-RECURRING-EVENT TOOL] Starting update:', {
+      eventId,
+      scope,
+      title,
+      timezone
+    });
+
+    const supabaseService = new SupabaseService();
+
+    // Get the event
+    const events = await supabaseService.getEvents(userId);
+    const event = events?.find(e => e.id === eventId);
+
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+
+    if (!event.is_recurring) {
+      throw new Error(`Event is not recurring. Use regular event update instead.`);
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (title) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (location !== undefined) updateData.location = location;
+    if (startTime) {
+      const newStartUTC = convertToUTC(startTime, timezone);
+      updateData.start_time = newStartUTC;
+      // Preserve duration
+      const duration = new Date(event.end_time).getTime() - new Date(event.start_time).getTime();
+      updateData.end_time = new Date(new Date(newStartUTC).getTime() + duration).toISOString();
+    }
+
+    if (scope === 'entire_series') {
+      // Update parent event
+      console.log('[UPDATE-RECURRING-EVENT TOOL] Updating entire series:', eventId);
+
+      const updated = await supabaseService.updateRecurringEventSeries(userId, eventId, updateData);
+
+      if (!updated) {
+        throw new Error('Failed to update recurring series');
+      }
+
+      return `✅ Updated recurring event series: "${updated.title}"`;
+    } else if (scope === 'this_instance') {
+      // Update single instance - would need to know which instance
+      // For now, require more specific handling
+      throw new Error(
+        "Updating single instances is not yet fully supported via this tool. Please contact support for instance-specific modifications."
+      );
+    } else {
+      throw new Error(`Invalid scope: ${scope}. Use 'entire_series' or 'this_instance'`);
+    }
+  },
+  {
+    name: "update_recurring_event",
+    description: "Update a recurring calendar event. Can update the entire series or a single instance.",
+    schema: z.object({
+      eventId: z.string().describe("ID of the recurring event (parent event)"),
+      scope: z.enum(['entire_series', 'this_instance']).describe("Update entire series or just this instance"),
+      title: z.string().optional().describe("New event title"),
+      description: z.string().optional().describe("New description"),
+      location: z.string().optional().describe("New location"),
+      startTime: z.string().optional().describe("New start time for the event (affects all instances or just this one depending on scope)"),
+    }),
+  }
+);

@@ -15,6 +15,13 @@ export interface DatabaseEvent {
   category_name?: string;
   category_color?: string;
   category_icon?: string;
+
+  // Recurring event fields
+  recurrence_rule?: string;  // RFC 5545 RRULE format
+  recurrence_end?: string;  // Optional recurrence end date
+  parent_event_id?: string;  // Links instances to parent recurring event
+  is_recurring?: boolean;  // Quick flag for recurring events
+  is_instance?: boolean;  // Flag for event instances of a recurring series
 }
 
 export interface DatabaseCategory {

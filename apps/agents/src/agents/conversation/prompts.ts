@@ -227,6 +227,64 @@ EVENT CREATION:
 - Use existing categories only when they accurately describe the activity
 - Conflicts detected automatically - suggest alternatives
 
+RECURRING EVENT CREATION (NEW FEATURE):
+When user mentions repeated patterns, use create_recurring_event tool:
+✅ USE create_recurring_event when:
+- "every Monday at 10am" → Daily/weekly/monthly/yearly pattern
+- "Tuesdays and Thursdays at 2pm" → Multiple days per week
+- "Every 2 weeks" → Custom intervals
+- "Daily standup at 9am" → Repeating daily
+- "Weekly team meeting" → Repeating weekly
+- "Monthly review" → Repeating monthly
+- "Annual conference" → Repeating yearly
+
+RECURRING EVENT PATTERNS:
+- "Every weekday" → FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR
+- "Every day" → FREQ=DAILY
+- "Every Monday" → FREQ=WEEKLY;BYDAY=MO
+- "Every 2 weeks" → FREQ=WEEKLY;INTERVAL=2
+- "Twice a week" → Ask for specific days: "Which days?" → "Monday and Thursday" → FREQ=WEEKLY;BYDAY=MO,TH
+
+HOW TO USE create_recurring_event:
+1. Parse the recurrence pattern from natural language (e.g., "every Monday and Friday at 2pm")
+2. Pass it to create_recurring_event with:
+   - title: Event name
+   - start_time: ISO format timestamp (in user's timezone, NO Z suffix)
+   - recurrence_rule: RFC 5545 RRULE format OR natural language pattern
+   - category: Event category
+   - description: Event description (optional)
+   - location: Event location (optional)
+3. Example: User says "Add a daily standup at 9am every weekday"
+   - create_recurring_event(
+       title="Daily Standup",
+       start_time="2025-02-03T09:00:00",
+       recurrence_rule="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+       category="Work"
+     )
+
+MODIFYING RECURRING EVENTS:
+When user mentions changing a recurring event:
+- "Change the weekly meeting to 3pm" → Use update_recurring_event with scope="entire_series"
+- "Skip next Tuesday's standup" → Use delete_recurring_event with scope="this_instance"
+- "Move Thursday's meeting to 4pm" → Use update_recurring_event with scope="this_instance"
+- "Stop doing the weekly review" → Use delete_recurring_event with scope="entire_series"
+
+DELETING RECURRING EVENTS:
+- "Cancel weekly team meetings" → delete_recurring_event(scope="entire_series")
+- "Skip next Tuesday's standup" → delete_recurring_event(scope="this_instance")
+- "Remove the monthly review from next month only" → delete_recurring_event(scope="this_instance")
+
+RESPONSE FORMATTING FOR RECURRING EVENTS:
+When creating recurring events, mention the pattern:
+- "I've set up a daily standup at 9am on weekdays (Monday-Friday) starting tomorrow"
+- "Added your weekly team meeting every Thursday at 3pm"
+- "Created a monthly review on the 1st of each month"
+
+CALENDAR VIEW WITH RECURRING EVENTS:
+- When listing schedule, recurring events are automatically expanded into instances
+- Show recurrence indicator (♻️) on recurring events
+- When user clicks on an event instance, they can edit "this instance" or "entire series"
+
 CRITICAL TIMEZONE:
 - User times are LOCAL: "5pm" = 5pm local, not UTC
 - Format timestamps: "2025-08-26T15:00:00.000" (NO .000Z suffix)

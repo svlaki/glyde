@@ -233,3 +233,196 @@ export async function deleteUserEvent(req: Request, res: Response): Promise<void
     sendErrorResponse(res, 500, 'Failed to delete user event');
   }
 }
+
+// ============================================================================
+// RECURRING EVENT ENDPOINTS
+// ============================================================================
+
+export async function createRecurringEvent(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, title, start_time, recurrence_rule, recurrence_end, location, description, category } = req.body;
+
+    // Validate required fields
+    if (!user_id) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(user_id)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      sendErrorResponse(res, 400, 'Event title is required');
+      return;
+    }
+
+    if (!start_time) {
+      sendErrorResponse(res, 400, 'start_time is required');
+      return;
+    }
+
+    if (!recurrence_rule) {
+      sendErrorResponse(res, 400, 'recurrence_rule is required (RFC 5545 format)');
+      return;
+    }
+
+    logger.info('Creating recurring event for user', { user_id, title });
+
+    const event = await getSupabaseService().createRecurringEvent(user_id, {
+      title: title.trim(),
+      start_time,
+      end_time: req.body.end_time || new Date(new Date(start_time).getTime() + 60 * 60 * 1000).toISOString(),
+      location: location || '',
+      description: description || '',
+      category: category || 'Personal',
+      recurrence_rule,
+      recurrence_end: recurrence_end || null
+    });
+
+    if (!event) {
+      sendErrorResponse(res, 500, 'Failed to create recurring event');
+      return;
+    }
+
+    logger.info('Successfully created recurring event', { event_id: event.id, user_id });
+
+    res.status(201).json({
+      success: true,
+      event
+    });
+  } catch (error) {
+    console.error('Error creating recurring event:', error);
+    sendErrorResponse(res, 500, 'Failed to create recurring event', { error });
+  }
+}
+
+export async function getExpandedEvents(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, start_date, end_date } = req.body;
+
+    if (!user_id) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(user_id)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    logger.info('Fetching expanded events for user', { user_id, start_date, end_date });
+
+    const events = await getSupabaseService().getExpandedEvents(user_id, start_date, end_date);
+
+    logger.info('Successfully fetched expanded events', { count: events.length, user_id });
+
+    res.json({
+      success: true,
+      events
+    });
+  } catch (error) {
+    logger.error('Error fetching expanded events', { error: error instanceof Error ? error.message : error });
+    sendErrorResponse(res, 500, 'Failed to fetch expanded events', { error });
+  }
+}
+
+export async function updateRecurringEvent(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, event_id, scope, ...updates } = req.body;
+
+    if (!user_id) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(user_id)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    if (!event_id) {
+      sendErrorResponse(res, 400, 'event_id is required');
+      return;
+    }
+
+    if (!scope || !['entire_series', 'this_instance'].includes(scope)) {
+      sendErrorResponse(res, 400, 'scope must be "entire_series" or "this_instance"');
+      return;
+    }
+
+    logger.info('Updating recurring event', { user_id, event_id, scope });
+
+    if (scope === 'entire_series') {
+      const event = await getSupabaseService().updateRecurringEventSeries(user_id, event_id, updates);
+
+      if (!event) {
+        sendErrorResponse(res, 500, 'Failed to update recurring series');
+        return;
+      }
+
+      logger.info('Successfully updated recurring series', { event_id, user_id });
+
+      res.json({
+        success: true,
+        event
+      });
+    } else {
+      // For single instance, would need more context (which occurrence date)
+      sendErrorResponse(res, 501, 'Updating single instances is not yet fully supported via API');
+    }
+  } catch (error) {
+    console.error('Error updating recurring event:', error);
+    sendErrorResponse(res, 500, 'Failed to update recurring event', { error });
+  }
+}
+
+export async function deleteRecurringEvent(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, event_id, scope } = req.body;
+
+    if (!user_id) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(user_id)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    if (!event_id) {
+      sendErrorResponse(res, 400, 'event_id is required');
+      return;
+    }
+
+    if (!scope || !['entire_series', 'this_instance', 'all_future'].includes(scope)) {
+      sendErrorResponse(res, 400, 'scope must be "entire_series", "this_instance", or "all_future"');
+      return;
+    }
+
+    logger.info('Deleting recurring event', { user_id, event_id, scope });
+
+    if (scope === 'entire_series') {
+      const success = await getSupabaseService().deleteRecurringEventSeries(user_id, event_id);
+
+      if (!success) {
+        sendErrorResponse(res, 500, 'Failed to delete recurring series');
+        return;
+      }
+
+      logger.info('Successfully deleted recurring series', { event_id, user_id });
+
+      res.json({
+        success: true
+      });
+    } else {
+      // For other scopes, would need instance-specific handling
+      sendErrorResponse(res, 501, 'Deleting specific instances is not yet fully supported via API');
+    }
+  } catch (error) {
+    console.error('Error deleting recurring event:', error);
+    sendErrorResponse(res, 500, 'Failed to delete recurring event', { error });
+  }
+}

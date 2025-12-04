@@ -112,7 +112,18 @@ CREATE INDEX IF NOT EXISTS idx_user_goals_status ON public.user_goals(status);
 CREATE INDEX IF NOT EXISTS idx_user_insights_user_id ON public.user_insights(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_insights_type ON public.user_insights(insight_type);
 CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id ON public.user_interactions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_interactions_timestamp ON public.user_interactions(timestamp);
+-- Create timestamp index if column exists
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'user_interactions'
+        AND column_name = 'timestamp'
+    ) THEN
+        CREATE INDEX IF NOT EXISTS idx_user_interactions_timestamp ON public.user_interactions(timestamp);
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_event_analytics_user_date ON public.event_analytics(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_user_context_user_id ON public.user_context(user_id);
 
@@ -154,10 +165,23 @@ CREATE POLICY "Users can manage their own insights" ON public.user_insights
     FOR ALL USING (auth.uid() = user_id);
 
 -- Create RLS policies for user_interactions
-CREATE POLICY "Users can view their own interactions" ON public.user_interactions
-    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own interactions" ON public.user_interactions
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_interactions' AND policyname = 'Users can view their own interactions'
+    ) THEN
+        CREATE POLICY "Users can view their own interactions" ON public.user_interactions
+            FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_interactions' AND policyname = 'Users can insert their own interactions'
+    ) THEN
+        CREATE POLICY "Users can insert their own interactions" ON public.user_interactions
+            FOR INSERT WITH CHECK (auth.uid() = user_id);
+    END IF;
+END $$;
 
 -- Create RLS policies for event_analytics
 CREATE POLICY "Users can view their own analytics" ON public.event_analytics

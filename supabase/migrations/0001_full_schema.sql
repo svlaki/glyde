@@ -11,22 +11,40 @@ CREATE TABLE IF NOT EXISTS public.profile (
 ALTER TABLE public.profile ENABLE ROW LEVEL SECURITY;
 
 -- Users can view all profiles
-CREATE POLICY IF NOT EXISTS "Users can view all profiles" 
-  ON public.profile 
-  FOR SELECT 
-  USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profile' AND policyname = 'Users can view all profiles'
+  ) THEN
+    CREATE POLICY "Users can view all profiles"
+      ON public.profile
+      FOR SELECT
+      USING (true);
+  END IF;
+END $$;
 
 -- Users can update only their own profile
-CREATE POLICY IF NOT EXISTS "Users can update own profile" 
-  ON public.profile 
-  FOR UPDATE 
-  USING (auth.uid() = id);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profile' AND policyname = 'Users can update own profile'
+  ) THEN
+    CREATE POLICY "Users can update own profile"
+      ON public.profile
+      FOR UPDATE
+      USING (auth.uid() = id);
+  END IF;
+END $$;
 
 -- Users can't delete profiles
-CREATE POLICY IF NOT EXISTS "Users cannot delete profiles" 
-  ON public.profile 
-  FOR DELETE 
-  USING (false);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profile' AND policyname = 'Users cannot delete profiles'
+  ) THEN
+    CREATE POLICY "Users cannot delete profiles"
+      ON public.profile
+      FOR DELETE
+      USING (false);
+  END IF;
+END $$;
 
 -- Function to generate per-user schemas (trigger-based, for auth.users)
 CREATE OR REPLACE FUNCTION create_user_schema()

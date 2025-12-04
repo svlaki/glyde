@@ -117,7 +117,8 @@ END;
 $$;
 
 -- Fix the get_user_events function to include color
-CREATE OR REPLACE FUNCTION public.get_user_events(
+DROP FUNCTION IF EXISTS public.get_user_events(text, timestamptz, timestamptz);
+CREATE FUNCTION public.get_user_events(
     user_schema text,
     start_date timestamptz DEFAULT NULL,
     end_date timestamptz DEFAULT NULL

@@ -32,7 +32,7 @@ initializeSupabase();
 import express from 'express';
 import cors from 'cors';
 import { createUserSchema } from './user.js';
-import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent } from './events.js';
+import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent, createRecurringEvent, getExpandedEvents, updateRecurringEvent, deleteRecurringEvent } from './events.js';
 import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask } from './tasks.js';
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
@@ -219,9 +219,13 @@ app.post('/api/user/create-schema', createUserSchema);
 
 // Events endpoints
 app.post('/api/events', getUserEvents);
+app.post('/api/events/expanded', getExpandedEvents);
 app.post('/api/events/create', createUserEvent);
+app.post('/api/events/create-recurring', createRecurringEvent);
 app.post('/api/events/update', updateUserEvent);
+app.post('/api/events/update-recurring', updateRecurringEvent);
 app.post('/api/events/delete', deleteUserEvent);
+app.post('/api/events/delete-recurring', deleteRecurringEvent);
 
 // Tasks endpoints
 app.post('/api/tasks', getUserTasks);

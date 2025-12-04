@@ -16,7 +16,7 @@ export const searchEventsTool = tool(
 
     try {
       const supabaseService = new SupabaseService();
-      let events = await supabaseService.getEvents(userId);
+      let events = await supabaseService.getExpandedEvents(userId);
 
       // Filter out past events unless includePast is true (includes ongoing multi-day events)
       if (!includePast) {

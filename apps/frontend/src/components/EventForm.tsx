@@ -3,7 +3,8 @@ import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { createUserCategory, Category } from '../lib/categoryService'
-import { CalendarEvent } from '../lib/eventService'
+import { CalendarEvent, createRecurringEvent } from '../lib/calendarService'
+import { buildRRuleFromForm, getNextOccurrences } from '../lib/recurrenceUtils'
 import { AspectForm } from './AspectForm'
 import { getColors } from '../styles/colors'
 import { Modal } from './Modal'
@@ -30,6 +31,17 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   const [loading, setLoading] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
+
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurrencePattern, setRecurrencePattern] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('weekly')
+  const [interval, setInterval] = useState(1)
+  const [daysOfWeek, setDaysOfWeek] = useState<string[]>(['MO'])
+  const [dayOfMonth, setDayOfMonth] = useState(1)
+  const [endType, setEndType] = useState<'never' | 'after' | 'until'>('never')
+  const [count, setCount] = useState(10)
+  const [untilDate, setUntilDate] = useState('')
+  const [recurrencePreview, setRecurrencePreview] = useState<Date[]>([])
 
   useEffect(() => {
     if (event) {
@@ -68,8 +80,47 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       roundedEnd.setHours(roundedEnd.getHours() + 1)
       setEndDateTime(formatDateTimeForInput(roundedEnd))
     }
+    // Reset recurrence state
+    setIsRecurring(false)
+    setRecurrencePattern('weekly')
+    setInterval(1)
+    setDaysOfWeek(['MO'])
+    setDayOfMonth(1)
+    setEndType('never')
+    setCount(10)
+    setUntilDate('')
+    setRecurrencePreview([])
     setShowCategoryDropdown(false)
   }, [event, isOpen])
+
+  // Update recurrence preview when settings change
+  useEffect(() => {
+    if (!isRecurring || !startDateTime) {
+      setRecurrencePreview([])
+      return
+    }
+    try {
+      const startDate = new Date(startDateTime)
+      if (isNaN(startDate.getTime())) {
+        setRecurrencePreview([])
+        return
+      }
+      const rrule = buildRRuleFromForm({
+        pattern: recurrencePattern,
+        interval,
+        daysOfWeek: recurrencePattern === 'weekly' ? daysOfWeek : [],
+        dayOfMonth: recurrencePattern === 'monthly' ? dayOfMonth : 1,
+        endType,
+        count: endType === 'after' ? count : undefined,
+        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
+      })
+      const occurrences = getNextOccurrences(rrule, startDate, 3)
+      setRecurrencePreview(occurrences)
+    } catch (err) {
+      console.error('Error updating recurrence preview:', err)
+      setRecurrencePreview([])
+    }
+  }, [isRecurring, startDateTime, recurrencePattern, interval, daysOfWeek, dayOfMonth, endType, count, untilDate])
 
   // Helper function to format date for input display
   const formatDateTimeForInput = (date: Date): string => {
@@ -120,14 +171,57 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       const startISO = startDate.toISOString()
       const endISO = endDate.toISOString()
 
-      await onSave({
-        id: event?.id,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        category: category || undefined,
-        start_time: startISO,
-        end_time: endISO
-      })
+      // Handle recurring event creation
+      if (isRecurring && !event?.id && user) {
+        // Build RRULE
+        const rrule = buildRRuleFromForm({
+          pattern: recurrencePattern,
+          interval,
+          daysOfWeek: recurrencePattern === 'weekly' ? daysOfWeek : [],
+          dayOfMonth: recurrencePattern === 'monthly' ? dayOfMonth : 1,
+          endType,
+          count: endType === 'after' ? count : undefined,
+          untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
+        })
+
+        const { event: createdEvent, error } = await createRecurringEvent(
+          user,
+          title.trim(),
+          startISO,
+          rrule,
+          category || 'Personal',
+          description.trim() || undefined,
+          undefined, // location
+          endType === 'until' && untilDate ? new Date(untilDate).toISOString() : undefined,
+          session?.access_token
+        )
+
+        if (error) {
+          alert('Failed to create recurring event: ' + error)
+          setLoading(false)
+          return
+        }
+
+        // Call onSave with the created event to trigger a refresh
+        await onSave({
+          id: createdEvent?.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category: category || undefined,
+          start_time: startISO,
+          end_time: endISO
+        })
+      } else {
+        // Regular event
+        await onSave({
+          id: event?.id,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category: category || undefined,
+          start_time: startISO,
+          end_time: endISO
+        })
+      }
       onClose()
       setShowCategoryDropdown(false)
     } catch (error) {
@@ -463,6 +557,234 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
             }}
           />
         </div>
+
+        {/* Recurrence Toggle - Only for new events */}
+        {!event?.id && (
+          <div style={{
+            padding: '16px',
+            background: colors.bgPrimary,
+            borderRadius: '8px',
+            border: `1px solid ${colors.border}`
+          }}>
+            {/* Toggle */}
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              cursor: 'pointer',
+              marginBottom: isRecurring ? '16px' : '0'
+            }}>
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '14px', fontWeight: '500', color: colors.textPrimary }}>
+                Make this a recurring event
+              </span>
+            </label>
+
+            {/* Recurrence Options */}
+            {isRecurring && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Pattern */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Repeat:</label>
+                  <select
+                    value={recurrencePattern}
+                    onChange={(e) => setRecurrencePattern(e.target.value as any)}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      background: colors.bgSecondary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      flex: 1,
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+
+                {/* Interval */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Every:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={interval}
+                    onChange={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                    style={{
+                      width: '60px',
+                      padding: '8px',
+                      fontSize: '14px',
+                      background: colors.bgSecondary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      textAlign: 'center'
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+                    {recurrencePattern === 'daily' ? 'day(s)' : recurrencePattern === 'weekly' ? 'week(s)' : recurrencePattern === 'monthly' ? 'month(s)' : 'year(s)'}
+                  </span>
+                </div>
+
+                {/* Days of Week (for weekly) */}
+                {recurrencePattern === 'weekly' && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {[
+                      { label: 'M', value: 'MO' },
+                      { label: 'T', value: 'TU' },
+                      { label: 'W', value: 'WE' },
+                      { label: 'T', value: 'TH' },
+                      { label: 'F', value: 'FR' },
+                      { label: 'S', value: 'SA' },
+                      { label: 'S', value: 'SU' }
+                    ].map((day) => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => {
+                          if (daysOfWeek.includes(day.value)) {
+                            if (daysOfWeek.length > 1) {
+                              setDaysOfWeek(daysOfWeek.filter(d => d !== day.value))
+                            }
+                          } else {
+                            setDaysOfWeek([...daysOfWeek, day.value])
+                          }
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: daysOfWeek.includes(day.value) ? 'none' : `1px solid ${colors.border}`,
+                          background: daysOfWeek.includes(day.value) ? colors.accent : 'transparent',
+                          color: daysOfWeek.includes(day.value) ? '#fff' : colors.textSecondary,
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Day of Month (for monthly) */}
+                {recurrencePattern === 'monthly' && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>On day:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={dayOfMonth}
+                      onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                      style={{
+                        width: '60px',
+                        padding: '8px',
+                        fontSize: '14px',
+                        background: colors.bgSecondary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        textAlign: 'center'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* End Condition */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Ends:</label>
+                  <select
+                    value={endType}
+                    onChange={(e) => setEndType(e.target.value as any)}
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      background: colors.bgSecondary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px'
+                    }}
+                  >
+                    <option value="never">Never</option>
+                    <option value="after">After</option>
+                    <option value="until">On date</option>
+                  </select>
+
+                  {endType === 'after' && (
+                    <>
+                      <input
+                        type="number"
+                        min="1"
+                        value={count}
+                        onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{
+                          width: '60px',
+                          padding: '8px',
+                          fontSize: '14px',
+                          background: colors.bgSecondary,
+                          color: colors.textPrimary,
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: '6px',
+                          textAlign: 'center'
+                        }}
+                      />
+                      <span style={{ fontSize: '13px', color: colors.textSecondary }}>occurrences</span>
+                    </>
+                  )}
+
+                  {endType === 'until' && (
+                    <input
+                      type="date"
+                      value={untilDate}
+                      onChange={(e) => setUntilDate(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '14px',
+                        background: colors.bgSecondary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px'
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Preview */}
+                {recurrencePreview.length > 0 && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '10px',
+                    background: colors.bgSecondary,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: colors.textSecondary
+                  }}>
+                    <span style={{ fontWeight: '500' }}>Next occurrences:</span>
+                    <div style={{ marginTop: '4px' }}>
+                      {recurrencePreview.map((date, idx) => (
+                        <div key={idx}>
+                          {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at {date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{

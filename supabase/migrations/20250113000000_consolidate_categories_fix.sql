@@ -1,18 +1,9 @@
 -- Consolidate and fix categories system
 -- This migration:
--- 1. Removes duplicate categories (keeping first by created_at)
--- 2. Generates capital letter icons for all categories
--- 3. Removes any emoji characters from category names
+-- 1. Removes emoji characters from category names
+-- 2. Removes duplicate categories (keeping first by created_at)
+-- 3. Generates capital letter icons for all categories
 -- 4. Ensures consistent display order
-
--- Function to remove emoji characters from text
-CREATE OR REPLACE FUNCTION remove_emoji_from_text(input_text TEXT)
-RETURNS TEXT AS $$
-BEGIN
-  -- Remove common emoji patterns while preserving the base text
-  RETURN input_text;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
 
 -- Helper function to generate icon from category name (capital letter)
 CREATE OR REPLACE FUNCTION generate_icon_from_name(category_name TEXT)
@@ -23,8 +14,38 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- Step 1: Identify and remove duplicate categories per user
--- Keep the oldest one (first created), delete newer duplicates
+-- Helper function to remove emojis - uses translate to remove common emoji codepoints
+CREATE OR REPLACE FUNCTION clean_category_name(input_name TEXT)
+RETURNS TEXT AS $$
+DECLARE
+  result TEXT;
+BEGIN
+  result := input_name;
+
+  -- Remove common emojis by their actual characters
+  -- This uses PostgreSQL's built-in Unicode support
+  result := REGEXP_REPLACE(result, '[✈️✈🎶👥📚💼🧹🎬🛒🏋️‍♀️🏋️‍♂️🏋🏋️❤️❤🏥🎨🤝👶🏡]', '', 'g');
+
+  -- Remove any remaining emoji-like patterns (symbols and emoticons)
+  -- Covers mathematical operators, arrows, shapes, emoticons
+  result := REGEXP_REPLACE(result, '[\u2600-\u27BF]', '', 'g');
+
+  -- Trim leading/trailing whitespace
+  result := TRIM(result);
+
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Temporarily drop constraint to allow duplicates during cleanup
+ALTER TABLE public.categories DROP CONSTRAINT IF EXISTS categories_user_id_name_key;
+
+-- Step 1: Clean category names - remove emojis
+UPDATE public.categories
+SET name = clean_category_name(name);
+
+-- Step 2: Remove duplicates AFTER cleaning names
+-- Keep the oldest category (first created_at), delete newer duplicates
 DELETE FROM public.categories c1
 WHERE EXISTS (
   SELECT 1 FROM public.categories c2
@@ -33,23 +54,12 @@ WHERE EXISTS (
   AND c1.created_at > c2.created_at
 );
 
--- Step 2: Update all icons to capital letters (first letter of category name)
-UPDATE public.categories
-SET icon = generate_icon_from_name(name)
-WHERE icon IS NULL OR icon = '';
+-- Re-add the unique constraint
+ALTER TABLE public.categories ADD CONSTRAINT categories_user_id_name_key UNIQUE (user_id, name);
 
--- Step 3: Remove any emoji characters from category names by extracting just the text
--- This regex pattern matches most emoji ranges and removes them
+-- Step 3: Update ALL icons to capital letters (first letter of cleaned category name)
 UPDATE public.categories
-SET name = TRIM(
-  REGEXP_REPLACE(
-    name,
-    '[\x{1F000}-\x{1F9FF}]|[\x{2600}-\x{27BF}]|[\x{2300}-\x{23FF}]|[\x{2B50}]|[\x{2B55}]|[\x{1F900}-\x{1F9FF}]|[\u0080-\uffff]',
-    '',
-    'g'
-  )
-)
-WHERE name ~ '[\x{1F000}-\x{1F9FF}]|[\x{2600}-\x{27BF}]|[\x{2300}-\x{23FF}]|[\x{2B50}]|[\x{2B55}]|[\x{1F900}-\x{1F9FF}]|[\u0080-\uffff]';
+SET icon = generate_icon_from_name(name);
 
 -- Step 4: Reset display_order to ensure consistent ordering
 WITH ordered_cats AS (
@@ -66,8 +76,8 @@ WHERE EXISTS (SELECT 1 FROM ordered_cats WHERE ordered_cats.id = categories.id);
 DO $$
 BEGIN
   RAISE NOTICE 'Category consolidation complete:';
+  RAISE NOTICE '✓ Removed emoji characters from names';
   RAISE NOTICE '✓ Removed duplicate categories';
   RAISE NOTICE '✓ Generated capital letter icons';
-  RAISE NOTICE '✓ Removed emoji characters';
   RAISE NOTICE '✓ Reset display order';
 END $$;
