@@ -41,7 +41,7 @@ export class ConversationAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('conversation', "gpt-4o"); // Use GPT-4 for better intelligence
+    super('conversation', "gpt-5.1"); // Use GPT-5.1 for best intelligence
     this.graph = this.createGraph();
   }
 

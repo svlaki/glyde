@@ -45,8 +45,8 @@ export const searchEventsTool = tool(
         const categoryLabel = event.category ? ` [${event.category}]` : '';
         const description = event.description ? ` - ${event.description}` : '';
         const location = event.location ? ` at ${event.location}` : '';
-        
-        return `📅 ${event.title}${description} - ${startTime}${location}${categoryLabel}`;
+
+        return `📅 ${event.title}${description} - ${startTime}${location}${categoryLabel}\n   ID: ${event.id}`;
       });
 
       // Return events with search context for the agent to filter semantically

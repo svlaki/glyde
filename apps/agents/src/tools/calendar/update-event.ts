@@ -6,7 +6,7 @@ import { CategoryService } from "../../services/CategoryService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateEventTool = tool(
-  async ({ eventId, searchQuery, title, startTime, endTime, location, description, category }, config) => {
+  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, category }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -46,28 +46,41 @@ export const updateEventTool = tool(
           word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
         );
 
-        const matchingEvents = recentEvents.filter((event: any) => {
+        let matchingEvents = recentEvents.filter((event: any) => {
           const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
           const hasMatch = queryWords.some(word => searchText.includes(word));
           const hasFullMatch = searchText.includes(normalizedQuery);
           return hasMatch || hasFullMatch;
         });
 
-        if (matchingEvents.length > 0) {
-          targetEventId = matchingEvents[0].id;
-          console.log('✅ [UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
-        } else {
+        // If currentStartTime is provided, filter to events starting at that exact time
+        if (currentStartTime && matchingEvents.length > 1) {
+          const targetTime = new Date(currentStartTime).getTime();
+          const timeFilteredEvents = matchingEvents.filter((event: any) => {
+            const eventTime = new Date(event.start_time).getTime();
+            // Allow 1 minute tolerance for time matching
+            return Math.abs(eventTime - targetTime) < 60000;
+          });
+
+          if (timeFilteredEvents.length > 0) {
+            matchingEvents = timeFilteredEvents;
+            console.log(`✅ [UPDATE-EVENT TOOL] Filtered to ${matchingEvents.length} event(s) by currentStartTime: ${currentStartTime}`);
+          }
+        }
+
+        if (matchingEvents.length === 0) {
           return `❌ No event found matching: "${searchQuery}". Please check the event name and try again.`;
         }
 
         if (matchingEvents.length > 1) {
-          // Multiple matches - ask for clarification
+          // Multiple matches - ask for clarification with IDs so agent can be precise
           const eventsList = matchingEvents.slice(0, 5).map(e => {
             const eventDate = new Date(e.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            return `- ${e.title} on ${eventDate} at ${new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+            const eventTime = new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            return `- ${e.title} on ${eventDate} at ${eventTime} (ID: ${e.id})`;
           }).join('\n');
 
-          throw new Error(`Found ${matchingEvents.length} events matching "${searchQuery}". Which one should I update?\n${eventsList}`);
+          throw new Error(`Found ${matchingEvents.length} events matching "${searchQuery}". Which one should I update? Use the eventId parameter or currentStartTime for precision:\n${eventsList}`);
         }
 
         targetEventId = matchingEvents[0].id;
@@ -145,10 +158,11 @@ export const updateEventTool = tool(
   },
   {
     name: "update_event",
-    description: "Update an existing calendar event. If eventId is not provided, use semantic search to find the event by description. Can update event category and details.",
+    description: "Update an existing calendar event. Use eventId for precision when available. If eventId is not provided, use searchQuery with optional currentStartTime to disambiguate same-named events. Can update event category and details.",
     schema: z.object({
-      eventId: z.string().optional().describe("Event ID to update (optional - if not provided, search by description)"),
+      eventId: z.string().optional().describe("Event ID to update (preferred - use this when you have the ID from a previous search or list)"),
       searchQuery: z.string().optional().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
+      currentStartTime: z.string().optional().describe("Current start time of the event in ISO format - use this to disambiguate when multiple events have the same name (e.g., '2024-01-15T21:56:00')"),
       title: z.string().optional().describe("New event title - leave empty to keep existing"),
       startTime: z.string().optional().describe("New start time in ISO format - leave empty to keep existing"),
       endTime: z.string().optional().describe("New end time in ISO format - leave empty to keep existing"),

@@ -247,7 +247,9 @@ TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
 - Clear calendar → delete_multiple_events with searchQuery "*"
 - UPDATE event → update_event (supports category changes)
   IMPORTANT: update_event only searches recent events (today + 14 days). If not found, it will tell you.
-  If tool returns multiple matches, ask user which one they meant.
+  If tool returns multiple matches:
+    • If user said "all"/"all of them" → call list_events/search_events to get IDs, then loop calling update_event(eventId=...) for each
+    • Otherwise → ask user which one they meant
 - SEARCH/FIND events → search_events with text/category (for viewing only)
 - List range → list_events with dates
 
@@ -398,5 +400,15 @@ Assistant: → Calls update_memory_advanced({
   importance: "high",
   category: "values",
   triggerEarlyPersistence: true
-}) → "I've noted this important shift in your priorities. This will help me suggest better work-life balance in the future."`);
+}) → "I've noted this important shift in your priorities. This will help me suggest better work-life balance in the future."
+
+HANDLING "ALL" REQUESTS:
+When the user says "all", "all of them", "all my [events/tasks]", or similar:
+- DON'T repeatedly call update_event/delete_event with searchQuery (causes error loop)
+- DO call list_events or search_events first to get the specific event IDs
+- THEN loop through each ID calling the tool once per item
+- Example: User says "reschedule all my CS221 events"
+  1. search_events(query="CS221") → get array of events with IDs
+  2. For each event: update_event(eventId=xxx, startTime=...)
+  3. Respond with summary of what was changed`);
 }
