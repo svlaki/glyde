@@ -522,3 +522,280 @@ export async function deleteRecurringEvent(
   }
 }
 
+// Calendar Integration Functions for Onboarding
+
+export interface AnalysisStatus {
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  progress: number
+  result?: any
+  error?: string
+}
+
+export async function getGoogleAuthUrl(
+  user: User,
+  accessToken: string
+): Promise<{ success: boolean; authUrl?: string; state?: string; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_URL}/api/calendar/google/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ user_id: user.id })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to get Google auth URL' }
+    }
+
+    return { success: true, authUrl: data.authUrl, state: data.state }
+  } catch (error) {
+    console.error('Error getting Google auth URL:', error)
+    return { success: false, error: 'Failed to get Google auth URL' }
+  }
+}
+
+export async function importGoogleCalendar(
+  user: User,
+  accessToken: string,
+  code: string,
+  state: string
+): Promise<{ success: boolean; eventCount?: number; analysisJobId?: string; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    // First, handle callback to get access token
+    const callbackResponse = await fetch(`${API_URL}/api/calendar/google/callback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        code,
+        state
+      })
+    })
+
+    const callbackData = await callbackResponse.json()
+
+    if (!callbackResponse.ok) {
+      return { success: false, error: callbackData.error || 'Failed to connect Google Calendar' }
+    }
+
+    // Now import events
+    const importResponse = await fetch(`${API_URL}/api/calendar/google/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        accessToken: callbackData.accessToken
+      })
+    })
+
+    const importData = await importResponse.json()
+
+    if (!importResponse.ok) {
+      return { success: false, error: importData.error || 'Failed to import Google Calendar' }
+    }
+
+    return {
+      success: true,
+      eventCount: importData.eventCount,
+      analysisJobId: importData.analysisJobId
+    }
+  } catch (error) {
+    console.error('Error importing Google Calendar:', error)
+    return { success: false, error: 'Failed to import Google Calendar' }
+  }
+}
+
+export async function getMicrosoftAuthUrl(
+  user: User,
+  accessToken: string
+): Promise<{ success: boolean; authUrl?: string; state?: string; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_URL}/api/calendar/microsoft/auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ user_id: user.id })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to get Microsoft auth URL' }
+    }
+
+    return { success: true, authUrl: data.authUrl, state: data.state }
+  } catch (error) {
+    console.error('Error getting Microsoft auth URL:', error)
+    return { success: false, error: 'Failed to get Microsoft auth URL' }
+  }
+}
+
+export async function importMicrosoftCalendar(
+  user: User,
+  accessToken: string,
+  code: string,
+  state: string
+): Promise<{ success: boolean; eventCount?: number; analysisJobId?: string; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+
+    // First, handle callback to get access token
+    const callbackResponse = await fetch(`${API_URL}/api/calendar/microsoft/callback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        code,
+        state
+      })
+    })
+
+    const callbackData = await callbackResponse.json()
+
+    if (!callbackResponse.ok) {
+      return { success: false, error: callbackData.error || 'Failed to connect Microsoft Calendar' }
+    }
+
+    // Now import events
+    const importResponse = await fetch(`${API_URL}/api/calendar/microsoft/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        accessToken: callbackData.accessToken
+      })
+    })
+
+    const importData = await importResponse.json()
+
+    if (!importResponse.ok) {
+      return { success: false, error: importData.error || 'Failed to import Microsoft Calendar' }
+    }
+
+    return {
+      success: true,
+      eventCount: importData.eventCount,
+      analysisJobId: importData.analysisJobId
+    }
+  } catch (error) {
+    console.error('Error importing Microsoft Calendar:', error)
+    return { success: false, error: 'Failed to import Microsoft Calendar' }
+  }
+}
+
+export async function uploadICSFile(
+  user: User,
+  accessToken: string,
+  file: File
+): Promise<{ success: boolean; eventCount?: number; analysisJobId?: string; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_URL}/api/calendar/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: formData
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to upload calendar file' }
+    }
+
+    return {
+      success: true,
+      eventCount: data.eventCount,
+      analysisJobId: data.analysisJobId
+    }
+  } catch (error) {
+    console.error('Error uploading calendar file:', error)
+    return { success: false, error: 'Failed to upload calendar file' }
+  }
+}
+
+export async function getAnalysisStatus(
+  user: User,
+  accessToken: string,
+  jobId: string
+): Promise<{ success: boolean; data?: AnalysisStatus; error?: string }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_URL}/api/calendar/analysis/${jobId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: result.error || 'Failed to get analysis status' }
+    }
+
+    return {
+      success: true,
+      data: {
+        status: result.status,
+        progress: result.progress,
+        result: result.result,
+        error: result.error
+      }
+    }
+  } catch (error) {
+    console.error('Error getting analysis status:', error)
+    return { success: false, error: 'Failed to get analysis status' }
+  }
+}
+

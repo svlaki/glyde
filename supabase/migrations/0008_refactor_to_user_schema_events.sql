@@ -333,10 +333,10 @@ END;
 $$;
 
 -- Grant execute permission to authenticated users for new/updated functions
-GRANT EXECUTE ON FUNCTION public.get_user_events TO authenticated;
-GRANT EXECUTE ON FUNCTION public.create_user_event TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_user_event TO authenticated;
-GRANT EXECUTE ON FUNCTION public.add_archetype_columns_to_user_tables TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_user_events(TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_user_event(TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_user_event(TEXT, UUID, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.add_archetype_columns_to_user_tables() TO authenticated;
 
 -- Clean up the temporary function
 DROP FUNCTION IF EXISTS public.add_archetype_columns_to_user_tables;

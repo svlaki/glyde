@@ -19,5 +19,7 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
     }
   }, [navigate, location.pathname])
 
+  // Allow direct access to /onboarding page even if already completed
+  // This lets users re-do onboarding for testing
   return <>{children}</>
 }

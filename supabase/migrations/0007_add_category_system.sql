@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS public.user_categories (
 );
 
 -- Add category fields to events table
-ALTER TABLE public.events 
+ALTER TABLE public.events
 ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.categories(id),
 ADD COLUMN IF NOT EXISTS priority TEXT CHECK (priority IN ('low', 'medium', 'high', 'critical')) DEFAULT 'medium',
 ADD COLUMN IF NOT EXISTS energy_required TEXT CHECK (energy_required IN ('low', 'medium', 'high')) DEFAULT 'medium';
@@ -108,7 +108,7 @@ BEGIN
   FROM public.events e
   JOIN public.categories c ON e.category_id = c.id
   WHERE e.id = event_id;
-  
+
   RETURN COALESCE(category_color, '#6B7280'); -- Default gray if no category
 END;
 $$ LANGUAGE plpgsql;

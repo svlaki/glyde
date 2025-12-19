@@ -11,15 +11,11 @@ export async function getUserCategories(req: Request, res: Response): Promise<vo
 
     console.log('Fetching categories for user:', userId);
 
-    let categories = await categoryService.getCategories(userId);
+    const categories = await categoryService.getCategories(userId);
 
-    // Auto-create default categories if user has none
-    if (categories.length === 0) {
-      console.log('No categories found for user, creating defaults...');
-      await categoryService.createDefaultCategories(userId);
-      categories = await categoryService.getCategories(userId);
-    }
-
+    // Categories are created during onboarding
+    // If user has no categories, they haven't completed onboarding yet
+    // or their onboarding was done before category creation was added
     res.json({
       success: true,
       categories: categories

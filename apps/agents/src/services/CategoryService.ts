@@ -291,36 +291,6 @@ export class CategoryService {
   }
 
   /**
-   * Create default categories for a new user
-   */
-  async createDefaultCategories(userId: string): Promise<void> {
-    try {
-      // Check if user already has categories
-      const existing = await this.getCategories(userId);
-      if (existing.length > 0) {
-        console.log(`[CategoryService] User ${userId} already has ${existing.length} categories, skipping defaults`);
-        return;
-      }
-
-      // Call the database function that creates default categories
-      // This ensures we use a single source of truth (the SQL migration)
-      const { error } = await this.supabase.rpc('create_default_categories', {
-        target_user_id: userId
-      });
-
-      if (error) {
-        console.error('❌ [CategoryService] Error creating default categories:', error);
-        throw error;
-      }
-
-      console.log(`✅ [CategoryService] Created default categories for user: ${userId}`);
-    } catch (error) {
-      console.error('❌ [CategoryService] Exception creating default categories:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get category color by name
    */
   async getCategoryColor(userId: string, categoryName: string): Promise<string> {

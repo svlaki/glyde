@@ -28,15 +28,8 @@ export async function createUserSchema(req: Request, res: Response): Promise<voi
       console.log(`✅ [USER SCHEMA] Created for: ${user_email}`);
     }
 
-    // Create default categories for the user
-    try {
-      const categoryService = (await import('../services/CategoryService.js')).default;
-      await categoryService.createDefaultCategories(userId);
-      console.log(`✅ [CATEGORIES] Default categories created for: ${user_email}`);
-    } catch (categoryError) {
-      console.error('Error creating default categories:', categoryError);
-      // Continue anyway - categories might already exist
-    }
+    // Categories will be created during onboarding when user selects their aspects
+    console.log(`ℹ️  [CATEGORIES] Will be created during onboarding for: ${user_email}`);
 
     // For now, we'll skip profile table operations since they may not exist
     // The user schema creation RPC function should handle this

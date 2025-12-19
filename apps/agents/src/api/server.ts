@@ -41,6 +41,18 @@ import { getPendingInteractions, respondToInteraction, clearUserInteractions } f
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
 import { authenticateRequest } from './middleware/auth.js';
+import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
+import {
+  getGoogleAuthUrl,
+  handleGoogleCallback,
+  importGoogleCalendar,
+  getMicrosoftAuthUrl,
+  handleMicrosoftCallback,
+  importMicrosoftCalendar,
+  uploadCalendarFile,
+  uploadMiddleware,
+  getAnalysisStatus
+} from './calendar.js';
 
 const app = express();
 const PORT = env.PORT;
@@ -254,6 +266,22 @@ app.post('/api/categories/create', createUserCategory);
 app.post('/api/categories/update', updateUserCategory);
 app.post('/api/categories/delete', deleteUserCategory);
 app.post('/api/categories/color', getCategoryColor);
+
+// Onboarding endpoints
+app.post('/api/onboarding/complete', completeOnboarding);
+app.post('/api/onboarding/save-step', saveOnboardingStep);
+
+// Calendar integration endpoints
+app.post('/api/calendar/google/auth', getGoogleAuthUrl);
+app.post('/api/calendar/google/callback', handleGoogleCallback);
+app.post('/api/calendar/google/import', importGoogleCalendar);
+
+app.post('/api/calendar/microsoft/auth', getMicrosoftAuthUrl);
+app.post('/api/calendar/microsoft/callback', handleMicrosoftCallback);
+app.post('/api/calendar/microsoft/import', importMicrosoftCalendar);
+
+app.post('/api/calendar/upload', uploadMiddleware, uploadCalendarFile);
+app.get('/api/calendar/analysis/:jobId', getAnalysisStatus);
 
 // Interaction endpoints
 app.post('/api/interactions/pending', getPendingInteractions);

@@ -2,12 +2,17 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { useAuth } from '../lib/authContext'
+import { completeOnboarding, PreferencesData } from '../lib/onboardingService'
+import { uploadICSFile, getGoogleAuthUrl, getMicrosoftAuthUrl } from '../lib/calendarService'
 
 interface OnboardingData {
   name: string
   occupation: string
   goals: string[]
   aspects: string[]
+  timezone: string
+  preferences: PreferencesData
 }
 
 const PRESET_ASPECTS = ['Personal', 'Health', 'Work']
@@ -16,10 +21,12 @@ export function Onboarding() {
   const navigate = useNavigate()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const { user, session } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Form data
+  // Form data - Steps 1-3
   const [name, setName] = useState('')
   const [occupation, setOccupation] = useState('')
   const [currentGoal, setCurrentGoal] = useState('')
@@ -27,7 +34,24 @@ export function Onboarding() {
   const [selectedAspects, setSelectedAspects] = useState<string[]>(PRESET_ASPECTS)
   const [customAspect, setCustomAspect] = useState('')
 
-  const totalSteps = 3
+  // Step 4: Timezone
+  const [timezone, setTimezone] = useState(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+  )
+
+  // Step 5: Preferences
+  const [workHoursStart, setWorkHoursStart] = useState('09:00')
+  const [workHoursEnd, setWorkHoursEnd] = useState('17:00')
+  const [flexibleHours, setFlexibleHours] = useState(false)
+  const [communicationStyle, setCommunicationStyle] = useState<'direct' | 'collaborative' | 'formal' | 'casual'>('collaborative')
+  const [focusDuration, setFocusDuration] = useState(90)
+  const [meetingPreference, setMeetingPreference] = useState<'morning' | 'afternoon' | 'flexible'>('flexible')
+
+  // Step 6: Calendar import
+  const [calendarImported, setCalendarImported] = useState(false)
+  const [importedEventCount, setImportedEventCount] = useState(0)
+
+  const totalSteps = 7
 
   const handleAddGoal = () => {
     if (currentGoal.trim()) {
@@ -74,23 +98,132 @@ export function Onboarding() {
   }
 
   const handleComplete = async () => {
+    if (!user || !session?.access_token) {
+      setError('You must be logged in to complete onboarding')
+      return
+    }
+
     setLoading(true)
+    setError(null)
+
     try {
-      // Store onboarding data in localStorage for now
-      // Backend integration would happen here
+      const preferences: PreferencesData = {
+        work_hours: {
+          start: workHoursStart,
+          end: workHoursEnd,
+          flexible: flexibleHours
+        },
+        communication: {
+          style: communicationStyle,
+          preferred_channels: ['chat', 'email']
+        },
+        productivity: {
+          focus_block_duration: focusDuration,
+          break_frequency: 60,
+          meeting_preference: meetingPreference,
+          deep_work_time: 'morning'
+        }
+      }
+
       const onboardingData: OnboardingData = {
         name,
         occupation,
         goals,
-        aspects: selectedAspects
+        aspects: selectedAspects,
+        timezone,
+        preferences
       }
-      localStorage.setItem('onboardingData', JSON.stringify(onboardingData))
 
-      // Navigate to calendar
-      navigate('/calendar', { replace: true })
-    } catch (error) {
+      const result = await completeOnboarding(user, session.access_token, onboardingData)
+
+      if (result.success) {
+        localStorage.setItem('onboardingData', JSON.stringify(onboardingData))
+        navigate('/calendar', { replace: true })
+      } else {
+        setError(result.error || 'Failed to complete onboarding')
+      }
+    } catch (error: any) {
       console.error('Error completing onboarding:', error)
+      setError(error.message || 'An unexpected error occurred')
     } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !session?.access_token) {
+      setError('You must be logged in to upload calendar')
+      return
+    }
+
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await uploadICSFile(user, session.access_token, file)
+      if (result.success && result.eventCount) {
+        setCalendarImported(true)
+        setImportedEventCount(result.eventCount)
+      } else {
+        setError(result.error || 'Failed to upload calendar')
+      }
+    } catch (error: any) {
+      console.error('Error uploading calendar:', error)
+      setError(error.message || 'Failed to upload calendar')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleCalendar = async () => {
+    if (!user || !session?.access_token) {
+      setError('You must be logged in to connect Google Calendar')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await getGoogleAuthUrl(user, session.access_token)
+      if (result.success && result.authUrl) {
+        // Redirect to Google OAuth
+        window.location.href = result.authUrl
+      } else {
+        setError(result.error || 'Failed to get Google auth URL')
+        setLoading(false)
+      }
+    } catch (error: any) {
+      console.error('Error initiating Google OAuth:', error)
+      setError(error.message || 'Failed to connect Google Calendar')
+      setLoading(false)
+    }
+  }
+
+  const handleMicrosoftCalendar = async () => {
+    if (!user || !session?.access_token) {
+      setError('You must be logged in to connect Microsoft Calendar')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await getMicrosoftAuthUrl(user, session.access_token)
+      if (result.success && result.authUrl) {
+        // Redirect to Microsoft OAuth
+        window.location.href = result.authUrl
+      } else {
+        setError(result.error || 'Failed to get Microsoft auth URL')
+        setLoading(false)
+      }
+    } catch (error: any) {
+      console.error('Error initiating Microsoft OAuth:', error)
+      setError(error.message || 'Failed to connect Microsoft Calendar')
       setLoading(false)
     }
   }
@@ -103,6 +236,14 @@ export function Onboarding() {
         return goals.length > 0
       case 3:
         return selectedAspects.length > 0
+      case 4:
+        return timezone.trim().length > 0
+      case 5:
+        return true // Preferences have defaults
+      case 6:
+        return true // Calendar import is optional
+      case 7:
+        return true // Categories step (simplified, always valid)
       default:
         return false
     }
@@ -541,6 +682,446 @@ export function Onboarding() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Step 4: Timezone */}
+          {currentStep === 4 && (
+            <div>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: colors.textPrimary,
+                marginBottom: '8px'
+              }}>
+                Select your timezone
+              </h2>
+              <p style={{
+                fontSize: '14px',
+                color: colors.textSecondary,
+                marginBottom: '20px'
+              }}>
+                We've auto-detected your timezone. You can change it if needed.
+              </p>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: colors.textSecondary,
+                  marginBottom: '6px'
+                }}>
+                  Timezone
+                </label>
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    fontSize: '14px',
+                    background: colors.bgPrimary,
+                    color: colors.textPrimary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px'
+                  }}
+                >
+                  <option value="America/New_York">Eastern Time (ET)</option>
+                  <option value="America/Chicago">Central Time (CT)</option>
+                  <option value="America/Denver">Mountain Time (MT)</option>
+                  <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                  <option value="Europe/London">London (GMT)</option>
+                  <option value="Europe/Paris">Paris (CET)</option>
+                  <option value="Asia/Tokyo">Tokyo (JST)</option>
+                  <option value="Asia/Shanghai">Shanghai (CST)</option>
+                  <option value="Australia/Sydney">Sydney (AEST)</option>
+                </select>
+                <p style={{
+                  fontSize: '12px',
+                  color: colors.textSecondary,
+                  marginTop: '8px'
+                }}>
+                  Current time: {new Date().toLocaleTimeString('en-US', { timeZone: timezone })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Preferences */}
+          {currentStep === 5 && (
+            <div>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: colors.textPrimary,
+                marginBottom: '8px'
+              }}>
+                Work preferences
+              </h2>
+              <p style={{
+                fontSize: '14px',
+                color: colors.textSecondary,
+                marginBottom: '20px'
+              }}>
+                Help us understand how you work best
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: colors.textSecondary,
+                    marginBottom: '6px'
+                  }}>
+                    Work hours
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="time"
+                      value={workHoursStart}
+                      onChange={(e) => setWorkHoursStart(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '12px 14px',
+                        fontSize: '14px',
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <span style={{ color: colors.textSecondary }}>to</span>
+                    <input
+                      type="time"
+                      value={workHoursEnd}
+                      onChange={(e) => setWorkHoursEnd(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '12px 14px',
+                        fontSize: '14px',
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={flexibleHours}
+                      onChange={(e) => setFlexibleHours(e.target.checked)}
+                    />
+                    <span style={{ fontSize: '14px', color: colors.textPrimary }}>
+                      I have flexible work hours
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: colors.textSecondary,
+                    marginBottom: '6px'
+                  }}>
+                    Communication style
+                  </label>
+                  <select
+                    value={communicationStyle}
+                    onChange={(e) => setCommunicationStyle(e.target.value as any)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      fontSize: '14px',
+                      background: colors.bgPrimary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <option value="direct">Direct</option>
+                    <option value="collaborative">Collaborative</option>
+                    <option value="formal">Formal</option>
+                    <option value="casual">Casual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: colors.textSecondary,
+                    marginBottom: '6px'
+                  }}>
+                    Focus block duration: {focusDuration} minutes
+                  </label>
+                  <input
+                    type="range"
+                    min="30"
+                    max="180"
+                    step="15"
+                    value={focusDuration}
+                    onChange={(e) => setFocusDuration(parseInt(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: colors.textSecondary,
+                    marginBottom: '6px'
+                  }}>
+                    Meeting preference
+                  </label>
+                  <select
+                    value={meetingPreference}
+                    onChange={(e) => setMeetingPreference(e.target.value as any)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      fontSize: '14px',
+                      background: colors.bgPrimary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <option value="morning">Morning</option>
+                    <option value="afternoon">Afternoon</option>
+                    <option value="flexible">Flexible</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 6: Calendar Import */}
+          {currentStep === 6 && (
+            <div>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: colors.textPrimary,
+                marginBottom: '8px'
+              }}>
+                Import your calendar (optional)
+              </h2>
+              <p style={{
+                fontSize: '14px',
+                color: colors.textSecondary,
+                marginBottom: '20px'
+              }}>
+                Connect your calendar to analyze your work patterns
+              </p>
+
+              {!calendarImported ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Google Calendar */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleCalendar}
+                    disabled={loading}
+                    style={{
+                      padding: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      background: colors.bgPrimary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.currentTarget.style.background = colors.bgHover
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = colors.bgPrimary
+                    }}
+                  >
+                    <span>📅</span> Connect Google Calendar
+                  </button>
+
+                  {/* Microsoft Calendar */}
+                  <button
+                    type="button"
+                    onClick={handleMicrosoftCalendar}
+                    disabled={loading}
+                    style={{
+                      padding: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      background: colors.bgPrimary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.currentTarget.style.background = colors.bgHover
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = colors.bgPrimary
+                    }}
+                  >
+                    <span>📆</span> Connect Outlook/Microsoft 365
+                  </button>
+
+                  {/* ICS File Upload */}
+                  <label
+                    htmlFor="calendar-upload"
+                    style={{
+                      padding: '16px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      background: colors.bgPrimary,
+                      color: colors.textPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.currentTarget.style.background = colors.bgHover
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = colors.bgPrimary
+                    }}
+                  >
+                    <span>📄</span> Upload .ics File
+                  </label>
+                  <input
+                    id="calendar-upload"
+                    type="file"
+                    accept=".ics"
+                    onChange={handleFileUpload}
+                    disabled={loading}
+                    style={{ display: 'none' }}
+                  />
+
+                  <p style={{
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    color: colors.textSecondary,
+                    marginTop: '8px'
+                  }}>
+                    Or skip this step - you can import later in settings
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '24px',
+                  background: '#22c55e',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ fontSize: '16px', fontWeight: '500' }}>
+                    ✓ Calendar imported successfully!
+                  </p>
+                  <p style={{ fontSize: '14px', marginTop: '4px' }}>
+                    {importedEventCount} events imported
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}>
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 7: Categories (Simplified) */}
+          {currentStep === 7 && (
+            <div>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: colors.textPrimary,
+                marginBottom: '8px'
+              }}>
+                You're all set!
+              </h2>
+              <p style={{
+                fontSize: '14px',
+                color: colors.textSecondary,
+                marginBottom: '20px'
+              }}>
+                We've created default categories for you. You can customize them later in settings.
+              </p>
+
+              <div style={{
+                padding: '24px',
+                background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                borderRadius: '8px'
+              }}>
+                <p style={{ fontSize: '14px', color: colors.textPrimary }}>
+                  Default categories created:
+                </p>
+                <ul style={{
+                  marginTop: '12px',
+                  paddingLeft: '20px',
+                  color: colors.textSecondary,
+                  fontSize: '13px'
+                }}>
+                  <li>Work, School, Health & Hygiene</li>
+                  <li>Social, Family, Personal</li>
+                  <li>Fitness, Hobbies, Finance</li>
+                  <li>Shopping, Travel, Self-Care</li>
+                </ul>
+              </div>
+
+              {error && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '12px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '8px',
+                  fontSize: '14px'
+                }}>
+                  {error}
+                </div>
+              )}
             </div>
           )}
         </div>

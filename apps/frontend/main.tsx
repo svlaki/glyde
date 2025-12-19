@@ -10,6 +10,8 @@ import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
+import { Onboarding } from './src/components/Onboarding'
+import { OnboardingCheck } from './src/components/OnboardingCheck'
 
 function App() {
   return (
@@ -20,10 +22,20 @@ function App() {
             <Routes>
               <Route path="/" element={<Auth />} />
               <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/calendar"
                 element={
                   <ProtectedRoute>
-                    <CalendarPage />
+                    <OnboardingCheck>
+                      <CalendarPage />
+                    </OnboardingCheck>
                   </ProtectedRoute>
                 }
               />
@@ -31,7 +43,9 @@ function App() {
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <ProfilePage />
+                    <OnboardingCheck>
+                      <ProfilePage />
+                    </OnboardingCheck>
                   </ProtectedRoute>
                 }
               />
@@ -39,7 +53,9 @@ function App() {
                 path="/aspects"
                 element={
                   <ProtectedRoute>
-                    <AspectsPage />
+                    <OnboardingCheck>
+                      <AspectsPage />
+                    </OnboardingCheck>
                   </ProtectedRoute>
                 }
               />
