@@ -277,10 +277,13 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       maxWidth="500px"
     >
       <form onSubmit={handleSubmit} style={{
-        padding: '20px',
+        padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: 'clamp(12px, 2vh, 16px)',
+        overflowY: 'auto',
+        flex: 1,
+        minHeight: 0
       }}>
         {/* Title */}
         <div>

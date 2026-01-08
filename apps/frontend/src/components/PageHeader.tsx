@@ -1,15 +1,22 @@
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { usePlatform } from '../hooks/usePlatform'
 
 interface PageHeaderProps {
   showNav?: boolean
 }
 
 export function PageHeader({ showNav = true }: PageHeaderProps) {
+  const { isMobile } = usePlatform()
   const { user, signOut } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+
+  // Don't render on mobile - MobileHeader is used instead
+  if (isMobile) {
+    return null
+  }
 
   const navItems = [
     { label: 'Aspects', path: '/aspects' },
@@ -18,21 +25,21 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
 
   return (
     <header style={{
-      height: '60px',
+      height: 'clamp(50px, 8vh, 60px)',
       background: colors.bgSecondary,
       borderBottom: `1px solid ${colors.border}`,
       display: 'flex',
       alignItems: 'center',
-      padding: '0 30px',
+      padding: '0 clamp(15px, 4vw, 30px)',
       flexShrink: 0,
       justifyContent: 'space-between'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(20px, 5vw, 40px)' }}>
         <a
           href="/calendar"
           className="serif"
           style={{
-            fontSize: '26px',
+            fontSize: 'clamp(20px, 5vw, 26px)',
             fontWeight: '700',
             margin: 0,
             textDecoration: 'none',
@@ -43,7 +50,7 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
           Glyde
         </a>
         {showNav && (
-          <nav style={{ display: 'flex', gap: '8px' }}>
+          <nav style={{ display: 'flex', gap: 'clamp(4px, 1vw, 8px)' }}>
             {navItems.map(item => {
               const isActive = window.location.pathname === item.path
               return (
@@ -52,8 +59,8 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
                   href={item.path}
                   className="serif"
                   style={{
-                    padding: '8px 16px',
-                    fontSize: '16px',
+                    padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)',
+                    fontSize: 'clamp(14px, 3vw, 16px)',
                     fontWeight: '500',
                     color: colors.textPrimary,
                     textDecoration: 'none',
@@ -79,19 +86,20 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
           </nav>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <span style={{ fontSize: '13px', color: colors.textSecondary }}>{user?.email}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 15px)' }}>
+        <span style={{ fontSize: 'clamp(11px, 2vw, 13px)', color: colors.textSecondary, display: window.innerWidth < 600 ? 'none' : 'inline' }}>{user?.email}</span>
         <button
           onClick={toggleDarkMode}
           style={{
-            padding: '8px 12px',
+            padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2vw, 12px)',
             background: colors.bgHover,
             color: colors.textSecondary,
             border: `1px solid ${colors.border}`,
             borderRadius: '6px',
             cursor: 'pointer',
-            fontSize: '14px',
-            transition: 'all 0.2s'
+            fontSize: 'clamp(12px, 2.5vw, 14px)',
+            transition: 'all 0.2s',
+            minHeight: '36px'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = colors.bgTertiary
@@ -102,7 +110,7 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
         >
           {isDarkMode ? 'Light' : 'Dark'}
         </button>
-        <button onClick={signOut} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
+        <button onClick={signOut} className="btn btn-secondary" style={{ padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)', fontSize: 'clamp(12px, 2.5vw, 14px)', minHeight: '36px' }}>
           Sign Out
         </button>
       </div>

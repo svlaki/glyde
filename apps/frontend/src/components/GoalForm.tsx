@@ -7,6 +7,9 @@ import { Goal } from '../lib/goalService'
 import { getColors } from '../styles/colors'
 import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
+import { DatePickerMobile } from './mobile/DatePickerMobile'
+import { TimePickerMobile } from './mobile/TimePickerMobile'
+import { usePlatform } from '../hooks/usePlatform'
 
 interface GoalFormProps {
   goal?: Goal
@@ -20,12 +23,17 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const { categories, refreshCategories, getCategoryColor } = useCategories()
+  const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+  const [dueDate, setDueDate] = useState<Date | null>(null)
+  const [hasDueDate, setHasDueDate] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showTimePicker, setShowTimePicker] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -33,13 +41,36 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       setTitle(goal.title || '')
       setDescription(goal.description || '')
       setCategory(goal.category || '')
+      if ((goal as any).due_date) {
+        setDueDate(new Date((goal as any).due_date))
+        setHasDueDate(true)
+      } else {
+        setDueDate(null)
+        setHasDueDate(false)
+      }
     } else {
       setTitle('')
       setDescription('')
       setCategory('')
+      setDueDate(null)
+      setHasDueDate(false)
     }
     setEditingField(null)
   }, [goal, isOpen])
+
+  // Format helpers
+  const formatDate = (date: Date): string => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+  }
+
+  const formatTime = (date: Date): string => {
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const displayHours = hours % 12 || 12
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -79,11 +110,14 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
 
     setLoading(true)
     try {
-      const goalData = {
+      const goalData: any = {
         id: goal?.id,
         title: title.trim(),
         description: description.trim() || undefined,
         category: category || undefined
+      }
+      if (hasDueDate && dueDate) {
+        goalData.due_date = dueDate.toISOString()
       }
       console.log('Saving goal with data:', goalData)
       await onSave(goalData)
@@ -300,6 +334,123 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             )}
           </div>
 
+          {/* Due Date */}
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: hasDueDate ? '8px' : 0
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={hasDueDate}
+                  onChange={(e) => {
+                    setHasDueDate(e.target.checked)
+                    if (e.target.checked && !dueDate) {
+                      // Default to tomorrow at 5 PM
+                      const tomorrow = new Date()
+                      tomorrow.setDate(tomorrow.getDate() + 1)
+                      tomorrow.setHours(17, 0, 0, 0)
+                      setDueDate(tomorrow)
+                    }
+                  }}
+                  style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
+                />
+                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Set due date</span>
+              </label>
+            </div>
+
+            {hasDueDate && dueDate && (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div
+                  onClick={() => isMobile && setShowDatePicker(true)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    fontSize: '14px',
+                    background: colors.bgPrimary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    color: colors.textPrimary,
+                    cursor: isMobile ? 'pointer' : 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <span>📅</span>
+                  {isMobile ? (
+                    formatDate(dueDate)
+                  ) : (
+                    <input
+                      type="date"
+                      value={dueDate.toISOString().split('T')[0]}
+                      onChange={(e) => {
+                        const newDate = new Date(dueDate)
+                        const [year, month, day] = e.target.value.split('-').map(Number)
+                        newDate.setFullYear(year, month - 1, day)
+                        setDueDate(newDate)
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  )}
+                </div>
+                <div
+                  onClick={() => isMobile && setShowTimePicker(true)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    fontSize: '14px',
+                    background: colors.bgPrimary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    color: colors.textPrimary,
+                    cursor: isMobile ? 'pointer' : 'default',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {isMobile ? (
+                    formatTime(dueDate)
+                  ) : (
+                    <input
+                      type="time"
+                      value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
+                      onChange={(e) => {
+                        const [hours, minutes] = e.target.value.split(':').map(Number)
+                        const newDate = new Date(dueDate)
+                        newDate.setHours(hours, minutes)
+                        setDueDate(newDate)
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: colors.textPrimary,
+                        fontSize: '14px',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Description */}
           <div>
             <label style={{
@@ -377,6 +528,24 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         onClose={() => setIsAspectFormOpen(false)}
         onSave={handleCreateAspect}
       />
+
+      {/* Mobile Date/Time Pickers */}
+      {isMobile && dueDate && (
+        <>
+          <DatePickerMobile
+            value={dueDate}
+            onChange={setDueDate}
+            isOpen={showDatePicker}
+            onClose={() => setShowDatePicker(false)}
+          />
+          <TimePickerMobile
+            value={dueDate}
+            onChange={setDueDate}
+            isOpen={showTimePicker}
+            onClose={() => setShowTimePicker(false)}
+          />
+        </>
+      )}
     </Modal>
   )
 }

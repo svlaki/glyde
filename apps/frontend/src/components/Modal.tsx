@@ -28,7 +28,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      padding: '20px'
+      padding: 'clamp(8px, 2vw, 20px)'
     }}>
       {/* Backdrop */}
       <div
@@ -45,10 +45,11 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
       {/* Modal Content */}
       <div style={{
         position: 'relative',
-        width: '90%',
+        width: 'min(90vw, 100%)',
         maxWidth,
+        maxHeight: '85vh',
         background: colors.bgSecondary,
-        borderRadius: '12px',
+        borderRadius: 'clamp(8px, 2vw, 12px)',
         border: `1px solid ${colors.border}`,
         overflow: 'hidden',
         display: 'flex',
@@ -56,11 +57,12 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
       }}>
         {/* Header */}
         <div style={{
-          padding: '20px',
+          padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
           borderBottom: `1px solid ${colors.border}`,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexShrink: 0
         }}>
           <h2 style={{
             fontSize: '18px',

@@ -372,7 +372,7 @@ export function ChatBot() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px',
+        padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px)',
         borderBottom: `1px solid ${colors.borderLight}`,
         background: colors.bgPrimary,
         display: 'flex',
@@ -462,7 +462,7 @@ export function ChatBot() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '20px 16px',
+        padding: 'clamp(12px, 2.5vh, 20px) clamp(8px, 2vw, 16px)',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
@@ -851,7 +851,8 @@ export function ChatBot() {
 
       {/* Input area */}
       <div style={{
-        padding: '12px 16px 16px',
+        padding: 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
+        paddingBottom: 'calc(clamp(12px, 2vh, 16px) + env(safe-area-inset-bottom))',
         borderTop: `1px solid ${colors.borderLight}`,
         background: colors.bgSecondary,
         flexShrink: 0,

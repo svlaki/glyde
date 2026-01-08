@@ -9,7 +9,15 @@ export function Auth() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn, signUp, signInWithGoogle, isAuthenticated, isLoading } = useAuth()
+  const { signIn, signUp, signInWithGoogle, signOut, isAuthenticated, isLoading } = useAuth()
+
+  // Dev helper: clear session for testing
+  const handleClearSession = () => {
+    localStorage.clear()
+    sessionStorage.clear()
+    signOut()
+    window.location.reload()
+  }
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -70,6 +78,7 @@ export function Auth() {
       await signInWithGoogle()
     } catch (err: any) {
       setError(err.message || 'Google sign in failed')
+    } finally {
       setLoading(false)
     }
   }

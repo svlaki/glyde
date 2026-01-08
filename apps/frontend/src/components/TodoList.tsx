@@ -94,7 +94,7 @@ export function TodoList() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '20px 20px 5px 20px'
+        padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px) clamp(4px, 0.5vh, 5px)'
       }}>
         <div style={{
           display: 'flex',
@@ -133,7 +133,8 @@ export function TodoList() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '12px 16px'
+        padding: 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
+        paddingBottom: 'calc(clamp(8px, 1.5vh, 12px) + env(safe-area-inset-bottom))'
       }}>
         {loading ? (
           <div style={{

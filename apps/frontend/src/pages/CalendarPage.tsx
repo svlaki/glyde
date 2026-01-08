@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { PageHeader } from '../components/PageHeader'
 import { Calendar } from '../components/Calendar'
@@ -6,8 +7,97 @@ import { ChatBot } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
 import { TodoList } from '../components/TodoList'
 import { getColors } from '../styles/colors'
+import { usePlatform } from '../hooks/usePlatform'
+import { mobileStyles } from '../styles/mobileStyles'
+import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
 
 export function CalendarPage() {
+  const { isMobile } = usePlatform()
+
+  if (isMobile) {
+    return <CalendarPageMobile />
+  }
+
+  return <CalendarPageDesktop />
+}
+
+function CalendarPageMobile() {
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+  const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
+
+  const tabs = [
+    { id: 'calendar' as const, label: 'Calendar', icon: '📅' },
+    { id: 'chat' as const, label: 'Chat', icon: '💬' },
+    { id: 'todos' as const, label: 'Todos', icon: '✓' },
+    { id: 'agents' as const, label: 'Agents', icon: '🤖' }
+  ]
+
+  return (
+    <div style={mobileStyles.fullHeight}>
+      {/* Content area - changes based on active tab */}
+      <div style={{
+        ...mobileStyles.scrollContainer,
+        background: colors.bgPrimary,
+        // Only add padding for calendar view - other views handle their own padding
+        ...(activeTab === 'calendar' ? {
+          padding: 'clamp(12px, 2.5vw, 16px)',
+          paddingTop: 'max(env(safe-area-inset-top), 12px)',
+        } : {}),
+        paddingBottom: activeTab === 'calendar' ? 'calc(70px + env(safe-area-inset-bottom))' : 0
+      }}>
+        {activeTab === 'calendar' && <CalendarMobileWrapper />}
+        {activeTab === 'chat' && <ChatBot />}
+        {activeTab === 'todos' && <TodoList />}
+        {activeTab === 'agents' && <AgentInteractions />}
+      </div>
+
+      {/* Bottom tabs navigation */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        minHeight: '60px',
+        background: colors.bgSecondary,
+        borderTop: `1px solid ${colors.border}`,
+        display: 'flex',
+        justifyContent: 'space-around',
+        alignItems: 'center',
+        paddingTop: '4px',
+        paddingBottom: 'max(env(safe-area-inset-bottom), 4px)',
+        zIndex: 1000
+      }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '8px',
+              background: 'transparent',
+              border: 'none',
+              color: activeTab === tab.id ? colors.textPrimary : colors.textSecondary,
+              fontSize: '11px',
+              cursor: 'pointer',
+              minHeight: '44px',
+              transition: 'color 0.2s'
+            }}
+          >
+            <span style={{ fontSize: '20px' }}>{tab.icon}</span>
+            <span style={{ fontWeight: activeTab === tab.id ? '600' : '400' }}>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CalendarPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 

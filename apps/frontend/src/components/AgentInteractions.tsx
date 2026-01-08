@@ -699,7 +699,7 @@ export function AgentInteractions() {
     }}>
       {/* Header */}
       <div style={{
-        padding: '16px 20px 12px 20px',
+        padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px) clamp(8px, 1.5vh, 12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -774,8 +774,8 @@ export function AgentInteractions() {
       {/* Error message */}
       {error && (
         <div style={{
-          margin: '0 16px 12px 16px',
-          padding: '10px 12px',
+          margin: '0 clamp(8px, 2vw, 16px) clamp(8px, 1.5vh, 12px)',
+          padding: 'clamp(8px, 1.5vh, 10px) clamp(8px, 2vw, 12px)',
           background: hexToRgba(isDarkMode ? '#ef4444' : '#dc2626', 0.1),
           border: `1px solid ${hexToRgba(isDarkMode ? '#ef4444' : '#dc2626', 0.3)}`,
           borderRadius: '8px',
@@ -790,7 +790,8 @@ export function AgentInteractions() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '0 16px 16px 16px',
+        padding: '0 clamp(8px, 2vw, 16px) clamp(12px, 2vh, 16px)',
+        paddingBottom: 'calc(clamp(12px, 2vh, 16px) + env(safe-area-inset-bottom))',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px'
