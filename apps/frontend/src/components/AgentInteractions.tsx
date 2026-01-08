@@ -791,7 +791,7 @@ export function AgentInteractions() {
         flex: 1,
         overflowY: 'auto',
         padding: '0 clamp(8px, 2vw, 16px) clamp(12px, 2vh, 16px)',
-        paddingBottom: 'calc(clamp(12px, 2vh, 16px) + env(safe-area-inset-bottom))',
+        paddingBottom: 'clamp(12px, 2vh, 16px)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px'

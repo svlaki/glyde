@@ -54,8 +54,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   const [recurringEventToEdit, setRecurringEventToEdit] = useState<CalendarEvent | null>(null)
   const [isRecurringEditOpen, setIsRecurringEditOpen] = useState(false)
 
-  // Long-press state for creating events
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  // Tap state for creating events on time slots
   const [isDragging, setIsDragging] = useState(false)
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragStartY, setDragStartY] = useState<number>(0)
@@ -80,6 +79,10 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   const touchedEventRef = useRef<CalendarEvent | null>(null)
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const hasMovedRef = useRef(false)
+
+  // Refs for time slot tap detection (for creating new events)
+  const timeSlotTouchStartRef = useRef<{ hour: number; x: number; y: number; time: number } | null>(null)
+  const timeSlotHasMovedRef = useRef(false)
 
   // Get event color based on category
   const getEventColor = (event: CalendarEvent): string => {
@@ -184,12 +187,23 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   // Scroll to current time in day view
   useEffect(() => {
     if (view === 'day' && scrollContainerRef.current) {
-      const now = new Date()
-      const currentHour = now.getHours()
-      const scrollPosition = currentHour * 60 - 120
-      scrollContainerRef.current.scrollTop = Math.max(0, scrollPosition)
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          const now = new Date()
+          const currentMinutes = now.getHours() * 60 + now.getMinutes()
+          const containerHeight = scrollContainerRef.current.clientHeight
+          const totalHeight = 24 * 60 // Total scrollable height (24 hours * 60px)
+          const maxScroll = totalHeight - containerHeight
+
+          // Try to position current time in upper third, but clamp to valid range
+          const idealScroll = currentMinutes - (containerHeight / 3)
+          const scrollPosition = Math.max(0, Math.min(idealScroll, maxScroll))
+          scrollContainerRef.current.scrollTop = scrollPosition
+        }
+      }, 100)
     }
-  }, [view])
+  }, [view, currentDate])
 
   // Handle clicking a day in month view
   const handleDayClick = (date: Date) => {
@@ -278,20 +292,39 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     setIsFormOpen(true)
   }
 
-  // Long press handlers
-  const handleLongPressStart = (hour: number) => {
-    const timer = setTimeout(() => {
-      handleTimeSlotTap(hour)
-      setLongPressTimer(null)
-    }, 200)
-    setLongPressTimer(timer)
+  // Time slot touch handlers (tap to create event, like tapping existing events)
+  const handleTimeSlotTouchStart = (hour: number, clientX: number, clientY: number) => {
+    timeSlotTouchStartRef.current = { hour, x: clientX, y: clientY, time: Date.now() }
+    timeSlotHasMovedRef.current = false
   }
 
-  const handleLongPressEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer)
-      setLongPressTimer(null)
+  const handleTimeSlotTouchMove = (clientX: number, clientY: number) => {
+    if (!timeSlotTouchStartRef.current) return
+
+    const deltaX = Math.abs(clientX - timeSlotTouchStartRef.current.x)
+    const deltaY = Math.abs(clientY - timeSlotTouchStartRef.current.y)
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
+    // If moved more than 10px, consider it scrolling
+    if (distance > 10) {
+      timeSlotHasMovedRef.current = true
     }
+  }
+
+  const handleTimeSlotTouchEnd = () => {
+    if (!timeSlotTouchStartRef.current) return
+
+    const touchDuration = Date.now() - timeSlotTouchStartRef.current.time
+    const hour = timeSlotTouchStartRef.current.hour
+
+    // Quick tap (< 200ms) without movement = create event
+    if (!timeSlotHasMovedRef.current && touchDuration < 200) {
+      handleTimeSlotTap(hour)
+    }
+
+    // Reset
+    timeSlotTouchStartRef.current = null
+    timeSlotHasMovedRef.current = false
   }
 
   // Multi-stage touch handlers for events
@@ -475,7 +508,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {view === 'month' ? (
         // Month View
         <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto' }}>
@@ -603,218 +636,262 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
           </div>
         </div>
       ) : (
-        // Day View
-        <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-          <div style={{ display: 'flex', minHeight: '100%' }}>
-            {/* Time Column */}
-            <div style={{
-              width: '60px',
-              borderRight: `1px solid ${colors.border}`,
-              flexShrink: 0,
-              background: colors.bgSecondary
-            }}>
-              {hours.map(hour => (
-                <div
-                  key={hour}
-                  style={{
-                    height: '60px',
-                    borderBottom: `1px solid ${colors.border}`,
-                    padding: '4px',
-                    fontSize: '11px',
-                    color: colors.textSecondary,
-                    textAlign: 'center',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {formatTime(hour)}
-                </div>
-              ))}
-            </div>
-
-            {/* Day Column */}
-            <div className="calendar-day-view" style={{ flex: 1, position: 'relative', background: colors.bgPrimary }}>
-              {/* Hour blocks - long-press to create events */}
-              {hours.map(hour => (
-                <div
-                  key={hour}
-                  className="calendar-timeslot"
-                  onTouchStart={() => handleLongPressStart(hour)}
-                  onTouchEnd={handleLongPressEnd}
-                  onTouchMove={handleLongPressEnd}
-                  onMouseDown={() => handleLongPressStart(hour)}
-                  onMouseUp={handleLongPressEnd}
-                  onMouseLeave={handleLongPressEnd}
-                  style={{
-                    height: '60px',
-                    borderBottom: `1px solid ${colors.border}`,
-                    position: 'relative',
-                    cursor: 'pointer'
-                  }}
-                />
-              ))}
-
-              {/* 15-minute grid lines - only shown in edit mode */}
-              {isInEditMode && hours.map(hour => (
-                <>
-                  {[15, 30, 45].map(minute => (
-                    <div
-                      key={`grid-${hour}-${minute}`}
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: `${hour * 60 + minute}px`,
-                        height: '1px',
-                        background: isDarkMode
-                          ? 'rgba(255, 255, 255, 0.08)'
-                          : 'rgba(0, 0, 0, 0.06)',
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }}
-                    />
-                  ))}
-                </>
-              ))}
-
-              {/* Current time indicator */}
-              {currentDate.toDateString() === new Date().toDateString() && (
+        // Day View - Apple Calendar style
+        <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative', paddingTop: '8px', paddingBottom: '8px' }}>
+          <div style={{ position: 'relative', minHeight: `${24 * 60}px` }}>
+            {/* Hour rows with time labels inline */}
+            {hours.map(hour => (
+              <div
+                key={hour}
+                className="calendar-timeslot"
+                onTouchStart={(e) => {
+                  const touch = e.touches[0]
+                  if (touch) {
+                    handleTimeSlotTouchStart(hour, touch.clientX, touch.clientY)
+                  }
+                }}
+                onTouchMove={(e) => {
+                  const touch = e.touches[0]
+                  if (touch) {
+                    handleTimeSlotTouchMove(touch.clientX, touch.clientY)
+                  }
+                }}
+                onTouchEnd={handleTimeSlotTouchEnd}
+                onClick={() => handleTimeSlotTap(hour)}
+                style={{
+                  height: '60px',
+                  position: 'relative',
+                  cursor: 'pointer'
+                }}
+              >
+                {/* Time label and horizontal line */}
                 <div style={{
                   position: 'absolute',
+                  top: 0,
                   left: 0,
                   right: 0,
-                  top: `${(currentTime.getHours() * 60 + currentTime.getMinutes())}px`,
-                  height: '2px',
-                  background: '#ef4444',
-                  zIndex: 10,
-                  pointerEvents: 'none'
+                  display: 'flex',
+                  alignItems: 'center',
+                  transform: 'translateY(-50%)'
                 }}>
+                  <span style={{
+                    fontSize: '11px',
+                    color: colors.textTertiary,
+                    width: '50px',
+                    textAlign: 'right',
+                    paddingRight: '8px',
+                    flexShrink: 0,
+                    background: colors.bgPrimary
+                  }}>
+                    {formatTime(hour)}
+                  </span>
                   <div style={{
-                    position: 'absolute',
-                    left: '-6px',
-                    top: '-5px',
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: '#ef4444'
+                    flex: 1,
+                    height: '1px',
+                    background: colors.border
                   }} />
                 </div>
-              )}
+              </div>
+            ))}
 
-              {/* Events */}
-              {getEventsForDate(currentDate).map((event) => {
-                const startTime = new Date(event.start_time)
-                const endTime = new Date(event.end_time)
-                const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
-                const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
-                const eventColor = getEventColor(event)
-                const isBeingDragged = isDragging && draggingEvent?.id === event.id
+            {/* Bottom 12 AM line (midnight - end of day) */}
+            <div style={{
+              position: 'absolute',
+              top: `${24 * 60}px`,
+              left: 0,
+              right: 0,
+              display: 'flex',
+              alignItems: 'center',
+              transform: 'translateY(-50%)'
+            }}>
+              <span style={{
+                fontSize: '11px',
+                color: colors.textTertiary,
+                width: '50px',
+                textAlign: 'right',
+                paddingRight: '8px',
+                flexShrink: 0,
+                background: colors.bgPrimary
+              }}>
+                {formatTime(0)}
+              </span>
+              <div style={{
+                flex: 1,
+                height: '1px',
+                background: colors.border
+              }} />
+            </div>
 
-                // Calculate visual position with snapping to 15-minute intervals
-                let dragOffset = 0
-                if (isBeingDragged) {
-                  const rawDragOffset = dragCurrentY - dragStartY
-                  // Calculate where the event would land (snapped to :00, :15, :30, :45)
-                  const newMinutesRaw = startMinutes + rawDragOffset
-                  const snappedMinutes = Math.round(newMinutesRaw / 15) * 15
-                  dragOffset = snappedMinutes - startMinutes
-                }
-
-                return (
+            {/* 15-minute grid lines - only shown in edit mode */}
+            {isInEditMode && hours.map(hour => (
+              <div key={`grid-container-${hour}`}>
+                {[15, 30, 45].map(minute => (
                   <div
-                    key={event.id}
-                    onTouchStart={(e) => {
-                      e.stopPropagation()
-                      const touch = e.touches[0]
-                      if (touch) {
-                        handleEventTouchStart(event, touch.clientY, touch.clientX)
-                      }
-                    }}
-                    onTouchMove={(e) => {
-                      const touch = e.touches[0]
-                      if (touch) {
-                        handleEventTouchMove(touch.clientY, touch.clientX)
-                        if (isDragging) {
-                          e.preventDefault()
-                        }
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      e.stopPropagation()
-                      handleEventTouchEnd()
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Mouse click (desktop) - maintain old behavior
-                      if (!isDragging) {
-                        if (event.is_recurring || event.parent_event_id) {
-                          setRecurringEventToView(event)
-                          setIsRecurringViewOpen(true)
-                        } else {
-                          setSelectedEvent(event)
-                          setIsFormOpen(true)
-                        }
-                      }
-                    }}
-                    className="calendar-event"
+                    key={`grid-${hour}-${minute}`}
                     style={{
                       position: 'absolute',
-                      left: '8px',
-                      right: '8px',
-                      top: `${startMinutes + dragOffset}px`,
-                      height: `${Math.max(duration, 15)}px`,
-                      background: hexToRgba(eventColor, isBeingDragged ? 0.25 : 0.15),
-                      borderLeft: `4px solid ${eventColor}`,
-                      borderRadius: '4px',
-                      padding: '4px 8px',
-                      cursor: isInEditMode ? 'grabbing' : isDragging ? 'grabbing' : 'pointer',
-                      overflow: 'hidden',
-                      zIndex: isBeingDragged ? 100 : 5,
-                      opacity: isBeingDragged ? 0.8 : 1,
-                      transition: isBeingDragged ? 'none' : 'all 0.2s',
-                      touchAction: 'none',
-                      // Apply pulsing animations based on mode
-                      ...(touchedEvent?.id === event.id && isInPreviewMode && !isInEditMode && {
-                        boxShadow: isDarkMode
-                          ? '0 0 0 2px rgba(255, 255, 255, 0.4), 0 0 0 6px rgba(96, 165, 250, 0.5)'
-                          : '0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.4)',
-                        animation: isDarkMode
-                          ? 'eventPulseDark 1.5s ease-in-out infinite'
-                          : 'eventPulse 1.5s ease-in-out infinite'
-                      }),
-                      ...(touchedEvent?.id === event.id && isInEditMode && {
-                        boxShadow: isDarkMode
-                          ? '0 0 0 2px rgba(255, 255, 255, 0.5), 0 0 0 8px rgba(96, 165, 250, 0.6)'
-                          : '0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.5)',
-                        animation: isDarkMode
-                          ? 'eventPulseDark 1s ease-in-out infinite'
-                          : 'eventPulse 1s ease-in-out infinite'
-                      })
+                      left: '58px',
+                      right: 0,
+                      top: `${hour * 60 + minute}px`,
+                      height: '1px',
+                      background: isDarkMode
+                        ? 'rgba(255, 255, 255, 0.08)'
+                        : 'rgba(0, 0, 0, 0.06)',
+                      pointerEvents: 'none',
+                      zIndex: 1
                     }}
-                  >
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      color: colors.textPrimary,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {event.title}
-                      {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}>♻️</span>}
-                    </div>
-                    <div style={{
-                      fontSize: '11px',
-                      color: colors.textSecondary,
-                      marginTop: '2px'
-                    }}>
-                      {startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </div>
+                  />
+                ))}
+              </div>
+            ))}
+
+            {/* Current time indicator with time badge */}
+            {currentDate.toDateString() === new Date().toDateString() && (
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: `${(currentTime.getHours() * 60 + currentTime.getMinutes())}px`,
+                zIndex: 10,
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                {/* Time badge */}
+                <div style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontSize: '10px',
+                  fontWeight: '600',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  marginLeft: '4px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                </div>
+                {/* Red line */}
+                <div style={{
+                  flex: 1,
+                  height: '2px',
+                  background: '#ef4444'
+                }} />
+              </div>
+            )}
+
+            {/* Events */}
+            {getEventsForDate(currentDate).map((event) => {
+              const startTime = new Date(event.start_time)
+              const endTime = new Date(event.end_time)
+              const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
+              const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
+              const eventColor = getEventColor(event)
+              const isBeingDragged = isDragging && draggingEvent?.id === event.id
+
+              // Calculate visual position with snapping to 15-minute intervals
+              let dragOffset = 0
+              if (isBeingDragged) {
+                const rawDragOffset = dragCurrentY - dragStartY
+                // Calculate where the event would land (snapped to :00, :15, :30, :45)
+                const newMinutesRaw = startMinutes + rawDragOffset
+                const snappedMinutes = Math.round(newMinutesRaw / 15) * 15
+                dragOffset = snappedMinutes - startMinutes
+              }
+
+              return (
+                <div
+                  key={event.id}
+                  onTouchStart={(e) => {
+                    e.stopPropagation()
+                    const touch = e.touches[0]
+                    if (touch) {
+                      handleEventTouchStart(event, touch.clientY, touch.clientX)
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    const touch = e.touches[0]
+                    if (touch) {
+                      handleEventTouchMove(touch.clientY, touch.clientX)
+                      if (isDragging) {
+                        e.preventDefault()
+                      }
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    e.stopPropagation()
+                    handleEventTouchEnd()
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // Mouse click (desktop) - maintain old behavior
+                    if (!isDragging) {
+                      if (event.is_recurring || event.parent_event_id) {
+                        setRecurringEventToView(event)
+                        setIsRecurringViewOpen(true)
+                      } else {
+                        setSelectedEvent(event)
+                        setIsFormOpen(true)
+                      }
+                    }
+                  }}
+                  className="calendar-event"
+                  style={{
+                    position: 'absolute',
+                    left: '58px',
+                    right: '8px',
+                    top: `${startMinutes + dragOffset}px`,
+                    height: `${Math.max(duration, 15)}px`,
+                    background: hexToRgba(eventColor, isBeingDragged ? 0.35 : 0.25),
+                    borderLeft: `3px solid ${eventColor}`,
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    cursor: isInEditMode ? 'grabbing' : isDragging ? 'grabbing' : 'pointer',
+                    overflow: 'hidden',
+                    zIndex: isBeingDragged ? 100 : 5,
+                    opacity: isBeingDragged ? 0.8 : 1,
+                    transition: isBeingDragged ? 'none' : 'all 0.2s',
+                    touchAction: 'none',
+                    // Apply pulsing animations based on mode
+                    ...(touchedEvent?.id === event.id && isInPreviewMode && !isInEditMode && {
+                      boxShadow: isDarkMode
+                        ? '0 0 0 2px rgba(255, 255, 255, 0.4), 0 0 0 6px rgba(96, 165, 250, 0.5)'
+                        : '0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.4)',
+                      animation: isDarkMode
+                        ? 'eventPulseDark 1.5s ease-in-out infinite'
+                        : 'eventPulse 1.5s ease-in-out infinite'
+                    }),
+                    ...(touchedEvent?.id === event.id && isInEditMode && {
+                      boxShadow: isDarkMode
+                        ? '0 0 0 2px rgba(255, 255, 255, 0.5), 0 0 0 8px rgba(96, 165, 250, 0.6)'
+                        : '0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.5)',
+                      animation: isDarkMode
+                        ? 'eventPulseDark 1s ease-in-out infinite'
+                        : 'eventPulse 1s ease-in-out infinite'
+                    })
+                  }}
+                >
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: eventColor,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {event.title}
+                    {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}>♻️</span>}
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: eventColor,
+                    opacity: 0.8,
+                    marginTop: '2px'
+                  }}>
+                    {startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

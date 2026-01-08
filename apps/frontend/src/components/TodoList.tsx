@@ -134,7 +134,7 @@ export function TodoList() {
         flex: 1,
         overflowY: 'auto',
         padding: 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
-        paddingBottom: 'calc(clamp(8px, 1.5vh, 12px) + env(safe-area-inset-bottom))'
+        paddingBottom: 'clamp(8px, 1.5vh, 12px)'
       }}>
         {loading ? (
           <div style={{

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Picker from 'react-mobile-picker'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
@@ -8,8 +9,31 @@ import { getColors } from '../styles/colors'
 import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
-import { TimePickerMobile } from './mobile/TimePickerMobile'
 import { usePlatform } from '../hooks/usePlatform'
+
+// Time picker options
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+const PERIODS = ['AM', 'PM']
+
+const dateToPickerValue = (date: Date) => {
+  let hour = date.getHours()
+  const minute = date.getMinutes()
+  const period = hour >= 12 ? 'PM' : 'AM'
+  if (hour === 0) hour = 12
+  else if (hour > 12) hour = hour - 12
+  return { hour: String(hour), minute: String(minute).padStart(2, '0'), period }
+}
+
+const pickerValueToDate = (val: { hour: string; minute: string; period: string }, baseDate: Date) => {
+  let hour = parseInt(val.hour)
+  const minute = parseInt(val.minute)
+  if (val.period === 'AM' && hour === 12) hour = 0
+  else if (val.period === 'PM' && hour !== 12) hour += 12
+  const newDate = new Date(baseDate)
+  newDate.setHours(hour, minute, 0, 0)
+  return newDate
+}
 
 interface GoalFormProps {
   goal?: Goal
@@ -34,6 +58,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,6 +82,13 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     }
     setEditingField(null)
   }, [goal, isOpen])
+
+  // Sync time picker value with dueDate
+  useEffect(() => {
+    if (dueDate) {
+      setTimePickerValue(dateToPickerValue(dueDate))
+    }
+  }, [dueDate])
 
   // Format helpers
   const formatDate = (date: Date): string => {
@@ -368,6 +400,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             </div>
 
             {hasDueDate && dueDate && (
+              <>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div
                   onClick={() => isMobile && setShowDatePicker(true)}
@@ -410,12 +443,12 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   )}
                 </div>
                 <div
-                  onClick={() => isMobile && setShowTimePicker(true)}
+                  onClick={() => isMobile && setShowTimePicker(!showTimePicker)}
                   style={{
                     flex: 1,
                     padding: '10px 12px',
                     fontSize: '14px',
-                    background: colors.bgPrimary,
+                    background: showTimePicker ? colors.bgHover : colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
@@ -448,6 +481,75 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   )}
                 </div>
               </div>
+
+              {/* Inline Time Picker for Mobile */}
+              {isMobile && showTimePicker && (
+                <div style={{
+                  marginTop: '8px',
+                  background: colors.bgPrimary,
+                  borderRadius: '8px',
+                  border: `1px solid ${colors.border}`,
+                  overflow: 'hidden'
+                }}>
+                  <Picker
+                    value={timePickerValue}
+                    onChange={(val) => {
+                      setTimePickerValue(val)
+                      setDueDate(pickerValueToDate(val, dueDate))
+                    }}
+                    height={150}
+                    itemHeight={36}
+                    wheelMode="natural"
+                  >
+                    <Picker.Column name="hour">
+                      {HOURS.map(h => (
+                        <Picker.Item key={h} value={h}>
+                          {({ selected }) => (
+                            <div style={{
+                              fontSize: '18px',
+                              fontWeight: selected ? '600' : '400',
+                              color: selected ? colors.textPrimary : colors.textSecondary
+                            }}>
+                              {h}
+                            </div>
+                          )}
+                        </Picker.Item>
+                      ))}
+                    </Picker.Column>
+                    <Picker.Column name="minute">
+                      {MINUTES.map(m => (
+                        <Picker.Item key={m} value={m}>
+                          {({ selected }) => (
+                            <div style={{
+                              fontSize: '18px',
+                              fontWeight: selected ? '600' : '400',
+                              color: selected ? colors.textPrimary : colors.textSecondary
+                            }}>
+                              {m}
+                            </div>
+                          )}
+                        </Picker.Item>
+                      ))}
+                    </Picker.Column>
+                    <Picker.Column name="period">
+                      {PERIODS.map(p => (
+                        <Picker.Item key={p} value={p}>
+                          {({ selected }) => (
+                            <div style={{
+                              fontSize: '18px',
+                              fontWeight: selected ? '600' : '400',
+                              color: selected ? colors.textPrimary : colors.textSecondary
+                            }}>
+                              {p}
+                            </div>
+                          )}
+                        </Picker.Item>
+                      ))}
+                    </Picker.Column>
+                  </Picker>
+                </div>
+              )}
+              </>
             )}
           </div>
 
@@ -529,22 +631,14 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         onSave={handleCreateAspect}
       />
 
-      {/* Mobile Date/Time Pickers */}
+      {/* Mobile Date Picker */}
       {isMobile && dueDate && (
-        <>
-          <DatePickerMobile
-            value={dueDate}
-            onChange={setDueDate}
-            isOpen={showDatePicker}
-            onClose={() => setShowDatePicker(false)}
-          />
-          <TimePickerMobile
-            value={dueDate}
-            onChange={setDueDate}
-            isOpen={showTimePicker}
-            onClose={() => setShowTimePicker(false)}
-          />
-        </>
+        <DatePickerMobile
+          value={dueDate}
+          onChange={setDueDate}
+          isOpen={showDatePicker}
+          onClose={() => setShowDatePicker(false)}
+        />
       )}
     </Modal>
   )

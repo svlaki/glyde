@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { PageHeader } from '../components/PageHeader'
 import { Calendar } from '../components/Calendar'
@@ -10,6 +9,7 @@ import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
 import { mobileStyles } from '../styles/mobileStyles'
 import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
+import { MobileMenu } from '../components/mobile/MobileMenu'
 
 export function CalendarPage() {
   const { isMobile } = usePlatform()
@@ -25,32 +25,111 @@ function CalendarPageMobile() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const tabs = [
-    { id: 'calendar' as const, label: 'Calendar', icon: '📅' },
-    { id: 'chat' as const, label: 'Chat', icon: '💬' },
-    { id: 'todos' as const, label: 'Todos', icon: '✓' },
-    { id: 'agents' as const, label: 'Agents', icon: '🤖' }
+    { id: 'calendar' as const, label: 'Calendar' },
+    { id: 'chat' as const, label: 'Chat' },
+    { id: 'todos' as const, label: 'Tasks' },
+    { id: 'agents' as const, label: 'Interactions' }
   ]
+
+  // Get header title based on active tab
+  const getHeaderTitle = () => {
+    switch (activeTab) {
+      case 'chat': return 'Chat'
+      case 'todos': return 'Tasks'
+      case 'agents': return 'Interactions'
+      default: return ''
+    }
+  }
+
+  // Reusable header for non-calendar tabs
+  const renderHeader = () => (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '16px',
+      flexShrink: 0
+    }}>
+      <button
+        onClick={() => setIsMenuOpen(true)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: colors.textPrimary,
+          fontSize: '22px',
+          padding: '4px',
+          cursor: 'pointer',
+          minWidth: '32px',
+          minHeight: '32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        ☰
+      </button>
+      <h2 style={{
+        fontSize: '22px',
+        fontWeight: '700',
+        color: colors.textPrimary,
+        margin: 0,
+        letterSpacing: '-0.02em',
+        flex: 1
+      }}>
+        {getHeaderTitle()}
+      </h2>
+    </div>
+  )
 
   return (
     <div style={mobileStyles.fullHeight}>
       {/* Content area - changes based on active tab */}
       <div style={{
         ...mobileStyles.scrollContainer,
+        // Calendar tab: disable outer scroll, let inner calendar scroll
+        // Other tabs: enable outer scroll
+        overflow: activeTab === 'calendar' ? 'hidden' : 'auto',
+        // Calendar tab needs flex container for proper height chain
+        display: 'flex',
+        flexDirection: 'column',
         background: colors.bgPrimary,
-        // Only add padding for calendar view - other views handle their own padding
-        ...(activeTab === 'calendar' ? {
-          padding: 'clamp(12px, 2.5vw, 16px)',
-          paddingTop: 'max(env(safe-area-inset-top), 12px)',
-        } : {}),
-        paddingBottom: activeTab === 'calendar' ? 'calc(70px + env(safe-area-inset-bottom))' : 0
+        paddingLeft: 'clamp(12px, 2.5vw, 16px)',
+        paddingRight: 'clamp(12px, 2.5vw, 16px)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+        paddingBottom: 'calc(70px + env(safe-area-inset-bottom, 0px))'
       }}>
         {activeTab === 'calendar' && <CalendarMobileWrapper />}
-        {activeTab === 'chat' && <ChatBot />}
-        {activeTab === 'todos' && <TodoList />}
-        {activeTab === 'agents' && <AgentInteractions />}
+        {activeTab === 'chat' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {renderHeader()}
+            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+              <ChatBot />
+            </div>
+          </div>
+        )}
+        {activeTab === 'todos' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {renderHeader()}
+            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+              <TodoList />
+            </div>
+          </div>
+        )}
+        {activeTab === 'agents' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {renderHeader()}
+            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+              <AgentInteractions />
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Mobile Menu */}
+      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
 
       {/* Bottom tabs navigation */}
       <div style={{
@@ -75,21 +154,20 @@ function CalendarPageMobile() {
             style={{
               flex: 1,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              gap: '4px',
-              padding: '8px',
+              justifyContent: 'center',
+              padding: '12px 8px',
               background: 'transparent',
               border: 'none',
               color: activeTab === tab.id ? colors.textPrimary : colors.textSecondary,
-              fontSize: '11px',
+              fontSize: '12px',
+              fontWeight: activeTab === tab.id ? '600' : '400',
               cursor: 'pointer',
               minHeight: '44px',
               transition: 'color 0.2s'
             }}
           >
-            <span style={{ fontSize: '20px' }}>{tab.icon}</span>
-            <span style={{ fontWeight: activeTab === tab.id ? '600' : '400' }}>{tab.label}</span>
+            {tab.label}
           </button>
         ))}
       </div>
@@ -159,6 +237,7 @@ function CalendarPageDesktop() {
         document.removeEventListener('mouseup', handleMouseUp)
       }
     }
+    return undefined
   }, [isResizingLeft, isResizingRight])
 
   return (

@@ -27,7 +27,7 @@ export function CalendarMobileWrapper() {
   }
 
   const weekDays = getWeekDays()
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] // Single letter like Apple Calendar
 
   const isToday = (date: Date) => {
     const today = new Date()
@@ -42,27 +42,6 @@ export function CalendarMobileWrapper() {
       date1.getFullYear() === date2.getFullYear()
   }
 
-  // // Navigation functions
-  // const handlePrev = () => {
-  //   const newDate = new Date(currentDate)
-  //   if (view === 'day') {
-  //     newDate.setDate(currentDate.getDate() - 1)
-  //   } else {
-  //     newDate.setMonth(currentDate.getMonth() - 1)
-  //   }
-  //   setCurrentDate(newDate)
-  // }
-
-  // const handleNext = () => {
-  //   const newDate = new Date(currentDate)
-  //   if (view === 'day') {
-  //     newDate.setDate(currentDate.getDate() + 1)
-  //   } else {
-  //     newDate.setMonth(currentDate.getMonth() + 1)
-  //   }
-  //   setCurrentDate(newDate)
-  // }
-
   const handleToday = () => {
     setCurrentDate(new Date())
   }
@@ -72,7 +51,6 @@ export function CalendarMobileWrapper() {
     if (view === 'day') {
       return currentDate.toLocaleDateString('en-US', {
         month: 'long',
-        day: 'numeric',
         year: 'numeric'
       })
     } else {
@@ -83,25 +61,39 @@ export function CalendarMobileWrapper() {
     }
   }
 
+  // Compact button style shared between toggle and Today
+  const compactButtonStyle = {
+    padding: '4px 10px',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '11px',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+    minHeight: '28px'
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', height: '100%', minHeight: 0 }}>
-      {/* Date header with menu button */}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {/* Header row: Menu + Date + Toggle + Today */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '12px'
+        gap: '8px',
+        marginBottom: '8px'
       }}>
+        {/* Menu button */}
         <button
           onClick={() => setIsMenuOpen(true)}
           style={{
             background: 'transparent',
             border: 'none',
             color: colors.textPrimary,
-            fontSize: '22px',
-            padding: '4px',
+            fontSize: '20px',
+            padding: '2px',
             cursor: 'pointer',
-            minWidth: '32px',
-            minHeight: '32px',
+            minWidth: '28px',
+            minHeight: '28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -109,8 +101,10 @@ export function CalendarMobileWrapper() {
         >
           ☰
         </button>
+
+        {/* Date title */}
         <h2 style={{
-          fontSize: '22px',
+          fontSize: '18px',
           fontWeight: '700',
           color: colors.textPrimary,
           margin: 0,
@@ -119,36 +113,22 @@ export function CalendarMobileWrapper() {
         }}>
           {getDateHeader()}
         </h2>
-      </div>
 
-      {/* Controls row - View toggle on left, Navigation on right */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '12px'
-      }}>
-        {/* View toggle - compressed */}
+        {/* View toggle */}
         <div style={{
           display: 'flex',
-          gap: '4px',
+          gap: '2px',
           padding: '2px',
           background: colors.bgSecondary,
-          borderRadius: '6px',
-          flexShrink: 0
+          borderRadius: '6px'
         }}>
           <button
             onClick={() => setView('day')}
             style={{
-              padding: '6px 12px',
-              border: 'none',
-              borderRadius: '4px',
+              ...compactButtonStyle,
               background: view === 'day' ? colors.bgHover : 'transparent',
               color: colors.textPrimary,
-              fontSize: '12px',
-              fontWeight: view === 'day' ? '600' : '400',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
+              fontWeight: view === 'day' ? '600' : '400'
             }}
           >
             Day
@@ -156,91 +136,36 @@ export function CalendarMobileWrapper() {
           <button
             onClick={() => setView('month')}
             style={{
-              padding: '6px 12px',
-              border: 'none',
-              borderRadius: '4px',
+              ...compactButtonStyle,
               background: view === 'month' ? colors.bgHover : 'transparent',
               color: colors.textPrimary,
-              fontSize: '12px',
-              fontWeight: view === 'month' ? '600' : '400',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
+              fontWeight: view === 'month' ? '600' : '400'
             }}
           >
             Month
           </button>
         </div>
 
-        {/* Navigation buttons */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          {/* <button
-            onClick={handlePrev}
-            style={{
-              padding: '6px 10px',
-              background: colors.bgSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              color: colors.textPrimary,
-              cursor: 'pointer',
-              fontSize: '14px',
-              minHeight: '32px',
-              minWidth: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            ←
-          </button> */}
-          <button
-            onClick={handleToday}
-            style={{
-              padding: '6px 12px',
-              background: colors.bgSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              color: colors.textPrimary,
-              cursor: 'pointer',
-              fontSize: '11px',
-              fontWeight: '500',
-              minHeight: '32px'
-            }}
-          >
-            Today
-          </button>
-          {/* <button
-            onClick={handleNext}
-            style={{
-              padding: '6px 10px',
-              background: colors.bgSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              color: colors.textPrimary,
-              cursor: 'pointer',
-              fontSize: '14px',
-              minHeight: '32px',
-              minWidth: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            →
-          </button> */}
-        </div>
+        {/* Today button */}
+        <button
+          onClick={handleToday}
+          style={{
+            ...compactButtonStyle,
+            background: colors.bgSecondary,
+            border: `1px solid ${colors.border}`,
+            color: colors.textPrimary,
+            borderRadius: '6px'
+          }}
+        >
+          Today
+        </button>
       </div>
 
-      {/* Day switcher - only shown in day view */}
+      {/* Day picker - compact Apple-style (only shown in day view) */}
       {view === 'day' && (
         <div style={{
           display: 'flex',
-          gap: '6px',
-          overflowX: 'auto',
-          paddingBottom: '2px',
-          marginLeft: '0',
-          marginRight: '0',
-          paddingLeft: '0',
-          paddingRight: '0'
+          marginBottom: '8px'
         }}>
           {weekDays.map((day, index) => {
             const selected = isSameDay(day, currentDate)
@@ -251,32 +176,57 @@ export function CalendarMobileWrapper() {
                 key={index}
                 onClick={() => setCurrentDate(day)}
                 style={{
+                  flex: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '2px',
-                  padding: '6px 10px',
-                  border: `1.5px solid ${selected ? colors.textPrimary : colors.border}`,
-                  borderRadius: '8px',
-                  background: selected ? colors.bgHover : colors.bgSecondary,
-                  color: today ? colors.textPrimary : colors.textSecondary,
+                  padding: '4px 0',
+                  border: 'none',
+                  background: 'transparent',
+                  color: colors.textSecondary,
                   cursor: 'pointer',
-                  minWidth: '44px',
-                  flexShrink: 0,
-                  transition: 'all 0.2s',
-                  fontWeight: selected ? '600' : '400'
+                  transition: 'all 0.15s'
                 }}
               >
-                <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.03em' }}>{dayNames[index]}</span>
-                <span style={{ fontSize: '15px', fontWeight: '600' }}>{day.getDate()}</span>
+                {/* Day letter */}
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: '500',
+                  color: colors.textTertiary,
+                  textTransform: 'uppercase'
+                }}>
+                  {dayNames[index]}
+                </span>
+                {/* Date number */}
+                <span style={{
+                  fontSize: '17px',
+                  fontWeight: selected || today ? '600' : '400',
+                  color: selected
+                    ? '#fff'
+                    : today
+                      ? '#ef4444'
+                      : colors.textSecondary,
+                  background: selected
+                    ? '#ef4444'
+                    : 'transparent',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {day.getDate()}
+                </span>
               </button>
             )
           })}
         </div>
       )}
 
-      {/* Mobile Calendar */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* Mobile Calendar - scrollable area */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <MobileCalendar
           view={view}
           currentDate={currentDate}

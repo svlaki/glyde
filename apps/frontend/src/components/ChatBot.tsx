@@ -60,9 +60,9 @@ const isSameTimeGroup = (date1: Date, date2: Date): boolean => {
 
 // Suggestion chips data
 const SUGGESTIONS = [
-  { label: "What's on today?", icon: "📅" },
-  { label: "Schedule a meeting", icon: "✨" },
-  { label: "Find free time", icon: "🔍" },
+  { label: "What's on today?", icon: "" },
+  { label: "Schedule a meeting", icon: "" },
+  { label: "Find free time", icon: "" },
 ]
 
 export function ChatBot() {
@@ -852,7 +852,7 @@ export function ChatBot() {
       {/* Input area */}
       <div style={{
         padding: 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
-        paddingBottom: 'calc(clamp(12px, 2vh, 16px) + env(safe-area-inset-bottom))',
+        paddingBottom: 'clamp(12px, 2vh, 16px)',
         borderTop: `1px solid ${colors.borderLight}`,
         background: colors.bgSecondary,
         flexShrink: 0,

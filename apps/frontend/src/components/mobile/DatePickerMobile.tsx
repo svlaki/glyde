@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
+import { Calendar } from '@/components/ui/calendar'
+import { Button } from '@/components/ui/button'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 
@@ -12,209 +14,159 @@ interface DatePickerMobileProps {
 export function DatePickerMobile({ value, onChange, isOpen, onClose }: DatePickerMobileProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const [viewDate, setViewDate] = useState(value || new Date())
 
-  if (!isOpen) return null
-
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December']
-  const dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-
-  // Get days for the month grid
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const startDay = firstDay.getDay()
-  const daysInMonth = lastDay.getDate()
-
-  const days: (number | null)[] = []
-  // Add empty slots for days before the first
-  for (let i = 0; i < startDay; i++) {
-    days.push(null)
-  }
-  // Add the days of the month
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i)
+  const handleSelect = (date: Date | undefined) => {
+    if (date) {
+      // Preserve the time from the original value
+      const newDate = new Date(value)
+      newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate())
+      onChange(newDate)
+      onClose()
+    }
   }
 
-  const isToday = (day: number) => {
+  const handleTodayClick = () => {
     const today = new Date()
-    return day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
-  }
-
-  const isSelected = (day: number) => {
-    return day === value.getDate() &&
-      month === value.getMonth() &&
-      year === value.getFullYear()
-  }
-
-  const handleDayClick = (day: number) => {
     const newDate = new Date(value)
-    newDate.setFullYear(year, month, day)
+    newDate.setFullYear(today.getFullYear(), today.getMonth(), today.getDate())
     onChange(newDate)
     onClose()
   }
 
-  const prevMonth = () => {
-    setViewDate(new Date(year, month - 1, 1))
-  }
-
-  const nextMonth = () => {
-    setViewDate(new Date(year, month + 1, 1))
-  }
-
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 1200,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px'
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: colors.bgSecondary,
-          borderRadius: '16px',
-          padding: '16px',
-          width: '100%',
-          maxWidth: '320px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)'
-        }}
-      >
-        {/* Month/Year Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px'
-        }}>
-          <button
-            onClick={prevMonth}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '20px',
-              color: colors.textPrimary,
-              cursor: 'pointer',
-              padding: '8px',
-              minWidth: '44px',
-              minHeight: '44px'
-            }}
-          >
-            ‹
-          </button>
-          <span style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: colors.textPrimary
-          }}>
-            {monthNames[month]} {year}
-          </span>
-          <button
-            onClick={nextMonth}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '20px',
-              color: colors.textPrimary,
-              cursor: 'pointer',
-              padding: '8px',
-              minWidth: '44px',
-              minHeight: '44px'
-            }}
-          >
-            ›
-          </button>
-        </div>
-
-        {/* Day Names */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-          marginBottom: '8px'
-        }}>
-          {dayNames.map(day => (
-            <div key={day} style={{
-              textAlign: 'center',
-              fontSize: '12px',
-              fontWeight: '600',
-              color: colors.textSecondary,
-              padding: '4px'
-            }}>
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Days Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px'
-        }}>
-          {days.map((day, idx) => (
-            <div
-              key={idx}
-              onClick={() => day && handleDayClick(day)}
-              style={{
-                aspectRatio: '1',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '14px',
-                fontWeight: day && isSelected(day) ? '600' : '400',
-                color: day ? (isSelected(day) ? '#fff' : colors.textPrimary) : 'transparent',
-                background: day && isSelected(day) ? '#000' : (day && isToday(day) ? colors.bgHover : 'transparent'),
-                borderRadius: '50%',
-                cursor: day ? 'pointer' : 'default',
-                border: day && isToday(day) && !isSelected(day) ? `1px solid ${colors.textSecondary}` : 'none'
-              }}
-            >
-              {day || ''}
-            </div>
-          ))}
-        </div>
-
-        {/* Today Button */}
-        <button
-          onClick={() => {
-            const today = new Date()
-            const newDate = new Date(value)
-            newDate.setFullYear(today.getFullYear(), today.getMonth(), today.getDate())
-            onChange(newDate)
-            onClose()
-          }}
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay
           style={{
-            width: '100%',
-            marginTop: '16px',
-            padding: '12px',
-            background: colors.bgPrimary,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '8px',
-            color: colors.textPrimary,
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer'
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 1200
+          }}
+        />
+        <Dialog.Content
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: colors.bgSecondary,
+            borderRadius: '16px',
+            padding: '16px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+            zIndex: 1201,
+            outline: 'none'
           }}
         >
-          Today
-        </button>
-      </div>
-    </div>
+          <Dialog.Title className="sr-only">Select Date</Dialog.Title>
+
+          <style>{`
+            .rdp {
+              --rdp-cell-size: 40px;
+              --rdp-accent-color: ${isDarkMode ? '#fff' : '#000'};
+              --rdp-background-color: ${colors.bgHover};
+              margin: 0;
+            }
+            .rdp-months {
+              justify-content: center;
+            }
+            .rdp-month {
+              background: transparent;
+            }
+            .rdp-caption {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 0 0.5rem;
+              margin-bottom: 0.5rem;
+            }
+            .rdp-caption_label {
+              font-size: 1rem;
+              font-weight: 600;
+              color: ${colors.textPrimary};
+            }
+            .rdp-nav {
+              display: flex;
+              gap: 0.25rem;
+            }
+            .rdp-nav_button {
+              width: 32px;
+              height: 32px;
+              background: transparent;
+              border: 1px solid ${colors.border};
+              border-radius: 6px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: ${colors.textPrimary};
+            }
+            .rdp-nav_button:hover {
+              background: ${colors.bgHover};
+            }
+            .rdp-table {
+              border-collapse: collapse;
+            }
+            .rdp-head_cell {
+              font-size: 0.75rem;
+              font-weight: 600;
+              color: ${colors.textSecondary};
+              text-transform: uppercase;
+              padding: 0.5rem 0;
+            }
+            .rdp-cell {
+              padding: 2px;
+            }
+            .rdp-day {
+              width: 40px;
+              height: 40px;
+              font-size: 0.875rem;
+              border-radius: 50%;
+              border: none;
+              background: transparent;
+              color: ${colors.textPrimary};
+              cursor: pointer;
+              transition: background-color 0.15s;
+            }
+            .rdp-day:hover:not(.rdp-day_selected) {
+              background: ${colors.bgHover};
+            }
+            .rdp-day_selected {
+              background: ${isDarkMode ? '#fff' : '#000'} !important;
+              color: ${isDarkMode ? '#000' : '#fff'} !important;
+              font-weight: 600;
+            }
+            .rdp-day_today:not(.rdp-day_selected) {
+              border: 1px solid ${colors.textSecondary};
+              font-weight: 600;
+            }
+            .rdp-day_outside {
+              color: ${colors.textTertiary};
+            }
+          `}</style>
+
+          <Calendar
+            mode="single"
+            selected={value}
+            onSelect={handleSelect}
+            defaultMonth={value}
+          />
+
+          <Button
+            variant="outline"
+            onClick={handleTodayClick}
+            style={{
+              width: '100%',
+              marginTop: '12px',
+              background: colors.bgPrimary,
+              borderColor: colors.border,
+              color: colors.textPrimary
+            }}
+          >
+            Today
+          </Button>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }

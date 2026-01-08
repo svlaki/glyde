@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { useCategories } from '../../lib/categoryContext'
@@ -8,7 +9,35 @@ import { buildRRuleFromForm, getNextOccurrences } from '../../lib/recurrenceUtil
 import { AspectForm } from '../AspectForm'
 import { getColors } from '../../styles/colors'
 import { DatePickerMobile } from './DatePickerMobile'
-import { TimePickerMobile } from './TimePickerMobile'
+import { TimePickerSlider } from './TimePickerSlider'
+
+// Convert Date to picker value
+const dateToPickerValue = (date: Date) => {
+  let hour = date.getHours()
+  const minute = date.getMinutes()
+  const period = hour >= 12 ? 'PM' : 'AM'
+  if (hour === 0) hour = 12
+  else if (hour > 12) hour = hour - 12
+  return {
+    hour: String(hour),
+    minute: String(minute).padStart(2, '0'),
+    period
+  }
+}
+
+// Convert picker value to Date (preserving the date part)
+const pickerValueToDate = (pickerValue: { hour: string; minute: string; period: string }, baseDate: Date) => {
+  let hour = parseInt(pickerValue.hour)
+  const minute = parseInt(pickerValue.minute)
+  if (pickerValue.period === 'AM') {
+    if (hour === 12) hour = 0
+  } else {
+    if (hour !== 12) hour = hour + 12
+  }
+  const newDate = new Date(baseDate)
+  newDate.setHours(hour, minute, 0, 0)
+  return newDate
+}
 
 interface EventFormMobileProps {
   event?: CalendarEvent | null
@@ -37,6 +66,8 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showStartTimePicker, setShowStartTimePicker] = useState(false)
   const [showEndTimePicker, setShowEndTimePicker] = useState(false)
+  const [startTimeValue, setStartTimeValue] = useState(() => dateToPickerValue(new Date()))
+  const [endTimeValue, setEndTimeValue] = useState(() => dateToPickerValue(new Date()))
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false)
@@ -87,6 +118,15 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
     setRecurrencePreview([])
     setShowCategoryDropdown(false)
   }, [event, isOpen])
+
+  // Sync picker values with dates
+  useEffect(() => {
+    setStartTimeValue(dateToPickerValue(startDate))
+  }, [startDate])
+
+  useEffect(() => {
+    setEndTimeValue(dateToPickerValue(endDate))
+  }, [endDate])
 
   useEffect(() => {
     if (!isRecurring || !startDate) {
@@ -234,8 +274,6 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
     return cat?.color || '#999'
   }
 
-  if (!isOpen) return null
-
   const fieldStyle = {
     flex: 1,
     padding: '10px 12px',
@@ -253,427 +291,472 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
 
   return (
     <>
-      {/* Backdrop - tap to close */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          zIndex: 1100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}
-      >
-        {/* Centered Modal Popup */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: '100%',
-            maxWidth: '400px',
-            height: '60vh',
-            background: colors.bgSecondary,
-            borderRadius: '16px',
-            zIndex: 1101,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)'
-          }}
-        >
-          {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: `1px solid ${colors.border}`,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: colors.textPrimary }}>
-              {event?.id ? 'Edit Event' : 'New Event'}
-            </h2>
-            <button
-              onClick={onClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontSize: '24px',
-                color: colors.textSecondary,
-                cursor: 'pointer',
-                padding: '0',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Form */}
-          <form
-            onSubmit={handleSubmit}
+      <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog.Portal>
+          <Dialog.Overlay
             style={{
-              padding: '16px',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.6)',
+              zIndex: 1100
+            }}
+          />
+          <Dialog.Content
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'calc(100% - 40px)',
+              maxWidth: '400px',
+              height: '60vh',
+              background: colors.bgSecondary,
+              borderRadius: '16px',
+              zIndex: 1101,
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              overflowY: 'auto',
-              flex: 1,
-              minHeight: 0
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+              outline: 'none'
             }}
           >
-            {/* Title */}
-            <div>
-              <label style={{
-                fontSize: '12px',
-                fontWeight: '500',
-                color: colors.textSecondary,
-                marginBottom: '4px',
-                display: 'block'
-              }}>
-                Event Title *
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Add title"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '16px',
-                  background: colors.bgPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  color: colors.textPrimary,
-                  minHeight: '44px'
-                }}
-              />
+            {/* Header */}
+            <div style={{
+              padding: '12px 16px',
+              borderBottom: `1px solid ${colors.border}`,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <Dialog.Title style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: colors.textPrimary }}>
+                {event?.id ? 'Edit Event' : 'New Event'}
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '24px',
+                    color: colors.textSecondary,
+                    cursor: 'pointer',
+                    padding: '0',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  ×
+                </button>
+              </Dialog.Close>
             </div>
 
-            {/* Date Selection */}
-            <div
-              onClick={() => setShowDatePicker(true)}
+            {/* Form */}
+            <form
+              onSubmit={handleSubmit}
               style={{
-                ...fieldStyle,
-                justifyContent: 'flex-start',
-                gap: '8px'
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                overflowY: 'auto',
+                flex: 1,
+                minHeight: 0
               }}
             >
-              <span style={{ fontSize: '16px' }}>📅</span>
-              {formatDate(startDate)}
-            </div>
-
-            {/* Time: Start → End */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
-                onClick={() => setShowStartTimePicker(true)}
-                style={{
-                  ...fieldStyle,
-                  flex: 1
-                }}
-              >
-                {formatTime(startDate)}
-              </div>
-              <span style={{
-                color: colors.textSecondary,
-                fontSize: '18px',
-                flexShrink: 0
-              }}>→</span>
-              <div
-                onClick={() => setShowEndTimePicker(true)}
-                style={{
-                  ...fieldStyle,
-                  flex: 1
-                }}
-              >
-                {formatTime(endDate)}
-              </div>
-            </div>
-
-            {/* Category */}
-            <div>
-              <label style={{
-                fontSize: '12px',
-                fontWeight: '500',
-                color: colors.textSecondary,
-                marginBottom: '4px',
-                display: 'block'
-              }}>
-                Aspect/Category
-              </label>
-              <div style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+              {/* Title */}
+              <div>
+                <label style={{
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: colors.textSecondary,
+                  marginBottom: '4px',
+                  display: 'block'
+                }}>
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Add title"
                   style={{
                     width: '100%',
                     padding: '12px',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
-                    color: category ? colors.textPrimary : colors.textSecondary,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    minHeight: '44px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
+                    color: colors.textPrimary,
+                    minHeight: '44px'
                   }}
-                >
-                  {category ? (
-                    <>
-                      <div style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        background: getCategoryColor(category),
-                        flexShrink: 0
-                      }} />
-                      {category}
-                    </>
-                  ) : 'Select category...'}
-                </button>
+                />
+              </div>
 
-                {showCategoryDropdown && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    background: colors.bgSecondary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                    zIndex: 10,
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}>
-                    <div
-                      onClick={() => {
-                        setCategory('')
-                        setShowCategoryDropdown(false)
+              {/* Date Selection */}
+              <div
+                onClick={() => setShowDatePicker(true)}
+                style={{
+                  ...fieldStyle,
+                  justifyContent: 'flex-start',
+                  gap: '8px'
+                }}
+              >
+{formatDate(startDate)}
+              </div>
+
+              {/* Time: Start → End */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    onClick={() => {
+                      setShowStartTimePicker(!showStartTimePicker)
+                      setShowEndTimePicker(false)
+                    }}
+                    style={{
+                      ...fieldStyle,
+                      flex: 1,
+                      background: showStartTimePicker ? colors.bgHover : colors.bgPrimary
+                    }}
+                  >
+                    {formatTime(startDate)}
+                  </div>
+                  <span style={{
+                    color: colors.textSecondary,
+                    fontSize: '18px',
+                    flexShrink: 0
+                  }}>→</span>
+                  <div
+                    onClick={() => {
+                      setShowEndTimePicker(!showEndTimePicker)
+                      setShowStartTimePicker(false)
+                    }}
+                    style={{
+                      ...fieldStyle,
+                      flex: 1,
+                      background: showEndTimePicker ? colors.bgHover : colors.bgPrimary
+                    }}
+                  >
+                    {formatTime(endDate)}
+                  </div>
+                </div>
+
+                {/* Inline Start Time Picker */}
+                {showStartTimePicker && (
+                  <div style={{ marginTop: '8px' }}>
+                    <TimePickerSlider
+                      value={startTimeValue}
+                      onChange={(val) => {
+                        setStartTimeValue(val)
+                        setStartDate(pickerValueToDate(val, startDate))
                       }}
-                      style={{
-                        padding: '10px 12px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        color: colors.textSecondary,
-                        borderBottom: `1px solid ${colors.border}`
+                      height={150}
+                      itemHeight={36}
+                      backgroundColor={colors.bgPrimary}
+                      borderColor={colors.border}
+                      textColor={colors.textSecondary}
+                      selectedTextColor={colors.textPrimary}
+                    />
+                  </div>
+                )}
+
+                {/* Inline End Time Picker */}
+                {showEndTimePicker && (
+                  <div style={{ marginTop: '8px' }}>
+                    <TimePickerSlider
+                      value={endTimeValue}
+                      onChange={(val) => {
+                        setEndTimeValue(val)
+                        setEndDate(pickerValueToDate(val, endDate))
                       }}
-                    >
-                      None
-                    </div>
-                    {categories.map((cat) => (
+                      height={150}
+                      itemHeight={36}
+                      backgroundColor={colors.bgPrimary}
+                      borderColor={colors.border}
+                      textColor={colors.textSecondary}
+                      selectedTextColor={colors.textPrimary}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label style={{
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: colors.textSecondary,
+                  marginBottom: '4px',
+                  display: 'block'
+                }}>
+                  Aspect/Category
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      fontSize: '14px',
+                      background: colors.bgPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      color: category ? colors.textPrimary : colors.textSecondary,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      minHeight: '44px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {category ? (
+                      <>
+                        <div style={{
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          background: getCategoryColor(category),
+                          flexShrink: 0
+                        }} />
+                        {category}
+                      </>
+                    ) : 'Select category...'}
+                  </button>
+
+                  {showCategoryDropdown && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '4px',
+                      background: colors.bgSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      zIndex: 10,
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
                       <div
-                        key={cat.id}
                         onClick={() => {
-                          setCategory(cat.name)
+                          setCategory('')
                           setShowCategoryDropdown(false)
                         }}
                         style={{
                           padding: '10px 12px',
                           cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
                           fontSize: '14px',
-                          color: colors.textPrimary,
-                          background: category === cat.name ? colors.bgHover : 'transparent'
+                          color: colors.textSecondary,
+                          borderBottom: `1px solid ${colors.border}`
                         }}
                       >
-                        <div style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: cat.color,
-                          flexShrink: 0
-                        }} />
-                        {cat.icon && <span>{cat.icon}</span>}
-                        {cat.name}
+                        None
                       </div>
-                    ))}
-                    <div
-                      onClick={() => {
-                        setIsAspectFormOpen(true)
-                        setShowCategoryDropdown(false)
-                      }}
-                      style={{
-                        padding: '10px 12px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        color: colors.textPrimary,
-                        fontWeight: '500',
-                        borderTop: `1px solid ${colors.border}`
-                      }}
-                    >
-                      + New Aspect
+                      {categories.map((cat) => (
+                        <div
+                          key={cat.id}
+                          onClick={() => {
+                            setCategory(cat.name)
+                            setShowCategoryDropdown(false)
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '14px',
+                            color: colors.textPrimary,
+                            background: category === cat.name ? colors.bgHover : 'transparent'
+                          }}
+                        >
+                          <div style={{
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: cat.color,
+                            flexShrink: 0
+                          }} />
+                          {cat.icon && <span>{cat.icon}</span>}
+                          {cat.name}
+                        </div>
+                      ))}
+                      <div
+                        onClick={() => {
+                          setIsAspectFormOpen(true)
+                          setShowCategoryDropdown(false)
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          color: colors.textPrimary,
+                          fontWeight: '500',
+                          borderTop: `1px solid ${colors.border}`
+                        }}
+                      >
+                        + New Aspect
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Description */}
-            <div>
-              <label style={{
-                fontSize: '12px',
-                fontWeight: '500',
-                color: colors.textSecondary,
-                marginBottom: '4px',
-                display: 'block'
-              }}>
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add description..."
-                rows={2}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '16px',
-                  background: colors.bgPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  color: colors.textPrimary,
-                  resize: 'none',
-                  fontFamily: 'inherit'
-                }}
-              />
-            </div>
-
-            {/* Recurrence - only for new events */}
-            {!event?.id && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
+              {/* Description */}
+              <div>
                 <label style={{
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  color: colors.textSecondary,
+                  marginBottom: '4px',
+                  display: 'block'
+                }}>
+                  Description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Add description..."
+                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '16px',
+                    background: colors.bgPrimary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    color: colors.textPrimary,
+                    resize: 'none',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Recurrence - only for new events */}
+              {!event?.id && (
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer'
+                  gap: '12px'
                 }}>
-                  <input
-                    type="checkbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
-                  />
-                  <span style={{ fontSize: '14px', color: colors.textPrimary }}>Repeat</span>
-                </label>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isRecurring}
+                      onChange={(e) => setIsRecurring(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
+                    />
+                    <span style={{ fontSize: '14px', color: colors.textPrimary }}>Repeat</span>
+                  </label>
 
-                {isRecurring && (
-                  <select
-                    value={recurrencePattern}
-                    onChange={(e) => setRecurrencePattern(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
-                    style={{
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      background: colors.bgPrimary,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: '6px',
-                      color: colors.textPrimary,
-                      flex: 1
-                    }}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                )}
-              </div>
-            )}
-          </form>
+                  {isRecurring && (
+                    <select
+                      value={recurrencePattern}
+                      onChange={(e) => setRecurrencePattern(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
+                      style={{
+                        padding: '8px 12px',
+                        fontSize: '14px',
+                        background: colors.bgPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        color: colors.textPrimary,
+                        flex: 1
+                      }}
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  )}
+                </div>
+              )}
+            </form>
 
-          {/* Footer with Save Button */}
-          <div style={{
-            padding: '16px',
-            borderTop: `1px solid ${colors.border}`,
-            background: colors.bgSecondary,
-            display: 'flex',
-            gap: '12px',
-            flexShrink: 0
-          }}>
-            {event?.id && onDelete && (
+            {/* Footer with Save Button */}
+            <div style={{
+              padding: '16px',
+              borderTop: `1px solid ${colors.border}`,
+              background: colors.bgSecondary,
+              display: 'flex',
+              gap: '12px',
+              flexShrink: 0
+            }}>
+              {event?.id && onDelete && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={loading}
+                  style={{
+                    padding: '14px 16px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    background: 'transparent',
+                    color: '#ef4444',
+                    border: '1.5px solid #ef4444',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    minHeight: '48px',
+                    opacity: loading ? 0.5 : 1
+                  }}
+                >
+                  Delete
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={onClose}
                 disabled={loading}
                 style={{
+                  flex: 1,
                   padding: '14px 16px',
                   fontSize: '15px',
                   fontWeight: '600',
-                  background: 'transparent',
-                  color: '#ef4444',
-                  border: '1.5px solid #ef4444',
+                  background: colors.bgPrimary,
+                  color: colors.textPrimary,
+                  border: `1.5px solid ${colors.border}`,
                   borderRadius: '8px',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   minHeight: '48px',
                   opacity: loading ? 0.5 : 1
                 }}
               >
-                Delete
+                Cancel
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                flex: 1,
-                padding: '14px 16px',
-                fontSize: '15px',
-                fontWeight: '600',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1.5px solid ${colors.border}`,
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                minHeight: '48px',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              onClick={() => handleSubmit()}
-              disabled={loading || !title.trim()}
-              style={{
-                flex: 2,
-                padding: '14px 16px',
-                fontSize: '15px',
-                fontWeight: '600',
-                background: '#000',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                minHeight: '48px',
-                opacity: (loading || !title.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
+              <button
+                type="submit"
+                onClick={() => handleSubmit()}
+                disabled={loading || !title.trim()}
+                style={{
+                  flex: 2,
+                  padding: '14px 16px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  background: '#000',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
+                  minHeight: '48px',
+                  opacity: (loading || !title.trim()) ? 0.5 : 1
+                }}
+              >
+                {loading ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Date/Time Pickers */}
       <DatePickerMobile
@@ -690,18 +773,6 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
         }}
         isOpen={showDatePicker}
         onClose={() => setShowDatePicker(false)}
-      />
-      <TimePickerMobile
-        value={startDate}
-        onChange={setStartDate}
-        isOpen={showStartTimePicker}
-        onClose={() => setShowStartTimePicker(false)}
-      />
-      <TimePickerMobile
-        value={endDate}
-        onChange={setEndDate}
-        isOpen={showEndTimePicker}
-        onClose={() => setShowEndTimePicker(false)}
       />
 
       {/* Aspect Form Modal */}
