@@ -6,7 +6,7 @@ import { Modal } from './Modal'
 import { useDarkMode } from '../lib/darkModeContext'
 
 interface AspectFormProps {
-  aspect?: Category
+  aspect?: Category | undefined
   isOpen: boolean
   onClose: () => void
   onSave: (aspect: Partial<Category>) => Promise<void>
@@ -14,26 +14,23 @@ interface AspectFormProps {
 
 // Ordered color palette - aspects will be assigned these colors in sequence
 const PRESET_COLORS = [
-  '#3b82f6', // Blue (1st)
-  '#22c55e', // Green (2nd)
-  '#f59e0b', // Amber (3rd)
-  '#ec4899', // Pink (4th)
-  '#8b5cf6', // Purple (5th)
-  '#06b6d4', // Cyan (6th)
-  '#f97316', // Orange (7th)
-  '#14b8a6', // Teal (8th)
   '#ef4444', // Red (9th)
+  '#f97316', // Orange (7th)
+  '#f59e0b', // Amber (3rd)
   '#eab308', // Yellow (10th)
-  '#6366f1', // Indigo (11th)
-  '#10b981', // Emerald (12th)
   '#84cc16', // Lime (13th)
+  '#22c55e', // Green (2nd)
+  '#10b981', // Emerald (12th)
+  '#14b8a6', // Teal (8th)
+  '#06b6d4', // Cyan (6th)
   '#0ea5e9', // Sky (14th)
-  '#a855f7', // Violet (15th)
+  '#3b82f6', // Blue (1st)
+  '#6366f1', // Indigo (11th)
+  '#8b5cf6', // Purple (5th)
   '#d946ef', // Fuchsia (16th)
-  '#f43f5e'  // Rose (17th)
+  '#ec4899', // Pink (4th)
+  
 ]
-
-const PRESET_ICONS = ['H', 'W', 'G', 'F', 'M', 'T', 'A', 'B', 'L', 'E', 'P', 'S']
 
 export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps) {
   const { isDarkMode } = useDarkMode()
@@ -42,7 +39,6 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
-  const [icon, setIcon] = useState('')
   const [context, setContext] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -52,8 +48,7 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
       setName(aspect.name || '')
       setDescription(aspect.description || '')
       setColor(aspect.color || PRESET_COLORS[0])
-      setIcon(aspect.icon || '')
-      setContext(aspect.context || '')
+      setContext(typeof aspect.context === 'string' ? aspect.context : (aspect.context?.text || ''))
     } else {
       // Creating new aspect - auto-assign next color in sequence
       setName('')
@@ -61,7 +56,6 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
       // Assign color based on number of existing aspects (cycles through palette)
       const nextColorIndex = categories.length % PRESET_COLORS.length
       setColor(PRESET_COLORS[nextColorIndex])
-      setIcon('')
       setContext('')
     }
   }, [aspect, isOpen, categories.length])
@@ -72,13 +66,13 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
 
     setLoading(true)
     try {
+      const contextValue = typeof context === 'string' && context.trim() ? { text: context.trim() } : undefined
       await onSave({
         id: aspect?.id,
         name: name.trim(),
         description: description.trim() || undefined,
         color,
-        icon: icon || undefined,
-        context: (typeof context === 'string' && context.trim()) || undefined
+        ...(contextValue ? { context: contextValue } : {})
       })
       onClose()
     } catch (error) {
@@ -171,8 +165,8 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                     type="button"
                     onClick={() => setColor(presetColor)}
                     style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '24px',
+                      height: '24px',
                       borderRadius: '6px',
                       background: presetColor,
                       border: color === presetColor ? `3px solid ${colors.textPrimary}` : 'none',
@@ -188,55 +182,6 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                   />
                 ))}
               </div>
-            </div>
-
-            {/* Icon */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: colors.textSecondary,
-                marginBottom: '6px'
-              }}>
-                Icon (optional)
-              </label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                {PRESET_ICONS.map(presetIcon => (
-                  <button
-                    key={presetIcon}
-                    type="button"
-                    onClick={() => setIcon(presetIcon)}
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '6px',
-                      background: icon === presetIcon ? colors.bgHover : colors.bgPrimary,
-                      border: `1px solid ${colors.border}`,
-                      cursor: 'pointer',
-                      fontSize: '20px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {presetIcon}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="text"
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="Or enter custom text"
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px'
-                }}
-              />
             </div>
 
             {/* Context */}

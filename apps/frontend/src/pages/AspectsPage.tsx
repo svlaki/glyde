@@ -89,7 +89,11 @@ function AspectsPageMobile() {
           padding: '20px',
           paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
         }}>
-          <GoalsByAspect aspect={selectedAspect} />
+          <GoalsByAspect
+            aspect={selectedAspect}
+            onEdit={() => handleEditAspect(selectedAspect)}
+            onDelete={() => handleDeleteAspect(selectedAspect)}
+          />
         </div>
 
         <AspectForm
@@ -109,17 +113,22 @@ function AspectsPageMobile() {
         title="Aspects"
         showMenu={true}
         actions={
-          <button
-            onClick={handleCreateAspect}
-            className="btn btn-primary"
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              minHeight: '44px'
-            }}
-          >
-            +
-          </button>
+        <button
+          onClick={handleCreateAspect}
+          className="btn btn-primary"
+          style={{
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: '400',
+            background: 'transparent',
+            color: colors.textSecondary,
+            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          New
+        </button>
         }
       />
 
@@ -130,14 +139,6 @@ function AspectsPageMobile() {
         paddingTop: '16px',
         paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
       }}>
-        <p style={{
-          fontSize: '14px',
-          color: colors.textSecondary,
-          margin: '0 0 20px 0'
-        }}>
-          Organize the aspects of your life
-        </p>
-
         {loading ? (
           <div style={{
             padding: '40px 20px',
@@ -303,13 +304,6 @@ function AspectsPageDesktop() {
                 +
               </button>
             </div>
-            <p style={{
-              fontSize: '13px',
-              color: colors.textSecondary,
-              margin: 0
-            }}>
-              Organize the aspects of your life
-            </p>
           </div>
 
           {/* Aspects List */}
@@ -365,7 +359,11 @@ function AspectsPageDesktop() {
           overflow: 'auto',
           padding: '30px'
         }}>
-          <GoalsByAspect aspect={selectedAspect} />
+          <GoalsByAspect
+            aspect={selectedAspect}
+            onEdit={selectedAspect ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={selectedAspect ? () => handleDeleteAspect(selectedAspect) : undefined}
+          />
         </div>
       </div>
 

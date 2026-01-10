@@ -10,9 +10,11 @@ import { getColors } from '../styles/colors'
 
 interface GoalsByAspectProps {
   aspect: Category | null
+  onEdit?: (() => void) | undefined
+  onDelete?: (() => void) | undefined
 }
 
-export function GoalsByAspect({ aspect }: GoalsByAspectProps) {
+export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -120,7 +122,7 @@ export function GoalsByAspect({ aspect }: GoalsByAspectProps) {
           marginBottom: '12px'
         }}>
           {aspect.icon && <span style={{ fontSize: '24px' }}>{aspect.icon}</span>}
-          <div>
+          <div style={{ flex: 1 }}>
             <h3 style={{
               fontSize: '18px',
               fontWeight: '600',
@@ -142,6 +144,63 @@ export function GoalsByAspect({ aspect }: GoalsByAspectProps) {
               <span>{goals.length} {goals.length === 1 ? 'goal' : 'goals'}</span>
             </div>
           </div>
+          {/* Action Buttons */}
+          {(onEdit || onDelete) && (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit()
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    background: colors.bgPrimary,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.bgTertiary
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgPrimary
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    background: colors.bgPrimary,
+                    color: '#c00',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = isDarkMode ? colors.bgTertiary : '#fee'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgPrimary
+                  }}
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Aspect Description */}

@@ -21,33 +21,26 @@ function StatsCard({ label, value, icon }: StatsCardProps) {
       background: colors.bgPrimary,
       border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
       borderRadius: '6px',
-      padding: '24px',
+      padding: '12px 8px',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
-      gap: '16px'
+      gap: '4px',
+      textAlign: 'center'
     }}>
       <div style={{
-        fontSize: '24px',
-        opacity: 0.5
+        fontSize: '20px',
+        fontWeight: '500',
+        color: colors.textPrimary
       }}>
-        {icon}
+        {value}
       </div>
-      <div>
-        <div style={{
-          fontSize: '24px',
-          fontWeight: '400',
-          color: colors.textPrimary,
-          marginBottom: '2px'
-        }}>
-          {value}
-        </div>
-        <div style={{
-          fontSize: '14px',
-          color: colors.textSecondary,
-          fontWeight: '400'
-        }}>
-          {label}
-        </div>
+      <div style={{
+        fontSize: '11px',
+        color: colors.textSecondary,
+        fontWeight: '400'
+      }}>
+        {label}
       </div>
     </div>
   )
@@ -114,8 +107,8 @@ export function ProfileStats() {
       {/* Stats Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '16px'
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '8px'
       }}>
         <StatsCard
           label="Active Tasks"

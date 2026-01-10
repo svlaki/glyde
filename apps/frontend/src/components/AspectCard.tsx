@@ -61,60 +61,6 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
           )}
         </div>
       </div>
-
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit()
-          }}
-          style={{
-            flex: 1,
-            padding: '6px 12px',
-            fontSize: '12px',
-            background: colors.bgPrimary,
-            color: colors.textSecondary,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '4px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = colors.bgTertiary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = colors.bgPrimary
-          }}
-        >
-          Edit
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-          style={{
-            flex: 1,
-            padding: '6px 12px',
-            fontSize: '12px',
-            background: colors.bgPrimary,
-            color: '#c00',
-            border: `1px solid ${colors.border}`,
-            borderRadius: '4px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = isDarkMode ? colors.bgTertiary : '#fee'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = colors.bgPrimary
-          }}
-        >
-          Delete
-        </button>
-      </div>
     </div>
   )
 }

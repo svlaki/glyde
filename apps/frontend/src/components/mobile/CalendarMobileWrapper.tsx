@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useKeenSlider } from 'keen-slider/react'
+import 'keen-slider/keen-slider.min.css'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { MobileCalendar } from './MobileCalendar'
@@ -11,11 +13,84 @@ export function CalendarMobileWrapper() {
   const [view, setView] = useState<'day' | 'month'>('day')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  // Get the days of the week for the day switcher
-  const getWeekDays = () => {
+  // Track if we're currently sliding to prevent multiple navigations
+  const isSliding = useRef(false)
+
+  // Refs to avoid stale closure in keen-slider callbacks
+  const currentDateRef = useRef(currentDate)
+  const viewRef = useRef(view)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    currentDateRef.current = currentDate
+  }, [currentDate])
+
+  useEffect(() => {
+    viewRef.current = view
+  }, [view])
+
+  // Helper function to navigate by offset
+  const navigateByOffset = (offset: number) => {
+    const newDate = new Date(currentDateRef.current)
+    if (viewRef.current === 'day') {
+      newDate.setDate(newDate.getDate() + (offset * 7)) // ±1 week
+    } else {
+      newDate.setMonth(newDate.getMonth() + offset) // ±1 month
+    }
+    setCurrentDate(newDate)
+  }
+
+  // Week header slider (for day view swipe navigation)
+  const [weekSliderRef] = useKeenSlider<HTMLDivElement>({
+    initial: 1,
+    slides: { perView: 1 },
+    rubberband: false,
+    slideChanged(slider) {
+      if (isSliding.current) return
+      isSliding.current = true
+
+      const slideIndex = slider.track.details.rel
+      if (slideIndex === 0) {
+        navigateByOffset(-1)
+      } else if (slideIndex === 2) {
+        navigateByOffset(1)
+      }
+
+      setTimeout(() => {
+        slider.moveToIdx(1, true, { duration: 0 })
+        isSliding.current = false
+      }, 50)
+    },
+  })
+
+  // Month view slider (swipe on entire month grid)
+  const [monthSliderRef] = useKeenSlider<HTMLDivElement>({
+    initial: 1,
+    slides: { perView: 1 },
+    rubberband: false,
+    slideChanged(slider) {
+      if (isSliding.current) return
+      isSliding.current = true
+
+      const slideIndex = slider.track.details.rel
+      if (slideIndex === 0) {
+        navigateByOffset(-1)
+      } else if (slideIndex === 2) {
+        navigateByOffset(1)
+      }
+
+      setTimeout(() => {
+        slider.moveToIdx(1, true, { duration: 0 })
+        isSliding.current = false
+      }, 50)
+    },
+  })
+
+  // Get the days of the week for a given date
+  const getWeekDays = (date: Date) => {
     const week = []
-    const startOfWeek = new Date(currentDate)
-    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay())
+    const startOfWeek = new Date(date)
+    startOfWeek.setDate(date.getDate() - date.getDay())
     startOfWeek.setHours(0, 0, 0, 0)
 
     for (let i = 0; i < 7; i++) {
@@ -26,8 +101,18 @@ export function CalendarMobileWrapper() {
     return week
   }
 
-  const weekDays = getWeekDays()
-  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] // Single letter like Apple Calendar
+  // Get offset date for slider slides
+  const getOffsetDate = (offset: number) => {
+    const newDate = new Date(currentDate)
+    if (view === 'day') {
+      newDate.setDate(newDate.getDate() + (offset * 7))
+    } else {
+      newDate.setMonth(newDate.getMonth() + offset)
+    }
+    return newDate
+  }
+
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
   const isToday = (date: Date) => {
     const today = new Date()
@@ -46,22 +131,13 @@ export function CalendarMobileWrapper() {
     setCurrentDate(new Date())
   }
 
-  // Format the date header
   const getDateHeader = () => {
-    if (view === 'day') {
-      return currentDate.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-      })
-    } else {
-      return currentDate.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-      })
-    }
+    return currentDate.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric'
+    })
   }
 
-  // Compact button style shared between toggle and Today
   const compactButtonStyle = {
     padding: '4px 10px',
     border: 'none',
@@ -73,6 +149,70 @@ export function CalendarMobileWrapper() {
     minHeight: '28px'
   }
 
+  // Render a single week row with day letters AND date numbers
+  const renderWeekRow = (weekDate: Date) => {
+    const weekDays = getWeekDays(weekDate)
+    return (
+      <div style={{ display: 'flex', width: '100%' }}>
+        {weekDays.map((day, index) => {
+          const selected = isSameDay(day, currentDate)
+          const today = isToday(day)
+
+          return (
+            <button
+              key={index}
+              onClick={() => setCurrentDate(day)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px',
+                padding: '4px 0',
+                border: 'none',
+                background: 'transparent',
+                color: colors.textSecondary,
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              {/* Day letter */}
+              <span style={{
+                fontSize: '10px',
+                fontWeight: '500',
+                color: colors.textTertiary,
+                textTransform: 'uppercase'
+              }}>
+                {dayNames[index]}
+              </span>
+              {/* Date number with circle for selected/today */}
+              <span style={{
+                fontSize: '17px',
+                fontWeight: selected || today ? '600' : '400',
+                color: selected
+                  ? '#fff'
+                  : today
+                    ? '#ef4444'
+                    : colors.textSecondary,
+                background: selected
+                  ? '#ef4444'
+                  : 'transparent',
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {day.getDate()}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* Header row: Menu + Date + Toggle + Today */}
@@ -82,7 +222,6 @@ export function CalendarMobileWrapper() {
         gap: '8px',
         marginBottom: '8px'
       }}>
-        {/* Menu button */}
         <button
           onClick={() => setIsMenuOpen(true)}
           style={{
@@ -102,7 +241,6 @@ export function CalendarMobileWrapper() {
           ☰
         </button>
 
-        {/* Date title */}
         <h2 style={{
           fontSize: '18px',
           fontWeight: '700',
@@ -114,7 +252,6 @@ export function CalendarMobileWrapper() {
           {getDateHeader()}
         </h2>
 
-        {/* View toggle */}
         <div style={{
           display: 'flex',
           gap: '2px',
@@ -146,7 +283,6 @@ export function CalendarMobileWrapper() {
           </button>
         </div>
 
-        {/* Today button */}
         <button
           onClick={handleToday}
           style={{
@@ -161,86 +297,74 @@ export function CalendarMobileWrapper() {
         </button>
       </div>
 
-      {/* Day picker - compact Apple-style (only shown in day view) */}
-      {view === 'day' && (
-        <div style={{
-          display: 'flex',
-          marginBottom: '8px'
-        }}>
-          {weekDays.map((day, index) => {
-            const selected = isSameDay(day, currentDate)
-            const today = isToday(day)
+      {view === 'day' ? (
+        <>
+          {/* Week header with swipe - ONLY this part is swipeable */}
+          <div
+            ref={weekSliderRef}
+            className="keen-slider"
+            style={{ marginBottom: '8px', overflow: 'hidden', minHeight: '60px' }}
+          >
+            <div className="keen-slider__slide">
+              {renderWeekRow(getOffsetDate(-1))}
+            </div>
+            <div className="keen-slider__slide">
+              {renderWeekRow(currentDate)}
+            </div>
+            <div className="keen-slider__slide">
+              {renderWeekRow(getOffsetDate(1))}
+            </div>
+          </div>
 
-            return (
-              <button
-                key={index}
-                onClick={() => setCurrentDate(day)}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '2px',
-                  padding: '4px 0',
-                  border: 'none',
-                  background: 'transparent',
-                  color: colors.textSecondary,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {/* Day letter */}
-                <span style={{
-                  fontSize: '10px',
-                  fontWeight: '500',
-                  color: colors.textTertiary,
-                  textTransform: 'uppercase'
-                }}>
-                  {dayNames[index]}
-                </span>
-                {/* Date number */}
-                <span style={{
-                  fontSize: '17px',
-                  fontWeight: selected || today ? '600' : '400',
-                  color: selected
-                    ? '#fff'
-                    : today
-                      ? '#ef4444'
-                      : colors.textSecondary,
-                  background: selected
-                    ? '#ef4444'
-                    : 'transparent',
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {day.getDate()}
-                </span>
-              </button>
-            )
-          })}
+          {/* Calendar body - NOT swipeable, single instance */}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <MobileCalendar
+              view="day"
+              currentDate={currentDate}
+              onDateChange={(date) => setCurrentDate(date)}
+            />
+          </div>
+        </>
+      ) : (
+        /* Month view - entire grid is swipeable */
+        <div
+          ref={monthSliderRef}
+          className="keen-slider"
+          style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+        >
+          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <MobileCalendar
+              view="month"
+              currentDate={getOffsetDate(-1)}
+              onDateChange={(date) => {
+                setCurrentDate(date)
+                setView('day')
+              }}
+            />
+          </div>
+          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <MobileCalendar
+              view="month"
+              currentDate={currentDate}
+              onDateChange={(date) => {
+                setCurrentDate(date)
+                setView('day')
+              }}
+            />
+          </div>
+          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <MobileCalendar
+              view="month"
+              currentDate={getOffsetDate(1)}
+              onDateChange={(date) => {
+                setCurrentDate(date)
+                setView('day')
+              }}
+            />
+          </div>
         </div>
       )}
 
-      {/* Mobile Calendar - scrollable area */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        <MobileCalendar
-          view={view}
-          currentDate={currentDate}
-          onDateChange={(date) => {
-            setCurrentDate(date)
-            // When clicking a day in month view, switch to day view
-            if (view === 'month') {
-              setView('day')
-            }
-          }}
-        />
-      </div>
-
-      {/* Mobile Menu */}
       <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
     </div>
   )

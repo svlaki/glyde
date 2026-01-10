@@ -11,41 +11,43 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  fixedWeeks = true,
   ...props
-}: CalendarProps) {
+}: CalendarProps & { fixedWeeks?: boolean }) {
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      fixedWeeks={fixedWeeks}
+      className={cn("p-4 w-full min-w-[280px]", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
+        month: "space-y-4 relative",
+        month_caption: "flex justify-center items-center pt-1 mb-4 h-8",
         caption_label: "text-sm font-medium",
-        nav: "space-x-1 flex items-center",
+        nav: "absolute top-0 left-0 right-0 flex justify-between items-center",
         button_previous: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-1"
+          buttonVariants({ variant: "ghost" }),
+          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-0"
         ),
         button_next: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1"
+          buttonVariants({ variant: "ghost" }),
+          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-0"
         ),
-        month_grid: "w-full border-collapse space-y-1",
-        weekdays: "flex",
+        month_grid: "w-full border-collapse",
+        weekdays: "grid grid-cols-7 mb-1",
         weekday:
-          "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
-        week: "flex w-full mt-2",
-        day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+          "text-muted-foreground font-normal text-[0.8rem] text-center py-1",
+        week: "grid grid-cols-7",
+        day: "relative p-0.5 text-center text-sm focus-within:relative focus-within:z-20",
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-8 w-8 p-0 font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 mx-auto"
         ),
         range_start: "day-range-start",
         range_end: "day-range-end",
         selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-        today: "bg-accent text-accent-foreground",
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full",
+        today: "bg-red-500 text-white rounded-full hover:bg-red-500 hover:text-white",
         outside:
           "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground opacity-50",
         disabled: "text-muted-foreground opacity-50",
@@ -57,9 +59,9 @@ function Calendar({
       components={{
         Chevron: ({ orientation }) => {
           if (orientation === "left") {
-            return <ChevronLeft className="h-4 w-4" />
+            return <ChevronLeft className="h-5 w-5" />
           }
-          return <ChevronRight className="h-4 w-4" />
+          return <ChevronRight className="h-5 w-5" />
         },
       }}
       {...props}

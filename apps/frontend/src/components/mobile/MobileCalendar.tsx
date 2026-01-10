@@ -54,23 +54,18 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   const [recurringEventToEdit, setRecurringEventToEdit] = useState<CalendarEvent | null>(null)
   const [isRecurringEditOpen, setIsRecurringEditOpen] = useState(false)
 
-  // Tap state for creating events on time slots
+  // Drag state for events
   const [isDragging, setIsDragging] = useState(false)
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragStartY, setDragStartY] = useState<number>(0)
   const [dragCurrentY, setDragCurrentY] = useState<number>(0)
 
-  // Multi-stage touch interaction state for events
-  const [eventTouchTimer, setEventTouchTimer] = useState<NodeJS.Timeout | null>(null)
-  const [eventPreviewTimer, setEventPreviewTimer] = useState<NodeJS.Timeout | null>(null)
+  // Touch state for events (hold to drag)
   const [touchedEvent, setTouchedEvent] = useState<CalendarEvent | null>(null)
-  const [isInPreviewMode, setIsInPreviewMode] = useState(false)
   const [isInEditMode, setIsInEditMode] = useState(false)
-  const [touchStartTime, setTouchStartTime] = useState<number>(0)
-  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null)
-  const [hasMoved, setHasMoved] = useState(false)
+  const [eventTouchTimer, setEventTouchTimer] = useState<NodeJS.Timeout | null>(null)
 
-  // Refs for touch handlers (avoids React stale closure bug)
+  // Refs for touch handlers
   const isInEditModeRef = useRef(false)
   const isDraggingRef = useRef(false)
   const draggingEventRef = useRef<CalendarEvent | null>(null)
@@ -79,10 +74,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   const touchedEventRef = useRef<CalendarEvent | null>(null)
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const hasMovedRef = useRef(false)
-
-  // Refs for time slot tap detection (for creating new events)
-  const timeSlotTouchStartRef = useRef<{ hour: number; x: number; y: number; time: number } | null>(null)
-  const timeSlotHasMovedRef = useRef(false)
+  const touchStartTimeRef = useRef(0)
 
   // Get event color based on category
   const getEventColor = (event: CalendarEvent): string => {
@@ -101,18 +93,15 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     const startDay = firstDay.getDay()
     const dates = []
 
-    // Add previous month days
     for (let i = startDay - 1; i >= 0; i--) {
       const prevDate = new Date(year, month, -i)
       dates.push(prevDate)
     }
 
-    // Add current month days
     for (let i = 1; i <= lastDay.getDate(); i++) {
       dates.push(new Date(year, month, i))
     }
 
-    // Add next month days to complete 6 weeks (42 days total)
     const totalDays = 42
     for (let i = 1; dates.length < totalDays; i++) {
       dates.push(new Date(year, month + 1, i))
@@ -121,7 +110,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     return dates
   }
 
-  // Get events for a specific date
   const getEventsForDate = (date: Date) => {
     const dateStr = date.toDateString()
     return events.filter(event => {
@@ -132,7 +120,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
 
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
-  // Load events and set up real-time subscription
+  // Load events
   useEffect(() => {
     let isSubscribed = true
 
@@ -151,7 +139,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
 
     loadEvents()
 
-    // Set up real-time subscription
     if (!user) return
 
     const channel = supabase
@@ -176,7 +163,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     }
   }, [user, session])
 
-  // Update current time every minute
+  // Update current time
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date())
@@ -184,19 +171,16 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     return () => clearInterval(timer)
   }, [])
 
-  // Scroll to current time in day view
+  // Scroll to current time
   useEffect(() => {
     if (view === 'day' && scrollContainerRef.current) {
-      // Small delay to ensure DOM is ready
       setTimeout(() => {
         if (scrollContainerRef.current) {
           const now = new Date()
           const currentMinutes = now.getHours() * 60 + now.getMinutes()
           const containerHeight = scrollContainerRef.current.clientHeight
-          const totalHeight = 24 * 60 // Total scrollable height (24 hours * 60px)
+          const totalHeight = 24 * 60
           const maxScroll = totalHeight - containerHeight
-
-          // Try to position current time in upper third, but clamp to valid range
           const idealScroll = currentMinutes - (containerHeight / 3)
           const scrollPosition = Math.max(0, Math.min(idealScroll, maxScroll))
           scrollContainerRef.current.scrollTop = scrollPosition
@@ -205,7 +189,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     }
   }, [view, currentDate])
 
-  // Handle clicking a day in month view
   const handleDayClick = (date: Date) => {
     onDateChange(date)
   }
@@ -216,7 +199,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     return `${displayHour} ${ampm}`
   }
 
-  // Handle event operations
   const handleUpdateEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
     if (!user || !session) return
 
@@ -264,7 +246,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     try {
       const { success } = await deleteRecurringEvent(user, event.id, deleteOption, session.access_token)
       if (success) {
-        // Refresh events after deletion
         const { events: userEvents } = await fetchExpandedEvents(user, session.access_token)
         setEvents(userEvents || [])
       }
@@ -281,7 +262,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     const endTime = new Date(startTime)
     endTime.setHours(hour + 1, 0, 0, 0)
 
-    // Create a new event template
     const newEventTemplate: Partial<CalendarEvent> = {
       title: '',
       start_time: startTime.toISOString(),
@@ -292,100 +272,48 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     setIsFormOpen(true)
   }
 
-  // Time slot touch handlers (tap to create event, like tapping existing events)
-  const handleTimeSlotTouchStart = (hour: number, clientX: number, clientY: number) => {
-    timeSlotTouchStartRef.current = { hour, x: clientX, y: clientY, time: Date.now() }
-    timeSlotHasMovedRef.current = false
-  }
-
-  const handleTimeSlotTouchMove = (clientX: number, clientY: number) => {
-    if (!timeSlotTouchStartRef.current) return
-
-    const deltaX = Math.abs(clientX - timeSlotTouchStartRef.current.x)
-    const deltaY = Math.abs(clientY - timeSlotTouchStartRef.current.y)
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-
-    // If moved more than 10px, consider it scrolling
-    if (distance > 10) {
-      timeSlotHasMovedRef.current = true
-    }
-  }
-
-  const handleTimeSlotTouchEnd = () => {
-    if (!timeSlotTouchStartRef.current) return
-
-    const touchDuration = Date.now() - timeSlotTouchStartRef.current.time
-    const hour = timeSlotTouchStartRef.current.hour
-
-    // Quick tap (< 200ms) without movement = create event
-    if (!timeSlotHasMovedRef.current && touchDuration < 200) {
-      handleTimeSlotTap(hour)
-    }
-
-    // Reset
-    timeSlotTouchStartRef.current = null
-    timeSlotHasMovedRef.current = false
-  }
-
-  // Multi-stage touch handlers for events
+  // Event touch handlers - ORIGINAL WORKFLOW:
+  // Quick tap = open event
+  // Hold 400ms = enter edit mode (can drag while holding)
   const handleEventTouchStart = (event: CalendarEvent, clientY: number, clientX: number) => {
-    // Clear any existing timers
     if (eventTouchTimer) clearTimeout(eventTouchTimer)
-    if (eventPreviewTimer) clearTimeout(eventPreviewTimer)
 
-    // Reset refs (avoids stale closure)
     touchedEventRef.current = event
     touchStartPosRef.current = { x: clientX, y: clientY }
     hasMovedRef.current = false
     isInEditModeRef.current = false
     isDraggingRef.current = false
     draggingEventRef.current = null
-    dragStartYRef.current = 0
-    dragCurrentYRef.current = 0
+    dragStartYRef.current = clientY
+    dragCurrentYRef.current = clientY
+    touchStartTimeRef.current = Date.now()
 
-    // Reset UI state
     setTouchedEvent(event)
-    setTouchStartTime(Date.now())
-    setTouchStartPos({ x: clientX, y: clientY })
-    setHasMoved(false)
-    setIsInPreviewMode(false)
     setIsInEditMode(false)
     setIsDragging(false)
 
-    // Stage 1: After 200ms, enter preview mode (visual feedback only)
-    const previewTimer = setTimeout(() => {
-      setIsInPreviewMode(true)
-      setEventTouchTimer(null)
-    }, 200)
-    setEventTouchTimer(previewTimer)
-
-    // Stage 2: After 400ms, enter edit mode (enable drag-and-drop)
-    const editTimer = setTimeout(() => {
-      console.log('[MobileCalendar] 400ms reached - EDIT MODE ENABLED')
-      isInEditModeRef.current = true // Set ref for touch handlers!
+    // After 400ms, enter edit mode (enable dragging while holding)
+    const timer = setTimeout(() => {
+      isInEditModeRef.current = true
       setIsInEditMode(true)
-      setEventPreviewTimer(null)
+      setEventTouchTimer(null)
     }, 400)
-    setEventPreviewTimer(editTimer)
+    setEventTouchTimer(timer)
   }
 
   const handleEventTouchMove = (clientY: number, clientX: number) => {
-    // Use refs to avoid stale closure!
     if (!touchedEventRef.current || !touchStartPosRef.current) return
 
     const deltaX = Math.abs(clientX - touchStartPosRef.current.x)
     const deltaY = Math.abs(clientY - touchStartPosRef.current.y)
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
 
-    // If moved more than 10px, consider it a drag
     if (distance > 10) {
       hasMovedRef.current = true
-      setHasMoved(true)
 
-      // Check ref, not state! (avoids stale closure)
       if (isInEditModeRef.current) {
+        // In edit mode - start/continue dragging
         if (!isDraggingRef.current) {
-          console.log('[MobileCalendar] Starting drag - edit mode active')
           isDraggingRef.current = true
           draggingEventRef.current = touchedEventRef.current
           dragStartYRef.current = touchStartPosRef.current.y
@@ -396,17 +324,11 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
         dragCurrentYRef.current = clientY
         setDragCurrentY(clientY)
       } else {
-        // If dragging before edit mode, cancel all timers (user is scrolling)
-        console.log('[MobileCalendar] Movement before edit mode - cancelling (hold 400ms first)')
+        // Movement before edit mode - cancel (user is scrolling)
         if (eventTouchTimer) {
           clearTimeout(eventTouchTimer)
           setEventTouchTimer(null)
         }
-        if (eventPreviewTimer) {
-          clearTimeout(eventPreviewTimer)
-          setEventPreviewTimer(null)
-        }
-        setIsInPreviewMode(false)
         setTouchedEvent(null)
         touchedEventRef.current = null
       }
@@ -414,66 +336,36 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
   }
 
   const handleEventTouchEnd = async () => {
-    const touchDuration = Date.now() - touchStartTime
+    const touchDuration = Date.now() - touchStartTimeRef.current
 
-    // Clear timers
     if (eventTouchTimer) {
       clearTimeout(eventTouchTimer)
       setEventTouchTimer(null)
     }
-    if (eventPreviewTimer) {
-      clearTimeout(eventPreviewTimer)
-      setEventPreviewTimer(null)
-    }
 
-    // Use refs to avoid stale closure!
+    // If dragging, complete the drag
     if (isDraggingRef.current && draggingEventRef.current) {
-      // Complete drag operation
       const deltaY = dragCurrentYRef.current - dragStartYRef.current
-
-      // Calculate raw delta in minutes (1px = 1 minute)
       const rawDeltaMinutes = deltaY
 
-      console.log('[MobileCalendar] Drag complete:', {
-        deltaY,
-        rawDeltaMinutes,
-        eventId: draggingEventRef.current.id,
-        eventTitle: draggingEventRef.current.title
-      })
-
-      if (Math.abs(rawDeltaMinutes) >= 10) { // Only update if moved at least 10 pixels
+      if (Math.abs(rawDeltaMinutes) >= 10) {
         const originalStart = new Date(draggingEventRef.current.start_time)
         const originalEnd = new Date(draggingEventRef.current.end_time)
         const duration = originalEnd.getTime() - originalStart.getTime()
 
-        // Calculate new start time with raw delta
         const newStartRaw = new Date(originalStart.getTime() + rawDeltaMinutes * 60 * 1000)
-
-        // Snap the NEW start time to nearest 15-minute boundary (:00, :15, :30, :45)
         const snappedMinutes = Math.round(newStartRaw.getMinutes() / 15) * 15
         const newStart = new Date(newStartRaw)
-        newStart.setMinutes(snappedMinutes, 0, 0) // Also reset seconds and ms
-
-        // Calculate new end time maintaining the same duration
+        newStart.setMinutes(snappedMinutes, 0, 0)
         const newEnd = new Date(newStart.getTime() + duration)
-
-        console.log('[MobileCalendar] Updating event times:', {
-          originalStart: originalStart.toISOString(),
-          newStartRaw: newStartRaw.toISOString(),
-          snappedMinutes,
-          newStart: newStart.toISOString(),
-          newEnd: newEnd.toISOString()
-        })
 
         await handleUpdateEvent(draggingEventRef.current.id, {
           start_time: newStart.toISOString(),
           end_time: newEnd.toISOString()
         })
-      } else {
-        console.log('[MobileCalendar] Drag too small, not updating (need >= 10 pixels)')
       }
     } else if (!hasMovedRef.current && touchDuration < 200 && touchedEventRef.current) {
-      // Quick tap (< 200ms) - open event form
+      // Quick tap - open event form
       const event = touchedEventRef.current
       if (event.is_recurring || event.parent_event_id) {
         setRecurringEventToView(event)
@@ -483,9 +375,8 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
         setIsFormOpen(true)
       }
     }
-    // If 200ms-400ms or 400ms+, do nothing (just visual feedback)
 
-    // Reset all refs
+    // Reset all state
     touchedEventRef.current = null
     isInEditModeRef.current = false
     isDraggingRef.current = false
@@ -495,12 +386,8 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
     touchStartPosRef.current = null
     hasMovedRef.current = false
 
-    // Reset UI state
     setTouchedEvent(null)
-    setIsInPreviewMode(false)
     setIsInEditMode(false)
-    setHasMoved(false)
-    setTouchStartPos(null)
     setIsDragging(false)
     setDraggingEvent(null)
     setDragStartY(0)
@@ -516,72 +403,66 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
             display: 'grid',
             gridTemplateColumns: 'repeat(7, 1fr)',
             gridTemplateRows: 'auto repeat(6, 1fr)',
-            gap: '2px',
-            background: colors.border,
-            minHeight: '100%',
-            borderRadius: '8px',
-            overflow: 'hidden'
+            minHeight: '100%'
           }}>
-            {/* Week day headers */}
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} style={{
-                padding: '6px 4px',
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+              <div key={index} style={{
+                padding: '4px 2px',
                 textAlign: 'center',
                 fontSize: '10px',
-                fontWeight: '600',
-                letterSpacing: '0.05em',
-                color: colors.textSecondary,
-                background: colors.bgSecondary,
+                fontWeight: '500',
+                color: colors.textTertiary,
                 textTransform: 'uppercase'
               }}>
                 {day}
               </div>
             ))}
-            {/* Month dates */}
             {getMonthDates(currentDate).map((date, idx) => {
               const isToday = date.toDateString() === new Date().toDateString()
               const isCurrentMonth = date.getMonth() === currentDate.getMonth()
               const dayEvents = getEventsForDate(date)
+              const col = idx % 7
+              const row = Math.floor(idx / 7)
 
               return (
                 <div
                   key={idx}
                   onClick={() => handleDayClick(date)}
                   style={{
-                    padding: '8px',
-                    background: colors.bgSecondary,
+                    padding: '6px',
                     color: isCurrentMonth ? colors.textPrimary : colors.textTertiary,
                     cursor: 'pointer',
                     position: 'relative',
                     display: 'flex',
                     flexDirection: 'column',
-                    minHeight: '80px',
-                    overflow: 'hidden'
+                    minHeight: '70px',
+                    overflow: 'hidden',
+                    borderTop: row === 0 ? `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
+                    borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                    borderRight: col < 6 ? `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none'
                   }}
                 >
-                  {/* Date number */}
                   <div style={{
-                    fontSize: '14px',
-                    fontWeight: isToday ? '700' : '600',
+                    fontSize: '12px',
+                    fontWeight: isToday ? '600' : '400',
                     color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : 'inherit',
                     background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : 'transparent',
-                    width: '26px',
-                    height: '26px',
+                    width: '22px',
+                    height: '22px',
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '6px',
+                    marginBottom: '4px',
                     flexShrink: 0
                   }}>
                     {date.getDate()}
                   </div>
 
-                  {/* Events */}
                   <div style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '3px',
+                    gap: '2px',
                     overflow: 'hidden',
                     flex: 1
                   }}>
@@ -601,12 +482,12 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                             }
                           }}
                           style={{
-                            background: hexToRgba(eventColor, 0.15),
-                            borderLeft: `2.5px solid ${eventColor}`,
+                            background: hexToRgba(eventColor, 0.12),
+                            borderLeft: `2px solid ${eventColor}`,
                             color: colors.textPrimary,
-                            fontSize: '10px',
-                            padding: '3px 4px',
-                            borderRadius: '3px',
+                            fontSize: '9px',
+                            padding: '2px 3px',
+                            borderRadius: '2px',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -615,16 +496,16 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                           }}
                         >
                           {event.title}
-                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '9px' }}>♻️</span>}
+                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px' }}>♻️</span>}
                         </div>
                       )
                     })}
                     {dayEvents.length > 2 && (
                       <div style={{
-                        fontSize: '9px',
+                        fontSize: '8px',
                         color: colors.textSecondary,
-                        padding: '2px 4px',
-                        fontWeight: '600'
+                        padding: '1px 3px',
+                        fontWeight: '500'
                       }}>
                         +{dayEvents.length - 2} more
                       </div>
@@ -636,27 +517,13 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
           </div>
         </div>
       ) : (
-        // Day View - Apple Calendar style
+        // Day View
         <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative', paddingTop: '8px', paddingBottom: '8px' }}>
           <div style={{ position: 'relative', minHeight: `${24 * 60}px` }}>
-            {/* Hour rows with time labels inline */}
+            {/* Hour rows */}
             {hours.map(hour => (
               <div
                 key={hour}
-                className="calendar-timeslot"
-                onTouchStart={(e) => {
-                  const touch = e.touches[0]
-                  if (touch) {
-                    handleTimeSlotTouchStart(hour, touch.clientX, touch.clientY)
-                  }
-                }}
-                onTouchMove={(e) => {
-                  const touch = e.touches[0]
-                  if (touch) {
-                    handleTimeSlotTouchMove(touch.clientX, touch.clientY)
-                  }
-                }}
-                onTouchEnd={handleTimeSlotTouchEnd}
                 onClick={() => handleTimeSlotTap(hour)}
                 style={{
                   height: '60px',
@@ -664,7 +531,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                   cursor: 'pointer'
                 }}
               >
-                {/* Time label and horizontal line */}
                 <div style={{
                   position: 'absolute',
                   top: 0,
@@ -694,7 +560,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
               </div>
             ))}
 
-            {/* Bottom 12 AM line (midnight - end of day) */}
+            {/* Bottom 12 AM line */}
             <div style={{
               position: 'absolute',
               top: `${24 * 60}px`,
@@ -722,7 +588,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
               }} />
             </div>
 
-            {/* 15-minute grid lines - only shown in edit mode */}
+            {/* 15-minute grid lines - shown in edit mode */}
             {isInEditMode && hours.map(hour => (
               <div key={`grid-container-${hour}`}>
                 {[15, 30, 45].map(minute => (
@@ -745,7 +611,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
               </div>
             ))}
 
-            {/* Current time indicator with time badge */}
+            {/* Current time indicator */}
             {currentDate.toDateString() === new Date().toDateString() && (
               <div style={{
                 position: 'absolute',
@@ -757,7 +623,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                 display: 'flex',
                 alignItems: 'center'
               }}>
-                {/* Time badge */}
                 <div style={{
                   background: '#ef4444',
                   color: '#fff',
@@ -770,7 +635,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                 }}>
                   {currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                 </div>
-                {/* Red line */}
                 <div style={{
                   flex: 1,
                   height: '2px',
@@ -788,11 +652,9 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
               const eventColor = getEventColor(event)
               const isBeingDragged = isDragging && draggingEvent?.id === event.id
 
-              // Calculate visual position with snapping to 15-minute intervals
               let dragOffset = 0
               if (isBeingDragged) {
                 const rawDragOffset = dragCurrentY - dragStartY
-                // Calculate where the event would land (snapped to :00, :15, :30, :45)
                 const newMinutesRaw = startMinutes + rawDragOffset
                 const snappedMinutes = Math.round(newMinutesRaw / 15) * 15
                 dragOffset = snappedMinutes - startMinutes
@@ -823,7 +685,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
-                    // Mouse click (desktop) - maintain old behavior
                     if (!isDragging) {
                       if (event.is_recurring || event.parent_event_id) {
                         setRecurringEventToView(event)
@@ -845,21 +706,12 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
                     borderLeft: `3px solid ${eventColor}`,
                     borderRadius: '4px',
                     padding: '4px 8px',
-                    cursor: isInEditMode ? 'grabbing' : isDragging ? 'grabbing' : 'pointer',
+                    cursor: isDragging ? 'grabbing' : 'pointer',
                     overflow: 'hidden',
                     zIndex: isBeingDragged ? 100 : 5,
                     opacity: isBeingDragged ? 0.8 : 1,
                     transition: isBeingDragged ? 'none' : 'all 0.2s',
                     touchAction: 'none',
-                    // Apply pulsing animations based on mode
-                    ...(touchedEvent?.id === event.id && isInPreviewMode && !isInEditMode && {
-                      boxShadow: isDarkMode
-                        ? '0 0 0 2px rgba(255, 255, 255, 0.4), 0 0 0 6px rgba(96, 165, 250, 0.5)'
-                        : '0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(59, 130, 246, 0.4)',
-                      animation: isDarkMode
-                        ? 'eventPulseDark 1.5s ease-in-out infinite'
-                        : 'eventPulse 1.5s ease-in-out infinite'
-                    }),
                     ...(touchedEvent?.id === event.id && isInEditMode && {
                       boxShadow: isDarkMode
                         ? '0 0 0 2px rgba(255, 255, 255, 0.5), 0 0 0 8px rgba(96, 165, 250, 0.6)'
@@ -896,7 +748,7 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
         </div>
       )}
 
-      {/* Event Form Modal - Mobile or Desktop */}
+      {/* Event Form Modal */}
       {isFormOpen && (
         isMobile ? (
           <EventFormMobile
@@ -985,7 +837,6 @@ export function MobileCalendar({ view, currentDate, onDateChange }: MobileCalend
             setRecurringEventToEdit(null)
           }}
           onSuccess={async () => {
-            // Refresh events after editing
             const { events: userEvents } = await fetchExpandedEvents(user, session.access_token)
             setEvents(userEvents || [])
             setIsRecurringEditOpen(false)

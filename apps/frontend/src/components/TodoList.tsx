@@ -8,7 +8,11 @@ import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, Task 
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
 
-export function TodoList() {
+interface TodoListProps {
+  hideHeader?: boolean
+}
+
+export function TodoList({ hideHeader = false }: TodoListProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -93,41 +97,75 @@ export function TodoList() {
       flexDirection: 'column'
     }}>
       {/* Header */}
-      <div style={{
-        padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px) clamp(4px, 0.5vh, 5px)'
-      }}>
+      {!hideHeader && (
         <div style={{
+          padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px) clamp(4px, 0.5vh, 5px)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '4px'
+          }}>
+            <h3 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              margin: 0,
+              color: colors.textPrimary
+            }}>
+              Tasks
+            </h3>
+            <button
+              onClick={() => {
+                console.log('[TodoList] Opening task form')
+                setIsFormOpen(true)
+              }}
+              className="btn btn-primary"
+              style={{ padding: '5px 10px', fontSize: '16px' }}
+            >
+              +
+            </button>
+          </div>
+          <div style={{
+            fontSize: '13px',
+            color: colors.textSecondary
+          }}>
+            {tasks.length} pending
+          </div>
+        </div>
+      )}
+
+      {/* Add button when header is hidden */}
+      {hideHeader && (
+        <div style={{
+          padding: '12px 16px',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '4px'
+          alignItems: 'center'
         }}>
-          <h3 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            margin: 0,
-            color: colors.textPrimary
-          }}>
-            Tasks
-          </h3>
+          <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+            {tasks.length} pending
+          </span>
           <button
             onClick={() => {
-              console.log('[TodoList] Opening task form')
               setIsFormOpen(true)
             }}
             className="btn btn-primary"
-            style={{ padding: '5px 10px', fontSize: '16px' }}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              fontWeight: '400',
+              background: 'transparent',
+              color: colors.textSecondary,
+              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
           >
-            +
-          </button>
+            New
+        </button>
         </div>
-        <div style={{
-          fontSize: '13px',
-          color: colors.textSecondary
-        }}>
-          {tasks.length} pending
-        </div>
-      </div>
+      )}
 
       {/* Tasks */}
       <div style={{

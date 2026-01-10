@@ -114,7 +114,7 @@ function CalendarPageMobile() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {renderHeader()}
             <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
-              <TodoList />
+              <TodoList hideHeader />
             </div>
           </div>
         )}
@@ -122,7 +122,7 @@ function CalendarPageMobile() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {renderHeader()}
             <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
-              <AgentInteractions />
+              <AgentInteractions hideHeader />
             </div>
           </div>
         )}

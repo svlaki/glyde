@@ -22,12 +22,12 @@ interface Interaction {
 }
 
 export interface AgentInteractionsProps {
-  // No props needed - interactions are fetched independently
+  hideHeader?: boolean
 }
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-export function AgentInteractions() {
+export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -698,34 +698,96 @@ export function AgentInteractions() {
       overflow: 'hidden'
     }}>
       {/* Header */}
-      <div style={{
-        padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px) clamp(8px, 1.5vh, 12px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0
-      }}>
-        <h3 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          margin: 0,
-          color: colors.textPrimary,
-          letterSpacing: '0.02em'
+      {!hideHeader && (
+        <div style={{
+          padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px) clamp(8px, 1.5vh, 12px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0
         }}>
-          Interactions
-        </h3>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {interactions.length > 0 && (
-            <span style={{
-              fontSize: '12px',
-              color: colors.textTertiary,
-              background: colors.bgTertiary,
-              padding: '2px 8px',
-              borderRadius: '10px'
-            }}>
-              {interactions.length}
-            </span>
-          )}
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            margin: 0,
+            color: colors.textPrimary,
+            letterSpacing: '0.02em'
+          }}>
+            Interactions
+          </h3>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {interactions.length > 0 && (
+              <span style={{
+                fontSize: '12px',
+                color: colors.textTertiary,
+                background: colors.bgTertiary,
+                padding: '2px 8px',
+                borderRadius: '10px'
+              }}>
+                {interactions.length}
+              </span>
+            )}
+            <button
+              onClick={handleGenerateInteractions}
+              disabled={isRefreshing}
+              title="Generate new interactions"
+              style={{
+                padding: '6px',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                background: 'transparent',
+                color: colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                if (!isRefreshing) e.currentTarget.style.background = colors.bgTertiary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
+                }}
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Compact header when main header is hidden */}
+      {hideHeader && (
+        <div style={{
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0
+        }}>
+          <span style={{
+            fontSize: '13px',
+            color: colors.textSecondary
+          }}>
+            {interactions.length} pending
+          </span>
           <button
             onClick={handleGenerateInteractions}
             disabled={isRefreshing}
@@ -741,12 +803,6 @@ export function AgentInteractions() {
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'background 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              if (!isRefreshing) e.currentTarget.style.background = colors.bgTertiary
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
             }}
           >
             <svg
@@ -769,7 +825,7 @@ export function AgentInteractions() {
             </svg>
           </button>
         </div>
-      </div>
+      )}
 
       {/* Error message */}
       {error && (
