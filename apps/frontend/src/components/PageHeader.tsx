@@ -1,3 +1,4 @@
+import { ReactNode } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
@@ -5,10 +6,10 @@ import { usePlatform } from '../hooks/usePlatform'
 
 interface PageHeaderProps {
   showNav?: boolean
+  searchComponent?: ReactNode
 }
 
-export function PageHeader({ showNav = true }: PageHeaderProps) {
-  const { isMobile } = usePlatform()
+export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps) {
   const { user, signOut } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -84,6 +85,12 @@ export function PageHeader({ showNav = true }: PageHeaderProps) {
               )
             })}
           </nav>
+        )}
+        {/* Search Component */}
+        {searchComponent && (
+          <div style={{ marginLeft: '20px' }}>
+            {searchComponent}
+          </div>
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 15px)' }}>

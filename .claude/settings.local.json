@@ -45,7 +45,7 @@
       "mcp__serena__find_referencing_symbols",
       "mcp__supabase__search_docs",
       "mcp__serena__insert_before_symbol",
-      "mcp__postgresql__pg_execute_query"
+      "mcp__postgresql__pg_execute_query",
       "mcp__supabase__search_docs",
       "Bash(docker:*)"
     ],

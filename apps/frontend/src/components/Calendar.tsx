@@ -518,6 +518,9 @@ export function Calendar() {
     setIsFormOpen(true)
   }
 
+  // State for dragging tasks from TodoList
+  const [draggingTask, setDraggingTask] = useState<boolean>(false)
+
   // Handle drag start
   const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
     setDraggingEvent(event)
@@ -527,9 +530,17 @@ export function Calendar() {
   // Handle drag over to allow drop and show preview
   const handleDragOver = (e: React.DragEvent, date: Date, hour: number) => {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
 
-    if (!draggingEvent) return
+    // Check if dragging a task from TodoList
+    const hasTask = e.dataTransfer.types.includes('application/glyde-task')
+    if (hasTask) {
+      e.dataTransfer.dropEffect = 'copy'
+      setDraggingTask(true)
+    } else {
+      e.dataTransfer.dropEffect = 'move'
+    }
+
+    if (!draggingEvent && !hasTask) return
 
     // Calculate which 15-minute interval we're hovering over (0, 1, 2, or 3)
     const rect = e.currentTarget.getBoundingClientRect()
@@ -544,7 +555,7 @@ export function Calendar() {
   const handleDrop = async (e: React.DragEvent, date: Date, hour: number) => {
     e.preventDefault()
 
-    if (!draggingEvent || !user) return
+    if (!user) return
 
     // Get the mouse position within the hour cell
     const rect = e.currentTarget.getBoundingClientRect()
@@ -552,15 +563,59 @@ export function Calendar() {
     const cellHeight = rect.height
 
     // Calculate which 15-minute interval to snap to (0, 15, 30, or 45)
-    // Use percentage of cell height to determine quarter
     const quarter = Math.floor((offsetY / cellHeight) * 4)
     const snappedQuarter = Math.max(0, Math.min(3, quarter)) // Clamp to 0-3
-
-    console.log('[Drop] offsetY:', offsetY, 'cellHeight:', cellHeight, 'quarter:', quarter, 'snapped:', snappedQuarter)
 
     // Calculate new start time with 15-minute snapping
     const newStartTime = new Date(date)
     newStartTime.setHours(hour, snappedQuarter * 15, 0, 0)
+
+    // Check if this is a task being dropped from TodoList
+    const taskData = e.dataTransfer.getData('application/glyde-task')
+    if (taskData) {
+      try {
+        const task = JSON.parse(taskData)
+        console.log('[Drop] Creating event from task:', task.title)
+
+        // Use task's estimated_duration if available, otherwise default to 1 hour
+        const durationMinutes = task.estimated_duration || 60
+        const newEndTime = new Date(newStartTime.getTime() + durationMinutes * 60 * 1000)
+
+        // Create event from task
+        const { event: newEvent, error } = await createEvent(
+          user,
+          {
+            title: task.title,
+            start_time: newStartTime.toISOString(),
+            end_time: newEndTime.toISOString(),
+            description: task.description || `Scheduled time for task: ${task.title}`,
+            category: task.category_name || task.category || ''
+          },
+          session?.access_token
+        )
+
+        if (error) {
+          console.error('Failed to create event from task:', error)
+          alert('Failed to schedule task: ' + error)
+        } else if (newEvent) {
+          // Add to local state
+          setEvents([...events, newEvent])
+          console.log('[Drop] Event created successfully from task')
+        }
+      } catch (err) {
+        console.error('Error creating event from task:', err)
+        alert('Error scheduling task')
+      } finally {
+        setDraggingTask(false)
+        setDragPreview(null)
+      }
+      return
+    }
+
+    // Handle normal event drag (existing behavior)
+    if (!draggingEvent) return
+
+    console.log('[Drop] Moving event:', draggingEvent.title)
 
     // Calculate duration of original event
     const originalStart = new Date(draggingEvent.start_time)
@@ -606,6 +661,7 @@ export function Calendar() {
   // Handle drag end to clear preview
   const handleDragEnd = () => {
     setDraggingEvent(null)
+    setDraggingTask(false)
     setDragPreview(null)
   }
 
@@ -1001,7 +1057,7 @@ export function Calendar() {
                         })}
 
                         {/* Drag preview indicator */}
-                        {isPreviewSlot && draggingEvent && (
+                        {isPreviewSlot && (draggingEvent || draggingTask) && (
                           <div
                             style={{
                               position: 'absolute',
@@ -1009,7 +1065,7 @@ export function Calendar() {
                               left: '0',
                               right: '0',
                               height: '4px',
-                              background: '#000',
+                              background: draggingTask ? '#10b981' : '#000', // Green for task drop, black for event move
                               zIndex: 100,
                               pointerEvents: 'none',
                               boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
