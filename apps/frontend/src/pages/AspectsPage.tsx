@@ -9,8 +9,190 @@ import { AspectForm } from '../components/AspectForm'
 import { GoalsByAspect } from '../components/GoalsByAspect'
 import { EmptyState } from '../components/EmptyState'
 import { getColors } from '../styles/colors'
+import { usePlatform } from '../hooks/usePlatform'
+import { MobileHeader } from '../components/mobile/MobileHeader'
+import { mobileStyles } from '../styles/mobileStyles'
 
 export function AspectsPage() {
+  const { isMobile } = usePlatform()
+
+  if (isMobile) {
+    return <AspectsPageMobile />
+  }
+
+  return <AspectsPageDesktop />
+}
+
+function AspectsPageMobile() {
+  const { user, session } = useAuth()
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+  const { categories, loading, error, refreshCategories } = useCategories()
+  const [selectedAspect, setSelectedAspect] = useState<Category | null>(null)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingAspect, setEditingAspect] = useState<Category | undefined>(undefined)
+
+  const handleCreateAspect = () => {
+    setEditingAspect(undefined)
+    setIsFormOpen(true)
+  }
+
+  const handleEditAspect = (aspect: Category) => {
+    setEditingAspect(aspect)
+    setIsFormOpen(true)
+  }
+
+  const handleDeleteAspect = async (aspect: Category) => {
+    if (!user || !session) return
+
+    try {
+      await deleteUserCategory(user, aspect.id!, session.access_token)
+      if (selectedAspect?.id === aspect.id) {
+        setSelectedAspect(null)
+      }
+      await refreshCategories()
+    } catch (error) {
+      console.error('Error deleting aspect:', error)
+      alert('Failed to delete aspect. Please try again.')
+    }
+  }
+
+  const handleSaveAspect = async (aspectData: Partial<Category>) => {
+    if (!user || !session) return
+
+    try {
+      if (aspectData.id) {
+        const { id, ...updates } = aspectData
+        await updateUserCategory(user, id, updates, session.access_token)
+      } else {
+        await createUserCategory(user, aspectData as any, session.access_token)
+      }
+      await refreshCategories()
+      setIsFormOpen(false)
+    } catch (error) {
+      console.error('Error saving aspect:', error)
+      throw error
+    }
+  }
+
+  // Detail view - showing goals for selected aspect
+  if (selectedAspect) {
+    return (
+      <div style={mobileStyles.fullHeight}>
+        <MobileHeader
+          title={selectedAspect.name}
+          onBack={() => setSelectedAspect(null)}
+        />
+        <div style={{
+          ...mobileStyles.scrollContainer,
+          background: colors.bgPrimary,
+          padding: '20px',
+          paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
+        }}>
+          <GoalsByAspect
+            aspect={selectedAspect}
+            onEdit={() => handleEditAspect(selectedAspect)}
+            onDelete={() => handleDeleteAspect(selectedAspect)}
+          />
+        </div>
+
+        <AspectForm
+          aspect={editingAspect}
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+          onSave={handleSaveAspect}
+        />
+      </div>
+    )
+  }
+
+  // List view - showing all aspects
+  return (
+    <div style={mobileStyles.fullHeight}>
+      <MobileHeader
+        title="Aspects"
+        showMenu={true}
+        actions={
+        <button
+          onClick={handleCreateAspect}
+          className="btn btn-primary"
+          style={{
+            padding: '6px 12px',
+            fontSize: '13px',
+            fontWeight: '400',
+            background: 'transparent',
+            color: colors.textSecondary,
+            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          New
+        </button>
+        }
+      />
+
+      <div style={{
+        ...mobileStyles.scrollContainer,
+        background: colors.bgPrimary,
+        padding: '20px',
+        paddingTop: '16px',
+        paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
+      }}>
+        {loading ? (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: colors.textSecondary,
+            fontSize: '14px'
+          }}>
+            Loading aspects...
+          </div>
+        ) : error ? (
+          <div style={{
+            padding: '20px',
+            textAlign: 'center',
+            color: '#c66',
+            fontSize: '14px'
+          }}>
+            Error: {error}
+          </div>
+        ) : categories.length === 0 ? (
+          <EmptyState
+            title="No aspects yet"
+            description="Create your first aspect to get started"
+          />
+        ) : (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            {categories.map(aspect => (
+              <AspectCard
+                key={aspect.id}
+                aspect={aspect}
+                isSelected={false}
+                onClick={() => setSelectedAspect(aspect)}
+                onEdit={() => handleEditAspect(aspect)}
+                onDelete={() => handleDeleteAspect(aspect)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AspectForm
+        aspect={editingAspect}
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSave={handleSaveAspect}
+      />
+    </div>
+  )
+}
+
+function AspectsPageDesktop() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -122,13 +304,6 @@ export function AspectsPage() {
                 +
               </button>
             </div>
-            <p style={{
-              fontSize: '13px',
-              color: colors.textSecondary,
-              margin: 0
-            }}>
-              Organize the aspects of your life
-            </p>
           </div>
 
           {/* Aspects List */}
@@ -184,7 +359,11 @@ export function AspectsPage() {
           overflow: 'auto',
           padding: '30px'
         }}>
-          <GoalsByAspect aspect={selectedAspect} />
+          <GoalsByAspect
+            aspect={selectedAspect}
+            onEdit={selectedAspect ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={selectedAspect ? () => handleDeleteAspect(selectedAspect) : undefined}
+          />
         </div>
       </div>
 

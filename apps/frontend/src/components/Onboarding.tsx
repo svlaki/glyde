@@ -256,23 +256,27 @@ export function Onboarding() {
       alignItems: 'center',
       justifyContent: 'center',
       background: isDarkMode ? '#0a0a0a' : '#fafafa',
-      padding: '20px'
+      padding: 'clamp(10px, 2vw, 20px)'
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '600px',
+        maxWidth: 'min(600px, 95vw)',
         background: colors.bgPrimary,
-        borderRadius: '12px',
+        borderRadius: 'clamp(8px, 2vw, 12px)',
         boxShadow: isDarkMode ? '0 4px 20px rgba(0,0,0,0.5)' : '0 2px 10px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        maxHeight: '95vh',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Header */}
         <div style={{
-          padding: '30px 40px 20px',
-          borderBottom: `1px solid ${colors.border}`
+          padding: 'clamp(15px, 3vh, 20px) clamp(15px, 4vw, 20px)',
+          borderBottom: `1px solid ${colors.border}`,
+          flexShrink: 0
         }}>
           <h1 style={{
-            fontSize: '24px',
+            fontSize: 'clamp(20px, 5vw, 24px)',
             fontWeight: '600',
             color: colors.textPrimary,
             marginBottom: '8px'
@@ -280,7 +284,7 @@ export function Onboarding() {
             Welcome to Glyde
           </h1>
           <p style={{
-            fontSize: '14px',
+            fontSize: 'clamp(13px, 2.5vw, 14px)',
             color: colors.textSecondary
           }}>
             Let's get you set up with your personal intelligence system
@@ -289,8 +293,9 @@ export function Onboarding() {
 
         {/* Progress bar */}
         <div style={{
-          padding: '20px 40px',
-          background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
+          padding: 'clamp(12px, 2vh, 15px) clamp(15px, 4vw, 20px)',
+          background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+          flexShrink: 0
         }}>
           <div style={{
             display: 'flex',
@@ -322,7 +327,10 @@ export function Onboarding() {
 
         {/* Content */}
         <div style={{
-          padding: '30px 40px 40px'
+          padding: 'clamp(15px, 3vh, 20px) clamp(15px, 4vw, 20px) clamp(20px, 4vh, 30px)',
+          flex: 1,
+          overflow: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {/* Step 1: Basic Information */}
           {currentStep === 1 && (
@@ -1128,26 +1136,28 @@ export function Onboarding() {
 
         {/* Footer with navigation */}
         <div style={{
-          padding: '20px 40px',
+          padding: 'clamp(12px, 2vh, 15px) clamp(15px, 4vw, 20px)',
           borderTop: `1px solid ${colors.border}`,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          flexShrink: 0
         }}>
           <button
             type="button"
             onClick={handleBack}
             disabled={currentStep === 1}
             style={{
-              padding: '10px 20px',
-              fontSize: '14px',
+              padding: 'clamp(8px, 2vw, 10px) clamp(16px, 3vw, 20px)',
+              fontSize: 'clamp(13px, 2.5vw, 14px)',
               fontWeight: '500',
               background: 'transparent',
               color: currentStep === 1 ? colors.textSecondary : colors.textPrimary,
               border: `1px solid ${colors.border}`,
               borderRadius: '8px',
               cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-              opacity: currentStep === 1 ? 0.5 : 1
+              opacity: currentStep === 1 ? 0.5 : 1,
+              minHeight: '44px'
             }}
           >
             Back
@@ -1159,15 +1169,16 @@ export function Onboarding() {
               onClick={handleNext}
               disabled={!canProceed()}
               style={{
-                padding: '10px 24px',
-                fontSize: '14px',
+                padding: 'clamp(8px, 2vw, 10px) clamp(20px, 4vw, 24px)',
+                fontSize: 'clamp(13px, 2.5vw, 14px)',
                 fontWeight: '500',
                 background: canProceed() ? '#3b82f6' : colors.bgHover,
                 color: canProceed() ? '#fff' : colors.textSecondary,
                 border: 'none',
                 borderRadius: '8px',
                 cursor: canProceed() ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minHeight: '44px'
               }}
             >
               Next
@@ -1178,15 +1189,16 @@ export function Onboarding() {
               onClick={handleComplete}
               disabled={!canProceed() || loading}
               style={{
-                padding: '10px 24px',
-                fontSize: '14px',
+                padding: 'clamp(8px, 2vw, 10px) clamp(20px, 4vw, 24px)',
+                fontSize: 'clamp(13px, 2.5vw, 14px)',
                 fontWeight: '500',
                 background: (canProceed() && !loading) ? '#22c55e' : colors.bgHover,
                 color: (canProceed() && !loading) ? '#fff' : colors.textSecondary,
                 border: 'none',
                 borderRadius: '8px',
                 cursor: (canProceed() && !loading) ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                minHeight: '44px'
               }}
             >
               {loading ? 'Completing...' : 'Get Started'}

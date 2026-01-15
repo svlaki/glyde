@@ -39,6 +39,11 @@ export async function completeOnboarding(
       return { success: false, error: 'User not authenticated' }
     }
 
+    console.log('🔵 Completing onboarding...')
+    console.log('🔵 API_URL:', API_URL)
+    console.log('🔵 Full URL:', `${API_URL}/api/onboarding/complete`)
+    console.log('🔵 User ID:', user.id)
+
     const response = await fetch(`${API_URL}/api/onboarding/complete`, {
       method: 'POST',
       headers: {
@@ -51,15 +56,34 @@ export async function completeOnboarding(
       })
     })
 
+    console.log('🔵 Response status:', response.status)
+    console.log('🔵 Response ok:', response.ok)
+
     const result = await response.json()
+    console.log('🔵 Response body:', result)
 
     if (!response.ok) {
+      console.error('🔴 Onboarding failed:', result.error)
       return { success: false, error: result.error || 'Failed to complete onboarding' }
     }
 
+    console.log('✅ Onboarding completed successfully')
     return { success: true }
   } catch (error) {
-    console.error('Error completing onboarding:', error)
+    console.error('🔴 Error completing onboarding:', error)
+    console.error('🔴 Error type:', typeof error)
+
+    if (error instanceof Error) {
+      console.error('🔴 Error message:', error.message)
+      console.error('🔴 Error stack:', error.stack)
+      return { success: false, error: `Network error: ${error.message}` }
+    }
+
+    if (error instanceof TypeError) {
+      console.error('🔴 TypeError - likely CORS or connection refused')
+      return { success: false, error: 'Cannot connect to backend. Make sure Docker is running.' }
+    }
+
     return { success: false, error: 'Failed to complete onboarding' }
   }
 }

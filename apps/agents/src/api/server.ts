@@ -57,9 +57,40 @@ import {
 const app = express();
 const PORT = env.PORT;
 
-// Middleware
+// Middleware - Allow requests from Capacitor apps and web
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost in any form (web dev, Capacitor simulator)
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+
+    // Allow Capacitor origins
+    if (origin.startsWith('capacitor://')) {
+      return callback(null, true);
+    }
+
+    // Allow ionic origins
+    if (origin.startsWith('ionic://')) {
+      return callback(null, true);
+    }
+
+    // Allow configured frontend URL
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+
+    // In development, allow all
+    if (isDevelopment) {
+      return callback(null, true);
+    }
+
+    // Reject everything else in production
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
