@@ -3,6 +3,7 @@ import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
 import { InteractionAgent } from '../agents/interaction/InteractionAgent.js';
 import { InteractionAgentGerald } from '../agents/interaction-gerald/InteractionAgentGerald.js';
+import { MaintenanceAgentMargaret } from '../agents/maintenance-margaret/MaintenanceAgentMargaret.js';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { ACTIVE_INTERACTION_AGENT } from '../config/agents.js';
 
@@ -32,10 +33,13 @@ async function initializeAgents(): Promise<void> {
 
   const interactionAgent = createInteractionAgent();
   await agentRegistry.registerAgent(interactionAgent);
+
+  const maintenanceAgent = new MaintenanceAgentMargaret();
+  await agentRegistry.registerAgent(maintenanceAgent);
 }
 
 async function ensureAgentsInitialized(): Promise<void> {
-  if (agentRegistry.hasAgent('conversation') && agentRegistry.hasAgent('interaction')) {
+  if (agentRegistry.hasAgent('conversation') && agentRegistry.hasAgent('interaction') && agentRegistry.hasAgent('maintenance')) {
     return;
   }
 
