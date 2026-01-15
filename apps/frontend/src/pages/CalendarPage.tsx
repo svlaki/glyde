@@ -5,6 +5,7 @@ import { Calendar } from '../components/Calendar'
 import { ChatBot } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
 import { TodoList } from '../components/TodoList'
+import { GlobalSearch } from '../components/GlobalSearch'
 import { getColors } from '../styles/colors'
 
 export function CalendarPage() {
@@ -80,7 +81,24 @@ export function CalendarPage() {
       background: colors.bgSecondary
     }}>
       {/* Header */}
-      <PageHeader />
+      <PageHeader
+        searchComponent={
+          <GlobalSearch
+            onSelectEvent={(eventId) => {
+              // TODO: Navigate to event or open event modal
+              console.log('Selected event:', eventId)
+            }}
+            onSelectTask={(taskId) => {
+              // TODO: Navigate to task or open task modal
+              console.log('Selected task:', taskId)
+            }}
+            onSelectGoal={(goalId) => {
+              // TODO: Navigate to goal or open goal modal
+              console.log('Selected goal:', goalId)
+            }}
+          />
+        }
+      />
 
       {/* Main Layout */}
       <div

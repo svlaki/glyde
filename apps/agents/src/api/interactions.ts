@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 
 import { getSupabaseService } from '../services/SupabaseService.js';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
+import { convertToUTC } from '../utils/timezoneUtils.js';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export async function getPendingInteractions(req: Request, res: Response): Promise<Response | void> {
   try {
@@ -146,6 +148,11 @@ export async function respondToInteraction(req: Request, res: Response): Promise
               if (!startTime) {
                 console.log(`[INTERACTION RESPONSE] No startTime in eventData, attempting to parse from response: "${trimmedResponse}"`);
 
+                // Get user's timezone for proper time parsing
+                const userProfile = await supabaseService.getProfile(userId);
+                const userTimezone = userProfile?.timezone || 'UTC';
+                console.log(`[INTERACTION RESPONSE] User timezone: ${userTimezone}`);
+
                 // Try to parse time from response like "9:00am", "2pm", "6:30pm", "Morning (7am)"
                 const timeMatch = trimmedResponse.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)/i);
                 if (timeMatch) {
@@ -160,16 +167,27 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                     hours = 0; // 12am = 0:00
                   }
 
-                  const now = new Date();
-                  now.setHours(hours, minutes, 0, 0);
+                  // Get today's date in user's timezone
+                  const nowUtc = new Date();
+                  const todayInUserTz = formatInTimeZone(nowUtc, userTimezone, 'yyyy-MM-dd');
+                  const currentHourInUserTz = parseInt(formatInTimeZone(nowUtc, userTimezone, 'H'));
+                  const currentMinuteInUserTz = parseInt(formatInTimeZone(nowUtc, userTimezone, 'm'));
 
-                  // If the time has already passed today, schedule for tomorrow
-                  if (now <= new Date()) {
-                    now.setDate(now.getDate() + 1);
+                  // Determine if we need tomorrow (if selected time already passed today in user's timezone)
+                  let dateToUse = todayInUserTz;
+                  if (hours < currentHourInUserTz || (hours === currentHourInUserTz && minutes <= currentMinuteInUserTz)) {
+                    // Time has passed today, use tomorrow
+                    const tomorrow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000);
+                    dateToUse = formatInTimeZone(tomorrow, userTimezone, 'yyyy-MM-dd');
                   }
 
-                  startTime = now.toISOString();
-                  console.log(`[INTERACTION RESPONSE] Parsed time: ${hours}:${minutes.toString().padStart(2, '0')} -> ${startTime}`);
+                  // Build local time string in user's timezone (no Z suffix)
+                  const localTimeString = `${dateToUse}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
+                  console.log(`[INTERACTION RESPONSE] Local time in ${userTimezone}: ${localTimeString}`);
+
+                  // Convert to UTC using the proper utility
+                  startTime = convertToUTC(localTimeString, userTimezone);
+                  console.log(`[INTERACTION RESPONSE] Converted to UTC: ${startTime}`);
                 } else {
                   console.log(`[INTERACTION RESPONSE] Could not parse time from response, using current time`);
                 }

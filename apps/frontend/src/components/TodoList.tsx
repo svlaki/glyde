@@ -1,12 +1,15 @@
 // Handles the task panel on the calendar page
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, Task } from '../lib/taskService'
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
+
+// Export Task type for drag-drop handling
+export type { Task } from '../lib/taskService'
 
 export function TodoList() {
   const { user, session } = useAuth()
@@ -160,6 +163,17 @@ export function TodoList() {
               return (
                 <div
                   key={task.id}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    // Store task data for calendar drop
+                    e.dataTransfer.setData('application/glyde-task', JSON.stringify(task))
+                    e.dataTransfer.effectAllowed = 'copy'
+                    // Add visual feedback
+                    e.currentTarget.style.opacity = '0.5'
+                  }}
+                  onDragEnd={(e) => {
+                    e.currentTarget.style.opacity = '1'
+                  }}
                   style={{
                     padding: '10px 12px',
                     background: hexToRgba(taskColor, 0.15),
@@ -170,7 +184,7 @@ export function TodoList() {
                     alignItems: 'flex-start',
                     gap: '10px',
                     transition: 'all 0.15s',
-                    cursor: 'pointer'
+                    cursor: 'grab'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = hexToRgba(taskColor, 0.25)
