@@ -14,6 +14,7 @@ export interface PromptContext {
   tomorrowDayName: string;
   toolCount?: number; // Optional: number of available tools
   zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
+  rulesContext?: string; // Optional: User's custom rules that guide agent behavior
 }
 
 /**
@@ -27,12 +28,22 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext } = context;
+  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext, rulesContext } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
 
-  return new SystemMessage(`You are a friendly personal calendar and task assistant. Help users manage their time and tasks naturally and conversationally.${toolInfo}
+  // Build rules section if rules exist
+  const rulesSection = rulesContext ? `
+
+PERSONAL RULES (YOU MUST FOLLOW THESE):
+The user has defined the following rules. These are persistent preferences that you MUST respect in all interactions:
+${rulesContext}
+
+IMPORTANT: These rules take precedence over general behavior. If a rule conflicts with a default behavior, follow the rule.
+` : '';
+
+  return new SystemMessage(`You are a friendly personal calendar and task assistant. Help users manage their time and tasks naturally and conversationally.${toolInfo}${rulesSection}
 
 CRITICAL TOOL USAGE (YOU MUST FOLLOW THIS):
 You have FULL access to modify the user's calendar, tasks, and goals through your tools.
@@ -383,22 +394,30 @@ TASK MANAGEMENT:
 - Mark tasks complete when user says they finished something
 - Update task details (due date, priority, category) when user asks
 
-BULK CATEGORY UPDATES (CRITICAL):
+BULK CATEGORY UPDATES (CRITICAL - MUST BE SEQUENTIAL):
 When user asks to "move X to category Y" or "put all X in category Y" or "categorize X as Y":
-1. Search for ALL matching items by TEXT CONTENT (DO NOT filter by category!):
-   - Use search_events(query="X", category=null) to find events by title/description
-   - Use list_tasks() with NO category filter, then filter response for "X" in title/description
-   - Use list_goals() with NO category filter, then filter response for "X" in title/description
-2. Update EVERY matching item with update_event/update_task/update_goal, passing the category parameter
-3. Report back how many of each type were updated
 
-Example: "move all mendicants things to mendicants category" should:
-  → search_events(query="mendicants", category=null) → find by text → update ALL with category="Mendicants"
-  → list_tasks() → filter for "mendicants" in title → update ALL with category="Mendicants"
-  → list_goals() → filter for "mendicants" in title → update ALL with category="Mendicants"
+⚠️ CRITICAL SEQUENCE - DO NOT CALL TOOLS IN PARALLEL:
+1. FIRST: Call list_categories to check if destination category exists
+2. SECOND: If category doesn't exist, call create_category and WAIT for it to complete
+3. THIRD: ONLY AFTER category exists, call bulk_update_events
 
-CRITICAL: When searching for items to categorize, NEVER pass the destination category as a filter!
-You're searching for UNcategorized items that CONTAIN the search term, not items already IN that category.
+Use bulk_update_events for moving multiple events to a category:
+  - bulk_update_events(searchQuery="mendicants", category="Mendicants")
+  - The tool will find all events matching the search and update them
+  - Category MUST exist before calling this tool!
+
+For tasks and goals, use individual update calls:
+  - list_tasks() → filter for matching items → update_task for each
+  - list_goals() → filter for matching items → update_goal for each
+
+Example: "move all mendicants events to Mendicants category" should:
+  1. list_categories → check if "Mendicants" exists
+  2. If not: create_category("Mendicants") → WAIT for response
+  3. THEN: bulk_update_events(searchQuery="mendicants", category="Mendicants")
+
+❌ WRONG: Calling create_category and bulk_update_events at the same time (parallel)
+✅ RIGHT: create_category FIRST, wait for success, THEN bulk_update_events
 
 INTELLIGENT EVENT ENRICHMENT WITH WEB SEARCH:
 When creating events with restaurants, venues, or locations mentioned:

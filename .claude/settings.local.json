@@ -47,7 +47,10 @@
       "mcp__serena__insert_before_symbol",
       "mcp__postgresql__pg_execute_query",
       "mcp__supabase__search_docs",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_snapshot"
     ],
     "deny": [],
     "ask": [],

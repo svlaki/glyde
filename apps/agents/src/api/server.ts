@@ -38,6 +38,7 @@ import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCh
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
+import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
 import { authenticateRequest } from './middleware/auth.js';
@@ -321,6 +322,13 @@ app.post('/api/interactions/clear', clearUserInteractions);
 // DISABLED: Automatic startup interaction generation removed
 // Interactions are now created directly by the agent via create_interaction tool
 // app.post('/api/interactions/generate-startup', generateStartupInteractions);
+
+// Rules endpoints
+app.post('/api/rules', getUserRules);
+app.post('/api/rules/create', createUserRule);
+app.post('/api/rules/update', updateUserRule);
+app.post('/api/rules/delete', deleteUserRule);
+app.post('/api/rules/toggle', toggleUserRule);
 
 // Chat endpoints
 app.post('/api/chat/history', async (req, res) => {

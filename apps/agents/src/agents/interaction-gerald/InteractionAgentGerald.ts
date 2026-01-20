@@ -2,6 +2,7 @@ import { StateGraph, Annotation } from "@langchain/langgraph";
 import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { SupabaseService } from '../../services/SupabaseService.js';
+import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
@@ -218,6 +219,18 @@ export class InteractionAgentGerald extends BaseAgent {
       const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
       const currentHour = parseInt(formatInTimeZone(nowUtc, state.timezone, 'H'), 10);
 
+      // Load user rules for context injection
+      let rulesContext = '';
+      try {
+        const userRules = await ruleService.getEnabledRules(state.userId);
+        if (userRules.length > 0) {
+          rulesContext = ruleService.formatRulesForPrompt(userRules);
+          console.log(`🤖 [GERALD] Loaded ${userRules.length} rules for user context`);
+        }
+      } catch (error) {
+        console.error('🤖 [GERALD] Error loading user rules:', error);
+      }
+
       // Build system prompt with full context
       const promptContext: GeraldPromptContext = {
         timezone: state.timezone,
@@ -231,6 +244,7 @@ export class InteractionAgentGerald extends BaseAgent {
         tomorrowDayName,
         currentHour,
         toolCount: tools.length,
+        rulesContext,
       };
 
       const systemMessage = buildGeraldSystemPrompt(promptContext);

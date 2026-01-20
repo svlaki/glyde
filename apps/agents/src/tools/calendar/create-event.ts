@@ -25,40 +25,27 @@ export const createEventTool = tool(
     const zepGraphService = new ZepGraphService();
     const categoryService = new CategoryService();
 
-    // Validate and ensure category exists
+    // Validate that category exists - do NOT auto-create
     let validatedCategory = category;
     if (category && category.trim().length > 0) {
-      try {
-        console.log(`[CREATE-EVENT TOOL] Validating category: "${category}"`);
+      console.log(`[CREATE-EVENT TOOL] Validating category: "${category}"`);
 
-        // Check if category exists
-        let existingCategory = await categoryService.getCategoryByName(userId, category.trim());
+      const existingCategory = await categoryService.getCategoryByName(userId, category.trim());
 
-        if (!existingCategory) {
-          // Category doesn't exist, create it with a default color
-          console.log(`[CREATE-EVENT TOOL] Category "${category}" does not exist, creating it...`);
-          const defaultColor = '#3b82f6'; // Blue
-          existingCategory = await categoryService.createCategory(userId, {
-            name: category.trim(),
-            color: defaultColor,
-            icon: undefined,
-            description: `Auto-created for event: ${title}`
-          });
+      if (!existingCategory) {
+        // Category doesn't exist - get all available categories and throw error
+        const allCategories = await categoryService.getCategories(userId);
+        const categoryNames = allCategories.map(c => c.name).join(', ');
 
-          if (!existingCategory) {
-            console.warn(`[CREATE-EVENT TOOL] Failed to create category "${category}", will use it anyway`);
-          } else {
-            console.log(`[CREATE-EVENT TOOL] Successfully created category: "${category}"`);
-          }
-        } else {
-          console.log(`[CREATE-EVENT TOOL] Category "${category}" already exists`);
-        }
-
-        validatedCategory = category.trim();
-      } catch (error) {
-        console.warn(`[CREATE-EVENT TOOL] Error validating/creating category "${category}":`, error);
-        // Continue with event creation even if category validation fails - the category name itself is valid
+        throw new Error(
+          `Category "${category}" does not exist. ` +
+          `Available categories: [${categoryNames}]. ` +
+          `Use an existing category or ask the user to create one first with create_category.`
+        );
       }
+
+      console.log(`[CREATE-EVENT TOOL] Category "${category}" validated successfully`);
+      validatedCategory = category.trim();
     }
 
     // Convert local times to UTC for storage
@@ -165,8 +152,8 @@ export const createEventTool = tool(
       endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
       location: z.string().optional().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().optional().nullable().describe("Event description. Leave empty if not specified"),
-      category: z.string().optional().nullable().describe("Category name for this event. Call list_categories first to see existing categories. For classes/projects/clients, create a SPECIFIC category first (e.g., 'CS173A' not 'School', 'Project Phoenix' not 'Work'). Generic categories are only for truly generic recurring activities. Required field - do not leave empty."),
+      category: z.string().optional().nullable().describe("Category name for this event. MUST be an existing category - call list_categories first. Will NOT be auto-created. For classes/projects/clients, create a SPECIFIC category first using create_category."),
       replaceConflicting: z.boolean().default(false).nullable().describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
     }),
   }
-);;;;;;
+);

@@ -11,7 +11,11 @@ import { getColors, hexToRgba } from '../styles/colors'
 // Export Task type for drag-drop handling
 export type { Task } from '../lib/taskService'
 
-export function TodoList() {
+interface TodoListProps {
+  hideHeader?: boolean
+}
+
+export function TodoList({ hideHeader = false }: TodoListProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)

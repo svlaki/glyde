@@ -5,6 +5,7 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from '../../services/SupabaseService.js';
+import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
@@ -404,6 +405,20 @@ IMPORTANT INSTRUCTIONS:
         console.error('Error loading Zep context:', error);
       }
 
+      // Load user rules for context injection
+      let rulesContext = '';
+      try {
+        const userRules = await ruleService.getEnabledRules(state.userId);
+        if (userRules.length > 0) {
+          rulesContext = ruleService.formatRulesForPrompt(userRules);
+          console.log(`[CONVERSATION AGENT] Loaded ${userRules.length} rules for user context`);
+        } else {
+          console.log(`[CONVERSATION AGENT] No rules found for user`);
+        }
+      } catch (error) {
+        console.error('Error loading user rules:', error);
+      }
+
       // Calculate temporal context IN USER'S TIMEZONE (critical for correct "tomorrow" interpretation)
       // Get current UTC time
       const nowUtc = new Date();
@@ -416,6 +431,7 @@ IMPORTANT INSTRUCTIONS:
       // Build system prompt from extracted function (was 200+ lines inline)
       // Pass tool count from ToolRegistry for dynamic prompt generation
       // Include Zep's pre-formatted context block with user summary and relevant facts
+      // Include user rules for behavioral guidance
       const systemMessage = buildSystemPrompt({
         timezone: state.timezone,
         eventContext,
@@ -425,7 +441,8 @@ IMPORTANT INSTRUCTIONS:
         tomorrowFormatted,
         tomorrowDayName,
         toolCount: tools.length,
-        zepGraphContext: zepThreadContext // Use Zep's built-in context block
+        zepGraphContext: zepThreadContext, // Use Zep's built-in context block
+        rulesContext // User's custom rules
       });
 
 

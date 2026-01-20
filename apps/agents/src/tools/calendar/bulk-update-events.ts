@@ -2,6 +2,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { CategoryService } from "../../services/CategoryService.js";
 
 export const bulkUpdateEventsTool = tool(
   async ({ searchQuery, eventIds, category, title, location, description }, config) => {
@@ -10,11 +11,11 @@ export const bulkUpdateEventsTool = tool(
       throw new Error("User ID is required for bulk updating events");
     }
 
-    // Validate that at least one update field is provided (empty strings don't count)
-    const hasCategory = category !== undefined && category !== '';
-    const hasTitle = title !== undefined && title !== '';
-    const hasLocation = location !== undefined && location !== '';
-    const hasDescription = description !== undefined && description !== '';
+    // Validate that at least one update field is provided (empty strings and null don't count)
+    const hasCategory = category !== undefined && category !== null && category !== '';
+    const hasTitle = title !== undefined && title !== null && title !== '';
+    const hasLocation = location !== undefined && location !== null && location !== '';
+    const hasDescription = description !== undefined && description !== null && description !== '';
 
     if (!hasCategory && !hasTitle && !hasLocation && !hasDescription) {
       throw new Error("At least one non-empty field to update must be provided (category, title, location, or description)");
@@ -23,6 +24,25 @@ export const bulkUpdateEventsTool = tool(
     // Initialize services
     const supabaseService = new SupabaseService();
     const zepGraphService = new ZepGraphService();
+    const categoryService = new CategoryService();
+
+    // Validate category exists before proceeding (prevents race condition with create_category)
+    if (hasCategory) {
+      console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Validating category: "${category}"`);
+      const existingCategory = await categoryService.getCategoryByName(userId, category!);
+
+      if (!existingCategory) {
+        const allCategories = await categoryService.getCategories(userId);
+        const categoryNames = allCategories.map(c => c.name).join(', ');
+
+        throw new Error(
+          `Category "${category}" does not exist. ` +
+          `Available categories: [${categoryNames}]. ` +
+          `Create the category first using create_category, then call bulk_update_events.`
+        );
+      }
+      console.log(`✅ [BULK-UPDATE-EVENTS TOOL] Category "${category}" validated`);
+    }
 
     let eventsToUpdate: any[] = [];
 
@@ -62,12 +82,12 @@ export const bulkUpdateEventsTool = tool(
     }
 
     // Prepare update data - only include non-empty values
-    // Empty strings should NOT be applied as updates
+    // Empty strings and null should NOT be applied as updates
     const updateData: any = {};
-    if (category !== undefined && category !== '') updateData.category = category;
-    if (title !== undefined && title !== '') updateData.title = title;
-    if (location !== undefined && location !== '') updateData.location = location;
-    if (description !== undefined && description !== '') updateData.description = description;
+    if (hasCategory) updateData.category = category;
+    if (hasTitle) updateData.title = title;
+    if (hasLocation) updateData.location = location;
+    if (hasDescription) updateData.description = description;
 
     let updatedCount = 0;
     const errors: string[] = [];
@@ -156,7 +176,7 @@ export const bulkUpdateEventsTool = tool(
     schema: z.object({
       searchQuery: z.string().optional().nullable().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
       eventIds: z.array(z.string()).optional().nullable().describe("Optional: Array of specific event IDs to update instead of using search"),
-      category: z.string().optional().nullable().describe("New category to assign to all matching events (e.g., 'Work', 'Personal', 'Mendicants', 'Health & Hygiene')"),
+      category: z.string().optional().nullable().describe("New category to assign to all matching events. MUST be an existing category - call list_categories first or create_category BEFORE this tool."),
       title: z.string().optional().nullable().describe("Optional: New title for all matching events (use cautiously)"),
       location: z.string().optional().nullable().describe("Optional: New location for all matching events"),
       description: z.string().optional().nullable().describe("Optional: New description for all matching events"),

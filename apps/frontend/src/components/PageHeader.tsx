@@ -12,6 +12,7 @@ interface PageHeaderProps {
 export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps) {
   const { user, signOut } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
+  const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
 
   // Don't render on mobile - MobileHeader is used instead
@@ -21,6 +22,7 @@ export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps)
 
   const navItems = [
     { label: 'Aspects', path: '/aspects' },
+    { label: 'Rules', path: '/rules' },
     { label: 'Profile', path: '/profile' }
   ]
 

@@ -16,6 +16,7 @@ export interface GeraldPromptContext {
   tomorrowDayName: string;
   currentHour: number;
   toolCount?: number;
+  rulesContext?: string; // Optional: User's custom rules that guide agent behavior
 }
 
 /**
@@ -39,13 +40,24 @@ export function buildGeraldSystemPrompt(context: GeraldPromptContext): SystemMes
     tomorrowFormatted,
     tomorrowDayName,
     currentHour,
-    toolCount
+    toolCount,
+    rulesContext
   } = context;
 
   // Time-based context for creative suggestions
   const timeOfDayContext = getTimeOfDayContext(currentHour);
 
-  return new SystemMessage(`You are Gerald, an intelligent life assistant who helps users optimize their time, achieve their goals, and maintain balance across all areas of life.
+  // Build rules section if rules exist
+  const rulesSection = rulesContext ? `
+
+PERSONAL RULES (YOU MUST FOLLOW THESE):
+The user has defined the following rules. These are persistent preferences that you MUST respect when making suggestions and creating interactions:
+${rulesContext}
+
+IMPORTANT: These rules take precedence over general behavior. If a rule conflicts with a suggestion pattern, follow the rule.
+` : '';
+
+  return new SystemMessage(`You are Gerald, an intelligent life assistant who helps users optimize their time, achieve their goals, and maintain balance across all areas of life.${rulesSection}
 
 CURRENT TIME & DATE:
 - Now: ${getCurrentTimeInTimezone(timezone)} on ${todayFormatted}

@@ -8,7 +8,7 @@ import { parseNaturalLanguageRecurrence, formatRRuleForDisplay, validateRRule } 
 import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 
 export const createRecurringEventTool = tool(
-  async ({ title, startTime, recurrence, rrule, category, description, location, endDate }, config) => {
+  async ({ title, startTime, endTime, recurrence, rrule, category, description, location, endDate }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -22,6 +22,7 @@ export const createRecurringEventTool = tool(
     console.log('[CREATE-RECURRING-EVENT TOOL] Starting recurring event creation:', {
       title,
       startTime,
+      endTime,
       recurrence,
       rrule,
       category,
@@ -63,46 +64,32 @@ export const createRecurringEventTool = tool(
       throw new Error("Either 'recurrence' (natural language) or 'rrule' (RFC 5545 format) is required");
     }
 
-    // Validate and ensure category exists
+    // Validate that category exists - do NOT auto-create
     let validatedCategory = category;
     if (category && category.trim().length > 0) {
-      try {
-        console.log(`[CREATE-RECURRING-EVENT TOOL] Validating category: "${category}"`);
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Validating category: "${category}"`);
 
-        let existingCategory = await categoryService.getCategoryByName(userId, category.trim());
+      const existingCategory = await categoryService.getCategoryByName(userId, category.trim());
 
-        if (!existingCategory) {
-          console.log(`[CREATE-RECURRING-EVENT TOOL] Category "${category}" does not exist, creating it...`);
-          const defaultColor = '#3b82f6';
-          existingCategory = await categoryService.createCategory(userId, {
-            name: category.trim(),
-            color: defaultColor,
-            icon: undefined,
-            description: `Auto-created for recurring event: ${title}`
-          });
+      if (!existingCategory) {
+        // Category doesn't exist - get all available categories and throw error
+        const allCategories = await categoryService.getCategories(userId);
+        const categoryNames = allCategories.map(c => c.name).join(', ');
 
-          if (!existingCategory) {
-            console.warn(`[CREATE-RECURRING-EVENT TOOL] Failed to create category "${category}", will use it anyway`);
-          } else {
-            console.log(`[CREATE-RECURRING-EVENT TOOL] Successfully created category: "${category}"`);
-          }
-        } else {
-          console.log(`[CREATE-RECURRING-EVENT TOOL] Category "${category}" already exists`);
-        }
-
-        validatedCategory = category.trim();
-      } catch (error) {
-        console.warn(`[CREATE-RECURRING-EVENT TOOL] Error validating/creating category "${category}":`, error);
+        throw new Error(
+          `Category "${category}" does not exist. ` +
+          `Available categories: [${categoryNames}]. ` +
+          `Use an existing category or ask the user to create one first with create_category.`
+        );
       }
+
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Category "${category}" validated successfully`);
+      validatedCategory = category.trim();
     }
 
-    // Convert local start time to UTC
+    // Convert local times to UTC
     const startTimeUTC = convertToUTC(startTime, timezone);
-
-    // For recurring events, we keep the same duration for all instances
-    // Assuming default 1 hour if endTime not provided
-    const startDate = new Date(startTimeUTC);
-    const endTimeUTC = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString();
+    const endTimeUTC = convertToUTC(endTime, timezone);
 
     console.log(`[CREATE-RECURRING-EVENT TOOL] Event times - Start UTC: ${startTimeUTC}, End UTC: ${endTimeUTC}`);
 
@@ -156,9 +143,10 @@ export const createRecurringEventTool = tool(
     schema: z.object({
       title: z.string().describe("Event title (e.g., 'Team standup', 'Weekly review', 'Gym session')"),
       startTime: z.string().describe("Start time for the first occurrence in ISO format. Examples: '2024-01-15T10:00:00', 'Monday at 2pm', '10:30am'"),
+      endTime: z.string().describe("End time for the first occurrence in ISO format. This determines the duration of each recurring instance."),
       recurrence: z.string().optional().describe("Natural language recurrence pattern. Examples: 'every Monday at 10am', 'daily for 30 days', 'every Tuesday and Thursday at 2pm', 'weekly for 12 weeks', 'monthly on the 15th'"),
       rrule: z.string().optional().describe("RFC 5545 RRULE format string (e.g., 'FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=12'). Use if you have a specific RRULE. Either 'recurrence' or 'rrule' is required."),
-      category: z.string().optional().describe("Category for this event. Will be auto-created if it doesn't exist."),
+      category: z.string().optional().describe("Category for this event. MUST be an existing category - call list_categories first. Will NOT be auto-created."),
       description: z.string().optional().describe("Description for the recurring event"),
       location: z.string().optional().describe("Location for the recurring event"),
       endDate: z.string().optional().describe("End date for the recurrence in ISO format (e.g., '2024-03-15'). Optional - omit for indefinite recurrence."),
