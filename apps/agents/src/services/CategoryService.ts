@@ -160,6 +160,57 @@ export class CategoryService {
   }
 
   /**
+   * Create or update a category (upsert) - handles duplicates gracefully
+   */
+  async upsertCategory(userId: string, input: CategoryCreateInput): Promise<Category | null> {
+    try {
+      // Validate input
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+
+      if (!input.name || typeof input.name !== 'string' || input.name.trim().length === 0) {
+        throw new Error('Category name is required and must be a non-empty string');
+      }
+
+      if (!input.color || typeof input.color !== 'string' || !input.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+        throw new Error('Valid hex color is required (e.g., #3b82f6)');
+      }
+
+      const { data, error } = await this.supabase
+        .from('categories')
+        .upsert({
+          user_id: userId,
+          name: input.name.trim(),
+          color: input.color.trim(),
+          icon: input.icon?.trim(),
+          description: input.description?.trim(),
+          context: input.context || {},
+        }, {
+          onConflict: 'user_id,name',
+          ignoreDuplicates: false
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ [CategoryService] Error upserting category:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('No data returned from database');
+      }
+
+      console.log(`✅ [CategoryService] Upserted category: ${input.name}`);
+      return data as Category;
+    } catch (error) {
+      console.error('❌ [CategoryService] Exception upserting category:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update a category
    */
   async updateCategory(

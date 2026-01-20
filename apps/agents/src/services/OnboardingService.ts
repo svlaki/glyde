@@ -1,5 +1,6 @@
 import { getSupabaseService } from './SupabaseService.js';
 import { CategoryService } from './CategoryService.js';
+import { ZepOnboardingSeedService } from './ZepOnboardingSeedService.js';
 
 export interface OnboardingData {
   name: string;
@@ -24,6 +25,22 @@ export interface OnboardingData {
       deep_work_time: 'morning' | 'afternoon' | 'evening';
     };
   };
+}
+
+// V2 Onboarding data interface (new structure)
+export interface OnboardingDataV2 {
+  fullName: string;
+  preferredName?: string;
+  birthday: string;
+  gender: string;
+  selectedCalendars: string[];
+  otherCalendar?: string;
+  occupation: string;
+  fieldOfStudy?: string;
+  aspects: string[];
+  goals: string[];
+  habits: string[];
+  timezone: string;
 }
 
 export class OnboardingService {
@@ -70,6 +87,135 @@ export class OnboardingService {
 
     // Create goals in the user's schema
     await this.createGoalsForUser(userId, data.goals);
+  }
+
+  /**
+   * Complete V2 onboarding (new structure with birthday, gender, habits)
+   * Wipes previous onboarding data and starts fresh
+   */
+  static async completeOnboardingV2(userId: string, data: OnboardingDataV2): Promise<void> {
+    const supabase = getSupabaseService().getClient();
+
+    console.log(`🔄 Starting V2 onboarding for user ${userId} - clearing previous data...`);
+
+    // Step 1: Clear previous onboarding data
+    await this.clearPreviousOnboardingData(userId);
+
+    // Step 2: Generate goals summary from goals array
+    const goals_summary = this.generateGoalsSummary(data.goals);
+
+    // Step 3: Prepare context data (only for non-column data)
+    const context_data = {
+      onboarding: {
+        completed_at: new Date().toISOString(),
+        version: '2.0',
+        steps_completed: ['basic_info', 'calendars', 'habits_goals']
+      },
+      life_aspects: data.aspects,
+      calendar_imported: false,
+      selected_calendars: data.selectedCalendars,
+      other_calendar: data.otherCalendar
+    };
+
+    // Step 4: Update profile with all onboarding data using proper columns
+    const { error } = await supabase
+      .from('profile')
+      .update({
+        display_name: data.preferredName || data.fullName,
+        preferred_name: data.preferredName || null,
+        birthday: data.birthday,
+        gender: data.gender,
+        occupation: data.occupation,
+        field_of_study: data.fieldOfStudy || null,
+        habits: data.habits,
+        timezone: data.timezone,
+        goals_summary: goals_summary,
+        context_data: context_data
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error completing V2 onboarding:', error);
+      throw new Error(`Failed to complete onboarding: ${error.message}`);
+    }
+
+    // Step 5: Create categories for each aspect
+    await this.createCategoriesForAspects(userId, data.aspects);
+
+    // Step 6: Create goals in the user's schema
+    await this.createGoalsForUser(userId, data.goals);
+
+    console.log(`✅ Completed V2 onboarding for user ${userId}`);
+
+    // Step 7: Seed Zep memory with onboarding data (non-blocking)
+    try {
+      const zepSeedService = new ZepOnboardingSeedService();
+      const seedResult = await zepSeedService.seedOnboardingData(userId, data, goals_summary);
+
+      if (!seedResult.success) {
+        console.warn(`⚠️ Zep seeding failed for user ${userId}:`, seedResult.errors);
+      }
+    } catch (error: any) {
+      // Log but don't fail onboarding - Zep seeding is non-critical
+      console.error(`⚠️ Zep seeding error for user ${userId}:`, error.message);
+    }
+  }
+
+  /**
+   * Clear all previous onboarding data for a user
+   * This ensures a fresh start when re-onboarding
+   */
+  private static async clearPreviousOnboardingData(userId: string): Promise<void> {
+    const supabase = getSupabaseService().getClient();
+
+    // Delete all existing categories for this user
+    const { error: categoriesError } = await supabase
+      .from('categories')
+      .delete()
+      .eq('user_id', userId);
+
+    if (categoriesError) {
+      console.warn(`⚠️ Failed to clear categories: ${categoriesError.message}`);
+    } else {
+      console.log(`✅ Cleared existing categories for user`);
+    }
+
+    // Delete all existing goals for this user
+    const { error: goalsError } = await supabase
+      .from('goals')
+      .delete()
+      .eq('user_id', userId);
+
+    if (goalsError) {
+      console.warn(`⚠️ Failed to clear goals: ${goalsError.message}`);
+    } else {
+      console.log(`✅ Cleared existing goals for user`);
+    }
+
+    // Reset profile onboarding-related fields
+    const { error: profileError } = await supabase
+      .from('profile')
+      .update({
+        display_name: null,
+        preferred_name: null,
+        birthday: null,
+        gender: null,
+        occupation: null,
+        field_of_study: null,
+        habits: [],
+        goals_summary: null,
+        context_data: {},
+        preferences: {},
+        work_patterns: {},
+        personality_traits: {}
+      })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.warn(`⚠️ Failed to reset profile: ${profileError.message}`);
+    } else {
+      console.log(`✅ Reset profile fields for user`);
+    }
   }
 
   /**
@@ -128,16 +274,16 @@ export class OnboardingService {
       const icon = aspect.charAt(0).toUpperCase(); // Use first letter as icon
 
       try {
-        await categoryService.createCategory(userId, {
+        // Use upsert to handle duplicates gracefully
+        await categoryService.upsertCategory(userId, {
           name: aspect,
           color: color,
           icon: icon,
           description: `${aspect} activities and events`
         });
-        console.log(`✅ Created category for aspect: ${aspect}`);
+        console.log(`✅ Created/updated category for aspect: ${aspect}`);
       } catch (error: any) {
         // Don't fail the whole onboarding if one category fails
-        // This might happen if the category already exists
         console.error(`⚠️  Failed to create category for aspect ${aspect}:`, error.message);
       }
     }
