@@ -4,6 +4,7 @@ import { OnboardingService } from '../services/OnboardingService.js';
 /**
  * Complete onboarding
  * POST /api/onboarding/complete
+ * Supports both V1 (old) and V2 (new) onboarding formats
  */
 export async function completeOnboarding(req: Request, res: Response) {
   try {
@@ -14,35 +15,82 @@ export async function completeOnboarding(req: Request, res: Response) {
       return;
     }
 
-    const { name, occupation, goals, aspects, timezone, preferences } = req.body;
+    // Check if this is V2 format (has fullName) or V1 format (has name + preferences)
+    const isV2 = 'fullName' in req.body;
 
-    // Validate required fields
-    if (!name || !occupation || !goals || !aspects || !timezone || !preferences) {
-      res.status(400).json({
-        success: false,
-        error: 'Missing required fields'
+    if (isV2) {
+      // V2 Format: New onboarding structure
+      const {
+        fullName,
+        preferredName,
+        birthday,
+        gender,
+        selectedCalendars,
+        otherCalendar,
+        occupation,
+        fieldOfStudy,
+        aspects,
+        goals,
+        habits,
+        timezone
+      } = req.body;
+
+      // Validate required V2 fields
+      if (!fullName || !birthday || !gender || !occupation || !aspects || !goals || !timezone) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required fields for V2 onboarding'
+        });
+        return;
+      }
+
+      // Complete V2 onboarding
+      await OnboardingService.completeOnboardingV2(userId, {
+        fullName,
+        preferredName,
+        birthday,
+        gender,
+        selectedCalendars: selectedCalendars || [],
+        otherCalendar,
+        occupation,
+        fieldOfStudy,
+        aspects,
+        goals,
+        habits: habits || [],
+        timezone
       });
-      return;
-    }
+    } else {
+      // V1 Format: Old onboarding structure
+      const { name, occupation, goals, aspects, timezone, preferences } = req.body;
 
-    // Validate preferences structure
-    if (!preferences.work_hours || !preferences.communication || !preferences.productivity) {
-      res.status(400).json({
-        success: false,
-        error: 'Invalid preferences structure'
+      // Validate required V1 fields
+      if (!name || !occupation || !goals || !aspects || !timezone || !preferences) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required fields'
+        });
+        return;
+      }
+
+      // Validate preferences structure
+      if (!preferences.work_hours || !preferences.communication || !preferences.productivity) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid preferences structure'
+        });
+        return;
+      }
+
+      // Complete V1 onboarding
+      await OnboardingService.completeOnboarding(userId, {
+        name,
+        occupation,
+        goals,
+        aspects,
+        timezone,
+        preferences
       });
-      return;
     }
-
-    // Complete onboarding
-    await OnboardingService.completeOnboarding(userId, {
-      name,
-      occupation,
-      goals,
-      aspects,
-      timezone,
-      preferences
-    });
 
     res.json({
       success: true,

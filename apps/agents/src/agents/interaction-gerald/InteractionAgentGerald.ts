@@ -401,8 +401,57 @@ export class InteractionAgentGerald extends BaseAgent {
       return `\nPROFILE: Not available.`;
     }
 
-    const name = profile.display_name || profile.email?.split('@')[0] || 'User';
-    return `\nPROFILE:\n  Name: ${name}\n  Timezone: ${profile.timezone || 'Not set'}`;
+    const parts: string[] = [];
+
+    // Name
+    const name = profile.preferred_name || profile.display_name || profile.email?.split('@')[0] || 'User';
+    parts.push(`Name: ${name}`);
+
+    // Occupation
+    if (profile.occupation) {
+      const occ = profile.field_of_study
+        ? `${profile.occupation} (${profile.field_of_study})`
+        : profile.occupation;
+      parts.push(`Occupation: ${occ}`);
+    }
+
+    // Habits/Challenges - map IDs to human-readable labels
+    if (profile.habits?.length) {
+      const habitLabels = this.mapHabitIds(profile.habits);
+      parts.push(`Known challenges: ${habitLabels.join(', ')}`);
+    }
+
+    // Life aspects
+    const aspects = profile.context_data?.life_aspects;
+    if (aspects?.length) {
+      parts.push(`Life focus areas: ${aspects.join(', ')}`);
+    }
+
+    // Goals summary
+    if (profile.goals_summary) {
+      parts.push(`Goals: ${profile.goals_summary}`);
+    }
+
+    return `\nPROFILE:\n  ${parts.join('\n  ')}`;
+  }
+
+  /**
+   * Map habit IDs to human-readable labels
+   */
+  private mapHabitIds(habitIds: string[]): string[] {
+    const HABIT_LABELS: Record<string, string> = {
+      'deadlines': 'struggles with deadlines',
+      'task-switching': 'difficulty switching tasks',
+      'procrastinator': 'tends to procrastinate',
+      'easily-distracted': 'gets easily distracted',
+      'poor-time-estimation': 'underestimates task duration',
+      'overcommit': 'tends to overcommit',
+      'forget-tasks': 'forgets tasks/appointments',
+      'work-life-balance': 'work-life balance challenges',
+      'perfectionist': 'perfectionist tendencies',
+      'energy-management': 'energy management challenges'
+    };
+    return habitIds.map(id => HABIT_LABELS[id] || id);
   }
 
   /**

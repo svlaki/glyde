@@ -10,7 +10,7 @@ import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
-import { Onboarding } from './src/components/Onboarding'
+import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
 
 function App() {

@@ -14,6 +14,7 @@ export interface PromptContext {
   tomorrowDayName: string;
   toolCount?: number; // Optional: number of available tools
   zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
+  profileContext?: string; // Optional: User profile context (name, occupation, habits, goals, life aspects)
 }
 
 /**
@@ -27,7 +28,7 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext } = context;
+  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext, profileContext } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
@@ -54,7 +55,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${profileContext ? `\n\nUSER PROFILE:${profileContext}` : ''}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}

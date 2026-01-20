@@ -462,6 +462,34 @@ export class ZepGraphService {
     }
   }
 
+
+  /**
+   * Add user preference to user's graph (used for onboarding data)
+   */
+  async addUserPreference(userId: string, preference: {
+    preference_type: string;
+    key: string;
+    value: string;
+    importance: string;
+  }): Promise<void> {
+    try {
+      await this.client.graph.add({
+        userId: userId,
+        ...formatEntityForGraph('UserPreference', {
+          preference_type: preference.preference_type,
+          preference_key: preference.key,
+          preference_value: preference.value,
+          importance: preference.importance,
+        })
+      });
+
+      console.log(`✅ [ZepGraphService] Added user preference: ${preference.key}`);
+    } catch (error) {
+      console.error(`❌ [ZepGraphService] Failed to add user preference:`, error);
+      throw error;
+    }
+  }
+
   // ============================================================================
   // CENTRAL GRAPH OPERATIONS - Cross-User Patterns
   // ============================================================================
