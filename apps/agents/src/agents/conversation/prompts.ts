@@ -36,11 +36,16 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
   // Build rules section if rules exist
   const rulesSection = rulesContext ? `
 
-PERSONAL RULES (YOU MUST FOLLOW THESE):
-The user has defined the following rules. These are persistent preferences that you MUST respect in all interactions:
+PERSONAL RULES:
+The user has defined the following rules. Each rule shows its status ([ENABLED] or [DISABLED]) and ID:
 ${rulesContext}
 
-IMPORTANT: These rules take precedence over general behavior. If a rule conflicts with a default behavior, follow the rule.
+RULE BEHAVIOR (CRITICAL):
+- ONLY follow [ENABLED] rules. These take precedence over general behavior.
+- DO NOT follow [DISABLED] rules. If you were following a rule that is now disabled, STOP following it immediately.
+- When user requests behavior matching a [DISABLED] rule, use toggle_rule to re-enable it instead of creating a duplicate.
+- Before creating a new rule with create_rule, check if a similar rule already exists (enabled or disabled). If it does, toggle it instead.
+- Rules can change mid-conversation. Always check the current status above, not what you did earlier in the conversation.
 ` : '';
 
   return new SystemMessage(`You are a friendly personal calendar and task assistant. Help users manage their time and tasks naturally and conversationally.${toolInfo}${rulesSection}

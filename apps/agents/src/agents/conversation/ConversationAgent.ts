@@ -405,13 +405,16 @@ IMPORTANT INSTRUCTIONS:
         console.error('Error loading Zep context:', error);
       }
 
-      // Load user rules for context injection
+      // Load ALL user rules (enabled and disabled) for context injection
+      // This allows the agent to see disabled rules and re-enable them instead of creating duplicates
       let rulesContext = '';
       try {
-        const userRules = await ruleService.getEnabledRules(state.userId);
+        const userRules = await ruleService.getRules(state.userId);
         if (userRules.length > 0) {
           rulesContext = ruleService.formatRulesForPrompt(userRules);
-          console.log(`[CONVERSATION AGENT] Loaded ${userRules.length} rules for user context`);
+          const enabledCount = userRules.filter(r => r.enabled).length;
+          const disabledCount = userRules.length - enabledCount;
+          console.log(`[CONVERSATION AGENT] Loaded ${userRules.length} rules (${enabledCount} enabled, ${disabledCount} disabled)`);
         } else {
           console.log(`[CONVERSATION AGENT] No rules found for user`);
         }

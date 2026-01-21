@@ -262,6 +262,7 @@ export class RuleService {
 
   /**
    * Format rules for injection into agent system prompt
+   * Shows ALL rules with their enabled/disabled status and IDs
    */
   formatRulesForPrompt(rules: Rule[]): string {
     if (rules.length === 0) {
@@ -270,7 +271,10 @@ export class RuleService {
 
     const formattedRules = rules
       .sort((a, b) => b.priority - a.priority)
-      .map(r => `- ${r.rule_text}`)
+      .map(r => {
+        const status = r.enabled ? '[ENABLED]' : '[DISABLED]';
+        return `- ${status} ${r.rule_text} (ID: ${r.id})`;
+      })
       .join('\n');
 
     return formattedRules;

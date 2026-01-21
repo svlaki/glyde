@@ -141,10 +141,8 @@ export class SupabaseService {
     return this.getEvents(userId, startDate, endDate);
   }
 
-  // Method for frontend - no timezone conversion (frontend handles it)
-  // Returns all events as UTC timestamps from database
-  // NO timezone conversion - caller (Agent or Frontend) handles display timezone
-  async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+  // Internal method to fetch raw events from database (no expansion)
+  private async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
       // Use the new function that joins category data
       const { data, error } = await this.client
@@ -158,8 +156,6 @@ export class SupabaseService {
         console.error('Error fetching events:', error);
         return [];
       }
-
-      console.log('✅ [SUPABASE SERVICE] Retrieved', data?.length || 0, 'events (UTC) with categories for user');
 
       // Transform to match DatabaseEvent interface - convert timestamps to ISO 8601
       const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
@@ -189,6 +185,82 @@ export class SupabaseService {
     } catch (error) {
       console.error('Exception fetching events:', error);
       return [];
+    }
+  }
+
+  // Method for frontend and agents - returns all events with recurring events expanded
+  // NO timezone conversion - caller (Agent or Frontend) handles display timezone
+  async getEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    try {
+      // Import rrule utilities
+      const {
+        expandRecurrenceWithEndTime,
+        validateRRule
+      } = await import('../utils/rrule.js');
+
+      // Get raw events from database
+      const rawEvents = await this.getRawEvents(userId, startDate, endDate);
+
+      if (!rawEvents || rawEvents.length === 0) {
+        return [];
+      }
+
+      const expandedEvents: DatabaseEvent[] = [];
+      // Use start of day to ensure events earlier today aren't filtered out
+      const startD = startDate ? new Date(startDate) : (() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return today;
+      })();
+      const endD = endDate ? new Date(endDate) : new Date(startD.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+      for (const event of rawEvents) {
+        if (event.is_recurring && event.recurrence_rule) {
+          // Validate and expand recurring event
+          if (!validateRRule(event.recurrence_rule)) {
+            console.warn('⚠️  [SupabaseService] Invalid RRULE for event:', event.id, event.recurrence_rule);
+            expandedEvents.push(event); // Add parent anyway
+            continue;
+          }
+
+          // Expand instances
+          const startT = new Date(event.start_time);
+          const endT = new Date(event.end_time);
+          const instances = expandRecurrenceWithEndTime(
+            event.recurrence_rule,
+            startT,
+            endT,
+            event.recurrence_end ? new Date(event.recurrence_end) : endD
+          );
+
+          // Filter instances within requested date range and create event objects
+          for (const instance of instances) {
+            if (instance.start >= startD && instance.start <= endD) {
+              expandedEvents.push({
+                ...event,
+                start_time: instance.start.toISOString(),
+                end_time: instance.end.toISOString(),
+                parent_event_id: event.id, // Reference to parent for updates/deletes
+                is_recurring: true
+              });
+            }
+          }
+        } else {
+          // Regular non-recurring event
+          expandedEvents.push(event);
+        }
+      }
+
+      // Sort by start time
+      expandedEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
+      console.log('✅ [SUPABASE SERVICE] Retrieved', rawEvents.length, 'raw events, expanded to', expandedEvents.length, 'events for user');
+
+      return expandedEvents;
+    } catch (error) {
+      console.error('Exception fetching/expanding events:', error);
+      // Fallback to raw events if expansion fails
+      return this.getRawEvents(userId, startDate, endDate);
     }
   }
 
@@ -376,76 +448,15 @@ export class SupabaseService {
    * Get events with expanded recurring instances for a date range
    * Combines regular events with expanded recurring event instances
    */
+  // Deprecated: getEvents() now automatically expands recurring events
+  // This method is kept for backward compatibility
   async getExpandedEvents(
     userId: string,
     startDate?: string,
     endDate?: string
   ): Promise<Array<DatabaseEvent & { is_instance?: boolean; parent_event_id_ref?: string }>> {
-    try {
-      // Import here to avoid circular dependencies
-      const {
-        expandRecurrenceWithEndTime,
-        validateRRule
-      } = await import('../utils/rrule.js');
-
-      // Get all events (both regular and recurring)
-      const allEvents = await this.getEvents(userId, startDate, endDate);
-
-      if (!allEvents || allEvents.length === 0) {
-        return [];
-      }
-
-      const expandedEvents: Array<DatabaseEvent & { is_instance?: boolean; parent_event_id_ref?: string }> = [];
-      const startD = startDate ? new Date(startDate) : new Date();
-      const endD = endDate ? new Date(endDate) : new Date(startD.getTime() + 365 * 24 * 60 * 60 * 1000);
-
-      for (const event of allEvents) {
-        if (event.is_recurring && event.recurrence_rule) {
-          // Validate and expand recurring event
-          if (!validateRRule(event.recurrence_rule)) {
-            console.warn('⚠️  [SupabaseService] Invalid RRULE for event:', event.id, event.recurrence_rule);
-            expandedEvents.push(event); // Add parent anyway
-            continue;
-          }
-
-          // Expand instances
-          const startT = new Date(event.start_time);
-          const endT = new Date(event.end_time);
-          const instances = expandRecurrenceWithEndTime(
-            event.recurrence_rule,
-            startT,
-            endT,
-            event.recurrence_end ? new Date(event.recurrence_end) : endD
-          );
-
-          // Filter instances within requested date range and create event objects
-          for (const instance of instances) {
-            if (instance.start >= startD && instance.start <= endD) {
-              expandedEvents.push({
-                ...event,
-                start_time: instance.start.toISOString(),
-                end_time: instance.end.toISOString(),
-                is_instance: true,
-                parent_event_id: event.id, // Use parent_event_id for frontend compatibility
-                is_recurring: true // Mark as recurring so frontend can identify it
-              });
-            }
-          }
-        } else {
-          // Regular non-recurring event
-          expandedEvents.push(event);
-        }
-      }
-
-      // Sort by start time
-      expandedEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-      return expandedEvents;
-    } catch (error) {
-      console.error('❌ [SupabaseService] Error expanding events:', error);
-      // Fallback to regular events if expansion fails
-      return this.getEvents(userId, startDate, endDate);
-    }
+    // Just forward to getEvents() which now handles expansion
+    return this.getEvents(userId, startDate, endDate);
   }
 
   /**
