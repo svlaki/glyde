@@ -15,6 +15,18 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 // HOISTED MOCKS - Must be at top level before any imports
 // =============================================================================
 
+// Stateful mock data - allows delete operations to actually remove items
+const mockState = {
+  events: [] as any[],
+  tasks: [] as any[],
+  goals: [] as any[],
+  categories: [
+    { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
+    { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
+  ] as any[],
+  rules: [] as any[],
+};
+
 const {
   mockSupabaseService,
   mockRuleService,
@@ -30,49 +42,102 @@ const {
       email: 'test@example.com',
       name: 'Test User',
     }),
-    getEvents: vi.fn().mockResolvedValue([]),
-    getEventsForAgent: vi.fn().mockResolvedValue([]),
-    createEvent: vi.fn().mockImplementation(async (userId: string, event: any) => ({
-      id: `evt-${Date.now()}`,
-      user_id: userId,
-      ...event,
-      created_at: new Date().toISOString(),
-    })),
-    updateEvent: vi.fn().mockImplementation(async (userId: string, eventId: string, updates: any) => ({
+    getEvents: vi.fn().mockImplementation(async () => mockState.events),
+    getEventsForAgent: vi.fn().mockImplementation(async () => mockState.events),
+    createEvent: vi.fn().mockImplementation(async (userId: string, event: any) => {
+      const newEvent = {
+        id: `evt-${Date.now()}`,
+        user_id: userId,
+        ...event,
+        created_at: new Date().toISOString(),
+      };
+      mockState.events.push(newEvent);
+      return newEvent;
+    }),
+    updateEvent: vi.fn().mockImplementation(async (userId: string, eventId: string, updates: any) => {
+      const index = mockState.events.findIndex(e => e.id === eventId);
+      if (index !== -1) {
+        mockState.events[index] = { ...mockState.events[index], ...updates, updated_at: new Date().toISOString() };
+        return mockState.events[index];
+      }
+      return { id: eventId, user_id: userId, ...updates, updated_at: new Date().toISOString() };
+    }),
+    deleteEvent: vi.fn().mockImplementation(async (_userId: string, eventId: string) => {
+      const index = mockState.events.findIndex(e => e.id === eventId);
+      if (index !== -1) {
+        mockState.events.splice(index, 1);
+      }
+      return { success: true };
+    }),
+    createRecurringEvent: vi.fn().mockImplementation(async (userId: string, event: any) => {
+      const newEvent = {
+        id: `recurring-evt-${Date.now()}`,
+        user_id: userId,
+        ...event,
+        is_recurring: true,
+        created_at: new Date().toISOString(),
+      };
+      mockState.events.push(newEvent);
+      return newEvent;
+    }),
+    updateRecurringEvent: vi.fn().mockImplementation(async (userId: string, eventId: string, updates: any) => ({
       id: eventId,
       user_id: userId,
       ...updates,
       updated_at: new Date().toISOString(),
     })),
-    deleteEvent: vi.fn().mockResolvedValue({ success: true }),
-    getTasks: vi.fn().mockResolvedValue([]),
-    createTask: vi.fn().mockImplementation(async (userId: string, task: any) => ({
-      id: `task-${Date.now()}`,
-      user_id: userId,
-      ...task,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    })),
+    deleteRecurringEvent: vi.fn().mockImplementation(async (_userId: string, eventId: string) => {
+      const index = mockState.events.findIndex(e => e.id === eventId);
+      if (index !== -1) {
+        mockState.events.splice(index, 1);
+      }
+      return { success: true };
+    }),
+    getTasks: vi.fn().mockImplementation(async () => mockState.tasks),
+    createTask: vi.fn().mockImplementation(async (userId: string, task: any) => {
+      const newTask = {
+        id: `task-${Date.now()}`,
+        user_id: userId,
+        ...task,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      };
+      mockState.tasks.push(newTask);
+      return newTask;
+    }),
     updateTask: vi.fn().mockResolvedValue({}),
-    deleteTask: vi.fn().mockResolvedValue({ success: true }),
+    deleteTask: vi.fn().mockImplementation(async (_userId: string, taskId: string) => {
+      const index = mockState.tasks.findIndex(t => t.id === taskId);
+      if (index !== -1) {
+        mockState.tasks.splice(index, 1);
+      }
+      return { success: true };
+    }),
     completeTask: vi.fn().mockResolvedValue({}),
-    getGoals: vi.fn().mockResolvedValue([]),
-    createGoal: vi.fn().mockImplementation(async (userId: string, goal: any) => ({
-      id: `goal-${Date.now()}`,
-      user_id: userId,
-      ...goal,
-      status: 'in_progress',
-      created_at: new Date().toISOString(),
-    })),
+    getGoals: vi.fn().mockImplementation(async () => mockState.goals),
+    createGoal: vi.fn().mockImplementation(async (userId: string, goal: any) => {
+      const newGoal = {
+        id: `goal-${Date.now()}`,
+        user_id: userId,
+        ...goal,
+        status: 'in_progress',
+        created_at: new Date().toISOString(),
+      };
+      mockState.goals.push(newGoal);
+      return newGoal;
+    }),
     updateGoal: vi.fn().mockResolvedValue({}),
-    deleteGoal: vi.fn().mockResolvedValue({ success: true }),
+    deleteGoal: vi.fn().mockImplementation(async (_userId: string, goalId: string) => {
+      const index = mockState.goals.findIndex(g => g.id === goalId);
+      if (index !== -1) {
+        mockState.goals.splice(index, 1);
+      }
+      return { success: true };
+    }),
     addGoalCheckIn: vi.fn().mockResolvedValue({}),
     getGoalCheckIns: vi.fn().mockResolvedValue([]),
-    getCategories: vi.fn().mockResolvedValue([
-      { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
-      { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
-    ]),
-    getExpandedEvents: vi.fn().mockResolvedValue([]),
+    getCategories: vi.fn().mockImplementation(async () => mockState.categories),
+    getExpandedEvents: vi.fn().mockImplementation(async () => mockState.events),
     getUserSettings: vi.fn().mockResolvedValue({}),
     updateUserSetting: vi.fn().mockResolvedValue(true),
   };
@@ -94,11 +159,19 @@ const {
     })),
     updateRule: vi.fn().mockResolvedValue({}),
     deleteRule: vi.fn().mockResolvedValue({ success: true }),
-    toggleRule: vi.fn().mockImplementation(async (_userId: string, ruleId: string, enabled: boolean) => ({
-      id: ruleId,
-      enabled,
-      updated_at: new Date().toISOString(),
-    })),
+    toggleRule: vi.fn().mockImplementation(async (_userId: string, ruleId: string, enabled: boolean) => {
+      // Update the rule in mockState
+      const index = mockState.rules.findIndex((r: any) => r.id === ruleId);
+      if (index !== -1) {
+        mockState.rules[index] = { ...mockState.rules[index], enabled, updated_at: new Date().toISOString() };
+        return mockState.rules[index];
+      }
+      return {
+        id: ruleId,
+        enabled,
+        updated_at: new Date().toISOString(),
+      };
+    }),
     searchRules: vi.fn().mockResolvedValue([]),
     formatRulesForPrompt: vi.fn().mockReturnValue(''),
   };
@@ -140,23 +213,36 @@ const {
     deleteGoal: vi.fn().mockResolvedValue(undefined),
     searchUserGraphAdvanced: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
     getEnhancedUserContext: vi.fn().mockResolvedValue({}),
+    searchEntities: vi.fn().mockResolvedValue([]),
+    searchEvents: vi.fn().mockResolvedValue([]),
+    searchTasks: vi.fn().mockResolvedValue([]),
   };
 
   const mockCategoryService = {
-    getCategories: vi.fn().mockResolvedValue([
-      { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
-      { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
-    ]),
+    getCategories: vi.fn().mockImplementation(async () => mockState.categories),
     getCategoryByName: vi.fn().mockResolvedValue(null),
-    createCategory: vi.fn().mockImplementation(async (userId: string, name: string, color?: string) => ({
-      id: `cat-${Date.now()}`,
-      user_id: userId,
-      name,
-      color: color || '#808080',
-      created_at: new Date().toISOString(),
-    })),
+    createCategory: vi.fn().mockImplementation(async (userId: string, nameOrInput: string | any, color?: string) => {
+      // Handle both (userId, name, color) and (userId, {name, color, ...}) signatures
+      const categoryName = typeof nameOrInput === 'object' ? nameOrInput.name : nameOrInput;
+      const categoryColor = typeof nameOrInput === 'object' ? nameOrInput.color : color;
+      const newCategory = {
+        id: `cat-${Date.now()}`,
+        user_id: userId,
+        name: categoryName,
+        color: categoryColor || '#808080',
+        created_at: new Date().toISOString(),
+      };
+      mockState.categories.push(newCategory);
+      return newCategory;
+    }),
     updateCategory: vi.fn().mockResolvedValue({}),
-    deleteCategory: vi.fn().mockResolvedValue({ success: true }),
+    deleteCategory: vi.fn().mockImplementation(async (_userId: string, categoryId: string) => {
+      const index = mockState.categories.findIndex((c: any) => c.id === categoryId);
+      if (index !== -1) {
+        mockState.categories.splice(index, 1);
+      }
+      return { success: true };
+    }),
   };
 
   return {
@@ -194,6 +280,7 @@ vi.mock('../../../../services/ZepGraphService.js', () => ({
 }));
 
 vi.mock('../../../../services/CategoryService.js', () => ({
+  default: mockCategoryService,
   CategoryService: vi.fn(() => mockCategoryService),
 }));
 
@@ -241,46 +328,53 @@ let agent: ConversationAgent;
 
 /**
  * Configures mocks based on test context
+ * Populates mockState arrays so stateful operations work correctly
  */
 function configureMocksFromContext(context: TestContext | undefined) {
   if (!context) return;
 
   if (context.existingEvents) {
-    mockSupabaseService.getEvents.mockResolvedValue(context.existingEvents);
-    mockSupabaseService.getEventsForAgent.mockResolvedValue(context.existingEvents);
-    mockSupabaseService.getExpandedEvents.mockResolvedValue(context.existingEvents);
+    // Populate mockState with existing events
+    mockState.events = [...context.existingEvents];
   }
 
   if (context.existingTasks) {
-    mockSupabaseService.getTasks.mockResolvedValue(context.existingTasks);
+    mockState.tasks = [...context.existingTasks];
   }
 
   if (context.existingGoals) {
-    mockSupabaseService.getGoals.mockResolvedValue(context.existingGoals);
+    mockState.goals = [...context.existingGoals];
   }
 
   if (context.existingRules) {
-    mockRuleService.getRules.mockResolvedValue(context.existingRules);
-    mockRuleService.getEnabledRules.mockResolvedValue(
-      context.existingRules.filter(r => r.enabled)
+    mockState.rules = [...context.existingRules];
+    mockRuleService.getRules.mockImplementation(async () => mockState.rules);
+    mockRuleService.getEnabledRules.mockImplementation(async () =>
+      mockState.rules.filter((r: any) => r.enabled)
     );
-    mockRuleService.formatRulesForPrompt.mockReturnValue(
-      context.existingRules
-        .map(r => `- [${r.enabled ? 'ENABLED' : 'DISABLED'}] ${r.rule_text} (ID: ${r.id})`)
+    mockRuleService.formatRulesForPrompt.mockImplementation(() =>
+      mockState.rules
+        .map((r: any) => `- [${r.enabled ? 'ENABLED' : 'DISABLED'}] ${r.rule_text} (ID: ${r.id})`)
         .join('\n')
     );
     mockRuleService.getRule.mockImplementation(async (_userId: string, ruleId: string) => {
-      return context.existingRules?.find(r => r.id === ruleId) || null;
+      return mockState.rules.find((r: any) => r.id === ruleId) || null;
+    });
+    mockRuleService.searchRules.mockImplementation(async (_userId: string, query: string) => {
+      const q = query.toLowerCase();
+      return mockState.rules.filter((r: any) =>
+        r.rule_text.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q))
+      );
     });
   }
 
   if (context.existingCategories) {
-    mockSupabaseService.getCategories.mockResolvedValue(context.existingCategories);
-    mockCategoryService.getCategories.mockResolvedValue(context.existingCategories);
+    mockState.categories = [...context.existingCategories];
     mockCategoryService.getCategoryByName.mockImplementation(async (_userId: string, name: string) => {
       const normalized = name.toLowerCase().trim();
-      return context.existingCategories?.find(
-        c => c.name.toLowerCase().trim() === normalized
+      return mockState.categories.find(
+        (c: any) => c.name.toLowerCase().trim() === normalized
       ) || null;
     });
   }
@@ -290,33 +384,46 @@ function configureMocksFromContext(context: TestContext | undefined) {
  * Resets all mocks to default state
  */
 function resetMocks() {
-  // Reset all mock implementations to defaults
-  mockSupabaseService.getProfile.mockResolvedValue({
-    id: 'test-user-id',
-    timezone: 'America/New_York',
-    email: 'test@example.com',
-    name: 'Test User',
+  // Reset mockState to defaults
+  mockState.events = [];
+  mockState.tasks = [];
+  mockState.goals = [];
+  mockState.categories = [
+    { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
+    { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
+  ];
+  mockState.rules = [];
+
+  // Reset RuleService implementations to use mockState
+  mockRuleService.getRules.mockImplementation(async () => mockState.rules);
+  mockRuleService.getEnabledRules.mockImplementation(async () =>
+    mockState.rules.filter((r: any) => r.enabled)
+  );
+  mockRuleService.formatRulesForPrompt.mockImplementation(() =>
+    mockState.rules.length > 0
+      ? mockState.rules
+          .map((r: any) => `- [${r.enabled ? 'ENABLED' : 'DISABLED'}] ${r.rule_text} (ID: ${r.id})`)
+          .join('\n')
+      : ''
+  );
+  mockRuleService.getRule.mockImplementation(async (_userId: string, ruleId: string) => {
+    return mockState.rules.find((r: any) => r.id === ruleId) || null;
   });
-  mockSupabaseService.getEvents.mockResolvedValue([]);
-  mockSupabaseService.getEventsForAgent.mockResolvedValue([]);
-  mockSupabaseService.getExpandedEvents.mockResolvedValue([]);
-  mockSupabaseService.getTasks.mockResolvedValue([]);
-  mockSupabaseService.getGoals.mockResolvedValue([]);
-  mockSupabaseService.getCategories.mockResolvedValue([
-    { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
-    { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
-  ]);
+  mockRuleService.searchRules.mockImplementation(async (_userId: string, query: string) => {
+    const q = query.toLowerCase();
+    return mockState.rules.filter((r: any) =>
+      r.rule_text.toLowerCase().includes(q) ||
+      (r.description && r.description.toLowerCase().includes(q))
+    );
+  });
 
-  mockRuleService.getRules.mockResolvedValue([]);
-  mockRuleService.getEnabledRules.mockResolvedValue([]);
-  mockRuleService.formatRulesForPrompt.mockReturnValue('');
-  mockRuleService.getRule.mockResolvedValue(null);
-
-  mockCategoryService.getCategories.mockResolvedValue([
-    { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
-    { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
-  ]);
-  mockCategoryService.getCategoryByName.mockResolvedValue(null);
+  // Reset CategoryService to use mockState
+  mockCategoryService.getCategoryByName.mockImplementation(async (_userId: string, name: string) => {
+    const normalized = name.toLowerCase().trim();
+    return mockState.categories.find(
+      (c: any) => c.name.toLowerCase().trim() === normalized
+    ) || null;
+  });
 
   mockZepMemoryService.getThreadContext.mockResolvedValue('');
 }
@@ -391,9 +498,21 @@ function extractToolCallsFromMocks(): CapturedToolCall[] {
       for (const callArgs of mock.mock.calls) {
         const toolName = serviceMethodToToolMap[method];
         if (toolName) {
+          let args: any;
+          if (callArgs.length > 1) {
+            // If the second arg is an object with 'name', it's already the full input
+            if (typeof callArgs[1] === 'object' && callArgs[1] !== null && 'name' in callArgs[1]) {
+              args = callArgs[1];
+            } else {
+              // Positional args: (userId, name, color)
+              args = { name: callArgs[1], color: callArgs[2] };
+            }
+          } else {
+            args = callArgs[0];
+          }
           calls.push({
             name: toolName,
-            args: callArgs.length > 1 ? { name: callArgs[1], color: callArgs[2] } : callArgs[0],
+            args,
             timestamp: Date.now(),
             order: order++,
           });

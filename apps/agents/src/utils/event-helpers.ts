@@ -18,6 +18,13 @@ export interface DatabaseEvent {
   category_name?: string;
   category_color?: string;
   category_icon?: string;
+  // Recurring event fields
+  recurrence_rule?: string;
+  recurrence_end?: string;
+  parent_event_id?: string;
+  is_recurring?: boolean;
+  is_instance?: boolean;
+  instance_date?: string;
 }
 
 /**

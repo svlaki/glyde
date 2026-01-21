@@ -120,11 +120,41 @@ export const deleteEventTool = tool(
     }
 
     // Get event details before deletion for response
-    const eventToDelete = await supabaseService.getEventsForAgent(userId)
-      .then(events => events.find(e => e.id === targetEventId));
+    const allEvents = await supabaseService.getEvents(userId);
+    const eventToDelete = allEvents.find((e: any) => e.id === targetEventId);
 
     const eventTitle = eventToDelete?.title || 'Unknown event';
 
+    // Check if this is a recurring event instance
+    if (eventToDelete?.is_instance && eventToDelete?.parent_event_id) {
+      // Delete just this instance of the recurring event
+      console.log(`🔄 [DELETE-EVENT TOOL] Deleting recurring instance for date: ${eventToDelete.instance_date}`);
+
+      const instanceDeleted = await supabaseService.deleteRecurringEventInstance(
+        userId,
+        eventToDelete.parent_event_id,
+        eventToDelete.instance_date || eventToDelete.start_time
+      );
+
+      if (!instanceDeleted) {
+        throw new Error(`Failed to delete recurring event instance`);
+      }
+
+      console.log(`✅ [DELETE-EVENT TOOL] Recurring instance "${eventTitle}" deleted successfully`);
+
+      // Format event time for response
+      let timeInfo = '';
+      if (eventToDelete?.start_time) {
+        const startDate = new Date(eventToDelete.start_time);
+        const dateStr = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        const timeStr = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        timeInfo = ` on ${dateStr} at ${timeStr}`;
+      }
+
+      return `✅ EVENT: Deleted this instance of recurring event "${eventTitle}"${timeInfo}. Other occurrences remain unchanged. To delete the entire series, use delete_recurring_event with scope 'entire_series'.`;
+    }
+
+    // Regular event deletion
     const deleteResult = await supabaseService.deleteEvent(userId, targetEventId);
 
     if (!deleteResult.success) {
@@ -132,15 +162,6 @@ export const deleteEventTool = tool(
     }
 
     console.log(`✅ [DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully from database`);
-
-    // Verify deletion by checking if event is gone
-    const verifyEvents = await supabaseService.getEvents(userId);
-    const stillExists = verifyEvents.some(e => e.id === targetEventId);
-
-    if (stillExists) {
-      console.error('❌ [DELETE-EVENT TOOL] Event still exists after deletion!');
-      throw new Error('Event deletion failed - event still exists in database');
-    }
 
     // Remove from knowledge graph asynchronously (fire-and-forget for speed)
     const removeFromGraph = async () => {

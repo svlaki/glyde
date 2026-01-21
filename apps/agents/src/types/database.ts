@@ -22,6 +22,7 @@ export interface DatabaseEvent {
   parent_event_id?: string;  // Links instances to parent recurring event
   is_recurring?: boolean;  // Quick flag for recurring events
   is_instance?: boolean;  // Flag for event instances of a recurring series
+  instance_date?: string;  // YYYY-MM-DD date for this specific instance
 }
 
 export interface DatabaseCategory {

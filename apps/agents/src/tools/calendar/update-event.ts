@@ -109,6 +109,26 @@ export const updateEventTool = tool(
     const events = await supabaseService.getEvents(userId);
     const originalEvent = events.find((e: any) => e.id === targetEventId);
 
+    // Check if this is a recurring event instance
+    if (originalEvent?.is_instance && originalEvent?.parent_event_id) {
+      console.log(`[UPDATE-EVENT TOOL] Detected recurring event instance`);
+
+      // For time changes on a recurring instance, guide user to use update_recurring_event
+      if (startTime || endTime) {
+        const instanceDate = new Date(originalEvent.start_time).toLocaleDateString('en-US', {
+          weekday: 'long', month: 'long', day: 'numeric'
+        });
+        return `⚠️ "${originalEvent.title}" on ${instanceDate} is part of a recurring series. To change the time:\n` +
+          `- To reschedule just THIS instance: Use update_recurring_event with scope 'this_instance'\n` +
+          `- To reschedule ALL instances: Use update_recurring_event with scope 'entire_series'\n\n` +
+          `I can update the title, description, location, or category for the entire series if you'd like.`;
+      }
+
+      // For metadata changes (title, description, location, category), update the parent (affects all instances)
+      console.log(`[UPDATE-EVENT TOOL] Updating parent recurring event: ${originalEvent.parent_event_id}`);
+      targetEventId = originalEvent.parent_event_id;
+    }
+
     // Convert local times to UTC for storage (same as create-event)
     const startTimeUTC = startTime ? convertToUTC(startTime, timezone) : undefined;
     const endTimeUTC = endTime ? convertToUTC(endTime, timezone) : undefined;

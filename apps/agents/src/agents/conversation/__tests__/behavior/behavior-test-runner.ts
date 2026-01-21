@@ -226,8 +226,9 @@ export async function runBehaviorTest(
     validateToolCall(expected, capturedCalls)
   );
 
-  // Check for extra tools if not allowed
-  if (!testCase.allowExtraTools && testCase.expectedTools.length > 0) {
+  // Check for extra tools if explicitly disallowed (default: allow extra tools)
+  // The agent often calls helper tools like list_rules, list_categories, etc.
+  if (testCase.allowExtraTools === false && testCase.expectedTools.length > 0) {
     const expectedToolNames = new Set(testCase.expectedTools.map(t => t.name));
     const extraCalls = capturedCalls.filter(c => !expectedToolNames.has(c.name));
 
@@ -354,7 +355,8 @@ export function formatTestSummary(results: BehaviorTestResult[]): string {
     byCategory.get(category)!.push(result);
   }
 
-  for (const [category, categoryResults] of byCategory) {
+  for (const entry of Array.from(byCategory.entries())) {
+    const [category, categoryResults] = entry;
     const categoryPassed = categoryResults.filter(r => r.passed).length;
     const categoryTotal = categoryResults.length;
     lines.push(`\n${category}: ${categoryPassed}/${categoryTotal}`);

@@ -72,39 +72,59 @@ export const createEventTool = tool(
       });
 
       if (conflictingEvents.length > 0) {
-        const conflictingEvent = conflictingEvents[0];
+        const conflictingEvent = conflictingEvents[0] as any;
 
         // If replaceConflicting is true, delete the conflicting event and continue
         if (replaceConflicting) {
           console.log(`[CREATE-EVENT TOOL] Auto-deleting conflicting event: "${conflictingEvent.title}"`);
 
-          const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id);
+          // Check if the conflicting event is a recurring instance
+          if (conflictingEvent.is_instance && conflictingEvent.parent_event_id) {
+            // Delete just this instance of the recurring event
+            console.log(`[CREATE-EVENT TOOL] Conflicting event is a recurring instance, deleting only this occurrence`);
 
-          if (!deleteResult.success) {
-            throw new Error(`Failed to delete conflicting event "${conflictingEvent.title}": ${deleteResult.error}`);
-          }
-
-          console.log(`[CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
-
-          // Delete from graph with intentional sync tracking
-          // Don't block event creation if graph deletion fails - it's non-critical
-          executeZepOperation(
-            {
+            const instanceDeleted = await supabaseService.deleteRecurringEventInstance(
               userId,
-              entityType: 'event',
-              entityId: conflictingEvent.id,
-              operation: 'delete',
-              maxRetries: 2
-            },
-            async () => {
-              await zepGraphService.deleteCalendarEvent(conflictingEvent.id);
-              return conflictingEvent.id;
+              conflictingEvent.parent_event_id,
+              conflictingEvent.instance_date || conflictingEvent.start_time
+            );
+
+            if (!instanceDeleted) {
+              throw new Error(`Failed to delete conflicting recurring instance "${conflictingEvent.title}"`);
             }
-          ).catch(err => {
-            console.warn('[CREATE-EVENT TOOL] Non-critical: Failed to remove conflicting event from graph:', err);
-          });
+
+            console.log(`[CREATE-EVENT TOOL] Recurring instance "${conflictingEvent.title}" on ${conflictingEvent.instance_date} deleted, proceeding with creation`);
+          } else {
+            // Regular event deletion
+            const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id);
+
+            if (!deleteResult.success) {
+              throw new Error(`Failed to delete conflicting event "${conflictingEvent.title}": ${deleteResult.error}`);
+            }
+
+            console.log(`[CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
+
+            // Delete from graph with intentional sync tracking
+            // Don't block event creation if graph deletion fails - it's non-critical
+            executeZepOperation(
+              {
+                userId,
+                entityType: 'event',
+                entityId: conflictingEvent.id,
+                operation: 'delete',
+                maxRetries: 2
+              },
+              async () => {
+                await zepGraphService.deleteCalendarEvent(conflictingEvent.id);
+                return conflictingEvent.id;
+              }
+            ).catch(err => {
+              console.warn('[CREATE-EVENT TOOL] Non-critical: Failed to remove conflicting event from graph:', err);
+            });
+          }
         } else {
-          return `Time conflict detected! You already have "${conflictingEvent.title}" scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+          const isRecurring = conflictingEvent.is_instance ? ' (recurring)' : '';
+          return `Time conflict detected! You already have "${conflictingEvent.title}"${isRecurring} scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
         }
       }
     } catch (error) {

@@ -205,6 +205,26 @@ export class SupabaseService {
         return [];
       }
 
+      // Fetch all exceptions for this user's recurring events
+      const { data: exceptions } = await this.client
+        .from('recurring_event_exceptions')
+        .select('parent_event_id, exception_date, exception_type')
+        .eq('user_id', userId);
+
+      // Build a map of exceptions by parent_event_id -> Set of exception dates
+      const exceptionMap = new Map<string, Set<string>>();
+      if (exceptions) {
+        for (const exc of exceptions) {
+          if (!exceptionMap.has(exc.parent_event_id)) {
+            exceptionMap.set(exc.parent_event_id, new Set());
+          }
+          // Only track deleted exceptions (modified ones have separate override events)
+          if (exc.exception_type === 'deleted') {
+            exceptionMap.get(exc.parent_event_id)!.add(exc.exception_date);
+          }
+        }
+      }
+
       const expandedEvents: DatabaseEvent[] = [];
       // Use start of day to ensure events earlier today aren't filtered out
       const startD = startDate ? new Date(startDate) : (() => {
@@ -223,6 +243,9 @@ export class SupabaseService {
             continue;
           }
 
+          // Get deleted dates for this event
+          const deletedDates = exceptionMap.get(event.id) || new Set();
+
           // Expand instances
           const startT = new Date(event.start_time);
           const endT = new Date(event.end_time);
@@ -235,13 +258,22 @@ export class SupabaseService {
 
           // Filter instances within requested date range and create event objects
           for (const instance of instances) {
+            const instanceDate = instance.start.toISOString().split('T')[0];
+
+            // Skip deleted instances
+            if (deletedDates.has(instanceDate)) {
+              continue;
+            }
+
             if (instance.start >= startD && instance.start <= endD) {
               expandedEvents.push({
                 ...event,
                 start_time: instance.start.toISOString(),
                 end_time: instance.end.toISOString(),
                 parent_event_id: event.id, // Reference to parent for updates/deletes
-                is_recurring: true
+                is_recurring: true,
+                is_instance: true, // Flag to indicate this is an expanded instance, not a DB record
+                instance_date: instanceDate // YYYY-MM-DD for identifying this instance
               });
             }
           }
@@ -525,13 +557,35 @@ export class SupabaseService {
    */
   async deleteRecurringEventInstance(userId: string, parentEventId: string, instanceDate: string): Promise<boolean> {
     try {
-      // For now, we don't track deleted instances separately
-      // In a more advanced system, you'd create an exception record
-      // This is a placeholder for future enhancement
-      console.log('⚠️  [SupabaseService] Instance deletion for', parentEventId, 'on', instanceDate, '(not implemented)');
+      // Extract just the date part (YYYY-MM-DD) from the instance date
+      const exceptionDate = instanceDate.split('T')[0];
+
+      console.log('🗑️  [SupabaseService] Creating exception record to delete instance:', {
+        parentEventId,
+        instanceDate: exceptionDate
+      });
+
+      // Create an exception record to mark this instance as deleted
+      const { error } = await this.client
+        .from('recurring_event_exceptions')
+        .upsert({
+          user_id: userId,
+          parent_event_id: parentEventId,
+          exception_date: exceptionDate,
+          exception_type: 'deleted'
+        }, {
+          onConflict: 'parent_event_id,exception_date'
+        });
+
+      if (error) {
+        console.error('❌ [SupabaseService] Error creating exception record:', error);
+        return false;
+      }
+
+      console.log('✅ [SupabaseService] Successfully marked instance as deleted:', exceptionDate);
       return true;
     } catch (error) {
-      console.error('❌ [SupabaseService] Error deleting recurring instance:', error);
+      console.error('❌ [SupabaseService] Exception deleting recurring instance:', error);
       return false;
     }
   }
