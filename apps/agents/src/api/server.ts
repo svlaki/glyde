@@ -79,6 +79,11 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Allow Railway production URLs
+    if (origin.endsWith('.up.railway.app')) {
+      return callback(null, true);
+    }
+
     // Allow configured frontend URL
     if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
       return callback(null, true);
