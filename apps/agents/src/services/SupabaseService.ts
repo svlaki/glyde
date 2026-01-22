@@ -226,13 +226,13 @@ export class SupabaseService {
       }
 
       const expandedEvents: DatabaseEvent[] = [];
-      // Use start of day to ensure events earlier today aren't filtered out
-      const startD = startDate ? new Date(startDate) : (() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return today;
-      })();
-      const endD = endDate ? new Date(endDate) : new Date(startD.getTime() + 365 * 24 * 60 * 60 * 1000);
+      // For date filtering: only apply if explicitly provided
+      const hasStartFilter = !!startDate;
+      const hasEndFilter = !!endDate;
+      const startD = startDate ? new Date(startDate) : null;
+      // Default end date: 1 year from now if not specified
+      const now = new Date();
+      const endD = endDate ? new Date(endDate) : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
       for (const event of rawEvents) {
         if (event.is_recurring && event.recurrence_rule) {
@@ -246,7 +246,7 @@ export class SupabaseService {
           // Get deleted dates for this event
           const deletedDates = exceptionMap.get(event.id) || new Set();
 
-          // Expand instances
+          // Expand instances from the event's original start date
           const startT = new Date(event.start_time);
           const endT = new Date(event.end_time);
           const instances = expandRecurrenceWithEndTime(
@@ -256,7 +256,7 @@ export class SupabaseService {
             event.recurrence_end ? new Date(event.recurrence_end) : endD
           );
 
-          // Filter instances within requested date range and create event objects
+          // Add all instances (filter by date range only if explicitly requested)
           for (const instance of instances) {
             const instanceDate = instance.start.toISOString().split('T')[0];
 
@@ -265,17 +265,27 @@ export class SupabaseService {
               continue;
             }
 
-            if (instance.start >= startD && instance.start <= endD) {
-              expandedEvents.push({
-                ...event,
-                start_time: instance.start.toISOString(),
-                end_time: instance.end.toISOString(),
-                parent_event_id: event.id, // Reference to parent for updates/deletes
-                is_recurring: true,
-                is_instance: true, // Flag to indicate this is an expanded instance, not a DB record
-                instance_date: instanceDate // YYYY-MM-DD for identifying this instance
-              });
+            // Apply date filters only if explicitly provided
+            if (hasStartFilter && startD && instance.start < startD) {
+              continue;
             }
+            if (hasEndFilter && instance.start > endD) {
+              continue;
+            }
+            // If no end filter, still limit to 1 year from now to prevent infinite expansion
+            if (!hasEndFilter && instance.start > endD) {
+              continue;
+            }
+
+            expandedEvents.push({
+              ...event,
+              start_time: instance.start.toISOString(),
+              end_time: instance.end.toISOString(),
+              parent_event_id: event.id, // Reference to parent for updates/deletes
+              is_recurring: true,
+              is_instance: true, // Flag to indicate this is an expanded instance, not a DB record
+              instance_date: instanceDate // YYYY-MM-DD for identifying this instance
+            });
           }
         } else {
           // Regular non-recurring event

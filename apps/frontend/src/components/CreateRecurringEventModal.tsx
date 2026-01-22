@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Modal } from './Modal'
 import { createRecurringEvent } from '../lib/calendarService'
@@ -21,7 +21,11 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
 
   // Form state
   const [title, setTitle] = useState('')
-  const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16))
+  const [startTime, setStartTime] = useState(() => {
+    const now = new Date()
+    now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0)
+    return now.toISOString().slice(0, 16)
+  })
   const [pattern, setPattern] = useState<RecurrencePattern>('weekly')
   const [interval, setInterval] = useState(1)
   const [daysOfWeek, setDaysOfWeek] = useState<string[]>(['MO'])
@@ -51,6 +55,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
   // Update preview when recurrence changes
   const updatePreview = () => {
     try {
+      if (!startTime) return
       const startDate = new Date(startTime)
       const rrule = buildRRuleFromForm({
         pattern,
@@ -59,7 +64,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         dayOfMonth: pattern === 'monthly' ? dayOfMonth : 1,
         endType,
         count: endType === 'after' ? count : undefined,
-        untilDate: endType === 'until' ? (untilDate ? new Date(untilDate) : undefined) : undefined
+        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
       })
 
       const occurrences = getNextOccurrences(rrule, startDate, 5)
@@ -71,7 +76,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
   }
 
   // Update preview when relevant fields change
-  React.useEffect(() => {
+  useEffect(() => {
     updatePreview()
   }, [pattern, interval, daysOfWeek, dayOfMonth, endType, count, untilDate, startTime])
 
@@ -99,7 +104,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         dayOfMonth: pattern === 'monthly' ? dayOfMonth : 1,
         endType,
         count: endType === 'after' ? count : undefined,
-        untilDate: endType === 'until' ? (untilDate ? new Date(untilDate) : undefined) : undefined
+        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
       })
 
       const { event, error: createError } = await createRecurringEvent(
@@ -124,7 +129,9 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
 
       // Reset form
       setTitle('')
-      setStartTime(new Date().toISOString().slice(0, 16))
+      const now = new Date()
+      now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0)
+      setStartTime(now.toISOString().slice(0, 16))
       setPattern('weekly')
       setInterval(1)
       setDaysOfWeek(['MO'])
@@ -151,9 +158,9 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Create Recurring Event" maxWidth="700px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Form content */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {/* Title */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
@@ -180,7 +187,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
           {/* Start time */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Start Time
+              Start Date & Time
             </label>
             <input
               type="datetime-local"
@@ -360,7 +367,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
                   backgroundColor: colors.bgPrimary,
                   color: colors.textPrimary,
                   fontSize: '14px',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  marginTop: '10px'
                 }}
               />
             )}

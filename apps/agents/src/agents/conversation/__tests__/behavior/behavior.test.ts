@@ -437,6 +437,9 @@ const serviceMethodToToolMap: Record<string, string> = {
   'updateEvent': 'update_event',
   'deleteEvent': 'delete_event',
   'getEvents': 'list_events',
+  'createRecurringEvent': 'create_recurring_event',
+  'updateRecurringEvent': 'update_recurring_event',
+  'deleteRecurringEvent': 'delete_recurring_event',
   'createTask': 'create_task',
   'updateTask': 'update_task',
   'deleteTask': 'delete_task',
@@ -469,6 +472,7 @@ function extractToolCallsFromMocks(): CapturedToolCall[] {
   // Check SupabaseService mocks
   const supabaseMethods = [
     'createEvent', 'updateEvent', 'deleteEvent',
+    'createRecurringEvent', 'updateRecurringEvent', 'deleteRecurringEvent',
     'createTask', 'updateTask', 'deleteTask', 'completeTask',
     'createGoal', 'updateGoal', 'deleteGoal', 'addGoalCheckIn',
   ];

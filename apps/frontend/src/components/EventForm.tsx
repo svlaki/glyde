@@ -26,8 +26,8 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
-  const [startDateTime, setStartDateTime] = useState('')
-  const [endDateTime, setEndDateTime] = useState('')
+  const [startDate, setStartDate] = useState<Date>(new Date())
+  const [endDate, setEndDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
@@ -49,19 +49,19 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       setDescription(event.description || '')
       setCategory(event.category || '')
 
-      // Format existing dates as readable strings
+      // Set dates from event
       if (event.start_time) {
-        const startDate = new Date(event.start_time)
-        setStartDateTime(formatDateTimeForInput(startDate))
+        setStartDate(new Date(event.start_time))
       } else {
-        setStartDateTime('')
+        setStartDate(new Date())
       }
 
       if (event.end_time) {
-        const endDate = new Date(event.end_time)
-        setEndDateTime(formatDateTimeForInput(endDate))
+        setEndDate(new Date(event.end_time))
       } else {
-        setEndDateTime('')
+        const defaultEnd = new Date()
+        defaultEnd.setHours(defaultEnd.getHours() + 1)
+        setEndDate(defaultEnd)
       }
     } else {
       // Reset for new event
@@ -73,12 +73,12 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       const now = new Date()
       const roundedStart = new Date(now)
       roundedStart.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0)
-      setStartDateTime(formatDateTimeForInput(roundedStart))
+      setStartDate(roundedStart)
 
       // Default end time 1 hour after start
       const roundedEnd = new Date(roundedStart)
       roundedEnd.setHours(roundedEnd.getHours() + 1)
-      setEndDateTime(formatDateTimeForInput(roundedEnd))
+      setEndDate(roundedEnd)
     }
     // Reset recurrence state
     setIsRecurring(false)
@@ -95,12 +95,11 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
   // Update recurrence preview when settings change
   useEffect(() => {
-    if (!isRecurring || !startDateTime) {
+    if (!isRecurring || !startDate) {
       setRecurrencePreview([])
       return
     }
     try {
-      const startDate = new Date(startDateTime)
       if (isNaN(startDate.getTime())) {
         setRecurrencePreview([])
         return
@@ -120,47 +119,61 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       console.error('Error updating recurrence preview:', err)
       setRecurrencePreview([])
     }
-  }, [isRecurring, startDateTime, recurrencePattern, interval, daysOfWeek, dayOfMonth, endType, count, untilDate])
+  }, [isRecurring, startDate, recurrencePattern, interval, daysOfWeek, dayOfMonth, endType, count, untilDate])
 
-  // Helper function to format date for input display
-  const formatDateTimeForInput = (date: Date): string => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-    const month = months[date.getMonth()]
-    const day = date.getDate()
-    const year = date.getFullYear()
-    const hours = date.getHours()
-    const minutes = date.getMinutes()
-    const ampm = hours >= 12 ? 'PM' : 'AM'
-    const displayHours = hours % 12 || 12
-    const displayMinutes = minutes.toString().padStart(2, '0')
+  // Helper functions for date/time inputs
+  const formatDateForInput = (date: Date): string => {
+    return date.toISOString().split('T')[0]
+  }
 
-    return `${month} ${day}, ${year} ${displayHours}:${displayMinutes} ${ampm}`
+  const formatTimeForInput = (date: Date): string => {
+    return date.toTimeString().slice(0, 5)
+  }
+
+  const handleDateChange = (dateStr: string, isStart: boolean) => {
+    const currentDate = isStart ? startDate : endDate
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const newDate = new Date(currentDate)
+    newDate.setFullYear(year, month - 1, day)
+
+    if (isStart) {
+      setStartDate(newDate)
+      if (endDate <= newDate) {
+        const newEnd = new Date(newDate)
+        newEnd.setHours(newEnd.getHours() + 1)
+        setEndDate(newEnd)
+      }
+    } else {
+      setEndDate(newDate)
+    }
+  }
+
+  const handleTimeChange = (timeStr: string, isStart: boolean) => {
+    const currentDate = isStart ? startDate : endDate
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    const newDate = new Date(currentDate)
+    newDate.setHours(hours, minutes, 0, 0)
+
+    if (isStart) {
+      setStartDate(newDate)
+      if (endDate <= newDate) {
+        const newEnd = new Date(newDate)
+        newEnd.setHours(newEnd.getHours() + 1)
+        setEndDate(newEnd)
+      }
+    } else {
+      setEndDate(newDate)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
-    if (!startDateTime || !endDateTime) return
+    if (!startDate || !endDate) return
 
     setLoading(true)
     try {
-      // Parse string dates to Date objects
-      const startDate = new Date(startDateTime)
-      const endDate = new Date(endDateTime)
-
       // Validate dates
-      if (isNaN(startDate.getTime())) {
-        alert('Invalid start date/time. Please use a format like "January 21, 2025 2:30 PM"')
-        setLoading(false)
-        return
-      }
-
-      if (isNaN(endDate.getTime())) {
-        alert('Invalid end date/time. Please use a format like "January 21, 2025 3:30 PM"')
-        setLoading(false)
-        return
-      }
-
       if (endDate <= startDate) {
         alert('End time must be after start time.')
         setLoading(false)
@@ -325,22 +338,36 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
           }}>
             Start Date & Time *
           </label>
-          <input
-            type="text"
-            value={startDateTime}
-            onChange={(e) => setStartDateTime(e.target.value)}
-            required
-            placeholder="e.g., January 21, 2025 2:30 PM"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textPrimary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px'
-            }}
-          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="date"
+              value={formatDateForInput(startDate)}
+              onChange={(e) => handleDateChange(e.target.value, true)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
+            <input
+              type="time"
+              value={formatTimeForInput(startDate)}
+              onChange={(e) => handleTimeChange(e.target.value, true)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
+          </div>
         </div>
 
         {/* End Date & Time */}
@@ -354,22 +381,36 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
           }}>
             End Date & Time *
           </label>
-          <input
-            type="text"
-            value={endDateTime}
-            onChange={(e) => setEndDateTime(e.target.value)}
-            required
-            placeholder="e.g., January 21, 2025 3:30 PM"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textPrimary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px'
-            }}
-          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="date"
+              value={formatDateForInput(endDate)}
+              onChange={(e) => handleDateChange(e.target.value, false)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
+            <input
+              type="time"
+              value={formatTimeForInput(endDate)}
+              onChange={(e) => handleTimeChange(e.target.value, false)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
+          </div>
         </div>
 
         {/* Aspect */}
@@ -839,13 +880,13 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
             </button>
             <button
               type="submit"
-              disabled={loading || !title.trim() || !startDateTime || !endDateTime}
+              disabled={loading || !title.trim()}
               className="btn btn-primary"
               style={{
                 padding: '10px 20px',
                 fontSize: '14px',
-                cursor: (loading || !title.trim() || !startDateTime || !endDateTime) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim() || !startDateTime || !endDateTime) ? 0.5 : 1
+                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
+                opacity: (loading || !title.trim()) ? 0.5 : 1
               }}
             >
               {loading ? 'Saving...' : event?.id ? 'Update Event' : 'Create Event'}

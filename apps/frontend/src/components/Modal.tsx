@@ -83,7 +83,9 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
           </div>
 
           {/* Children (form content) */}
-          {children}
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

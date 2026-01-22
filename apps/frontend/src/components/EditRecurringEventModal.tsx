@@ -61,7 +61,14 @@ export function EditRecurringEventModal({
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
-      setStartTime(event.start_time ? new Date(event.start_time).toISOString().slice(0, 16) : '')
+      // Format date for datetime-local input
+      if (event.start_time) {
+        const date = new Date(event.start_time)
+        setStartTime(date.toISOString().slice(0, 16))
+      } else {
+        const now = new Date()
+        setStartTime(now.toISOString().slice(0, 16))
+      }
       setCategory(event.category || 'Personal')
       setDescription(event.description || '')
       setLocation(event.location || '')
@@ -76,11 +83,7 @@ export function EditRecurringEventModal({
           setDayOfMonth(parsed.dayOfMonth || 1)
           setEndType(parsed.endType || 'never')
           setCount(parsed.count || 10)
-          if (parsed.untilDate) {
-            setUntilDate(parsed.untilDate.toISOString().split('T')[0])
-          } else {
-            setUntilDate('')
-          }
+          setUntilDate(parsed.untilDate ? parsed.untilDate.toISOString().split('T')[0] : '')
         }
       }
     }
@@ -98,7 +101,7 @@ export function EditRecurringEventModal({
         dayOfMonth: pattern === 'monthly' ? dayOfMonth : 1,
         endType,
         count: endType === 'after' ? count : undefined,
-        untilDate: endType === 'until' ? (untilDate ? new Date(untilDate) : undefined) : undefined
+        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
       })
 
       const occurrences = getNextOccurrences(rrule, startDate, 5)
@@ -138,7 +141,7 @@ export function EditRecurringEventModal({
         dayOfMonth: pattern === 'monthly' ? dayOfMonth : 1,
         endType,
         count: endType === 'after' ? count : undefined,
-        untilDate: endType === 'until' ? (untilDate ? new Date(untilDate) : undefined) : undefined
+        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
       })
 
       // Get the parent event ID if this is an instance
@@ -188,9 +191,9 @@ export function EditRecurringEventModal({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Edit Recurring Event" maxWidth="700px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {/* Form content */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, maxHeight: '60vh' }}>
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {/* Info banner */}
           <div style={{
             padding: '12px',
@@ -230,7 +233,7 @@ export function EditRecurringEventModal({
           {/* Start time */}
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Start Time
+              Start Date & Time
             </label>
             <input
               type="datetime-local"
@@ -410,7 +413,8 @@ export function EditRecurringEventModal({
                   backgroundColor: colors.bgPrimary,
                   color: colors.textPrimary,
                   fontSize: '14px',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  marginTop: '10px'
                 }}
               />
             )}
