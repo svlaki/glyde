@@ -49,11 +49,10 @@ export class CalendarIntegrationService {
   }
 
   /**
-   * Import events into user's schema
+   * Import events into public.events table
    */
   static async importEvents(userId: string, events: CalendarEvent[]): Promise<number> {
     const supabase = getSupabaseService().getClient();
-    const userSchema = `u_${userId.replace(/-/g, '')}`;
 
     // Only import events from last 3 months
     const threeMonthsAgo = new Date();
@@ -67,10 +66,14 @@ export class CalendarIntegrationService {
       return 0;
     }
 
-    // Prepare events for insertion
+    // Prepare events for insertion (map to public.events column names)
     const eventsToInsert = recentEvents.map(event => ({
-      ...event,
       user_id: userId,
+      title: event.event_title,
+      start_time: event.event_starts_at,
+      end_time: event.event_ends_at,
+      description: event.event_description || null,
+      location: event.event_location || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }));
@@ -83,12 +86,10 @@ export class CalendarIntegrationService {
       const batch = eventsToInsert.slice(i, i + batchSize);
 
       const { error, count } = await supabase
-        .from(`${userSchema}.events`)
+        .from('events')
         .insert(batch);
 
       if (error) {
-        console.error('Error inserting events batch:', error);
-        // Continue with next batch instead of failing completely
         continue;
       }
 

@@ -3,10 +3,10 @@ import Queue from 'bull';
 import { v4 as uuidv4 } from 'uuid';
 
 interface Event {
-  event_starts_at: string;
-  event_ends_at: string;
-  event_title: string;
-  event_description?: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  description?: string;
 }
 
 interface WorkPatterns {
@@ -52,10 +52,11 @@ export class CalendarAnalysisService {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
     const { data: events, error } = await supabase
-      .from(`u_${userId.replace(/-/g, '')}.events`)
-      .select('event_starts_at, event_ends_at, event_title, event_description')
-      .gte('event_starts_at', threeMonthsAgo.toISOString())
-      .order('event_starts_at', { ascending: true });
+      .from('events')
+      .select('start_time, end_time, title, description')
+      .eq('user_id', userId)
+      .gte('start_time', threeMonthsAgo.toISOString())
+      .order('start_time', { ascending: true });
 
     if (error) {
       console.error('Error fetching events:', error);
@@ -74,8 +75,8 @@ export class CalendarAnalysisService {
 
     // Get date range
     const dateRange = {
-      start: events[0].event_starts_at,
-      end: events[events.length - 1].event_starts_at
+      start: events[0].start_time,
+      end: events[events.length - 1].start_time
     };
 
     const workPatterns: WorkPatterns = {
@@ -102,7 +103,7 @@ export class CalendarAnalysisService {
     const hourCounts = new Map<number, number>();
 
     events.forEach(event => {
-      const startTime = new Date(event.event_starts_at);
+      const startTime = new Date(event.start_time);
       const hour = startTime.getHours();
       hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
     });
@@ -129,8 +130,8 @@ export class CalendarAnalysisService {
     // Identify meetings by keywords
     const meetingKeywords = ['meeting', 'call', 'sync', 'standup', 'review', 'discussion'];
     const meetings = events.filter(event => {
-      const title = event.event_title?.toLowerCase() || '';
-      const description = event.event_description?.toLowerCase() || '';
+      const title = event.title?.toLowerCase() || '';
+      const description = event.description?.toLowerCase() || '';
       return meetingKeywords.some(keyword =>
         title.includes(keyword) || description.includes(keyword)
       );
@@ -147,14 +148,14 @@ export class CalendarAnalysisService {
 
     // Calculate average meetings per day
     const dateSet = new Set(meetings.map(m =>
-      new Date(m.event_starts_at).toDateString()
+      new Date(m.start_time).toDateString()
     ));
     const avg_per_day = meetings.length / dateSet.size;
 
     // Calculate average duration
     const durations = meetings.map(m => {
-      const start = new Date(m.event_starts_at);
-      const end = new Date(m.event_ends_at);
+      const start = new Date(m.start_time);
+      const end = new Date(m.end_time);
       return (end.getTime() - start.getTime()) / (1000 * 60); // minutes
     });
     const avg_duration = durations.reduce((a, b) => a + b, 0) / durations.length;
@@ -164,7 +165,7 @@ export class CalendarAnalysisService {
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     meetings.forEach(m => {
-      const dayIndex = new Date(m.event_starts_at).getDay();
+      const dayIndex = new Date(m.start_time).getDay();
       const dayName = dayNames[dayIndex];
       dayCounts.set(dayName, (dayCounts.get(dayName) || 0) + 1);
     });
@@ -177,7 +178,7 @@ export class CalendarAnalysisService {
     // Find busy times (day + hour combinations)
     const busyTimeCounts = new Map<string, number>();
     meetings.forEach(m => {
-      const date = new Date(m.event_starts_at);
+      const date = new Date(m.start_time);
       const dayIndex = date.getDay();
       const dayName = dayNames[dayIndex];
       const hour = date.getHours();
@@ -216,17 +217,17 @@ export class CalendarAnalysisService {
     evening: 'high' | 'medium' | 'low';
   } {
     const morningEvents = events.filter(e => {
-      const hour = new Date(e.event_starts_at).getHours();
+      const hour = new Date(e.start_time).getHours();
       return hour >= 6 && hour < 12;
     });
 
     const afternoonEvents = events.filter(e => {
-      const hour = new Date(e.event_starts_at).getHours();
+      const hour = new Date(e.start_time).getHours();
       return hour >= 12 && hour < 18;
     });
 
     const eveningEvents = events.filter(e => {
-      const hour = new Date(e.event_starts_at).getHours();
+      const hour = new Date(e.start_time).getHours();
       return hour >= 18 && hour < 22;
     });
 

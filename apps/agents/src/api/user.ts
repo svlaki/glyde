@@ -1,73 +1,42 @@
 import { Request, Response } from 'express';
 import { supabase } from '../services/SupabaseService.js';
 
+/**
+ * Ensures user profile exists in public.profile table.
+ * Note: Per-user schemas are no longer used - all data is in public schema with RLS.
+ */
 export async function createUserSchema(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.authUserId;
     const { user_email } = req.body ?? {};
 
     if (!userId || !user_email) {
-      res.status(400).json({ error: 'user_email is required' });
+      res.status(400).json({ success: false, error: 'user_email is required' });
       return;
     }
 
-    // For now, we'll skip user table creation since it may not exist
-    // This is handled by Supabase Auth automatically
-    console.log(`🔧 [USER SCHEMA] Processing: ${user_email}`);
+    // Ensure profile exists in public.profile table
+    const { error: profileError } = await supabase
+      .from('profile')
+      .upsert({
+        id: userId,
+        email: user_email
+      }, {
+        onConflict: 'id'
+      });
 
-    // Create user-specific schema tables using RPC function
-    const { error: schemaError } = await supabase.rpc('create_user_schema_rpc', {
-      user_id: userId,
-      user_email: user_email
-    });
-
-    if (schemaError) {
-      console.error('Error creating user schema:', schemaError);
-      // Continue anyway - schema might already exist
-    } else {
-      console.log(`✅ [USER SCHEMA] Created for: ${user_email}`);
-    }
-
-    // Categories will be created during onboarding when user selects their aspects
-    console.log(`ℹ️  [CATEGORIES] Will be created during onboarding for: ${user_email}`);
-
-    // For now, we'll skip profile table operations since they may not exist
-    // The user schema creation RPC function should handle this
-    console.log(`🎉 [USER SCHEMA] Completed for: ${user_email}`);
-    
-    // Try to create user profile, but don't fail if table doesn't exist
-    try {
-      const { data: existingProfile, error: profileFetchError } = await supabase
-        .from('user_profiles')
-        .select('user_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (profileFetchError && profileFetchError.code !== 'PGRST116') {
-        console.log('User profiles table may not exist, skipping profile creation');
-      } else if (!existingProfile) {
-        await supabase.from('user_profiles').insert([{
-          user_id: userId,
-          preferences: {},
-          goals: [],
-          values: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }]);
-        console.log(`Created user profile for: ${userId}`);
-      }
-    } catch (error) {
-      console.log('Profile creation skipped - table may not exist');
+    if (profileError) {
+      res.status(500).json({ success: false, error: 'Failed to create user profile' });
+      return;
     }
 
     res.json({
       success: true,
-      message: 'User schema created successfully',
+      message: 'User profile initialized successfully',
       user_id: userId
     });
 
   } catch (error) {
-    console.error('Error in createUserSchema:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

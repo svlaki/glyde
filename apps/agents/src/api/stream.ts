@@ -137,7 +137,6 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
     const agentContext = {
       userId: context.userId,
       sessionId: context.sessionId || 'default',
-      userSchema: context.userSchema || `u_${context.userId.replace(/-/g, '')}`,
       timezone: typeof context.timezone === 'string' && context.timezone.length > 0
         ? context.timezone : 'UTC',
       conversationHistory: Array.isArray(context.conversationHistory)

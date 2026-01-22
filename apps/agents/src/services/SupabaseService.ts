@@ -31,12 +31,6 @@ export class SupabaseService {
     return this.client;
   }
 
-  private getUserSchema(userId: string): string {
-    // DEPRECATED: Now using public schema with RLS
-    // All tables are in public schema, filtered by user_id via RLS policies
-    return 'public';
-  }
-
   /**
    * Helper: Resolve category_id from either category_id or category name
    * Eliminates 60+ lines of duplicate code across 6 methods

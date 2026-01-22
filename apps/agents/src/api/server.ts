@@ -39,6 +39,7 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
+import { getChatHistory, saveChatMessage, saveChatMessagesBatch, clearChatHistory } from './chat.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
 import { authenticateRequest } from './middleware/auth.js';
@@ -335,28 +336,11 @@ app.post('/api/rules/update', updateUserRule);
 app.post('/api/rules/delete', deleteUserRule);
 app.post('/api/rules/toggle', toggleUserRule);
 
-// Chat endpoints
-app.post('/api/chat/history', async (req, res) => {
-  try {
-    const userId = req.authUserId;
-    if (!userId) {
-      res.status(401).json({ success: false, error: 'Unauthorized' });
-      return;
-    }
-
-    const { session_id, limit = 50 } = req.body ?? {};
-
-    // For now, return empty array - chat history is managed in frontend
-    // This endpoint exists to prevent 404 errors
-    res.json({
-      success: true,
-      messages: []
-    });
-  } catch (error) {
-    console.error('Error fetching chat history:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch chat history' });
-  }
-});
+// Chat endpoints - persistent storage in user schema
+app.post('/api/chat/history', getChatHistory);
+app.post('/api/chat/message', saveChatMessage);
+app.post('/api/chat/messages/batch', saveChatMessagesBatch);
+app.post('/api/chat/clear', clearChatHistory);
 
 // Agent endpoints - for LangGraph agent system
 app.post('/api/agent/process', addStartTime, processAgentMessage);

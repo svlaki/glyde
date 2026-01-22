@@ -347,7 +347,6 @@ export async function generateStartupInteractions(req: Request, res: Response): 
     const context = {
       userId,
       sessionId,
-      userSchema: 'public',
       timezone,
       conversationHistory: [],
       isInternal: true // Internal message - don't store in conversation history

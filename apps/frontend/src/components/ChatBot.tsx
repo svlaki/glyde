@@ -17,6 +17,9 @@ interface ChatBotProps {
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
+// Session ID for chat persistence (consistent per user)
+const getSessionId = (userId: string): string => `chat_${userId}`
+
 // Sparkle icon for AI assistant
 const SparkleIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -95,13 +98,21 @@ export function ChatBot() {
   // Messages state - managed locally with native fetch streaming
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
   const [streamingMessage, setStreamingMessage] = useState<string>('')
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Load initial messages from localStorage
-  const loadInitialMessages = useCallback((): Message[] => {
-    if (!user?.id) return []
+  // Create welcome message
+  const createWelcomeMessage = useCallback((): Message => ({
+    id: 'welcome',
+    text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
+    sender: 'bot',
+    timestamp: new Date()
+  }), [user?.user_metadata?.full_name])
 
+  // Load messages from localStorage (fallback/cache)
+  const loadFromLocalStorage = useCallback((): Message[] => {
+    if (!user?.id) return []
     const savedMessages = localStorage.getItem(`chat_messages_${user.id}`)
     if (savedMessages) {
       try {
@@ -109,42 +120,119 @@ export function ChatBot() {
         return parsed.map((msg: any) => ({
           id: msg.id,
           text: msg.text,
-          sender: msg.sender,
+          sender: msg.sender === 'assistant' ? 'bot' : msg.sender,
           timestamp: new Date(msg.timestamp)
         }))
       } catch (e) {
         console.error('Failed to parse saved messages:', e)
       }
     }
+    return []
+  }, [user?.id])
 
-    // Return welcome message
-    return [{
-      id: '1',
-      text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
-      sender: 'bot',
-      timestamp: new Date()
-    }]
-  }, [user?.id, user?.user_metadata?.full_name])
-
-  // Initialize messages on mount
-  useEffect(() => {
-    if (user?.id) {
-      setMessages(loadInitialMessages())
-    }
-  }, [user?.id, loadInitialMessages])
-
-  // Save messages to localStorage
-  const saveMessagesToStorage = useCallback((msgs: Message[]) => {
+  // Save messages to localStorage (cache)
+  const saveToLocalStorage = useCallback((msgs: Message[]) => {
     if (!user?.id) return
     localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify(msgs))
   }, [user?.id])
 
-  // Save messages whenever they change
-  useEffect(() => {
-    if (user?.id && messages.length > 0 && !isLoading) {
-      saveMessagesToStorage(messages)
+  // Load messages from API
+  const loadFromAPI = useCallback(async (): Promise<Message[] | null> => {
+    if (!user?.id || !session?.access_token) return null
+
+    try {
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/chat/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          session_id: getSessionId(user.id),
+          limit: 100
+        })
+      })
+
+      if (!response.ok) {
+        console.warn('Failed to load chat history from API:', response.status)
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success && Array.isArray(data.messages)) {
+        return data.messages.map((msg: any) => ({
+          id: msg.id,
+          text: msg.content,
+          sender: msg.sender === 'assistant' ? 'bot' : msg.sender,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }
+      return null
+    } catch (error) {
+      console.warn('Error loading chat history from API:', error)
+      return null
     }
-  }, [messages, user?.id, isLoading, saveMessagesToStorage])
+  }, [user?.id, session?.access_token])
+
+  // Save a single message to API (fire and forget, with localStorage backup)
+  const saveMessageToAPI = useCallback(async (message: Message) => {
+    if (!user?.id || !session?.access_token) return
+
+    try {
+      await fetch(`${AGENT_SERVICE_URL}/api/chat/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          session_id: getSessionId(user.id),
+          content: message.text,
+          sender: message.sender === 'bot' ? 'assistant' : message.sender,
+          metadata: { originalId: message.id }
+        })
+      })
+    } catch (error) {
+      console.warn('Failed to save message to API (using localStorage cache):', error)
+    }
+  }, [user?.id, session?.access_token])
+
+  // Initialize messages on mount - API first, localStorage fallback
+  useEffect(() => {
+    const initializeMessages = async () => {
+      if (!user?.id) return
+
+      setIsInitializing(true)
+
+      // Try API first
+      const apiMessages = await loadFromAPI()
+
+      if (apiMessages && apiMessages.length > 0) {
+        setMessages(apiMessages)
+        saveToLocalStorage(apiMessages) // Update local cache
+      } else {
+        // Fallback to localStorage
+        const localMessages = loadFromLocalStorage()
+        if (localMessages.length > 0) {
+          setMessages(localMessages)
+        } else {
+          // No messages anywhere, show welcome
+          setMessages([createWelcomeMessage()])
+        }
+      }
+
+      setIsInitializing(false)
+    }
+
+    initializeMessages()
+  }, [user?.id, session?.access_token, loadFromAPI, loadFromLocalStorage, saveToLocalStorage, createWelcomeMessage])
+
+  // Save messages to localStorage whenever they change (cache layer)
+  useEffect(() => {
+    if (user?.id && messages.length > 0 && !isLoading && !isInitializing) {
+      saveToLocalStorage(messages)
+    }
+  }, [messages, user?.id, isLoading, isInitializing, saveToLocalStorage])
 
   // Auto-scroll to bottom when new messages arrive or streaming updates
   useEffect(() => {
@@ -152,17 +240,32 @@ export function ChatBot() {
   }, [messages, isLoading, streamingMessage])
 
   // Clear chat handler
-  const handleClearChat = () => {
-    const welcomeMessage: Message = {
-      id: '1',
-      text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
-      sender: 'bot',
-      timestamp: new Date()
-    }
+  const handleClearChat = async () => {
+    const welcomeMessage = createWelcomeMessage()
     setMessages([welcomeMessage])
     setStreamingMessage('')
+
     if (user?.id) {
+      // Clear localStorage cache
       localStorage.setItem(`chat_messages_${user.id}`, JSON.stringify([welcomeMessage]))
+
+      // Clear server-side history (fire and forget)
+      if (session?.access_token) {
+        try {
+          await fetch(`${AGENT_SERVICE_URL}/api/chat/clear`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              session_id: getSessionId(user.id)
+            })
+          })
+        } catch (error) {
+          console.warn('Failed to clear chat history on server:', error)
+        }
+      }
     }
   }
 
@@ -210,14 +313,17 @@ export function ChatBot() {
     setIsLoading(true)
     setStreamingMessage('')
 
+    // Save user message to API (fire and forget)
+    saveMessageToAPI(userMessage)
+
     // Reset textarea height
     if (inputRef.current) {
       inputRef.current.style.height = '36px'
     }
 
-    // Build conversation history
+    // Build conversation history (exclude welcome message)
     const conversationHistory = messages
-      .filter(msg => msg.id !== '1')
+      .filter(msg => msg.id !== 'welcome' && msg.id !== '1')
       .map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'assistant',
         content: msg.text
@@ -303,6 +409,9 @@ export function ChatBot() {
       setMessages(prev => [...prev, botMessage])
       setStreamingMessage('')
       setToolStatus(null)
+
+      // Save bot message to API (fire and forget)
+      saveMessageToAPI(botMessage)
 
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
