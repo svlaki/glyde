@@ -17,10 +17,10 @@ export const listCategoriesTool = tool(
       }
 
       const categoriesList = categories.map(cat =>
-        `• ${cat.icon || ''} ${cat.name} (${cat.color}) - ${cat.description || 'No description'}`
+        `• "${cat.name}" ${cat.icon ? `[icon: ${cat.icon}]` : ''} (${cat.color}) - ${cat.description || 'No description'}`
       ).join('\n');
 
-      return `Available categories (${categories.length}):\n${categoriesList}`;
+      return `Available categories (${categories.length}). Use the exact name in quotes when assigning:\n${categoriesList}`;
     } catch (error) {
       console.error('❌ [list-categories] Error:', error);
       return `❌ Error listing categories: ${error instanceof Error ? error.message : 'Unknown error'}`;

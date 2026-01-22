@@ -1,12 +1,13 @@
 // Handles the task panel on the calendar page
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, Task } from '../lib/taskService'
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
+import { supabase } from '../lib/supabase'
 
 // Export Task type for drag-drop handling
 export type { Task } from '../lib/taskService'
@@ -27,6 +28,37 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
 
   useEffect(() => {
     loadTasks()
+  }, [user, session])
+
+  // Real-time subscription for task updates
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel(`tasks-${user.id}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('[TodoList] Real-time task change:', payload.eventType)
+          // Reload tasks on any change
+          loadTasks()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[TodoList] Subscribed to real-time task updates')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user, session])
 
   const loadTasks = async () => {
