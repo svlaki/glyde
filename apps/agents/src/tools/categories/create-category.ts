@@ -3,7 +3,7 @@ import { z } from "zod";
 import CategoryService from "../../services/CategoryService.js";
 
 export const createCategoryTool = tool(
-  async ({ name, color, icon, description, context }, config) => {
+  async ({ name, color, description, context }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "❌ User ID required";
@@ -19,7 +19,6 @@ export const createCategoryTool = tool(
       const category = await CategoryService.createCategory(userId, {
         name,
         color: color || '#3b82f6',
-        icon: icon || undefined,
         description: description || undefined,
         context: context || undefined,
       });
@@ -28,7 +27,7 @@ export const createCategoryTool = tool(
         return "❌ Failed to create category";
       }
 
-      return `✅ Created category: "${name}" ${icon || ''} (${color || '#3b82f6'})`;
+      return `✅ Created category: "${name}" (${color || '#3b82f6'})`;
     } catch (error) {
       console.error('❌ [create-category] Error:', error);
       return `❌ Error creating category: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -40,7 +39,6 @@ export const createCategoryTool = tool(
     schema: z.object({
       name: z.string().describe("Category name (e.g., 'Gym', 'Project X', 'Doctor Appointments')"),
       color: z.string().optional().nullable().describe("Hex color code (e.g., '#3b82f6'). Use meaningful colors that match the category type."),
-      icon: z.string().optional().nullable().describe("Emoji icon (e.g., '🏋️', '📊', '🏥')"),
       description: z.string().optional().nullable().describe("Description of what this category is for"),
       context: z.record(z.any()).optional().nullable().describe("AI context object with preferences and patterns for this category"),
     }),

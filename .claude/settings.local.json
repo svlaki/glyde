@@ -55,7 +55,10 @@
       "Bash(npm test:*)",
       "Bash(npx supabase:*)",
       "WebSearch",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "Bash(git checkout:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(lsof:*)"
     ],
     "deny": [],
     "ask": [],

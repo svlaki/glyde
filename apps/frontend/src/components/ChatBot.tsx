@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
+import { useCategories } from '../lib/categoryContext'
 import { getColors, hexToRgba } from '../styles/colors'
 
 interface Message {
@@ -71,6 +72,7 @@ const SUGGESTIONS = [
 export function ChatBot() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
+  const { refreshCategories } = useCategories()
   const colors = getColors(isDarkMode)
 
   // Accent colors for user messages (warm terracotta/amber)
@@ -412,6 +414,9 @@ export function ChatBot() {
 
       // Save bot message to API (fire and forget)
       saveMessageToAPI(botMessage)
+
+      // Refresh categories in case agent created/modified any
+      refreshCategories()
 
     } catch (error) {
       if ((error as Error).name === 'AbortError') {

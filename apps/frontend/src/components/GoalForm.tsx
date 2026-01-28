@@ -243,7 +243,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                           background: getCategoryColor(category),
                           flexShrink: 0
                         }} />
-                        {cat.icon && <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>}
                         <span>{category}</span>
                       </>
                     ) : (
@@ -330,9 +329,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       background: getCategoryColor(cat.name),
                       flexShrink: 0
                     }} />
-                    {cat.icon && (
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                    )}
                     <span>{cat.name}</span>
                   </div>
                 ))}

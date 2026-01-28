@@ -271,14 +271,12 @@ export class OnboardingService {
     for (let i = 0; i < aspects.length; i++) {
       const aspect = aspects[i];
       const color = aspectColors[aspect] || defaultColors[i % defaultColors.length];
-      const icon = aspect.charAt(0).toUpperCase(); // Use first letter as icon
 
       try {
         // Use upsert to handle duplicates gracefully
         await categoryService.upsertCategory(userId, {
           name: aspect,
           color: color,
-          icon: icon,
           description: `${aspect} activities and events`
         });
         console.log(`✅ Created/updated category for aspect: ${aspect}`);

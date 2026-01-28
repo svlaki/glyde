@@ -450,11 +450,6 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                   background: getCategoryColor(category),
                   flexShrink: 0
                 }} />
-                {categories.find(c => c.name === category)?.icon && (
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                    {categories.find(c => c.name === category)?.icon}
-                  </span>
-                )}
                 <span>{category}</span>
               </>
             ) : (
@@ -535,9 +530,6 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                     background: cat.color || '#999',
                     flexShrink: 0
                   }} />
-                  {cat.icon && (
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                  )}
                   <span>{cat.name}</span>
                 </div>
               ))}
@@ -708,9 +700,9 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          border: daysOfWeek.includes(day.value) ? 'none' : `1px solid ${colors.border}`,
-                          background: daysOfWeek.includes(day.value) ? colors.accent : 'transparent',
-                          color: daysOfWeek.includes(day.value) ? '#fff' : colors.textSecondary,
+                          border: `1px solid ${daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
+                          background: daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
+                          color: daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
                           fontSize: '12px',
                           fontWeight: '600',
                           cursor: 'pointer'

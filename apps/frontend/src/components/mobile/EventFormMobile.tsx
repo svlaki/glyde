@@ -582,7 +582,6 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                             background: cat.color,
                             flexShrink: 0
                           }} />
-                          {cat.icon && <span>{cat.icon}</span>}
                           {cat.name}
                         </div>
                       ))}

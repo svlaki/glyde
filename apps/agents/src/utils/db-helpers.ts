@@ -121,7 +121,6 @@ export async function getGoals(userId: string) {
 export async function createCategory(userId: string, data: {
   name: string;
   color?: string;
-  icon?: string;
 }) {
   const supabase = getSupabaseClient();
   const { data: category, error } = await supabase

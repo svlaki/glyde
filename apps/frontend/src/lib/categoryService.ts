@@ -5,7 +5,6 @@ export interface Category {
   user_id: string
   name: string
   color: string
-  icon?: string
   description?: string
   context?: Record<string, any>
   created_at?: string
@@ -57,7 +56,6 @@ export async function createUserCategory(
   categoryData: {
     name: string
     color: string
-    icon?: string
     description?: string
     context?: Record<string, any>
   },

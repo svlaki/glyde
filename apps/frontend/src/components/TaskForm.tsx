@@ -249,11 +249,6 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     background: getCategoryColor(category),
                     flexShrink: 0
                   }} />
-                  {categories.find(c => c.name === category)?.icon && (
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                      {categories.find(c => c.name === category)?.icon}
-                    </span>
-                  )}
                   <span>{category}</span>
                 </>
               ) : (
@@ -334,9 +329,6 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       background: cat.color || '#999',
                       flexShrink: 0
                     }} />
-                    {cat.icon && (
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                    )}
                     <span>{cat.name}</span>
                   </div>
                 ))}

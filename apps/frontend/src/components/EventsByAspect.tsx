@@ -195,7 +195,6 @@ export function EventsByAspect({ aspect }: EventsByAspectProps) {
         paddingBottom: '16px',
         borderBottom: isDarkMode ? '1px solid #2a2a2a' : '1px solid #e5e5e5'
       }}>
-        {aspect.icon && <span style={{ fontSize: '24px' }}>{aspect.icon}</span>}
         <div>
           <h3 style={{
             fontSize: '18px',

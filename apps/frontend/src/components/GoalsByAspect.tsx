@@ -121,7 +121,6 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
           gap: '12px',
           marginBottom: '12px'
         }}>
-          {aspect.icon && <span style={{ fontSize: '24px' }}>{aspect.icon}</span>}
           <div style={{ flex: 1 }}>
             <h3 style={{
               fontSize: '18px',
