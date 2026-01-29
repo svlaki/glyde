@@ -69,7 +69,7 @@ export const deleteMultipleEventsTool = tool(
     const errors: string[] = [];
 
     for (const event of eventsToDelete) {
-      const deleteResult = await supabaseService.deleteEvent(userId, event.id);
+      const deleteResult = await supabaseService.deleteEvent(userId, event.id, { source: 'agent', agentType: 'conversation' });
       if (deleteResult.success) {
         deletedCount++;
 

@@ -96,7 +96,7 @@ export const createEventTool = tool(
             console.log(`[CREATE-EVENT TOOL] Recurring instance "${conflictingEvent.title}" on ${conflictingEvent.instance_date} deleted, proceeding with creation`);
           } else {
             // Regular event deletion
-            const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id);
+            const deleteResult = await supabaseService.deleteEvent(userId, conflictingEvent.id, { source: 'agent', agentType: 'conversation' });
 
             if (!deleteResult.success) {
               throw new Error(`Failed to delete conflicting event "${conflictingEvent.title}": ${deleteResult.error}`);
@@ -140,7 +140,7 @@ export const createEventTool = tool(
       location: location || "",
       description: description || "",
       category: validatedCategory || ''
-    });
+    }, { source: 'agent', agentType: 'conversation' });
 
     console.log('[CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
 

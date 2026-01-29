@@ -72,7 +72,7 @@ export const deleteGoalTool = tool(
 
           // Delete the goal
           const supabaseService = getSupabaseService();
-          const result = await supabaseService.deleteGoal(userId, goalToDelete.id);
+          const result = await supabaseService.deleteGoal(userId, goalToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
             return `❌ Failed to delete goal: ${result.error}`;
@@ -100,7 +100,7 @@ export const deleteGoalTool = tool(
       const goals = await supabaseService.getGoals(userId);
       const goalToDelete = goals.find((g: any) => g.id === targetGoalId);
 
-      const result = await supabaseService.deleteGoal(userId, targetGoalId);
+      const result = await supabaseService.deleteGoal(userId, targetGoalId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
         return `❌ Failed to delete goal: ${result.error}`;

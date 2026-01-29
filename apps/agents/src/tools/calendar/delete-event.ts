@@ -155,7 +155,7 @@ export const deleteEventTool = tool(
     }
 
     // Regular event deletion
-    const deleteResult = await supabaseService.deleteEvent(userId, targetEventId);
+    const deleteResult = await supabaseService.deleteEvent(userId, targetEventId, { source: 'agent', agentType: 'conversation' });
 
     if (!deleteResult.success) {
       throw new Error(`Failed to delete event: ${deleteResult.error}`);

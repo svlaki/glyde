@@ -92,7 +92,7 @@ export const updateTaskTool = tool(
       if (energyRequired !== undefined) updates.energyRequired = energyRequired;
       if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
 
-      const task = await supabaseService.updateTask(userId, targetTaskId, updates);
+      const task = await supabaseService.updateTask(userId, targetTaskId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
         return "❌ Failed to update task";

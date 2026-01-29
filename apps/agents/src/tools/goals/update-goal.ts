@@ -29,7 +29,7 @@ export const updateGoalTool = tool(
       if (category !== undefined && category !== null && category.trim() !== '') updates.category = category;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
 
-      const goal = await supabaseService.updateGoal(userId, goalId, updates);
+      const goal = await supabaseService.updateGoal(userId, goalId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
         return "❌ Failed to update goal";

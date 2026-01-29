@@ -16,7 +16,8 @@ export const completeTaskTool = tool(
         userId,
         taskId,
         notes || undefined,
-        actualDuration || undefined
+        actualDuration || undefined,
+        { source: 'agent', agentType: 'conversation' }
       );
 
       if (!task) {

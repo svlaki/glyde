@@ -1,5 +1,7 @@
 import { SystemMessage } from "@langchain/core/messages";
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { ActivityLogEntry } from '../../services/SupabaseService.js';
+import { DatabaseProfile } from '../../types/database.js';
 
 /**
  * Context required to build the system prompt
@@ -15,6 +17,132 @@ export interface PromptContext {
   toolCount?: number; // Optional: number of available tools
   zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
+  // New context fields
+  userCategories?: any[]; // User's categories with IDs
+  userProfile?: DatabaseProfile | null; // Full user profile
+  recentUserActivity?: ActivityLogEntry[]; // Recent manual changes by user
+  recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
+}
+
+/**
+ * Build category context showing available categories with IDs
+ */
+export function buildCategoryContext(categories: any[]): string {
+  if (!categories || categories.length === 0) {
+    return '\n\nCATEGORIES: Using defaults (no custom categories yet).';
+  }
+
+  const categoryList = categories
+    .map(c => `  - "${c.name}" (ID: ${c.id})${c.color ? ` [${c.color}]` : ''}`)
+    .join('\n');
+
+  return `\n\nAVAILABLE CATEGORIES (${categories.length}) - Use these IDs when creating events/tasks/goals:\n${categoryList}`;
+}
+
+/**
+ * Build profile context showing user preferences and habits
+ */
+export function buildProfileContext(profile: DatabaseProfile | null): string {
+  if (!profile) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  if (profile.display_name) {
+    parts.push(`Name: ${profile.display_name}`);
+  }
+
+  if (profile.timezone) {
+    parts.push(`Timezone: ${profile.timezone}`);
+  }
+
+  // Add any extended profile fields if they exist
+  const extendedProfile = profile as any;
+  if (extendedProfile.occupation) {
+    parts.push(`Occupation: ${extendedProfile.occupation}`);
+  }
+  if (extendedProfile.life_focus_areas && Array.isArray(extendedProfile.life_focus_areas)) {
+    parts.push(`Focus Areas: ${extendedProfile.life_focus_areas.join(', ')}`);
+  }
+  if (extendedProfile.preferred_work_hours) {
+    parts.push(`Preferred Work Hours: ${extendedProfile.preferred_work_hours}`);
+  }
+  if (extendedProfile.communication_style) {
+    parts.push(`Communication Style: ${extendedProfile.communication_style}`);
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  return `\n\nUSER PROFILE:\n${parts.map(p => `  - ${p}`).join('\n')}`;
+}
+
+/**
+ * Format activity changes for display
+ */
+function formatActivityChanges(changes: Record<string, { old: any; new: any }> | null): string {
+  if (!changes) return '';
+
+  const changeStrs = Object.entries(changes)
+    .map(([field, { old: oldVal, new: newVal }]) => {
+      const oldStr = oldVal === null || oldVal === undefined ? 'none' : String(oldVal);
+      const newStr = newVal === null || newVal === undefined ? 'none' : String(newVal);
+      return `${field}: "${oldStr}" -> "${newStr}"`;
+    })
+    .join(', ');
+
+  return changeStrs ? ` (${changeStrs})` : '';
+}
+
+/**
+ * Build activity context showing recent user and agent actions
+ */
+export function buildActivityContext(
+  userActivity: ActivityLogEntry[],
+  agentActivity: ActivityLogEntry[]
+): string {
+  const parts: string[] = [];
+
+  // Recent user changes (manual edits)
+  if (userActivity && userActivity.length > 0) {
+    const userChanges = userActivity
+      .slice(0, 10) // Max 10 recent user changes
+      .map(a => {
+        const changeStr = formatActivityChanges(a.changes);
+        return `  - ${a.entity_type.toUpperCase()}: "${a.entity_title || 'Unknown'}" ${a.operation}${changeStr}`;
+      })
+      .join('\n');
+
+    parts.push(`RECENT MANUAL CHANGES (by user in last 30 min):\n${userChanges}`);
+  }
+
+  // Recent agent actions
+  if (agentActivity && agentActivity.length > 0) {
+    const agentChanges = agentActivity
+      .slice(0, 5) // Max 5 recent agent actions
+      .map(a => {
+        const changeStr = formatActivityChanges(a.changes);
+        const agentStr = a.agent_type ? ` [${a.agent_type}]` : '';
+        return `  - ${a.entity_type.toUpperCase()}: "${a.entity_title || 'Unknown'}" ${a.operation}${agentStr}${changeStr}`;
+      })
+      .join('\n');
+
+    parts.push(`RECENT AGENT ACTIONS (last 5 actions):\n${agentChanges}`);
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  return '\n\n' + parts.join('\n\n') + `
+
+ACTIVITY CONTEXT GUIDANCE:
+- Avoid suggesting changes the user just manually made
+- Don't repeat actions you recently performed
+- If user just edited something, they likely don't want it changed again
+- Reference recent changes when relevant to the conversation`;
 }
 
 /**
@@ -28,10 +156,30 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext, rulesContext } = context;
+  const {
+    timezone,
+    eventContext,
+    taskContext,
+    goalContext,
+    todayFormatted,
+    tomorrowFormatted,
+    tomorrowDayName,
+    toolCount,
+    zepGraphContext,
+    rulesContext,
+    userCategories,
+    userProfile,
+    recentUserActivity,
+    recentAgentActivity
+  } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
+
+  // Build new context sections
+  const categoryContext = buildCategoryContext(userCategories || []);
+  const profileContext = buildProfileContext(userProfile || null);
+  const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
 
   // Build rules section if rules exist
   const rulesSection = rulesContext ? `
@@ -70,7 +218,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${categoryContext}${profileContext}${activityContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}

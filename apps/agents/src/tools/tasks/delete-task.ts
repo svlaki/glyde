@@ -62,7 +62,7 @@ export const deleteTaskTool = tool(
 
           // Delete the task
           const supabaseService = getSupabaseService();
-          const result = await supabaseService.deleteTask(userId, taskToDelete.id);
+          const result = await supabaseService.deleteTask(userId, taskToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
             return `❌ Failed to delete task: ${result.error}`;
@@ -99,7 +99,7 @@ export const deleteTaskTool = tool(
       const tasks = await supabaseService.getTasks(userId);
       const taskToDelete = tasks.find((t: any) => t.id === targetTaskId);
 
-      const result = await supabaseService.deleteTask(userId, targetTaskId);
+      const result = await supabaseService.deleteTask(userId, targetTaskId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;

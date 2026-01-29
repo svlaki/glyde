@@ -23,7 +23,7 @@ export const createGoalTool = tool(
         priorityScore: priorityScore || 5,
         energyRequirement: energyRequirement || undefined,
         reviewFrequency: reviewFrequency || 'weekly',
-      });
+      }, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
         return "❌ Failed to create goal";

@@ -99,7 +99,8 @@ export const bulkUpdateEventsTool = tool(
         const updatedEvent = await supabaseService.updateEvent(
           userId,
           event.id,
-          updateData
+          updateData,
+          { source: 'agent', agentType: 'conversation' }
         );
 
         if (updatedEvent) {

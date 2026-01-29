@@ -20,7 +20,7 @@ export const createTaskTool = tool(
         category: category || 'Personal',
         energyRequired: energyRequired || undefined,
         estimatedDuration: estimatedDuration || undefined,
-      });
+      }, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
         return "❌ Failed to create task";

@@ -147,7 +147,8 @@ export const updateEventTool = tool(
         location: location || undefined,
         description: description || undefined,
         category: category || undefined,
-      }
+      },
+      { source: 'agent', agentType: 'conversation' }
     );
 
     if (!updatedEvent) {
