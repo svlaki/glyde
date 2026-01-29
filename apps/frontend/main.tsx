@@ -11,6 +11,7 @@ import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { RulesPage } from './src/pages/RulesPage'
+import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
@@ -80,6 +81,7 @@ function App() {
                   path="/dashboard"
                   element={<Navigate to="/calendar" replace />}
                 />
+                <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </CategoryProvider>

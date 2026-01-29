@@ -6,12 +6,80 @@ import { OnboardingService } from './OnboardingService.js';
 import { v4 as uuidv4 } from 'uuid';
 
 interface CalendarEvent {
-  event_title: string;
-  event_starts_at: string;
-  event_ends_at: string;
-  event_description?: string;
-  event_location?: string;
-  recurrence?: any;
+  title: string;
+  start_time: string;
+  end_time: string;
+  description?: string;
+  location?: string;
+  recurrence_rule?: string | null;
+  is_recurring?: boolean;
+}
+
+/**
+ * Convert Microsoft Graph API recurrence pattern to RFC 5545 RRULE format
+ */
+function convertMicrosoftRecurrenceToRRule(recurrence: any): string | null {
+  if (!recurrence?.pattern) return null;
+
+  const pattern = recurrence.pattern;
+  const range = recurrence.range;
+  const parts: string[] = [];
+
+  // Map Microsoft recurrence type to RRULE FREQ
+  const freqMap: Record<string, string> = {
+    daily: 'DAILY',
+    weekly: 'WEEKLY',
+    absoluteMonthly: 'MONTHLY',
+    relativeMonthly: 'MONTHLY',
+    absoluteYearly: 'YEARLY',
+    relativeYearly: 'YEARLY'
+  };
+
+  const freq = freqMap[pattern.type];
+  if (!freq) return null;
+
+  parts.push(`FREQ=${freq}`);
+
+  // Add interval if > 1
+  if (pattern.interval && pattern.interval > 1) {
+    parts.push(`INTERVAL=${pattern.interval}`);
+  }
+
+  // Add day of week for weekly recurrence
+  if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
+    const dayMap: Record<string, string> = {
+      sunday: 'SU', monday: 'MO', tuesday: 'TU', wednesday: 'WE',
+      thursday: 'TH', friday: 'FR', saturday: 'SA'
+    };
+    const days = pattern.daysOfWeek.map((d: string) => dayMap[d.toLowerCase()]).filter(Boolean);
+    if (days.length > 0) {
+      parts.push(`BYDAY=${days.join(',')}`);
+    }
+  }
+
+  // Add day of month for monthly recurrence
+  if (pattern.dayOfMonth) {
+    parts.push(`BYMONTHDAY=${pattern.dayOfMonth}`);
+  }
+
+  // Add month for yearly recurrence
+  if (pattern.month) {
+    parts.push(`BYMONTH=${pattern.month}`);
+  }
+
+  // Add end condition from range
+  if (range) {
+    if (range.type === 'endDate' && range.endDate) {
+      // Convert to RRULE UNTIL format (YYYYMMDD)
+      const endDate = new Date(range.endDate);
+      const until = endDate.toISOString().replace(/[-:]/g, '').split('T')[0];
+      parts.push(`UNTIL=${until}`);
+    } else if (range.type === 'numbered' && range.numberOfOccurrences) {
+      parts.push(`COUNT=${range.numberOfOccurrences}`);
+    }
+  }
+
+  return parts.join(';');
 }
 
 export class CalendarIntegrationService {
@@ -35,13 +103,25 @@ export class CalendarIntegrationService {
       const startDate = event.startDate.toJSDate();
       const endDate = event.endDate ? event.endDate.toJSDate() : new Date(startDate.getTime() + 3600000); // 1 hour default
 
+      // Extract RRULE if present
+      const rruleProp = vevent.getFirstProperty('rrule');
+      let rruleString: string | null = null;
+      if (rruleProp) {
+        const rruleValue = rruleProp.getFirstValue();
+        if (rruleValue) {
+          // ICAL.js returns the RRULE as an object, convert to string
+          rruleString = rruleValue.toString();
+        }
+      }
+
       events.push({
-        event_title: event.summary || 'Untitled Event',
-        event_starts_at: startDate.toISOString(),
-        event_ends_at: endDate.toISOString(),
-        event_description: event.description || '',
-        event_location: event.location || '',
-        recurrence: null // Simple import without recurrence
+        title: event.summary || 'Untitled Event',
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
+        description: event.description || '',
+        location: event.location || '',
+        recurrence_rule: rruleString,
+        is_recurring: !!rruleString
       });
     });
 
@@ -59,7 +139,7 @@ export class CalendarIntegrationService {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
     const recentEvents = events.filter(event =>
-      new Date(event.event_starts_at) >= threeMonthsAgo
+      new Date(event.start_time) >= threeMonthsAgo
     );
 
     if (recentEvents.length === 0) {
@@ -103,10 +183,24 @@ export class CalendarIntegrationService {
    * Get Google OAuth URL
    */
   static getGoogleAuthUrl(userId: string): string {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+
+    console.log('Google OAuth Config:', {
+      clientId: clientId ? `${clientId.substring(0, 20)}...` : 'MISSING',
+      clientSecret: clientSecret ? 'SET' : 'MISSING',
+      redirectUri: redirectUri || 'MISSING'
+    });
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error(`Google OAuth not configured. Missing: ${!clientId ? 'GOOGLE_CLIENT_ID ' : ''}${!clientSecret ? 'GOOGLE_CLIENT_SECRET ' : ''}${!redirectUri ? 'GOOGLE_REDIRECT_URI' : ''}`);
+    }
+
     const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
+      clientId,
+      clientSecret,
+      redirectUri
     );
 
     const scopes = ['https://www.googleapis.com/auth/calendar.readonly'];
@@ -117,6 +211,7 @@ export class CalendarIntegrationService {
       state: userId // Pass userId as state for callback
     });
 
+    console.log('Generated Google OAuth URL:', url);
     return url;
   }
 
@@ -163,20 +258,26 @@ export class CalendarIntegrationService {
       timeMin: threeMonthsAgo.toISOString(),
       timeMax: new Date().toISOString(),
       maxResults: 2500,
-      singleEvents: true,
-      orderBy: 'startTime'
+      singleEvents: false,  // Get parent recurring events with RRULE instead of expanded instances
+      orderBy: 'updated'    // Can't use startTime when singleEvents is false
     });
 
     const googleEvents = response.data.items || [];
 
-    const events: CalendarEvent[] = googleEvents.map(event => ({
-      event_title: event.summary || 'Untitled Event',
-      event_starts_at: event.start?.dateTime || event.start?.date || new Date().toISOString(),
-      event_ends_at: event.end?.dateTime || event.end?.date || new Date().toISOString(),
-      event_description: event.description || '',
-      event_location: event.location || '',
-      recurrence: null
-    }));
+    const events: CalendarEvent[] = googleEvents.map(event => {
+      // Extract RRULE from recurrence array (format: ["RRULE:FREQ=WEEKLY;BYDAY=MO", ...])
+      const rrule = event.recurrence?.find(r => r.startsWith('RRULE:'))?.replace('RRULE:', '') || null;
+
+      return {
+        title: event.summary || 'Untitled Event',
+        start_time: event.start?.dateTime || event.start?.date || new Date().toISOString(),
+        end_time: event.end?.dateTime || event.end?.date || new Date().toISOString(),
+        description: event.description || '',
+        location: event.location || '',
+        recurrence_rule: rrule,
+        is_recurring: !!rrule
+      };
+    });
 
     return events;
   }
@@ -259,20 +360,26 @@ export class CalendarIntegrationService {
     const response = await client
       .api('/me/calendar/events')
       .filter(`start/dateTime ge '${threeMonthsAgo.toISOString()}'`)
-      .select('subject,start,end,location,bodyPreview')
+      .select('subject,start,end,location,bodyPreview,recurrence')
       .top(2500)
       .get();
 
     const microsoftEvents = response.value || [];
 
-    const events: CalendarEvent[] = microsoftEvents.map((event: any) => ({
-      event_title: event.subject || 'Untitled Event',
-      event_starts_at: event.start?.dateTime || new Date().toISOString(),
-      event_ends_at: event.end?.dateTime || new Date().toISOString(),
-      event_description: event.bodyPreview || '',
-      event_location: event.location?.displayName || '',
-      recurrence: null
-    }));
+    const events: CalendarEvent[] = microsoftEvents.map((event: any) => {
+      // Convert Microsoft recurrence pattern to RRULE
+      const rrule = event.recurrence ? convertMicrosoftRecurrenceToRRule(event.recurrence) : null;
+
+      return {
+        title: event.subject || 'Untitled Event',
+        start_time: event.start?.dateTime || new Date().toISOString(),
+        end_time: event.end?.dateTime || new Date().toISOString(),
+        description: event.bodyPreview || '',
+        location: event.location?.displayName || '',
+        recurrence_rule: rrule,
+        is_recurring: !!rrule
+      };
+    });
 
     return events;
   }
@@ -290,12 +397,12 @@ export class CalendarIntegrationService {
 
     // Get date range
     const sortedEvents = events
-      .filter(e => e.event_starts_at)
-      .sort((a, b) => new Date(a.event_starts_at).getTime() - new Date(b.event_starts_at).getTime());
+      .filter(e => e.start_time)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
     const dateRange = {
-      start: sortedEvents[0]?.event_starts_at || new Date().toISOString(),
-      end: sortedEvents[sortedEvents.length - 1]?.event_starts_at || new Date().toISOString()
+      start: sortedEvents[0]?.start_time || new Date().toISOString(),
+      end: sortedEvents[sortedEvents.length - 1]?.start_time || new Date().toISOString()
     };
 
     // Update onboarding metadata

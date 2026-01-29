@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useDarkMode } from '../../../lib/darkModeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
 import { useAuth } from '../../../lib/authContext'
 import { CALENDAR_OPTIONS } from '../../../lib/onboardingService'
-import { getGoogleAuthUrl, getMicrosoftAuthUrl } from '../../../lib/calendarService'
+import { getGoogleAuthUrl, uploadICSFile } from '../../../lib/calendarService'
 
 export function Section2Calendars() {
   const { isDarkMode } = useDarkMode()
@@ -12,12 +12,45 @@ export function Section2Calendars() {
   const { state, toggleCalendar, updateField, dispatch } = useOnboarding()
   const { user, session } = useAuth()
   const [importLoading, setImportLoading] = useState(false)
+  const [fileUploadStatus, setFileUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle')
+  const [uploadedFileEventCount, setUploadedFileEventCount] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const hasImportableCalendar = state.selectedCalendars.some(c => {
     const option = CALENDAR_OPTIONS.find(opt => opt.id === c)
     return option?.importable === true
   })
   const hasOtherSelected = state.selectedCalendars.includes('other')
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user || !session?.access_token) return
+
+    setFileUploadStatus('uploading')
+    try {
+      const result = await uploadICSFile(user, session.access_token, file)
+
+      if (result.success) {
+        setFileUploadStatus('success')
+        setUploadedFileEventCount(result.eventCount || 0)
+        dispatch({
+          type: 'SET_CALENDAR_IMPORT_STATUS',
+          status: 'success',
+          eventCount: result.eventCount || 0
+        })
+      } else {
+        setFileUploadStatus('error')
+      }
+    } catch (err) {
+      console.error('File upload error:', err)
+      setFileUploadStatus('error')
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const handleStartImport = async () => {
     if (!user || !session?.access_token) return
@@ -26,13 +59,8 @@ export function Section2Calendars() {
     dispatch({ type: 'SET_CALENDAR_IMPORT_STATUS', status: 'importing' })
 
     try {
-      // Determine which calendar to import
-      const calendarType = state.selectedCalendars.includes('google') ? 'google' : 'outlook'
-
-      // Get auth URL
-      const result = calendarType === 'google'
-        ? await getGoogleAuthUrl(user, session.access_token)
-        : await getMicrosoftAuthUrl(user, session.access_token)
+      // Get Google auth URL
+      const result = await getGoogleAuthUrl(user, session.access_token)
 
       if (result.success && result.authUrl) {
         // Open OAuth in popup
@@ -286,6 +314,140 @@ export function Section2Calendars() {
           )}
         </div>
       )}
+
+      {/* ICS File Upload Section */}
+      <div style={{
+        padding: '20px',
+        borderRadius: '12px',
+        backgroundColor: colors.bgSecondary,
+        border: `1px solid ${colors.border}`,
+        marginBottom: '24px'
+      }}>
+        <p style={{
+          fontSize: '14px',
+          fontWeight: 500,
+          color: colors.textPrimary,
+          marginBottom: '12px'
+        }}>
+          Or upload a calendar file
+        </p>
+        <p style={{
+          fontSize: '13px',
+          color: colors.textSecondary,
+          marginBottom: '16px'
+        }}>
+          Export your calendar as an .ics file and upload it here.
+        </p>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".ics,text/calendar"
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+        />
+
+        {fileUploadStatus === 'idle' && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '8px',
+              border: `1px solid ${colors.border}`,
+              backgroundColor: colors.bgSecondary,
+              color: colors.textPrimary,
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Upload .ics file
+          </button>
+        )}
+
+        {fileUploadStatus === 'uploading' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            color: colors.textSecondary
+          }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              border: '2px solid #3b82f6',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+            <span>Uploading and importing events...</span>
+          </div>
+        )}
+
+        {fileUploadStatus === 'success' && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            color: '#10b981'
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="16 10 11 15 8 12" />
+            </svg>
+            <span>Imported {uploadedFileEventCount} events!</span>
+          </div>
+        )}
+
+        {fileUploadStatus === 'error' && (
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              color: '#ef4444',
+              marginBottom: '12px'
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              <span>Upload failed. Please try again.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setFileUploadStatus('idle')
+                fileInputRef.current?.click()
+              }}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        )}
+      </div>
 
       <p style={{
         fontSize: '12px',

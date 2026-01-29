@@ -11,11 +11,12 @@ export const GENDER_OPTIONS = [
 ]
 
 // Calendar options for Section 2
+// Only Google has OAuth import - others can use ICS file upload
 export const CALENDAR_OPTIONS = [
-  { id: 'apple', label: 'Apple/iCloud', importable: true },
-  { id: 'google', label: 'Google', importable: true },
-  { id: 'outlook', label: 'Outlook', importable: true },
-  { id: 'notion', label: 'Notion', importable: true },
+  { id: 'google', label: 'Google Calendar', importable: true },
+  { id: 'apple', label: 'Apple/iCloud', importable: false },
+  { id: 'outlook', label: 'Outlook', importable: false },
+  { id: 'notion', label: 'Notion', importable: false },
   { id: 'none', label: 'None', importable: false },
   { id: 'other', label: 'Other', importable: false }
 ]
