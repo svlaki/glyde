@@ -55,7 +55,16 @@
       "Bash(npm test:*)",
       "Bash(npx supabase:*)",
       "WebSearch",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git clone:*)",
+      "Bash(claude -p \"/plugin marketplace add C:/Users/pipej/temp-claude-plugin\")",
+      "Bash(grep:*)",
+      "Bash(npx eslint:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(xargs:*)",
+      "mcp__supabase__get_advisors"
     ],
     "deny": [],
     "ask": [],
