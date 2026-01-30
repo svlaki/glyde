@@ -12,6 +12,7 @@ import { searchTools } from './search/index.js';
 import { memoryTools } from './memory/index.js';
 import { interactionTools } from './interactions/index.js';
 import { rulesTools } from './rules/index.js';
+import { getPlanTool, updatePlanTool } from './plans/index.js';
 // NOTE: interactionTools imported but NOT registered in default tools
 // Interactions should only be created by Gerald (InteractionAgentGerald), not ConversationAgent
 // This prevents accidental duplicate/proactive suggestions from the conversation flow
@@ -73,6 +74,10 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
+    // Register plan tools
+    this.tools.set(getPlanTool.name, getPlanTool);
+    this.tools.set(updatePlanTool.name, updatePlanTool);
+
     // NOTE: Interaction tools NOT registered here
     // Gerald (InteractionAgentGerald) has its own tool set for proactive suggestions
     // This separation prevents ConversationAgent from accidentally creating interactions
@@ -106,7 +111,7 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules'): any[] {
+  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
       categories: ['create_category', 'list_categories', 'update_category', 'delete_category'],
@@ -116,7 +121,8 @@ export class ToolRegistry {
       memory: ['search_memory_unified', 'manage_patterns'],
       search: ['web_search'],
       interactions: ['create_interaction'],
-      rules: ['create_rule', 'list_rules', 'delete_rule']
+      rules: ['create_rule', 'list_rules', 'delete_rule'],
+      plans: ['get_plan', 'update_plan']
     };
 
     const toolNames = categoryPrefixes[category] || [];
@@ -148,7 +154,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules'): string[] {
+  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

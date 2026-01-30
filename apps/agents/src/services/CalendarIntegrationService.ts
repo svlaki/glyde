@@ -149,11 +149,11 @@ export class CalendarIntegrationService {
     // Prepare events for insertion (map to public.events column names)
     const eventsToInsert = recentEvents.map(event => ({
       user_id: userId,
-      title: event.event_title,
-      start_time: event.event_starts_at,
-      end_time: event.event_ends_at,
-      description: event.event_description || null,
-      location: event.event_location || null,
+      title: event.title,
+      start_time: event.start_time,
+      end_time: event.end_time,
+      description: event.description || null,
+      location: event.location || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }));

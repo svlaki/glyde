@@ -1,6 +1,6 @@
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
-import { AgentContext, AgentResponse, AgentType, MemoryContext } from "../../types/agents.js";
+import { AgentContext, AgentResponse, AgentType, MemoryContext, MessageContent } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepMemoryService } from "../../services/ZepMemoryService.js";
 import { env } from "../../utils/env.js";
@@ -44,6 +44,16 @@ export abstract class BaseAgent {
     }
   }
 
+  // Helper to extract text from MessageContent (handles string or multipart array)
+  private extractTextFromContent(content: MessageContent): string {
+    if (typeof content === 'string') {
+      return content;
+    }
+    // Extract text from content array (for multimodal messages)
+    const textPart = content.find(part => part.type === 'text');
+    return textPart && 'text' in textPart ? textPart.text : '';
+  }
+
   // Fallback memory loading for when Zep is unavailable
   private async loadBasicMemoryContext(context: AgentContext): Promise<MemoryContext> {
     const recentEvents = await this.supabaseService.getEvents(context.userId);
@@ -53,12 +63,13 @@ export abstract class BaseAgent {
     }));
 
     const baseMessages: BaseMessage[] = context.conversationHistory.map(msg => {
+      const textContent = this.extractTextFromContent(msg.content);
       if (msg.role === 'user') {
-        return new HumanMessage(msg.content);
+        return new HumanMessage(textContent);
       } else if (msg.role === 'assistant') {
-        return new AIMessage(msg.content);
+        return new AIMessage(textContent);
       } else {
-        return new SystemMessage(msg.content);
+        return new SystemMessage(textContent);
       }
     });
 
@@ -97,7 +108,7 @@ export abstract class BaseAgent {
 
   private buildConversationContext(messages: import('../../types/agents.js').ConversationMessage[]): string {
     const recentMessages = messages.slice(-5);
-    return recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    return recentMessages.map(msg => `${msg.role}: ${this.extractTextFromContent(msg.content)}`).join('\n');
   }
 
   private buildSemanticContext(events: any[], chats: any[]): string {

@@ -1792,7 +1792,12 @@ export class SupabaseService {
       }
 
       console.log(`✅ [SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
-      return filteredGoals;
+
+      // Map category_name to category for frontend compatibility
+      return filteredGoals.map((g: any) => ({
+        ...g,
+        category: g.category_name || g.category  // Use category_name from RPC, fallback to category
+      }));
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception getting goals:', error);
       return [];
@@ -2207,6 +2212,136 @@ export class SupabaseService {
         filter: `user_id=eq.${userId}`
       }, callback)
       .subscribe();
+  }
+
+  // ============================================================================
+  // LIFE PLAN MANAGEMENT METHODS
+  // ============================================================================
+
+  /**
+   * Get the active life plan for a user
+   */
+  async getPlan(userId: string): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('life_plans')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows returned - user has no plan yet
+          return null;
+        }
+        console.error('Error fetching plan:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception fetching plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new life plan for a user
+   */
+  async createPlan(userId: string, planData: {
+    title?: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      // Archive any existing active plan
+      await this.client
+        .from('life_plans')
+        .update({ status: 'archived' })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      const { data, error } = await this.client
+        .from('life_plans')
+        .insert({
+          user_id: userId,
+          title: planData.title || 'My Life Plan',
+          content: planData.content || '',
+          horizon_start: planData.horizonStart,
+          horizon_end: planData.horizonEnd,
+          status: planData.status || 'active'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating plan:', error);
+        return null;
+      }
+
+      console.log('Plan created:', data.id);
+      return data;
+    } catch (error) {
+      console.error('Exception creating plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update a life plan
+   */
+  async updatePlan(userId: string, planId: string, updates: {
+    title?: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      if (!this.isValidUUID(planId)) {
+        console.error('Invalid plan ID:', planId);
+        return null;
+      }
+
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.content !== undefined) updateData.content = updates.content;
+      if (updates.horizonStart !== undefined) updateData.horizon_start = updates.horizonStart;
+      if (updates.horizonEnd !== undefined) updateData.horizon_end = updates.horizonEnd;
+      if (updates.status !== undefined) updateData.status = updates.status;
+
+      const { data, error } = await this.client
+        .from('life_plans')
+        .update(updateData)
+        .eq('id', planId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating plan:', error);
+        return null;
+      }
+
+      console.log('Plan updated:', planId);
+      return data;
+    } catch (error) {
+      console.error('Exception updating plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete a life plan
+   */
+  async deletePlan(userId: string, planId: string): Promise<{ success: boolean; error: string | null }> {
+    return this.deleteRecord('life_plans', userId, planId, 'plan');
   }
 }
 

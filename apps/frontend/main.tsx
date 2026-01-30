@@ -11,6 +11,7 @@ import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { RulesPage } from './src/pages/RulesPage'
+import { PlanPage } from './src/pages/PlanPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
@@ -69,6 +70,16 @@ function App() {
                     <ProtectedRoute>
                       <OnboardingCheck>
                         <RulesPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/plan"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <PlanPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }

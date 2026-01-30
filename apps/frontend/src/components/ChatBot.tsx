@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
@@ -9,10 +10,14 @@ interface Message {
   text: string
   sender: 'user' | 'bot'
   timestamp: Date
+  hasImage?: boolean
+  imageData?: string  // base64 image data, kept for context
 }
 
 interface ChatBotProps {
   onSetResponseCallback?: (callback: (message: string) => void) => void;
+  hideHeader?: boolean;
+  compact?: boolean;
 }
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
@@ -50,6 +55,23 @@ const StopIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?
   </svg>
 )
 
+// Image/photo icon for image upload
+const ImageIcon = ({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+)
+
+// X icon for removing image
+const XIcon = ({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
 // Format timestamp
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
@@ -68,10 +90,21 @@ const SUGGESTIONS = [
   { label: "Find free time", icon: "" },
 ]
 
-export function ChatBot() {
+export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
+  const location = useLocation()
   const colors = getColors(isDarkMode)
+
+  // Derive current page from pathname
+  const getCurrentPage = (): string => {
+    const path = location.pathname
+    if (path === '/' || path === '/dashboard') return 'dashboard'
+    if (path === '/plan') return 'plan'
+    if (path.startsWith('/goals')) return 'goals'
+    if (path.startsWith('/tasks')) return 'tasks'
+    return 'dashboard'
+  }
 
   // Accent colors for user messages (warm terracotta/amber)
   const accentColors = {
@@ -89,8 +122,12 @@ export function ChatBot() {
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [toolStatus, setToolStatus] = useState<string | null>(null)
+
+  // Image state for vision support
+  const [selectedImage, setSelectedImage] = useState<{ base64: string; name: string } | null>(null)
 
   // Input state - managed locally since AI SDK v5 doesn't manage input internally
   const [input, setInput] = useState('')
@@ -295,18 +332,62 @@ export function ChatBot() {
     inputRef.current?.focus()
   }
 
+  // Image upload handlers
+  const handleImageClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      console.warn('Selected file is not an image')
+      return
+    }
+
+    // Validate file size (max 20MB per OpenAI limits)
+    if (file.size > 20 * 1024 * 1024) {
+      console.warn('Image too large (max 20MB)')
+      return
+    }
+
+    // Convert to base64
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      setSelectedImage({ base64, name: file.name })
+    }
+    reader.readAsDataURL(file)
+
+    // Clear the input so the same file can be selected again
+    e.target.value = ''
+  }
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null)
+  }
+
   // Send message with native fetch streaming
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
     const trimmedInput = input.trim()
-    if (!trimmedInput || isLoading || !user || !session) return
+    // Allow sending with just an image (no text required)
+    if ((!trimmedInput && !selectedImage) || isLoading || !user || !session) return
+
+    // Capture and clear image before async operations
+    const imageToSend = selectedImage
+    setSelectedImage(null)
 
     // Add user message to chat
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
       text: trimmedInput,
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      hasImage: !!imageToSend,
+      imageData: imageToSend?.base64  // Store for context window
     }
     setMessages(prev => [...prev, userMessage])
     setInput('')
@@ -322,12 +403,41 @@ export function ChatBot() {
     }
 
     // Build conversation history (exclude welcome message)
-    const conversationHistory = messages
-      .filter(msg => msg.id !== 'welcome' && msg.id !== '1')
-      .map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
+    // Keep images in context for the last 5 messages
+    const IMAGE_CONTEXT_WINDOW = 5
+    const filteredMessages = messages.filter(msg => msg.id !== 'welcome' && msg.id !== '1')
+    const recentMessageCount = filteredMessages.length
+
+    const conversationHistory = filteredMessages.map((msg, index) => {
+      const messagesFromEnd = recentMessageCount - index
+      const includeImage = msg.imageData && messagesFromEnd <= IMAGE_CONTEXT_WINDOW
+
+      if (includeImage && msg.sender === 'user') {
+        // Include image in content array for recent messages
+        return {
+          role: 'user' as const,
+          content: [
+            { type: 'text', text: msg.text || 'Sent an image' },
+            { type: 'image_url', image_url: { url: msg.imageData } }
+          ]
+        }
+      }
+      return {
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
         content: msg.text
-      }))
+      }
+    })
+
+    // Build current message content (with image if present)
+    let currentMessageContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
+    if (imageToSend) {
+      currentMessageContent = [
+        { type: 'text', text: trimmedInput || 'What is in this image?' },
+        { type: 'image_url', image_url: { url: imageToSend.base64 } }
+      ]
+    } else {
+      currentMessageContent = trimmedInput
+    }
 
     try {
       // Create abort controller for cancellation
@@ -342,13 +452,14 @@ export function ChatBot() {
         body: JSON.stringify({
           messages: [
             ...conversationHistory,
-            { role: 'user', content: trimmedInput }
+            { role: 'user', content: currentMessageContent }
           ],
           context: {
             userId: user.id,
             sessionId: 'default',
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            conversationHistory
+            conversationHistory,
+            currentPage: getCurrentPage()
           }
         }),
         signal: abortControllerRef.current.signal
@@ -480,92 +591,94 @@ export function ChatBot() {
       background: colors.bgPrimary,
     }}>
       {/* Header */}
-      <div style={{
-        padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px)',
-        borderBottom: `1px solid ${colors.borderLight}`,
-        background: colors.bgPrimary,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '10px',
-            background: `linear-gradient(135deg, ${hexToRgba(colors.textSecondary, 0.1)}, ${hexToRgba(colors.textSecondary, 0.05)})`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: `1px solid ${colors.borderLight}`,
-          }}>
-            <SparkleIcon size={16} color={colors.textSecondary} />
-          </div>
-          <div>
-            <h3 style={{
-              fontSize: '15px',
-              fontWeight: '600',
-              margin: 0,
-              color: colors.textPrimary,
-              fontFamily: '"EB Garamond", Georgia, serif',
-              letterSpacing: '0.01em',
-            }}>
-              Assistant
-            </h3>
+      {!hideHeader && (
+        <div style={{
+          padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px)',
+          borderBottom: `1px solid ${colors.borderLight}`,
+          background: colors.bgPrimary,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              background: `linear-gradient(135deg, ${hexToRgba(colors.textSecondary, 0.1)}, ${hexToRgba(colors.textSecondary, 0.05)})`,
               display: 'flex',
               alignItems: 'center',
-              gap: '5px',
-              marginTop: '1px',
+              justifyContent: 'center',
+              border: `1px solid ${colors.borderLight}`,
             }}>
-              <div style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: isLoading ? '#fbbf24' : '#4ade80',
-                boxShadow: isLoading
-                  ? '0 0 6px rgba(251, 191, 36, 0.4)'
-                  : '0 0 6px rgba(74, 222, 128, 0.4)',
-              }} />
-              <span style={{
-                fontSize: '11px',
-                color: colors.textTertiary,
-                fontWeight: '500',
+              <SparkleIcon size={16} color={colors.textSecondary} />
+            </div>
+            <div>
+              <h3 style={{
+                fontSize: '15px',
+                fontWeight: '600',
+                margin: 0,
+                color: colors.textPrimary,
+                fontFamily: '"EB Garamond", Georgia, serif',
+                letterSpacing: '0.01em',
               }}>
-                {isLoading ? 'Typing...' : 'Online'}
-              </span>
+                Assistant
+              </h3>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                marginTop: '1px',
+              }}>
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: isLoading ? '#fbbf24' : '#4ade80',
+                  boxShadow: isLoading
+                    ? '0 0 6px rgba(251, 191, 36, 0.4)'
+                    : '0 0 6px rgba(74, 222, 128, 0.4)',
+                }} />
+                <span style={{
+                  fontSize: '11px',
+                  color: colors.textTertiary,
+                  fontWeight: '500',
+                }}>
+                  {isLoading ? 'Typing...' : 'Online'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <button
-          onClick={handleClearChat}
-          title="Clear conversation"
-          style={{
-            padding: '8px',
-            background: 'transparent',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            color: colors.textTertiary,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = colors.bgTertiary
-            e.currentTarget.style.color = colors.textSecondary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = colors.textTertiary
-          }}
-        >
-          <ClearIcon size={16} />
-        </button>
-      </div>
+          <button
+            onClick={handleClearChat}
+            title="Clear conversation"
+            style={{
+              padding: '8px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: colors.textTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = colors.bgTertiary
+              e.currentTarget.style.color = colors.textSecondary
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = colors.textTertiary
+            }}
+          >
+            <ClearIcon size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{
@@ -660,7 +773,24 @@ export function ChatBot() {
                     wordBreak: 'break-word',
                   }}>
                     {isUser ? (
-                      message.text
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        {message.hasImage && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '4px',
+                            background: 'rgba(255,255,255,0.2)',
+                            flexShrink: 0,
+                            marginTop: '1px',
+                          }}>
+                            <ImageIcon size={12} color="currentColor" />
+                          </div>
+                        )}
+                        <span>{message.text || 'Sent an image'}</span>
+                      </div>
                     ) : (
                       <div className="chat-markdown">
                         <ReactMarkdown
@@ -914,7 +1044,7 @@ export function ChatBot() {
       </div>
 
       {/* Suggestion chips */}
-      {showSuggestions && (
+      {showSuggestions && !compact && (
         <div style={{
           padding: '0 16px 12px',
           display: 'flex',
@@ -966,6 +1096,78 @@ export function ChatBot() {
         background: colors.bgSecondary,
         flexShrink: 0,
       }}>
+        {/* Hidden file input for image upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          style={{ display: 'none' }}
+        />
+
+        {/* Image preview */}
+        {selectedImage && (
+          <div style={{
+            marginBottom: '8px',
+            padding: '8px',
+            background: colors.bgPrimary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <img
+              src={selectedImage.base64}
+              alt="Selected"
+              style={{
+                width: '48px',
+                height: '48px',
+                objectFit: 'cover',
+                borderRadius: '8px',
+              }}
+            />
+            <span style={{
+              flex: 1,
+              fontSize: '13px',
+              color: colors.textSecondary,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {selectedImage.name}
+            </span>
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              style={{
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                background: colors.bgTertiary,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textTertiary,
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#ef4444'
+                e.currentTarget.style.color = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textTertiary
+              }}
+            >
+              <XIcon size={12} />
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleSend}>
           <div style={{
             display: 'flex',
@@ -1011,6 +1213,39 @@ export function ChatBot() {
                 target.style.height = Math.min(target.scrollHeight, 100) + 'px'
               }}
             />
+            {/* Image upload button */}
+            {!isLoading && (
+              <button
+                type="button"
+                onClick={handleImageClick}
+                title="Upload image"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  padding: 0,
+                  background: selectedImage ? hexToRgba(colors.textSecondary, 0.15) : 'transparent',
+                  color: selectedImage ? colors.textPrimary : colors.textTertiary,
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgTertiary
+                  e.currentTarget.style.color = colors.textSecondary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = selectedImage ? hexToRgba(colors.textSecondary, 0.15) : 'transparent'
+                  e.currentTarget.style.color = selectedImage ? colors.textPrimary : colors.textTertiary
+                }}
+              >
+                <ImageIcon size={18} />
+              </button>
+            )}
             {isLoading ? (
               <button
                 type="button"
@@ -1043,20 +1278,20 @@ export function ChatBot() {
             ) : (
               <button
                 type="submit"
-                disabled={!(input ?? '').trim()}
+                disabled={!(input ?? '').trim() && !selectedImage}
                 style={{
                   width: '36px',
                   height: '36px',
                   padding: 0,
-                  background: !(input ?? '').trim()
+                  background: (!(input ?? '').trim() && !selectedImage)
                     ? colors.bgTertiary
                     : accent.userBubble,
-                  color: !(input ?? '').trim()
+                  color: (!(input ?? '').trim() && !selectedImage)
                     ? colors.textTertiary
                     : accent.userText,
                   border: 'none',
                   borderRadius: '10px',
-                  cursor: !(input ?? '').trim() ? 'not-allowed' : 'pointer',
+                  cursor: (!(input ?? '').trim() && !selectedImage) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1064,7 +1299,7 @@ export function ChatBot() {
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if ((input ?? '').trim()) {
+                  if ((input ?? '').trim() || selectedImage) {
                     e.currentTarget.style.transform = 'scale(1.05)'
                   }
                 }}

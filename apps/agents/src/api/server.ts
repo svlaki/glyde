@@ -35,6 +35,7 @@ import { createUserSchema } from './user.js';
 import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent, createRecurringEvent, getExpandedEvents, updateRecurringEvent, deleteRecurringEvent } from './events.js';
 import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask } from './tasks.js';
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
+import { getUserPlan, createUserPlan, updateUserPlan, deleteUserPlan } from './plans.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
@@ -291,6 +292,12 @@ app.post('/api/goals/update', updateUserGoal);
 app.post('/api/goals/delete', deleteUserGoal);
 app.post('/api/goals/check-in', addGoalCheckIn);
 app.post('/api/goals/check-ins', getGoalCheckIns);
+
+// Plan endpoints
+app.post('/api/plan', getUserPlan);
+app.post('/api/plan/create', createUserPlan);
+app.post('/api/plan/update', updateUserPlan);
+app.post('/api/plan/delete', deleteUserPlan);
 
 // Profile endpoints
 app.post('/api/profile', getUserProfile);

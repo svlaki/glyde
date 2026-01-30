@@ -7,7 +7,7 @@ import { z } from "zod";
 import { SupabaseService, ActivityLogEntry } from '../../services/SupabaseService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
-import { AgentContext, AgentResponse } from '../../types/agents.js';
+import { AgentContext, AgentResponse, ImageContent } from '../../types/agents.js';
 import { getCurrentTimeInTimezone, isValidTimezone } from '../../utils/timezoneUtils.js';
 import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -50,6 +50,10 @@ const ConversationState = Annotation.Root({
   recentAgentActivity: Annotation<ActivityLogEntry[]>({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
+  }),
+  currentPage: Annotation<string>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => 'dashboard',
   }),
 });
 
@@ -132,17 +136,20 @@ export class ConversationAgent extends BaseAgent {
         // Keep last 10 messages for context (5 exchanges)
         const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
-          // Ensure content is a string
-          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-          
           if (msg.role === 'user') {
-            messages.push(new HumanMessage(content));
+            // Handle multipart content (text + images from recent messages)
+            if (Array.isArray(msg.content)) {
+              messages.push(new HumanMessage({ content: msg.content as any }));
+            } else {
+              messages.push(new HumanMessage(msg.content));
+            }
           } else if (msg.role === 'assistant') {
-            messages.push(new AIMessage(content));
+            const textContent = typeof msg.content === 'string' ? msg.content : '';
+            messages.push(new AIMessage(textContent));
           }
         }
       }
-      
+
       // Add the current message
       messages.push(new HumanMessage(message));
       
@@ -158,6 +165,7 @@ export class ConversationAgent extends BaseAgent {
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
+        currentPage: (context as any).currentPage || 'dashboard',
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -215,8 +223,9 @@ IMPORTANT INSTRUCTIONS:
   /**
    * Stream message processing for token-by-token output.
    * Uses LangGraph's streamEvents() method.
+   * Supports optional images for vision capabilities.
    */
-  async *streamMessage(context: AgentContext, message: string): AsyncGenerator<{
+  async *streamMessage(context: AgentContext, message: string, images: ImageContent[] = []): AsyncGenerator<{
     type: 'text-delta' | 'tool-start' | 'tool-end' | 'error' | 'status';
     content?: string;
     toolName?: string;
@@ -270,18 +279,38 @@ IMPORTANT INSTRUCTIONS:
         // Keep last 10 messages for context (5 exchanges)
         const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
-          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-
           if (msg.role === 'user') {
-            messages.push(new HumanMessage(content));
+            // Handle multipart content (text + images from recent messages)
+            if (Array.isArray(msg.content)) {
+              messages.push(new HumanMessage({ content: msg.content as any }));
+            } else {
+              messages.push(new HumanMessage(msg.content));
+            }
           } else if (msg.role === 'assistant') {
-            messages.push(new AIMessage(content));
+            // Assistant messages are always text-only
+            const textContent = typeof msg.content === 'string' ? msg.content : '';
+            messages.push(new AIMessage(textContent));
           }
         }
       }
 
-      // Add the current message
-      messages.push(new HumanMessage(message));
+      // Add the current message (with images if present)
+      if (images.length > 0) {
+        // Build multipart content for vision
+        const contentParts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string; detail?: string } }> = [
+          { type: 'text', text: message }
+        ];
+        for (const img of images) {
+          contentParts.push({
+            type: 'image_url',
+            image_url: { url: img.image_url.url, detail: img.image_url.detail || 'auto' }
+          });
+        }
+        messages.push(new HumanMessage({ content: contentParts }));
+        console.log(`[CONVERSATION AGENT] Added message with ${images.length} image(s)`);
+      } else {
+        messages.push(new HumanMessage(message));
+      }
 
       // Build initial state
       const initialState = {
@@ -295,6 +324,7 @@ IMPORTANT INSTRUCTIONS:
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
+        currentPage: (context as any).currentPage || 'dashboard',
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
@@ -511,7 +541,8 @@ IMPORTANT INSTRUCTIONS:
         userCategories: state.userCategories, // Available categories with IDs
         userProfile: state.userProfile, // User profile with preferences
         recentUserActivity: state.recentUserActivity, // Recent manual changes
-        recentAgentActivity: state.recentAgentActivity // Recent agent actions
+        recentAgentActivity: state.recentAgentActivity, // Recent agent actions
+        currentPage: state.currentPage // Current page user is viewing
       });
 
 

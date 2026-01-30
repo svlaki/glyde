@@ -53,6 +53,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const [category, setCategory] = useState('')
   const [dueDate, setDueDate] = useState<Date | null>(null)
   const [hasDueDate, setHasDueDate] = useState(false)
+  const [milestones, setMilestones] = useState<Array<{ title: string; due_date?: string; completed?: boolean }>>([])
+  const [showMilestones, setShowMilestones] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
@@ -73,12 +75,25 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         setDueDate(null)
         setHasDueDate(false)
       }
+      if (goal.milestones && goal.milestones.length > 0) {
+        setMilestones(goal.milestones.map(m => ({
+          title: m.title,
+          due_date: m.due_date,
+          completed: m.completed
+        })))
+        setShowMilestones(true)
+      } else {
+        setMilestones([])
+        setShowMilestones(false)
+      }
     } else {
       setTitle('')
       setDescription('')
       setCategory('')
       setDueDate(null)
       setHasDueDate(false)
+      setMilestones([])
+      setShowMilestones(false)
     }
     setEditingField(null)
   }, [goal, isOpen])
@@ -151,6 +166,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       if (hasDueDate && dueDate) {
         goalData.due_date = dueDate.toISOString()
       }
+      if (milestones.length > 0) {
+        goalData.milestones = milestones.filter(m => m.title.trim())
+      }
       console.log('Saving goal with data:', goalData)
       await onSave(goalData)
       onClose()
@@ -160,6 +178,20 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const addMilestone = () => {
+    setMilestones([...milestones, { title: '', completed: false }])
+  }
+
+  const updateMilestone = (index: number, field: string, value: string | boolean) => {
+    setMilestones(milestones.map((m, i) =>
+      i === index ? { ...m, [field]: value } : m
+    ))
+  }
+
+  const removeMilestone = (index: number) => {
+    setMilestones(milestones.filter((_, i) => i !== index))
   }
 
   return (
@@ -567,7 +599,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={6}
+              rows={4}
               placeholder="Describe what you want to accomplish and why it matters to you..."
               style={{
                 width: '100%',
@@ -580,6 +612,109 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                 resize: 'vertical'
               }}
             />
+          </div>
+
+          {/* Milestones */}
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              marginBottom: showMilestones || milestones.length > 0 ? '8px' : 0
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={showMilestones || milestones.length > 0}
+                  onChange={(e) => {
+                    setShowMilestones(e.target.checked)
+                    if (e.target.checked && milestones.length === 0) {
+                      addMilestone()
+                    }
+                  }}
+                  style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
+                />
+                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Add milestones</span>
+              </label>
+            </div>
+
+            {(showMilestones || milestones.length > 0) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {milestones.map((milestone, index) => (
+                  <div key={index} style={{
+                    display: 'flex',
+                    gap: '8px',
+                    alignItems: 'center'
+                  }}>
+                    <input
+                      type="text"
+                      value={milestone.title}
+                      onChange={(e) => updateMilestone(index, 'title', e.target.value)}
+                      placeholder="Milestone title"
+                      style={{
+                        flex: 1,
+                        padding: '8px 10px',
+                        fontSize: '13px',
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <input
+                      type="date"
+                      value={milestone.due_date || ''}
+                      onChange={(e) => updateMilestone(index, 'due_date', e.target.value)}
+                      style={{
+                        padding: '8px 10px',
+                        fontSize: '13px',
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '4px',
+                        width: '140px'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMilestone(index)}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: '14px',
+                        background: 'transparent',
+                        color: colors.textSecondary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addMilestone}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    background: 'transparent',
+                    color: colors.textSecondary,
+                    border: `1px dashed ${colors.border}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  + Add milestone
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

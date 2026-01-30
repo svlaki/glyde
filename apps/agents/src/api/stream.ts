@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
+import { ImageContent } from '../types/agents.js';
 
 // Get the shared agent registry instance
 const agentRegistry = AgentRegistry.getInstance();
@@ -57,6 +58,9 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
     let context: any;
     let message: string;
 
+    // Extract images from message content (for vision support)
+    let images: ImageContent[] = [];
+
     // Handle AI SDK v5 format (messages array with custom body fields)
     if (Array.isArray(aiMessages) && aiMessages.length > 0) {
       // Extract the last user message
@@ -73,10 +77,18 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         // Extract text from parts
         const textPart = lastUserMessage.parts.find((p: any) => p.type === 'text');
         message = textPart?.text || '';
+        // Extract images from parts
+        images = lastUserMessage.parts
+          .filter((p: any) => p.type === 'image_url')
+          .map((p: any) => ({ type: 'image_url' as const, image_url: p.image_url }));
       } else if (Array.isArray(lastUserMessage.content)) {
         // Handle content as array of parts
         const textPart = lastUserMessage.content.find((p: any) => p.type === 'text');
         message = textPart?.text || '';
+        // Extract images from content array
+        images = lastUserMessage.content
+          .filter((p: any) => p.type === 'image_url')
+          .map((p: any) => ({ type: 'image_url' as const, image_url: p.image_url }));
       } else {
         message = '';
       }
@@ -98,7 +110,7 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         }));
       }
 
-      console.log(`🌊 [STREAM] AI SDK v5 format - extracted message: "${message.substring(0, 50)}..."`);
+      console.log(`🌊 [STREAM] AI SDK v5 format - extracted message: "${message.substring(0, 50)}..."${images.length > 0 ? ` with ${images.length} image(s)` : ''}`);
     }
     // Handle legacy format
     else if (legacyContext && legacyMessage) {
@@ -142,7 +154,8 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
       conversationHistory: Array.isArray(context.conversationHistory)
         ? context.conversationHistory : [],
       userProfile: context.userProfile,
-      isInternal: false
+      isInternal: false,
+      currentPage: context.currentPage || 'dashboard'
     };
 
     // Get conversation agent
@@ -173,7 +186,7 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
       // Using TEXT STREAM PROTOCOL - just send plain text chunks
       let chunkCount = 0;
       console.log(`🌊 [STREAM] Starting to stream events (text protocol)...`);
-      for await (const event of agent.streamMessage(agentContext, message)) {
+      for await (const event of agent.streamMessage(agentContext, message, images)) {
         if (event.type === 'status' && event.content) {
           // Send status updates as SSE-style events that frontend can parse
           // Format: [STATUS:message] - frontend will strip this and show in UI
