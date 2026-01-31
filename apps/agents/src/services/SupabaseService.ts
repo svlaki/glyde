@@ -1821,6 +1821,7 @@ export class SupabaseService {
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
       milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
       goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
       parentGoalId?: string;
       keyResults?: any[];
@@ -1861,6 +1862,7 @@ export class SupabaseService {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.progress !== undefined) updateData.progress = updates.progress;
       if (updates.milestones !== undefined) updateData.milestones = updates.milestones;
+      if (updates.milestoneType !== undefined) updateData.milestone_type = updates.milestoneType;
       if (updates.goalType !== undefined) updateData.goal_type = updates.goalType;
       if (updates.parentGoalId !== undefined) updateData.parent_goal_id = updates.parentGoalId;
       if (updates.keyResults !== undefined) updateData.key_results = updates.keyResults;

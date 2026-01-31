@@ -133,27 +133,22 @@ export function GoalsPage() {
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
     if (!user || !session) return
 
-    console.log('handleSaveGoal called with:', goalData)
-
     try {
       if (goalData.id) {
-        // Update existing goal
-        console.log('Updating goal with category:', goalData.category)
-        await updateUserGoal(user, session.access_token, goalData.id, {
-          title: goalData.title,
-          description: goalData.description,
-          category: goalData.category
-        })
+        // Update existing goal - pass all fields from the form
+        const { id, ...updates } = goalData
+        await updateUserGoal(user, session.access_token, id, updates)
       } else {
         // Create new goal
         if (!goalData.title) {
           throw new Error('Goal title is required')
         }
-        console.log('Creating goal with category:', goalData.category)
         await createUserGoal(user, session.access_token, {
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category
+          category: goalData.category,
+          milestones: goalData.milestones,
+          milestone_type: goalData.milestone_type
         })
       }
       // Realtime will refresh the list

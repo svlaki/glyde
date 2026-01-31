@@ -17,13 +17,14 @@ const ACCENT_COLORS = {
 
 interface TimelineItem {
   id: string
-  date: Date
+  date: Date | null
   title: string
   type: 'milestone' | 'goal'
   goalId: string
   milestoneIndex?: number
   color?: string
   completed?: boolean
+  position?: number // For non-dated items, 0-100 percentage
 }
 
 interface PlanTimelineProps {
@@ -43,6 +44,112 @@ interface DraggableItemProps {
   containerWidth: number
 }
 
+interface SimpleTimelineItemProps {
+  item: TimelineItem
+  colors: ReturnType<typeof getColors>
+  isDateBased: boolean
+}
+
+function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemProps) {
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const isGoal = item.type === 'goal'
+
+  // Use pre-calculated position for non-dated items, or calculate from date
+  const position = item.position ?? 50
+
+  return (
+    <div
+      onMouseEnter={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={() => setHoverPos(null)}
+      style={{
+        position: 'absolute',
+        left: `${position}%`,
+        transform: 'translateX(-50%)',
+        cursor: 'default',
+        zIndex: hoverPos ? 50 : 1
+      }}
+    >
+      {/* Hover tooltip */}
+      {hoverPos && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: hoverPos.y + 20,
+          left: hoverPos.x,
+          transform: 'translateX(-50%)',
+          padding: '8px 12px',
+          background: colors.bgPrimary,
+          border: `1px solid ${colors.border}`,
+          borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+          whiteSpace: 'nowrap',
+          zIndex: 9999,
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            fontSize: '12px',
+            fontWeight: '500',
+            color: colors.textPrimary
+          }}>
+            {item.title}
+          </div>
+          {item.date && (
+            <div style={{
+              fontSize: '11px',
+              color: colors.textSecondary,
+              marginTop: '2px'
+            }}>
+              {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* Marker */}
+      <div style={{
+        width: isGoal ? '16px' : '12px',
+        height: isGoal ? '16px' : '12px',
+        borderRadius: '50%',
+        background: item.completed ? ACCENT_COLORS.success : (item.color || ACCENT_COLORS.primary),
+        border: `2px solid ${colors.bgPrimary}`,
+        boxShadow: `0 2px 4px rgba(0,0,0,0.2)`,
+        marginBottom: '4px'
+      }} />
+
+      {/* Label + Date combined */}
+      <div style={{
+        position: 'absolute',
+        top: '18px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        textAlign: 'center',
+        whiteSpace: 'nowrap',
+        cursor: 'default'
+      }}>
+        <div style={{
+          fontSize: '10px',
+          color: colors.textSecondary,
+          maxWidth: '80px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}>
+          {item.title}
+        </div>
+        {isDateBased && item.date && (
+          <div style={{
+            fontSize: '9px',
+            color: colors.textTertiary,
+            marginTop: '2px'
+          }}>
+            {item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, containerWidth }: DraggableItemProps) {
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -55,8 +162,8 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
 
   // Calculate position on timeline
   const totalDays = Math.max(1, (timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24))
-  const daysFromStart = (item.date.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)
-  const position = Math.max(0, Math.min(100, (daysFromStart / totalDays) * 100))
+  const daysFromStart = item.date ? (item.date.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24) : 0
+  const position = item.position ?? Math.max(0, Math.min(100, (daysFromStart / totalDays) * 100))
 
   const isGoal = item.type === 'goal'
 
@@ -98,13 +205,15 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
           }}>
             {item.title}
           </div>
-          <div style={{
-            fontSize: '11px',
-            color: colors.textSecondary,
-            marginTop: '2px'
-          }}>
-            {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </div>
+          {item.date && (
+            <div style={{
+              fontSize: '11px',
+              color: colors.textSecondary,
+              marginTop: '2px'
+            }}>
+              {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </div>
+          )}
         </div>,
         document.body
       )}
@@ -139,13 +248,15 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
         }}>
           {item.title}
         </div>
-        <div style={{
-          fontSize: '9px',
-          color: colors.textTertiary,
-          marginTop: '2px'
-        }}>
-          {item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </div>
+        {item.date && (
+          <div style={{
+            fontSize: '9px',
+            color: colors.textTertiary,
+            marginTop: '2px'
+          }}>
+            {item.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -159,8 +270,10 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Build timeline items from goals and milestones
-  const timelineItems = useMemo(() => {
+  const { timelineItems, isDateBased } = useMemo(() => {
     const items: TimelineItem[] = []
+    let hasDateBasedItems = false
+    let hasNonDateBasedItems = false
 
     goals.forEach(goal => {
       // Get color from category context (uses user's actual category colors)
@@ -168,6 +281,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
 
       // Add goal target date
       if (goal.target_date) {
+        hasDateBasedItems = true
         items.push({
           id: `goal-${goal.id}`,
           date: new Date(goal.target_date),
@@ -179,10 +293,15 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
         })
       }
 
-      // Add milestones (only for dated milestone goals)
-      if (goal.milestone_type !== 'ordered' && goal.milestones && Array.isArray(goal.milestones)) {
+      // Add milestones
+      if (goal.milestones && Array.isArray(goal.milestones)) {
+        const isOrderedType = goal.milestone_type === 'ordered'
+        const totalMilestones = goal.milestones.length
+
         goal.milestones.forEach((milestone, index) => {
-          if (milestone.due_date) {
+          if (milestone.due_date && !isOrderedType) {
+            // Date-based milestone
+            hasDateBasedItems = true
             items.push({
               id: `milestone-${goal.id}-${index}`,
               date: new Date(milestone.due_date),
@@ -193,29 +312,61 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
               color: goalColor,
               completed: milestone.completed
             })
+          } else if (isOrderedType || !milestone.due_date) {
+            // Non-dated milestone - calculate equal spacing
+            hasNonDateBasedItems = true
+            // Space items evenly: first at ~10%, last at ~90%
+            const position = totalMilestones === 1
+              ? 50
+              : 10 + (index / (totalMilestones - 1)) * 80
+
+            items.push({
+              id: `milestone-${goal.id}-${index}`,
+              date: null,
+              title: milestone.title,
+              type: 'milestone',
+              goalId: goal.id,
+              milestoneIndex: index,
+              color: goalColor,
+              completed: milestone.completed,
+              position
+            })
           }
         })
       }
     })
 
-    // Sort by date
-    items.sort((a, b) => a.date.getTime() - b.date.getTime())
+    // Sort by date for date-based items, or by position for non-dated
+    if (hasDateBasedItems && !hasNonDateBasedItems) {
+      items.sort((a, b) => {
+        if (!a.date || !b.date) return 0
+        return a.date.getTime() - b.date.getTime()
+      })
+    } else if (hasNonDateBasedItems) {
+      items.sort((a, b) => (a.position ?? 50) - (b.position ?? 50))
+    }
 
-    return items
-  }, [goals, ACCENT_COLORS.primary])
+    return {
+      timelineItems: items,
+      isDateBased: hasDateBasedItems && !hasNonDateBasedItems
+    }
+  }, [goals, getCategoryColor])
 
-  // Calculate timeline range
+  // Calculate timeline range (only for date-based timelines)
   const { timelineStart, timelineEnd } = useMemo(() => {
     const now = new Date()
     const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
 
-    if (timelineItems.length === 0) {
+    // Filter to only items with dates
+    const datedItems = timelineItems.filter(i => i.date !== null)
+
+    if (datedItems.length === 0) {
       return { timelineStart: threeMonthsAgo, timelineEnd: oneYearFromNow }
     }
 
-    const minDate = new Date(Math.min(...timelineItems.map(i => i.date.getTime())))
-    const maxDate = new Date(Math.max(...timelineItems.map(i => i.date.getTime())))
+    const minDate = new Date(Math.min(...datedItems.map(i => i.date!.getTime())))
+    const maxDate = new Date(Math.max(...datedItems.map(i => i.date!.getTime())))
 
     // Add padding
     const start = new Date(Math.min(minDate.getTime(), now.getTime()) - 30 * 24 * 60 * 60 * 1000)
@@ -316,7 +467,110 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
         background: bgColor,
         borderRadius: '8px'
       }}>
-        No goals or milestones with dates. Add some goals to see your timeline.
+        No milestones yet. Add milestones to see your timeline.
+      </div>
+    )
+  }
+
+  // For non-date-based timeline, render a simpler view
+  if (!isDateBased) {
+    return (
+      <div style={{
+        height: '100%',
+        padding: hideTitle ? '10px' : '20px',
+        overflow: 'visible',
+        background: bgColor,
+        borderRadius: '8px'
+      }}>
+        {!hideTitle && (
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: colors.textPrimary
+          }}>
+            Progress
+          </h3>
+        )}
+
+        {/* Simple timeline container */}
+        <div style={{
+          position: 'relative',
+          height: hideTitle ? '60px' : '80px',
+          marginTop: hideTitle ? '0' : '20px'
+        }}>
+          {/* Timeline line */}
+          <div style={{
+            position: 'absolute',
+            top: '6px',
+            left: '5%',
+            right: '5%',
+            height: '2px',
+            background: colors.border
+          }} />
+
+          {/* Start marker */}
+          <div style={{
+            position: 'absolute',
+            left: '5%',
+            top: '0',
+            width: '4px',
+            height: '14px',
+            background: colors.border,
+            borderRadius: '2px'
+          }} />
+
+          {/* End marker */}
+          <div style={{
+            position: 'absolute',
+            right: '5%',
+            top: '0',
+            width: '4px',
+            height: '14px',
+            background: colors.border,
+            borderRadius: '2px'
+          }} />
+
+          {/* Timeline items - equally spaced */}
+          {timelineItems.map(item => (
+            <SimpleTimelineItem
+              key={item.id}
+              item={item}
+              colors={colors}
+              isDateBased={false}
+            />
+          ))}
+        </div>
+
+        {/* Legend */}
+        {!hideTitle && (
+          <div style={{
+            display: 'flex',
+            gap: '20px',
+            marginTop: '50px',
+            fontSize: '12px',
+            color: colors.textSecondary
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: colors.border
+              }} />
+              <span>Pending</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: ACCENT_COLORS.success
+              }} />
+              <span>Complete</span>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
