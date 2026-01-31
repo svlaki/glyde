@@ -40,8 +40,8 @@ CREATE POLICY "Service role full access to chat messages" ON public.chat_message
 
 -- Indexes for chat_messages
 CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON public.chat_messages(user_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON public.chat_messages(user_id, session_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON public.chat_messages(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON public.chat_messages(user_id, session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON public.chat_messages(user_id, created_at DESC);
 
 -- ============================================
 -- PART 2: Drop unused per-user schema functions

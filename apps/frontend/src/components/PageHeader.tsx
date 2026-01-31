@@ -24,6 +24,7 @@ export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps)
     { label: 'Plan', path: '/plan' },
     { label: 'Aspects', path: '/aspects' },
     { label: 'Rules', path: '/rules' },
+    { label: 'Connections', path: '/connections' },
     { label: 'Profile', path: '/profile' }
   ]
 

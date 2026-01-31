@@ -1673,6 +1673,7 @@ export class SupabaseService {
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
       milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
       goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
       parentGoalId?: string;
       keyResults?: any[];
@@ -1703,6 +1704,7 @@ export class SupabaseService {
           status: goalData.status || 'active',
           progress: goalData.progress || 0,
           milestones: goalData.milestones,
+          milestone_type: goalData.milestoneType || 'dated',
           goal_type: goalData.goalType || 'SMART',
           parent_goal_id: goalData.parentGoalId,
           key_results: goalData.keyResults || [],

@@ -129,7 +129,7 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
             color: colors.textPrimary,
             margin: '0 0 12px 0'
           }}>
-            Milestones
+            {goal.milestone_type === 'ordered' ? 'Steps' : 'Milestones'}
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {goal.milestones.map((milestone, index) => (
@@ -154,25 +154,53 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                   e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
                 }}
               >
-                <div style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  border: `2px solid ${milestone.completed ? (aspectColor || colors.accent) : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)')}`,
-                  background: milestone.completed ? (aspectColor || colors.accent) : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  marginTop: '1px',
-                  transition: 'all 0.15s ease'
-                }}>
-                  {milestone.completed && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
+                {goal.milestone_type === 'ordered' ? (
+                  /* Ordered milestones: Show step number with checkmark overlay when completed */
+                  <div style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    background: milestone.completed ? (aspectColor || colors.accent) : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '1px',
+                    transition: 'all 0.15s ease',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    color: milestone.completed ? '#fff' : colors.textSecondary
+                  }}>
+                    {milestone.completed ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                ) : (
+                  /* Dated milestones: Show checkbox */
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: `2px solid ${milestone.completed ? (aspectColor || colors.accent) : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)')}`,
+                    background: milestone.completed ? (aspectColor || colors.accent) : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '1px',
+                    transition: 'all 0.15s ease'
+                  }}>
+                    {milestone.completed && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                )}
                 <div style={{ flex: 1 }}>
                   <div style={{
                     fontSize: '13px',
@@ -182,7 +210,7 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                   }}>
                     {milestone.title}
                   </div>
-                  {milestone.due_date && (
+                  {goal.milestone_type !== 'ordered' && milestone.due_date && (
                     <div style={{
                       fontSize: '12px',
                       color: colors.textTertiary,

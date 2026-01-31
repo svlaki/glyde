@@ -17,25 +17,27 @@ CREATE TABLE IF NOT EXISTS public.user_activity_log (
 );
 
 -- Index for fetching recent activity by user (primary query pattern)
-CREATE INDEX idx_activity_log_user_time
+CREATE INDEX IF NOT EXISTS idx_activity_log_user_time
     ON public.user_activity_log(user_id, created_at DESC);
 
 -- Index for fetching activity by source (user vs agent)
-CREATE INDEX idx_activity_log_user_source_time
+CREATE INDEX IF NOT EXISTS idx_activity_log_user_source_time
     ON public.user_activity_log(user_id, source, created_at DESC);
 
 -- Index for fetching activity by entity (useful for entity history)
-CREATE INDEX idx_activity_log_entity
+CREATE INDEX IF NOT EXISTS idx_activity_log_entity
     ON public.user_activity_log(entity_type, entity_id, created_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.user_activity_log ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own activity
+DROP POLICY IF EXISTS "Users can view own activity" ON public.user_activity_log;
 CREATE POLICY "Users can view own activity" ON public.user_activity_log
     FOR SELECT USING (auth.uid() = user_id);
 
 -- Service role can insert (agents and API)
+DROP POLICY IF EXISTS "Service role can insert activity" ON public.user_activity_log;
 CREATE POLICY "Service role can insert activity" ON public.user_activity_log
     FOR INSERT WITH CHECK (true);
 

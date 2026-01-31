@@ -6,11 +6,13 @@ import { AuthProvider } from './src/lib/authContext'
 import { CategoryProvider } from './src/lib/categoryContext'
 import { DarkModeProvider } from './src/lib/darkModeContext'
 import { RuleProvider } from './src/lib/ruleContext'
+import { ConnectionProvider } from './src/lib/connectionContext'
 import { Auth } from './src/components/Auth'
 import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { RulesPage } from './src/pages/RulesPage'
+import { ConnectionsPage } from './src/pages/ConnectionsPage'
 import { PlanPage } from './src/pages/PlanPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
@@ -23,6 +25,7 @@ function App() {
       <AuthProvider>
         <DarkModeProvider>
           <RuleProvider>
+            <ConnectionProvider>
             <CategoryProvider>
               <Routes>
                 <Route path="/" element={<Auth />} />
@@ -75,6 +78,16 @@ function App() {
                   }
                 />
                 <Route
+                  path="/connections"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <ConnectionsPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/plan"
                   element={
                     <ProtectedRoute>
@@ -96,6 +109,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </CategoryProvider>
+            </ConnectionProvider>
           </RuleProvider>
         </DarkModeProvider>
       </AuthProvider>

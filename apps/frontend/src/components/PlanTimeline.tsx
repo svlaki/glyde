@@ -179,8 +179,8 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
         })
       }
 
-      // Add milestones
-      if (goal.milestones && Array.isArray(goal.milestones)) {
+      // Add milestones (only for dated milestone goals)
+      if (goal.milestone_type !== 'ordered' && goal.milestones && Array.isArray(goal.milestones)) {
         goal.milestones.forEach((milestone, index) => {
           if (milestone.due_date) {
             items.push({

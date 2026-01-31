@@ -24,15 +24,18 @@ CREATE INDEX IF NOT EXISTS idx_recurring_exceptions_date ON public.recurring_eve
 -- Enable RLS
 ALTER TABLE public.recurring_event_exceptions ENABLE ROW LEVEL SECURITY;
 
--- RLS policies
+-- RLS policies (drop first if exists to make migration idempotent)
+DROP POLICY IF EXISTS "Users can view their own exceptions" ON public.recurring_event_exceptions;
 CREATE POLICY "Users can view their own exceptions"
   ON public.recurring_event_exceptions FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own exceptions" ON public.recurring_event_exceptions;
 CREATE POLICY "Users can insert their own exceptions"
   ON public.recurring_event_exceptions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own exceptions" ON public.recurring_event_exceptions;
 CREATE POLICY "Users can delete their own exceptions"
   ON public.recurring_event_exceptions FOR DELETE
   USING (auth.uid() = user_id);

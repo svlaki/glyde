@@ -5,7 +5,7 @@ import { importGoogleCalendar } from '../lib/calendarService'
 export function OAuthCallbackPage() {
   const { user, session } = useAuth()
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
-  const [message, setMessage] = useState('Importing your calendar...')
+  const [message, setMessage] = useState('Processing...')
 
   useEffect(() => {
     async function handleCallback() {
@@ -21,6 +21,17 @@ export function OAuthCallbackPage() {
         return
       }
 
+      // Parse state to determine flow type
+      let flow = 'onboarding'
+      let userId = state
+      try {
+        const stateData = JSON.parse(state)
+        flow = stateData.flow || 'onboarding'
+        userId = stateData.userId || state
+      } catch {
+        // State is just the userId string (legacy format)
+      }
+
       // Wait for auth to be ready
       if (!user || !session?.access_token) {
         // Give auth context a moment to initialize
@@ -34,9 +45,25 @@ export function OAuthCallbackPage() {
         return
       }
 
+      // Handle connection flow
+      if (flow === 'connection') {
+        setMessage('Connecting your calendar...')
+        // Send code back to parent window for connection flow
+        setStatus('success')
+        setMessage('Calendar connected!')
+        sendMessage({
+          type: 'GOOGLE_CONNECTION_CALLBACK',
+          code,
+          state
+        })
+        return
+      }
+
+      // Handle onboarding/import flow
+      setMessage('Importing your calendar...')
       try {
         // Import calendar events
-        const result = await importGoogleCalendar(user, session.access_token, code, state)
+        const result = await importGoogleCalendar(user, session.access_token, code, userId)
 
         if (result.success) {
           setStatus('success')

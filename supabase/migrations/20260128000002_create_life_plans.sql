@@ -23,21 +23,25 @@ CREATE INDEX IF NOT EXISTS idx_life_plans_user_id ON public.life_plans(user_id);
 ALTER TABLE public.life_plans ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own plans" ON public.life_plans;
 CREATE POLICY "Users can view their own plans"
 ON public.life_plans
 FOR SELECT
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create their own plans" ON public.life_plans;
 CREATE POLICY "Users can create their own plans"
 ON public.life_plans
 FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own plans" ON public.life_plans;
 CREATE POLICY "Users can update their own plans"
 ON public.life_plans
 FOR UPDATE
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own plans" ON public.life_plans;
 CREATE POLICY "Users can delete their own plans"
 ON public.life_plans
 FOR DELETE
@@ -55,6 +59,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_life_plan_timestamp ON public.life_plans;
 CREATE TRIGGER trigger_update_life_plan_timestamp
   BEFORE UPDATE ON public.life_plans
   FOR EACH ROW

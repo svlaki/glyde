@@ -40,9 +40,22 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
+import {
+  getConnections,
+  getGoogleAuthUrl as getGoogleConnectionAuthUrl,
+  handleGoogleCallback as handleGoogleConnectionCallback,
+  triggerSync,
+  disconnectConnection,
+  handleGoogleWebhook,
+  getCalendarList,
+  getCalendarMappings,
+  syncCalendarList,
+  updateCalendarMapping
+} from './connections.js';
 import { getChatHistory, saveChatMessage, saveChatMessagesBatch, clearChatHistory } from './chat.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
+import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { authenticateRequest } from './middleware/auth.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
 import {
@@ -343,6 +356,20 @@ app.post('/api/rules/update', updateUserRule);
 app.post('/api/rules/delete', deleteUserRule);
 app.post('/api/rules/toggle', toggleUserRule);
 
+// Connections endpoints (for calendar sync)
+app.post('/api/connections', getConnections);
+app.post('/api/connections/google/auth', getGoogleConnectionAuthUrl);
+app.post('/api/connections/google/callback', handleGoogleConnectionCallback);
+app.post('/api/connections/sync', triggerSync);
+app.post('/api/connections/disconnect', disconnectConnection);
+// Calendar mappings endpoints (multi-calendar support)
+app.post('/api/connections/calendars', getCalendarList);
+app.post('/api/connections/calendars/mappings', getCalendarMappings);
+app.post('/api/connections/calendars/sync', syncCalendarList);
+app.post('/api/connections/calendars/mapping', updateCalendarMapping);
+// Webhook endpoint - no auth required (called by Google)
+app.post('/api/connections/webhook/google', handleGoogleWebhook);
+
 // Chat endpoints - persistent storage in user schema
 app.post('/api/chat/history', getChatHistory);
 app.post('/api/chat/message', saveChatMessage);
@@ -419,6 +446,9 @@ app.use('*', (req: express.Request, res: express.Response) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`Agent service running on port ${PORT}`);
+
+    // Start background jobs
+    startWatchRenewalJob();
   });
 }
 
