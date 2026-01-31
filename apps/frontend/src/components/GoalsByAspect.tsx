@@ -102,6 +102,33 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
     )
   }
 
+  const now = new Date()
+  const isRecurringOngoing = (event: CalendarEvent) => {
+    if (!event.recurrence_rule && !event.is_recurring) {
+      return false
+    }
+    if (!event.recurrence_end) {
+      return true
+    }
+    const recurrenceEnd = new Date(event.recurrence_end)
+    return !Number.isNaN(recurrenceEnd.getTime()) && recurrenceEnd >= now
+  }
+
+  const isPastEvent = (event: CalendarEvent) => {
+    const end = event.end_time ? new Date(event.end_time) : new Date(event.start_time)
+    if (Number.isNaN(end.getTime())) {
+      return false
+    }
+    if (isRecurringOngoing(event)) {
+      return false
+    }
+    return end < now
+  }
+
+  const currentEvents = events.filter(event => !isPastEvent(event))
+  const pastEvents = events.filter(event => isPastEvent(event))
+  const activeTasks = tasks.filter(task => task.status !== 'completed')
+  const completedTasks = tasks.filter(task => task.status === 'completed')
   const totalItems = events.length + tasks.length + goals.length
 
   return (
@@ -228,7 +255,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       )}
 
       {/* Events Section */}
-      {events.length > 0 && (
+      {currentEvents.length > 0 && (
         <div>
           <h4 style={{
             fontSize: '14px',
@@ -238,14 +265,14 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>
-            Events ({events.length})
+            Events ({currentEvents.length})
           </h4>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '8px'
           }}>
-            {events.map(event => (
+            {currentEvents.map(event => (
               <div
                 key={event.id}
                 style={{
@@ -300,7 +327,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       )}
 
       {/* Tasks Section */}
-      {tasks.length > 0 && (
+      {activeTasks.length > 0 && (
         <div>
           <h4 style={{
             fontSize: '14px',
@@ -310,14 +337,14 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
             textTransform: 'uppercase',
             letterSpacing: '0.05em'
           }}>
-            Tasks ({tasks.length})
+            Tasks ({activeTasks.length})
           </h4>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '8px'
           }}>
-            {tasks.map(task => (
+            {activeTasks.map(task => (
               <div
                 key={task.id}
                 style={{
@@ -441,6 +468,166 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                     lineHeight: '1.4'
                   }}>
                     {goal.description}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Completed Tasks Section */}
+      {completedTasks.length > 0 && (
+        <div>
+          <h4 style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            color: colors.textPrimary,
+            marginBottom: '12px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            Completed Tasks ({completedTasks.length})
+          </h4>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            {completedTasks.map(task => (
+              <div
+                key={task.id}
+                style={{
+                  padding: '12px 16px',
+                  background: colors.bgSecondary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  borderLeft: `4px solid ${aspect.color || '#999'}`,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = colors.bgSecondary
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '4px'
+                }}>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: colors.textPrimary
+                  }}>
+                    {task.title}
+                  </div>
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    background: '#4ade80',
+                    color: '#000',
+                    fontWeight: '500'
+                  }}>
+                    completed
+                  </span>
+                </div>
+                {task.due_date && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: colors.textSecondary
+                  }}>
+                    Due: {new Date(task.due_date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </div>
+                )}
+                {task.description && (
+                  <div style={{
+                    fontSize: '13px',
+                    color: colors.textSecondary,
+                    marginTop: '6px',
+                    lineHeight: '1.4'
+                  }}>
+                    {task.description}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Past Events Section */}
+      {pastEvents.length > 0 && (
+        <div>
+          <h4 style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            color: colors.textPrimary,
+            marginBottom: '12px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            Past Events ({pastEvents.length})
+          </h4>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            {pastEvents.map(event => (
+              <div
+                key={event.id}
+                style={{
+                  padding: '12px 16px',
+                  background: colors.bgSecondary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  borderLeft: `4px solid ${aspect.color || '#999'}`,
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = colors.bgSecondary
+                }}
+              >
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: colors.textPrimary,
+                  marginBottom: '4px'
+                }}>
+                  {event.title}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: colors.textSecondary
+                }}>
+                  {new Date(event.start_time).toLocaleString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                  })}
+                </div>
+                {event.description && (
+                  <div style={{
+                    fontSize: '13px',
+                    color: colors.textSecondary,
+                    marginTop: '6px',
+                    lineHeight: '1.4'
+                  }}>
+                    {event.description}
                   </div>
                 )}
               </div>
