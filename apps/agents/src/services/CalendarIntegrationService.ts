@@ -1,9 +1,7 @@
 import ICAL from 'ical.js';
 import { google } from 'googleapis';
-import { Client } from '@microsoft/microsoft-graph-client';
 import { getSupabaseService } from './SupabaseService.js';
 import { OnboardingService } from './OnboardingService.js';
-import { v4 as uuidv4 } from 'uuid';
 
 interface CalendarEvent {
   title: string;
@@ -13,73 +11,7 @@ interface CalendarEvent {
   location?: string;
   recurrence_rule?: string | null;
   is_recurring?: boolean;
-}
-
-/**
- * Convert Microsoft Graph API recurrence pattern to RFC 5545 RRULE format
- */
-function convertMicrosoftRecurrenceToRRule(recurrence: any): string | null {
-  if (!recurrence?.pattern) return null;
-
-  const pattern = recurrence.pattern;
-  const range = recurrence.range;
-  const parts: string[] = [];
-
-  // Map Microsoft recurrence type to RRULE FREQ
-  const freqMap: Record<string, string> = {
-    daily: 'DAILY',
-    weekly: 'WEEKLY',
-    absoluteMonthly: 'MONTHLY',
-    relativeMonthly: 'MONTHLY',
-    absoluteYearly: 'YEARLY',
-    relativeYearly: 'YEARLY'
-  };
-
-  const freq = freqMap[pattern.type];
-  if (!freq) return null;
-
-  parts.push(`FREQ=${freq}`);
-
-  // Add interval if > 1
-  if (pattern.interval && pattern.interval > 1) {
-    parts.push(`INTERVAL=${pattern.interval}`);
-  }
-
-  // Add day of week for weekly recurrence
-  if (pattern.daysOfWeek && pattern.daysOfWeek.length > 0) {
-    const dayMap: Record<string, string> = {
-      sunday: 'SU', monday: 'MO', tuesday: 'TU', wednesday: 'WE',
-      thursday: 'TH', friday: 'FR', saturday: 'SA'
-    };
-    const days = pattern.daysOfWeek.map((d: string) => dayMap[d.toLowerCase()]).filter(Boolean);
-    if (days.length > 0) {
-      parts.push(`BYDAY=${days.join(',')}`);
-    }
-  }
-
-  // Add day of month for monthly recurrence
-  if (pattern.dayOfMonth) {
-    parts.push(`BYMONTHDAY=${pattern.dayOfMonth}`);
-  }
-
-  // Add month for yearly recurrence
-  if (pattern.month) {
-    parts.push(`BYMONTH=${pattern.month}`);
-  }
-
-  // Add end condition from range
-  if (range) {
-    if (range.type === 'endDate' && range.endDate) {
-      // Convert to RRULE UNTIL format (YYYYMMDD)
-      const endDate = new Date(range.endDate);
-      const until = endDate.toISOString().replace(/[-:]/g, '').split('T')[0];
-      parts.push(`UNTIL=${until}`);
-    } else if (range.type === 'numbered' && range.numberOfOccurrences) {
-      parts.push(`COUNT=${range.numberOfOccurrences}`);
-    }
-  }
-
-  return parts.join(';');
+  external_id?: string | null;  // Google Calendar ID for deduplication
 }
 
 export class CalendarIntegrationService {
@@ -114,6 +46,9 @@ export class CalendarIntegrationService {
         }
       }
 
+      // Extract UID for deduplication (standard ICS property)
+      const uid = event.uid || null;
+
       events.push({
         title: event.summary || 'Untitled Event',
         start_time: startDate.toISOString(),
@@ -121,7 +56,8 @@ export class CalendarIntegrationService {
         description: event.description || '',
         location: event.location || '',
         recurrence_rule: rruleString,
-        is_recurring: !!rruleString
+        is_recurring: !!rruleString,
+        external_id: uid ? `ics:${uid}` : null  // Use UID for deduplication if available
       });
     });
 
@@ -146,34 +82,89 @@ export class CalendarIntegrationService {
       return 0;
     }
 
-    // Prepare events for insertion (map to public.events column names)
-    const eventsToInsert = recentEvents.map(event => ({
-      user_id: userId,
-      title: event.title,
-      start_time: event.start_time,
-      end_time: event.end_time,
-      description: event.description || null,
-      location: event.location || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }));
+    // Separate events with external_id (can upsert) from those without (ICS imports)
+    const eventsWithExternalId = recentEvents.filter(e => e.external_id);
+    const eventsWithoutExternalId = recentEvents.filter(e => !e.external_id);
 
-    // Insert events in batches of 100
-    const batchSize = 100;
     let totalInserted = 0;
+    const batchSize = 100;
 
-    for (let i = 0; i < eventsToInsert.length; i += batchSize) {
-      const batch = eventsToInsert.slice(i, i + batchSize);
+    // Upsert events with external_id (Google/Outlook) - prevents duplicates on re-import
+    for (let i = 0; i < eventsWithExternalId.length; i += batchSize) {
+      const batch = eventsWithExternalId.slice(i, i + batchSize).map(event => ({
+        user_id: userId,
+        title: event.title,
+        start_time: event.start_time,
+        end_time: event.end_time,
+        description: event.description || null,
+        location: event.location || null,
+        recurrence_rule: event.recurrence_rule || null,
+        is_recurring: event.is_recurring || false,
+        external_id: event.external_id,
+        updated_at: new Date().toISOString()
+      }));
 
       const { error, count } = await supabase
         .from('events')
-        .insert(batch);
+        .upsert(batch, {
+          onConflict: 'user_id,external_id',
+          ignoreDuplicates: false  // Update existing events with new data
+        });
 
       if (error) {
+        console.error('Error upserting events batch:', error);
         continue;
       }
 
       totalInserted += count || batch.length;
+    }
+
+    // For ICS imports (no external_id), check for duplicates by title+start_time
+    for (let i = 0; i < eventsWithoutExternalId.length; i += batchSize) {
+      const batch = eventsWithoutExternalId.slice(i, i + batchSize);
+      
+      // Check which events already exist
+      const existingCheck = await Promise.all(
+        batch.map(async (event) => {
+          const { data } = await supabase
+            .from('events')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('title', event.title)
+            .eq('start_time', event.start_time)
+            .limit(1);
+          return { event, exists: (data && data.length > 0) };
+        })
+      );
+
+      // Only insert events that don't already exist
+      const newEvents = existingCheck
+        .filter(({ exists }) => !exists)
+        .map(({ event }) => ({
+          user_id: userId,
+          title: event.title,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          description: event.description || null,
+          location: event.location || null,
+          recurrence_rule: event.recurrence_rule || null,
+          is_recurring: event.is_recurring || false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+
+      if (newEvents.length > 0) {
+        const { error, count } = await supabase
+          .from('events')
+          .insert(newEvents);
+
+        if (error) {
+          console.error('Error inserting ICS events batch:', error);
+          continue;
+        }
+
+        totalInserted += count || newEvents.length;
+      }
     }
 
     return totalInserted;
@@ -275,109 +266,8 @@ export class CalendarIntegrationService {
         description: event.description || '',
         location: event.location || '',
         recurrence_rule: rrule,
-        is_recurring: !!rrule
-      };
-    });
-
-    return events;
-  }
-
-  /**
-   * Get Microsoft OAuth URL
-   */
-  static getMicrosoftAuthUrl(userId: string): string {
-    const clientId = process.env.MICROSOFT_CLIENT_ID;
-    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || '';
-
-    // Debug logging
-    console.log('Microsoft OAuth Config:', {
-      clientId: clientId ? 'Set' : 'MISSING',
-      redirectUri: redirectUri || 'MISSING',
-      fullRedirectUri: redirectUri
-    });
-
-    if (!clientId || !redirectUri) {
-      throw new Error('Microsoft OAuth not configured. Please set MICROSOFT_CLIENT_ID and MICROSOFT_REDIRECT_URI in .env file');
-    }
-
-    const scopes = encodeURIComponent('Calendars.Read offline_access');
-    const encodedRedirectUri = encodeURIComponent(redirectUri);
-
-    const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodedRedirectUri}&response_mode=query&scope=${scopes}&state=${userId}`;
-
-    return url;
-  }
-
-  /**
-   * Handle Microsoft OAuth callback
-   */
-  static async handleMicrosoftCallback(code: string, state: string): Promise<string> {
-    const userId = state;
-
-    // Exchange code for token
-    const tokenEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
-
-    const params = new URLSearchParams({
-      client_id: process.env.MICROSOFT_CLIENT_ID || '',
-      scope: 'Calendars.Read offline_access',
-      code: code,
-      redirect_uri: process.env.MICROSOFT_REDIRECT_URI || '',
-      grant_type: 'authorization_code',
-      client_secret: process.env.MICROSOFT_CLIENT_SECRET || ''
-    });
-
-    const response = await fetch(tokenEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params
-    });
-
-    const data = await response.json() as any;
-
-    if (!response.ok) {
-      throw new Error(`Failed to exchange code for token: ${data.error_description || 'Unknown error'}`);
-    }
-
-    return data.access_token || '';
-  }
-
-  /**
-   * Import events from Microsoft Calendar
-   */
-  static async importMicrosoftEvents(userId: string, accessToken: string): Promise<CalendarEvent[]> {
-    const client = Client.init({
-      authProvider: (done) => {
-        done(null, accessToken);
-      }
-    });
-
-    // Get events from last 3 months
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-    const response = await client
-      .api('/me/calendar/events')
-      .filter(`start/dateTime ge '${threeMonthsAgo.toISOString()}'`)
-      .select('subject,start,end,location,bodyPreview,recurrence')
-      .top(2500)
-      .get();
-
-    const microsoftEvents = response.value || [];
-
-    const events: CalendarEvent[] = microsoftEvents.map((event: any) => {
-      // Convert Microsoft recurrence pattern to RRULE
-      const rrule = event.recurrence ? convertMicrosoftRecurrenceToRRule(event.recurrence) : null;
-
-      return {
-        title: event.subject || 'Untitled Event',
-        start_time: event.start?.dateTime || new Date().toISOString(),
-        end_time: event.end?.dateTime || new Date().toISOString(),
-        description: event.bodyPreview || '',
-        location: event.location?.displayName || '',
-        recurrence_rule: rrule,
-        is_recurring: !!rrule
+        is_recurring: !!rrule,
+        external_id: event.id ? `google:${event.id}` : null  // Prefix with source for uniqueness
       };
     });
 
@@ -389,7 +279,7 @@ export class CalendarIntegrationService {
    */
   static async completeCalendarImport(
     userId: string,
-    source: 'google' | 'outlook' | 'ics',
+    source: 'google' | 'ics',
     events: CalendarEvent[]
   ): Promise<{ eventCount: number; dateRange: { start: string; end: string } }> {
     // Import events

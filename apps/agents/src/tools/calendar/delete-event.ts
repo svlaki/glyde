@@ -168,7 +168,7 @@ export const deleteEventTool = tool(
       try {
         console.log('🧠 [DELETE-EVENT TOOL] Removing from knowledge graph (async)...');
 
-        await zepGraphService.deleteCalendarEvent(targetEventId);
+        await zepGraphService.deleteCalendarEvent(userId, targetEventId, eventTitle);
 
         console.log(`✅ [DELETE-EVENT TOOL] Event removed from knowledge graph`);
       } catch (error) {

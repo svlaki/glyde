@@ -61,22 +61,37 @@ export function parseNaturalLanguageRecurrence(
       interval = parseInt(intervalMatch[1], 10);
     }
 
-    // Extract weekdays
-    const dayNames: { [key: string]: string } = {
-      sunday: 'SU', sunday_: 'SU',
-      monday: 'MO', mon: 'MO', 'mon.': 'MO',
-      tuesday: 'TU', tue: 'TU', 'tue.': 'TU',
-      wednesday: 'WE', wed: 'WE', 'wed.': 'WE',
-      thursday: 'TH', thu: 'TH', 'thu.': 'TH',
-      friday: 'FR', fri: 'FR', 'fri.': 'FR',
-      saturday: 'SA', sat: 'SA', 'sat.': 'SA'
-    };
+    // Extract weekdays - use full names first to avoid substring matches
+    // Order matters: check longer names before shorter ones to avoid duplicates
+    const dayPatterns: Array<{ pattern: RegExp; abbrev: string }> = [
+      { pattern: /\bsunday\b/i, abbrev: 'SU' },
+      { pattern: /\bmonday\b/i, abbrev: 'MO' },
+      { pattern: /\btuesday\b/i, abbrev: 'TU' },
+      { pattern: /\bwednesday\b/i, abbrev: 'WE' },
+      { pattern: /\bthursday\b/i, abbrev: 'TH' },
+      { pattern: /\bfriday\b/i, abbrev: 'FR' },
+      { pattern: /\bsaturday\b/i, abbrev: 'SA' },
+      // Short forms with word boundaries to prevent substring matching
+      { pattern: /\bsun\b/i, abbrev: 'SU' },
+      { pattern: /\bmon\b/i, abbrev: 'MO' },
+      { pattern: /\btue\b/i, abbrev: 'TU' },
+      { pattern: /\btues\b/i, abbrev: 'TU' },
+      { pattern: /\bwed\b/i, abbrev: 'WE' },
+      { pattern: /\bthu\b/i, abbrev: 'TH' },
+      { pattern: /\bthur\b/i, abbrev: 'TH' },
+      { pattern: /\bthurs\b/i, abbrev: 'TH' },
+      { pattern: /\bfri\b/i, abbrev: 'FR' },
+      { pattern: /\bsat\b/i, abbrev: 'SA' },
+    ];
 
-    for (const [day, abbrev] of Object.entries(dayNames)) {
-      if (lowerText.includes(day)) {
-        byweekday.push(abbrev);
+    // Use a Set to prevent duplicate day entries
+    const weekdaySet = new Set<string>();
+    for (const { pattern, abbrev } of dayPatterns) {
+      if (pattern.test(lowerText)) {
+        weekdaySet.add(abbrev);
       }
     }
+    byweekday = Array.from(weekdaySet);
 
     // Extract duration (e.g., "for 30 days", "for 12 weeks")
     const durationMatch = text.match(/for\s+(\d+)\s+(day|week|month|year)s?/i);
@@ -148,17 +163,81 @@ export function validateRRule(rrule: string): boolean {
 }
 
 /**
+ * Convert a UTC date to "fake UTC" where UTC fields contain local time values.
+ * This is needed because rrule evaluates BYDAY in UTC, but we want local time behavior.
+ */
+function toFakeUtcLocal(utcDate: Date, timezone: string): Date {
+  // Get local time components
+  const options: Intl.DateTimeFormatOptions = { timeZone: timezone };
+  const localYear = parseInt(utcDate.toLocaleString('en-US', { ...options, year: 'numeric' }));
+  const localMonth = parseInt(utcDate.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
+  const localDay = parseInt(utcDate.toLocaleString('en-US', { ...options, day: 'numeric' }));
+  const localHour = parseInt(utcDate.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+  const localMinute = parseInt(utcDate.toLocaleString('en-US', { ...options, minute: 'numeric' }));
+  const localSecond = parseInt(utcDate.toLocaleString('en-US', { ...options, second: 'numeric' }));
+
+  // Create a date where UTC fields contain local time values
+  return new Date(Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond));
+}
+
+/**
+ * Convert a "fake UTC" date back to real UTC
+ */
+function fromFakeUtcLocal(fakeUtc: Date, timezone: string): Date {
+  // The fake UTC has local time in UTC fields - create a real local date
+  const localDate = new Date(
+    fakeUtc.getUTCFullYear(),
+    fakeUtc.getUTCMonth(),
+    fakeUtc.getUTCDate(),
+    fakeUtc.getUTCHours(),
+    fakeUtc.getUTCMinutes(),
+    fakeUtc.getUTCSeconds()
+  );
+
+  // Convert local date to UTC by getting the timezone offset
+  // Create a formatter to get the offset for this specific date in the timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
+  // Get what time it would be in the target timezone for this UTC interpretation
+  const parts = formatter.formatToParts(localDate);
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+
+  const tzYear = parseInt(getPart('year'));
+  const tzMonth = parseInt(getPart('month')) - 1;
+  const tzDay = parseInt(getPart('day'));
+  const tzHour = parseInt(getPart('hour'));
+  const tzMinute = parseInt(getPart('minute'));
+
+  // Calculate the offset by comparing
+  const offsetMs = localDate.getTime() - new Date(tzYear, tzMonth, tzDay, tzHour, tzMinute).getTime();
+
+  // Apply offset to get real UTC
+  return new Date(localDate.getTime() + offsetMs);
+}
+
+/**
  * Expand RRULE into individual date instances
  * @param rrule RFC 5545 RRULE string
- * @param startTime ISO 8601 start time for the first occurrence
+ * @param startTime ISO 8601 start time for the first occurrence (UTC)
  * @param endDate End date for expansion (defaults to 1 year from start)
  * @param limit Maximum number of occurrences to generate
+ * @param timezone User's timezone for correct BYDAY evaluation (e.g., 'America/Los_Angeles')
  */
 export function expandRecurrence(
   rrule: string,
   startTime: Date,
   endDate?: Date,
-  limit: number = 365
+  limit: number = 365,
+  timezone?: string
 ): Date[] {
   try {
     if (!validateRRule(rrule)) {
@@ -169,14 +248,38 @@ export function expandRecurrence(
     // Default end date to 1 year from start
     const expandEndDate = endDate || new Date(startTime.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-    // Parse RRULE
-    const rule = rrulestr(rrule, { dtstart: startTime });
+    // If timezone provided and RRULE has BYDAY, use fake UTC for correct day matching
+    const hasByday = rrule.includes('BYDAY');
+    const tz = timezone || 'UTC';
+
+    let dtstart: Date;
+    let searchEnd: Date;
+
+    if (hasByday && timezone) {
+      // Convert to fake UTC for correct BYDAY evaluation
+      dtstart = toFakeUtcLocal(startTime, tz);
+      searchEnd = toFakeUtcLocal(expandEndDate, tz);
+    } else {
+      dtstart = startTime;
+      searchEnd = expandEndDate;
+    }
+
+    // Parse RRULE with the appropriate dtstart
+    const rule = rrulestr(rrule, { dtstart });
 
     // Generate occurrences
-    const occurrences = rule.between(startTime, expandEndDate, true);
+    const occurrences = rule.between(dtstart, searchEnd, true);
+
+    // Convert back to real UTC if we used fake UTC
+    let realOccurrences: Date[];
+    if (hasByday && timezone) {
+      realOccurrences = occurrences.map(fakeUtc => fromFakeUtcLocal(fakeUtc, tz));
+    } else {
+      realOccurrences = occurrences;
+    }
 
     // Apply limit
-    return occurrences.slice(0, limit);
+    return realOccurrences.slice(0, limit);
   } catch (error) {
     console.error('❌ [RRule] Error expanding recurrence:', error);
     return [];
@@ -189,16 +292,18 @@ export function expandRecurrence(
  * @param startTime ISO 8601 start time for the first occurrence
  * @param endTime ISO 8601 end time (duration will be preserved across occurrences)
  * @param expandUntil End date for expansion
+ * @param timezone User's timezone for correct BYDAY evaluation
  */
 export function expandRecurrenceWithEndTime(
   rrule: string,
   startTime: Date,
   endTime: Date,
-  expandUntil?: Date
+  expandUntil?: Date,
+  timezone?: string
 ): Array<{ start: Date; end: Date }> {
   try {
     const duration = endTime.getTime() - startTime.getTime();
-    const startDates = expandRecurrence(rrule, startTime, expandUntil);
+    const startDates = expandRecurrence(rrule, startTime, expandUntil, 365, timezone);
 
     return startDates.map(start => ({
       start,

@@ -11,8 +11,8 @@ RUN npm install
 # Copy the rest of the application source code
 COPY . .
 
-# Build the TypeScript application
-RUN npm run build
+# Build the TypeScript application (increase memory for large TS projects)
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Expose port 8000 for the API server
 EXPOSE 8000

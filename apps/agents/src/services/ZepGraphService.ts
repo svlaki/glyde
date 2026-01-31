@@ -332,13 +332,18 @@ export class ZepGraphService {
 
   /**
    * Delete calendar event (mark as invalidated)
-   * Uses temporal invalidation to mark facts as invalid rather than hard deletion
+   * Uses temporal invalidation by adding a deletion fact to the graph
    */
-  async deleteCalendarEvent(eventId: string): Promise<void> {
+  async deleteCalendarEvent(userId: string, eventId: string, eventTitle?: string): Promise<void> {
     try {
-      // Log that the event has been deleted
-      // Zep's temporal system will handle invalidation through the reference_time mechanism
-      console.log(`✅ [ZepGraphService] Calendar event marked for invalidation: ${eventId}`);
+      // Add invalidation fact to the graph
+      // Zep's temporal system will use this to mark the event as no longer valid
+      await this.client.graph.add({
+        userId: userId,
+        data: `The calendar event "${eventTitle || eventId}" (ID: ${eventId}) has been deleted and is no longer scheduled. This event should be considered cancelled and removed from the user's schedule.`,
+        type: 'text',
+      });
+      console.log(`✅ [ZepGraphService] Calendar event invalidated in graph: ${eventId}`);
     } catch (error) {
       console.error(`⚠️ [ZepGraphService] Failed to invalidate calendar event ${eventId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary
@@ -377,13 +382,18 @@ export class ZepGraphService {
 
   /**
    * Delete task (mark as invalidated)
-   * Uses temporal invalidation to mark facts as invalid rather than hard deletion
+   * Uses temporal invalidation by adding a deletion fact to the graph
    */
-  async deleteTask(taskId: string): Promise<void> {
+  async deleteTask(userId: string, taskId: string, taskTitle?: string): Promise<void> {
     try {
-      // Log that the task has been deleted
-      // Zep's temporal system will handle invalidation through the reference_time mechanism
-      console.log(`✅ [ZepGraphService] Task marked for invalidation: ${taskId}`);
+      // Add invalidation fact to the graph
+      // Zep's temporal system will use this to mark the task as no longer valid
+      await this.client.graph.add({
+        userId: userId,
+        data: `The task "${taskTitle || taskId}" (ID: ${taskId}) has been deleted and is no longer active. This task should be considered removed from the user's task list.`,
+        type: 'text',
+      });
+      console.log(`✅ [ZepGraphService] Task invalidated in graph: ${taskId}`);
     } catch (error) {
       console.error(`⚠️ [ZepGraphService] Failed to invalidate task ${taskId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary
@@ -421,13 +431,18 @@ export class ZepGraphService {
 
   /**
    * Delete goal (mark as invalidated)
-   * Uses temporal invalidation to mark facts as invalid rather than hard deletion
+   * Uses temporal invalidation by adding a deletion fact to the graph
    */
-  async deleteGoal(goalId: string): Promise<void> {
+  async deleteGoal(userId: string, goalId: string, goalTitle?: string): Promise<void> {
     try {
-      // Log that the goal has been deleted
-      // Zep's temporal system will handle invalidation through the reference_time mechanism
-      console.log(`✅ [ZepGraphService] Goal marked for invalidation: ${goalId}`);
+      // Add invalidation fact to the graph
+      // Zep's temporal system will use this to mark the goal as no longer valid
+      await this.client.graph.add({
+        userId: userId,
+        data: `The goal "${goalTitle || goalId}" (ID: ${goalId}) has been deleted and is no longer being pursued. This goal should be considered removed from the user's goals.`,
+        type: 'text',
+      });
+      console.log(`✅ [ZepGraphService] Goal invalidated in graph: ${goalId}`);
     } catch (error) {
       console.error(`⚠️ [ZepGraphService] Failed to invalidate goal ${goalId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary

@@ -74,18 +74,63 @@ export function formatRRuleForDisplay(rrule: string): string {
 
 /**
  * Get next N occurrences of a recurring event
+ *
+ * IMPORTANT: The rrule library evaluates BYDAY constraints in UTC.
+ * Our events are stored in UTC but represent local times.
+ * We convert UTC to "fake UTC" local time for correct day-of-week matching,
+ * then convert the results back for display.
  */
 export function getNextOccurrences(
-  rrule: string,
+  rruleStr: string,
   startTime: Date,
-  count: number = 5
+  count: number = 5,
+  userTimezone?: string
 ): Date[] {
   try {
-    const rule = rrulestr(rrule, { dtstart: startTime });
-    // Generate occurrences up to a reasonable future date
-    const endDate = new Date(startTime.getTime() + 365 * 24 * 60 * 60 * 1000);
-    const occurrences = rule.between(startTime, endDate, true);
-    return occurrences.slice(0, count);
+    const tz = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Extract local time components from the UTC date
+    const options = { timeZone: tz };
+    const localYear = parseInt(startTime.toLocaleString('en-US', { ...options, year: 'numeric' }));
+    const localMonth = parseInt(startTime.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
+    const localDay = parseInt(startTime.toLocaleString('en-US', { ...options, day: 'numeric' }));
+    const localHour = parseInt(startTime.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const localMinute = parseInt(startTime.toLocaleString('en-US', { ...options, minute: 'numeric' }));
+
+    // Create a "fake UTC" date with local time components
+    // This makes rrule evaluate BYDAY in the user's local timezone
+    const localDtstart = new Date(Date.UTC(localYear, localMonth, localDay, localHour, localMinute, 0));
+
+    const rule = rrulestr(rruleStr, { dtstart: localDtstart });
+
+    // Get current time in the same "fake UTC" format for filtering
+    const now = new Date();
+    const nowYear = parseInt(now.toLocaleString('en-US', { ...options, year: 'numeric' }));
+    const nowMonth = parseInt(now.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
+    const nowDay = parseInt(now.toLocaleString('en-US', { ...options, day: 'numeric' }));
+    const nowHour = parseInt(now.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const nowMinute = parseInt(now.toLocaleString('en-US', { ...options, minute: 'numeric' }));
+    const localNow = new Date(Date.UTC(nowYear, nowMonth, nowDay, nowHour, nowMinute, 0));
+
+    const endDate = new Date(localNow.getTime() + 365 * 24 * 60 * 60 * 1000);
+    const searchStart = localNow > localDtstart ? localNow : localDtstart;
+
+    // Get occurrences (these are in "fake UTC" format)
+    const fakeUtcOccurrences = rule.between(searchStart, endDate, true).slice(0, count);
+
+    // Convert back to real local dates for display
+    // The "fake UTC" dates have local time in UTC fields, so we read UTC and display as-is
+    return fakeUtcOccurrences.map(fakeUtc => {
+      // Create a real local date from the fake UTC components
+      return new Date(
+        fakeUtc.getUTCFullYear(),
+        fakeUtc.getUTCMonth(),
+        fakeUtc.getUTCDate(),
+        fakeUtc.getUTCHours(),
+        fakeUtc.getUTCMinutes(),
+        0
+      );
+    });
   } catch (error) {
     console.error('Error getting next occurrences:', error);
     return [];
