@@ -62,9 +62,6 @@ import {
   getGoogleAuthUrl,
   handleGoogleCallback,
   importGoogleCalendar,
-  getMicrosoftAuthUrl,
-  handleMicrosoftCallback,
-  importMicrosoftCalendar,
   uploadCalendarFile,
   uploadMiddleware,
   getAnalysisStatus
@@ -329,15 +326,10 @@ app.post('/api/categories/color', getCategoryColor);
 app.post('/api/onboarding/complete', completeOnboarding);
 app.post('/api/onboarding/save-step', saveOnboardingStep);
 
-// Calendar integration endpoints
+// Calendar integration endpoints (Google Calendar + ICS file upload only for beta)
 app.post('/api/calendar/google/auth', getGoogleAuthUrl);
 app.post('/api/calendar/google/callback', handleGoogleCallback);
 app.post('/api/calendar/google/import', importGoogleCalendar);
-
-app.post('/api/calendar/microsoft/auth', getMicrosoftAuthUrl);
-app.post('/api/calendar/microsoft/callback', handleMicrosoftCallback);
-app.post('/api/calendar/microsoft/import', importMicrosoftCalendar);
-
 app.post('/api/calendar/upload', uploadMiddleware, uploadCalendarFile);
 app.get('/api/calendar/analysis/:jobId', getAnalysisStatus);
 

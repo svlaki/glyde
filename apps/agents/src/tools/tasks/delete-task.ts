@@ -68,6 +68,18 @@ export const deleteTaskTool = tool(
             return `❌ Failed to delete task: ${result.error}`;
           }
 
+          // Remove from Zep knowledge graph (fire-and-forget for speed)
+          const removeFromGraph = async () => {
+            try {
+              const zepGraphService = new ZepGraphService();
+              await zepGraphService.deleteTask(userId, taskToDelete.id, taskToDelete.title);
+              console.log(`[DELETE-TASK] Task removed from Zep graph: ${taskToDelete.id}`);
+            } catch (error) {
+              console.error('[DELETE-TASK] Failed to remove from Zep (non-critical):', error);
+            }
+          };
+          removeFromGraph();
+
           // Format due date for response
           let dueInfo = '';
           if (taskToDelete.due_date) {
@@ -103,6 +115,20 @@ export const deleteTaskTool = tool(
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;
+      }
+
+      // Remove from Zep knowledge graph (fire-and-forget for speed)
+      if (taskToDelete) {
+        const removeFromGraph = async () => {
+          try {
+            const zepGraphService = new ZepGraphService();
+            await zepGraphService.deleteTask(userId, targetTaskId, taskToDelete.title);
+            console.log(`[DELETE-TASK] Task removed from Zep graph: ${targetTaskId}`);
+          } catch (error) {
+            console.error('[DELETE-TASK] Failed to remove from Zep (non-critical):', error);
+          }
+        };
+        removeFromGraph();
       }
 
       // Format response with task details

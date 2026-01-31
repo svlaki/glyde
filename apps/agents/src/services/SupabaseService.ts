@@ -279,8 +279,9 @@ export class SupabaseService {
     return this.getEvents(userId, startDate, endDate);
   }
 
-  // Internal method to fetch raw events from database (no expansion)
-  private async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+  // Fetch raw events from database without recurring event expansion
+  // Use this for bulk operations like deletion to avoid duplicate processing
+  async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
       // Use the new function that joins category data
       const { data, error } = await this.client
@@ -343,6 +344,15 @@ export class SupabaseService {
         return [];
       }
 
+      // Fetch user's timezone for correct BYDAY expansion
+      const { data: profile } = await this.client
+        .from('profile')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+
+      const userTimezone = profile?.timezone || 'America/Los_Angeles';
+
       // Fetch all exceptions for this user's recurring events
       const { data: exceptions } = await this.client
         .from('recurring_event_exceptions')
@@ -385,13 +395,15 @@ export class SupabaseService {
           const deletedDates = exceptionMap.get(event.id) || new Set();
 
           // Expand instances from the event's original start date
+          // Pass user timezone for correct BYDAY evaluation
           const startT = new Date(event.start_time);
           const endT = new Date(event.end_time);
           const instances = expandRecurrenceWithEndTime(
             event.recurrence_rule,
             startT,
             endT,
-            event.recurrence_end ? new Date(event.recurrence_end) : endD
+            event.recurrence_end ? new Date(event.recurrence_end) : endD,
+            userTimezone
           );
 
           // Add all instances (filter by date range only if explicitly requested)
@@ -686,11 +698,48 @@ export class SupabaseService {
 
       console.log('✅ [SupabaseService] Created recurring event:', data.id);
 
-      // Fetch with category data
-      const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
-      const createdEvent = eventsWithCategories.find(e => e.id === data.id);
+      // Get category info if we have a category_id
+      let categoryName = event.category || 'Personal';
+      let categoryColor = '#3b82f6';
+      let categoryIcon = null;
 
-      return createdEvent || null;
+      if (categoryId) {
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('name, color, icon')
+          .eq('id', categoryId)
+          .single();
+
+        if (categoryData) {
+          categoryName = categoryData.name;
+          categoryColor = categoryData.color;
+          categoryIcon = categoryData.icon;
+        }
+      }
+
+      // Return the created event with category data directly (avoid re-fetching which can fail due to expansion logic)
+      const createdEvent: DatabaseEvent = {
+        id: data.id,
+        user_id: data.user_id,
+        title: data.title,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        location: data.location,
+        description: data.description,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        category: categoryName,
+        category_id: categoryId || undefined,
+        category_name: categoryName,
+        category_color: categoryColor,
+        category_icon: categoryIcon || undefined,
+        recurrence_rule: data.recurrence_rule,
+        recurrence_end: data.recurrence_end,
+        parent_event_id: data.parent_event_id,
+        is_recurring: data.is_recurring
+      };
+
+      return createdEvent;
     } catch (error) {
       console.error('❌ [SupabaseService] Exception creating recurring event:', error);
       return null;

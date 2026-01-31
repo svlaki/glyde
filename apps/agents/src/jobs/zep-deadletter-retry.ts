@@ -214,8 +214,24 @@ async function retryItem(
           break;
 
         case 'delete_event':
-          // Deletion is handled via invalidation - just mark as synced
-          operationSucceeded = true;
+          if (payload.eventId && user_id) {
+            await zepGraphService.deleteCalendarEvent(user_id, payload.eventId, payload.eventTitle);
+            operationSucceeded = true;
+          }
+          break;
+
+        case 'delete_task':
+          if (payload.taskId && user_id) {
+            await zepGraphService.deleteTask(user_id, payload.taskId, payload.taskTitle);
+            operationSucceeded = true;
+          }
+          break;
+
+        case 'delete_goal':
+          if (payload.goalId && user_id) {
+            await zepGraphService.deleteGoal(user_id, payload.goalId, payload.goalTitle);
+            operationSucceeded = true;
+          }
           break;
 
         default:

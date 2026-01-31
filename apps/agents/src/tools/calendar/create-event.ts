@@ -115,7 +115,7 @@ export const createEventTool = tool(
                 maxRetries: 2
               },
               async () => {
-                await zepGraphService.deleteCalendarEvent(conflictingEvent.id);
+                await zepGraphService.deleteCalendarEvent(userId, conflictingEvent.id, conflictingEvent.title);
                 return conflictingEvent.id;
               }
             ).catch(err => {
