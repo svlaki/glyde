@@ -19,32 +19,26 @@ export const deleteMultipleEventsTool = tool(
     console.log('🗑️ [DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, searchQuery });
 
     if (date) {
-      // Delete events on a specific date
+      // Delete events on a specific date - use getRawEvents to avoid expanded recurring instances
       const startDate = new Date(date);
       const endDate = new Date(date);
       endDate.setDate(endDate.getDate() + 1);
 
-      eventsToDelete = await supabaseService.getEvents(
+      // Use getRawEvents to get actual DB records, not expanded instances
+      eventsToDelete = await supabaseService.getRawEvents(
         userId,
         startDate.toISOString(),
         endDate.toISOString()
       );
     } else if (searchQuery) {
       if (searchQuery === "*") {
-        // Delete ALL events - use with caution!
-        eventsToDelete = await supabaseService.getEvents(userId);
+        // Delete ALL events - use getRawEvents to get actual DB records
+        eventsToDelete = await supabaseService.getRawEvents(userId);
       } else {
-        // Search for events using Zep graph and direct search
+        // Search for events using direct search on raw events
         try {
-          // Search knowledge graph for relevant events
-          const graphResults = await zepGraphService.searchEntities(userId,
-            `calendar events ${searchQuery}`,
-            undefined, // entityType
-            50 // limit
-          );
-
-          // Also search directly in database
-          const allEvents = await supabaseService.getEventsForAgent(userId);
+          // Get raw events (not expanded) to avoid duplicate deletions
+          const allEvents = await supabaseService.getRawEvents(userId);
           const matchingEvents = allEvents.filter((event: any) => {
             const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
             return searchText.includes(searchQuery.toLowerCase());
@@ -61,21 +55,26 @@ export const deleteMultipleEventsTool = tool(
       throw new Error("Either date or searchQuery must be provided");
     }
 
-    if (eventsToDelete.length === 0) {
+    // Deduplicate by event ID (in case any duplicates slipped through)
+    const uniqueEvents = Array.from(new Map(eventsToDelete.map(e => [e.id, e])).values());
+
+    if (uniqueEvents.length === 0) {
       return "No events found to delete";
     }
+
+    console.log(`🗑️ [DELETE-MULTIPLE-EVENTS TOOL] Deleting ${uniqueEvents.length} unique events`);
 
     let deletedCount = 0;
     const errors: string[] = [];
 
-    for (const event of eventsToDelete) {
-      const deleteResult = await supabaseService.deleteEvent(userId, event.id);
+    for (const event of uniqueEvents) {
+      const deleteResult = await supabaseService.deleteEvent(userId, event.id, { source: 'agent', agentType: 'conversation' });
       if (deleteResult.success) {
         deletedCount++;
 
-        // CRITICAL: Also delete from Zep graph to prevent orphaned nodes
+        // Also delete from Zep graph to prevent orphaned nodes
         try {
-          await zepGraphService.deleteCalendarEvent(event.id);
+          await zepGraphService.deleteCalendarEvent(userId, event.id, event.title);
         } catch (graphError) {
           console.warn(`⚠️ [DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
           // Non-critical - event is deleted from DB which is what matters

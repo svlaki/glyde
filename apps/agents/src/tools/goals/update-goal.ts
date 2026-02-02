@@ -4,7 +4,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const updateGoalTool = tool(
-  async ({ goalId, title, description, targetDate, status, progress, category, priorityScore }, config) => {
+  async ({ goalId, title, description, targetDate, status, progress, category, priorityScore, milestones }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "❌ User ID required";
@@ -28,8 +28,9 @@ export const updateGoalTool = tool(
       if (progress !== undefined && progress !== null) updates.progress = progress;
       if (category !== undefined && category !== null && category.trim() !== '') updates.category = category;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
+      if (milestones !== undefined && milestones !== null) updates.milestones = milestones;
 
-      const goal = await supabaseService.updateGoal(userId, goalId, updates);
+      const goal = await supabaseService.updateGoal(userId, goalId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
         return "❌ Failed to update goal";
@@ -83,6 +84,9 @@ export const updateGoalTool = tool(
       if (category !== undefined && originalGoal?.category !== category) {
         changes.push(`category changed to "${category}"`);
       }
+      if (milestones !== undefined && milestones !== null) {
+        changes.push(`milestones updated (${milestones.length} total)`);
+      }
 
       const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
@@ -104,6 +108,12 @@ export const updateGoalTool = tool(
       progress: z.number().min(0).max(100).optional().nullable().describe("Progress percentage (0-100)"),
       category: z.string().optional().nullable().describe("New category name"),
       priorityScore: z.number().min(1).max(10).optional().nullable().describe("New priority score (1-10)"),
+      milestones: z.array(z.object({
+        title: z.string().describe("Milestone title"),
+        description: z.string().optional().nullable().describe("Milestone description"),
+        due_date: z.string().optional().nullable().describe("Target date for milestone (ISO format)"),
+        status: z.enum(["pending", "in_progress", "completed"]).optional().nullable().describe("Milestone status"),
+      })).optional().nullable().describe("Updated list of milestones. This replaces existing milestones. Include all milestones (existing and new) when updating."),
     }),
   }
 );

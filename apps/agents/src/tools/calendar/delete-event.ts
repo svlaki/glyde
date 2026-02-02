@@ -155,7 +155,7 @@ export const deleteEventTool = tool(
     }
 
     // Regular event deletion
-    const deleteResult = await supabaseService.deleteEvent(userId, targetEventId);
+    const deleteResult = await supabaseService.deleteEvent(userId, targetEventId, { source: 'agent', agentType: 'conversation' });
 
     if (!deleteResult.success) {
       throw new Error(`Failed to delete event: ${deleteResult.error}`);
@@ -168,7 +168,7 @@ export const deleteEventTool = tool(
       try {
         console.log('🧠 [DELETE-EVENT TOOL] Removing from knowledge graph (async)...');
 
-        await zepGraphService.deleteCalendarEvent(targetEventId);
+        await zepGraphService.deleteCalendarEvent(userId, targetEventId, eventTitle);
 
         console.log(`✅ [DELETE-EVENT TOOL] Event removed from knowledge graph`);
       } catch (error) {

@@ -1,8 +1,21 @@
 import { BaseMessage } from '@langchain/core/messages';
 
+// Multimodal content types for vision support
+export interface ImageContent {
+  type: 'image_url';
+  image_url: { url: string; detail?: 'low' | 'high' | 'auto' };
+}
+
+export interface TextContent {
+  type: 'text';
+  text: string;
+}
+
+export type MessageContent = string | (TextContent | ImageContent)[];
+
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: MessageContent;
 }
 
 export interface AgentContext {

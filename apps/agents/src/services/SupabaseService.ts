@@ -2,6 +2,29 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
 import { AgentType } from '../types/agents.js';
 
+// Activity log types
+export type ActivityEntityType = 'event' | 'task' | 'goal' | 'category' | 'profile' | 'rule';
+export type ActivityOperation = 'create' | 'update' | 'delete' | 'complete' | 'uncomplete' | 'archive';
+export type ActivitySource = 'user' | 'agent';
+
+export interface ActivityChange {
+  old: any;
+  new: any;
+}
+
+export interface ActivityLogEntry {
+  id: string;
+  user_id: string;
+  entity_type: ActivityEntityType;
+  entity_id: string;
+  entity_title: string | null;
+  operation: ActivityOperation;
+  changes: Record<string, ActivityChange> | null;
+  source: ActivitySource;
+  agent_type: string | null;
+  created_at: string;
+}
+
 // Export supabase client for use in other modules
 export let supabase: SupabaseClient;
 
@@ -89,6 +112,127 @@ export class SupabaseService {
     }
   }
 
+  // ============================================================================
+  // ACTIVITY LOGGING METHODS
+  // ============================================================================
+
+  /**
+   * Log an activity to the activity log
+   * @param userId User ID
+   * @param entityType Type of entity (event, task, goal, etc.)
+   * @param entityId ID of the entity
+   * @param entityTitle Title of the entity for display
+   * @param operation Operation performed (create, update, delete, etc.)
+   * @param changes Field changes { field: { old: value, new: value } }
+   * @param source Who made the change (user or agent)
+   * @param agentType Which agent made the change (only when source=agent)
+   */
+  async logActivity(
+    userId: string,
+    entityType: ActivityEntityType,
+    entityId: string,
+    entityTitle: string | null,
+    operation: ActivityOperation,
+    changes: Record<string, ActivityChange> | null = null,
+    source: ActivitySource = 'user',
+    agentType: string | null = null
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await this.client
+        .from('user_activity_log')
+        .insert({
+          user_id: userId,
+          entity_type: entityType,
+          entity_id: entityId,
+          entity_title: entityTitle,
+          operation: operation,
+          changes: changes,
+          source: source,
+          agent_type: agentType
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.warn('[ACTIVITY LOG] Error logging activity:', error.message);
+        return null;
+      }
+
+      return data?.id || null;
+    } catch (error) {
+      console.warn('[ACTIVITY LOG] Exception logging activity:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get recent activity for a user
+   * @param userId User ID
+   * @param source Filter by source ('user', 'agent', or null for all)
+   * @param minutes How far back to look (default 30)
+   * @param limit Maximum number of entries (default 20)
+   */
+  async getRecentActivity(
+    userId: string,
+    source: ActivitySource | null = null,
+    minutes: number = 30,
+    limit: number = 20
+  ): Promise<ActivityLogEntry[]> {
+    try {
+      const cutoffTime = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+
+      let query = this.client
+        .from('user_activity_log')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', cutoffTime)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (source) {
+        query = query.eq('source', source);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.warn('[ACTIVITY LOG] Error fetching activity:', error.message);
+        return [];
+      }
+
+      return (data || []) as ActivityLogEntry[];
+    } catch (error) {
+      console.warn('[ACTIVITY LOG] Exception fetching activity:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper to compute changes between old and new objects
+   * Only includes fields that actually changed
+   */
+  private computeChanges(
+    oldObj: Record<string, any> | null,
+    newObj: Record<string, any>,
+    fieldsToTrack: string[]
+  ): Record<string, ActivityChange> | null {
+    if (!oldObj) return null;
+
+    const changes: Record<string, ActivityChange> = {};
+
+    for (const field of fieldsToTrack) {
+      const oldVal = oldObj[field];
+      const newVal = newObj[field];
+
+      // Only track if the field is being updated and value changed
+      if (newVal !== undefined && JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changes[field] = { old: oldVal, new: newVal };
+      }
+    }
+
+    return Object.keys(changes).length > 0 ? changes : null;
+  }
+
   async getProfile(userId: string): Promise<DatabaseProfile | null> {
     const { data, error } = await this.client
       .from('profile')
@@ -135,8 +279,9 @@ export class SupabaseService {
     return this.getEvents(userId, startDate, endDate);
   }
 
-  // Internal method to fetch raw events from database (no expansion)
-  private async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+  // Fetch raw events from database without recurring event expansion
+  // Use this for bulk operations like deletion to avoid duplicate processing
+  async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
       // Use the new function that joins category data
       const { data, error } = await this.client
@@ -199,6 +344,15 @@ export class SupabaseService {
         return [];
       }
 
+      // Fetch user's timezone for correct BYDAY expansion
+      const { data: profile } = await this.client
+        .from('profile')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+
+      const userTimezone = profile?.timezone || 'America/Los_Angeles';
+
       // Fetch all exceptions for this user's recurring events
       const { data: exceptions } = await this.client
         .from('recurring_event_exceptions')
@@ -241,13 +395,15 @@ export class SupabaseService {
           const deletedDates = exceptionMap.get(event.id) || new Set();
 
           // Expand instances from the event's original start date
+          // Pass user timezone for correct BYDAY evaluation
           const startT = new Date(event.start_time);
           const endT = new Date(event.end_time);
           const instances = expandRecurrenceWithEndTime(
             event.recurrence_rule,
             startT,
             endT,
-            event.recurrence_end ? new Date(event.recurrence_end) : endD
+            event.recurrence_end ? new Date(event.recurrence_end) : endD,
+            userTimezone
           );
 
           // Add all instances (filter by date range only if explicitly requested)
@@ -302,7 +458,11 @@ export class SupabaseService {
 
   // Accepts UTC timestamps for start_time and end_time
   // NO timezone conversion - caller must provide UTC times
-  async createEvent(userId: string, event: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
+  async createEvent(
+    userId: string,
+    event: Partial<DatabaseEvent> & {category?: string; category_id?: string},
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<DatabaseEvent | null> {
     try {
       // Extract event data - times should already be in UTC
       const title = event.title || 'Untitled Event';
@@ -335,10 +495,22 @@ export class SupabaseService {
         return null;
       }
 
+      // Log activity
+      await this.logActivity(
+        userId,
+        'event',
+        data.id,
+        title,
+        'create',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
       const createdEvent = eventsWithCategories.find(e => e.id === data.id);
-      
+
       return createdEvent || null;
     } catch (error) {
       console.error('Exception creating event:', error);
@@ -348,13 +520,26 @@ export class SupabaseService {
 
   // Accepts UTC timestamps for start_time and end_time
   // NO timezone conversion - caller must provide UTC times
-  async updateEvent(userId: string, eventId: string, updates: Partial<DatabaseEvent> & {category?: string; category_id?: string}): Promise<DatabaseEvent | null> {
+  async updateEvent(
+    userId: string,
+    eventId: string,
+    updates: Partial<DatabaseEvent> & {category?: string; category_id?: string},
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<DatabaseEvent | null> {
     try {
       // Validate eventId format
       if (!this.isValidUUID(eventId)) {
         console.error('❌ [SUPABASE SERVICE] Invalid UUID:', eventId);
         return null;
       }
+
+      // Fetch old event for change tracking
+      const { data: oldEvent } = await this.client
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .eq('user_id', userId)
+        .single();
 
       // Build update object with only provided fields
       // Note: start_time and end_time must already be in UTC format from caller
@@ -371,7 +556,7 @@ export class SupabaseService {
       }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
-      
+
       // Handle category using helper method
       if (updates.category_id !== undefined || updates.category !== undefined) {
         updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
@@ -392,10 +577,27 @@ export class SupabaseService {
         return null;
       }
 
+      // Log activity with changes
+      const changes = this.computeChanges(
+        oldEvent,
+        updateData,
+        ['title', 'start_time', 'end_time', 'location', 'description', 'category', 'category_id']
+      );
+      await this.logActivity(
+        userId,
+        'event',
+        eventId,
+        data.title || oldEvent?.title,
+        'update',
+        changes,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId);
       const updatedEvent = eventsWithCategories.find(e => e.id === eventId);
-      
+
       return updatedEvent || null;
     } catch (error) {
       console.error('Exception updating event:', error);
@@ -403,8 +605,35 @@ export class SupabaseService {
     }
   }
 
-  async deleteEvent(userId: string, eventId: string): Promise<{ success: boolean, error: string | null }> {
-    return this.deleteRecord('events', userId, eventId, 'event');
+  async deleteEvent(
+    userId: string,
+    eventId: string,
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<{ success: boolean, error: string | null }> {
+    // Fetch event title before deletion for logging
+    const { data: event } = await this.client
+      .from('events')
+      .select('title')
+      .eq('id', eventId)
+      .eq('user_id', userId)
+      .single();
+
+    const result = await this.deleteRecord('events', userId, eventId, 'event');
+
+    if (result.success) {
+      await this.logActivity(
+        userId,
+        'event',
+        eventId,
+        event?.title || 'Unknown Event',
+        'delete',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+    }
+
+    return result;
   }
 
   // ============================================================================
@@ -469,11 +698,48 @@ export class SupabaseService {
 
       console.log('✅ [SupabaseService] Created recurring event:', data.id);
 
-      // Fetch with category data
-      const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
-      const createdEvent = eventsWithCategories.find(e => e.id === data.id);
+      // Get category info if we have a category_id
+      let categoryName = event.category || 'Personal';
+      let categoryColor = '#3b82f6';
+      let categoryIcon = null;
 
-      return createdEvent || null;
+      if (categoryId) {
+        const { data: categoryData } = await this.client
+          .from('categories')
+          .select('name, color, icon')
+          .eq('id', categoryId)
+          .single();
+
+        if (categoryData) {
+          categoryName = categoryData.name;
+          categoryColor = categoryData.color;
+          categoryIcon = categoryData.icon;
+        }
+      }
+
+      // Return the created event with category data directly (avoid re-fetching which can fail due to expansion logic)
+      const createdEvent: DatabaseEvent = {
+        id: data.id,
+        user_id: data.user_id,
+        title: data.title,
+        start_time: data.start_time,
+        end_time: data.end_time,
+        location: data.location,
+        description: data.description,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        category: categoryName,
+        category_id: categoryId || undefined,
+        category_name: categoryName,
+        category_color: categoryColor,
+        category_icon: categoryIcon || undefined,
+        recurrence_rule: data.recurrence_rule,
+        recurrence_end: data.recurrence_end,
+        parent_event_id: data.parent_event_id,
+        is_recurring: data.is_recurring
+      };
+
+      return createdEvent;
     } catch (error) {
       console.error('❌ [SupabaseService] Exception creating recurring event:', error);
       return null;
@@ -679,21 +945,25 @@ export class SupabaseService {
   /**
    * Create a new task in the user's schema
    */
-  async createTask(userId: string, taskData: {
-    title: string;
-    description?: string;
-    category?: string;
-    category_id?: string;
-    dueDate?: string;
-    priority?: 'low' | 'medium' | 'high' | 'urgent';
-    status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-    parentGoalId?: string;
-    color?: string;
-    energyRequired?: 'low' | 'medium' | 'high';
-    estimatedDuration?: number;
-    contextRequired?: Record<string, any>;
-    recurringPattern?: Record<string, any>;
-  }): Promise<any> {
+  async createTask(
+    userId: string,
+    taskData: {
+      title: string;
+      description?: string;
+      category?: string;
+      category_id?: string;
+      dueDate?: string;
+      priority?: 'low' | 'medium' | 'high' | 'urgent';
+      status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+      parentGoalId?: string;
+      color?: string;
+      energyRequired?: 'low' | 'medium' | 'high';
+      estimatedDuration?: number;
+      contextRequired?: Record<string, any>;
+      recurringPattern?: Record<string, any>;
+    },
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<any> {
     try {
       // Handle category using helper method
       const categoryId = await this.resolveCategoryId(userId, taskData.category, taskData.category_id);
@@ -723,6 +993,18 @@ export class SupabaseService {
         console.error('❌ [SUPABASE SERVICE] Error creating task:', error);
         throw error;
       }
+
+      // Log activity
+      await this.logActivity(
+        userId,
+        'task',
+        data.id,
+        taskData.title,
+        'create',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
 
       console.log('✅ [SUPABASE SERVICE] Task created:', data.id);
       return data;
@@ -1213,23 +1495,28 @@ export class SupabaseService {
   /**
    * Update a task
    */
-  async updateTask(userId: string, taskId: string, updates: {
-    title?: string;
-    description?: string;
-    category?: string;
-    category_id?: string;
-    dueDate?: string;
-    priority?: 'low' | 'medium' | 'high' | 'urgent';
-    status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-    parentGoalId?: string;
-    color?: string;
-    energyRequired?: 'low' | 'medium' | 'high';
-    estimatedDuration?: number;
-    actualDuration?: number;
-    contextRequired?: Record<string, any>;
-    completionNotes?: string;
-    recurringPattern?: Record<string, any>;
-  }): Promise<any> {
+  async updateTask(
+    userId: string,
+    taskId: string,
+    updates: {
+      title?: string;
+      description?: string;
+      category?: string;
+      category_id?: string;
+      dueDate?: string;
+      priority?: 'low' | 'medium' | 'high' | 'urgent';
+      status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+      parentGoalId?: string;
+      color?: string;
+      energyRequired?: 'low' | 'medium' | 'high';
+      estimatedDuration?: number;
+      actualDuration?: number;
+      contextRequired?: Record<string, any>;
+      completionNotes?: string;
+      recurringPattern?: Record<string, any>;
+    },
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<any> {
     try {
       // Validate taskId format
       if (!this.isValidUUID(taskId)) {
@@ -1239,6 +1526,14 @@ export class SupabaseService {
       }
 
       console.log('🔄 [SUPABASE SERVICE] Updating task:', taskId);
+
+      // Fetch old task for change tracking
+      const { data: oldTask } = await this.client
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('user_id', userId)
+        .single();
 
       const updateData: any = {
         updated_at: new Date().toISOString()
@@ -1282,6 +1577,23 @@ export class SupabaseService {
         throw error;
       }
 
+      // Log activity with changes
+      const changes = this.computeChanges(
+        oldTask,
+        updateData,
+        ['title', 'description', 'due_date', 'priority', 'status', 'category', 'category_id']
+      );
+      await this.logActivity(
+        userId,
+        'task',
+        taskId,
+        data.title || oldTask?.title,
+        'update',
+        changes,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+
       console.log('✅ [SUPABASE SERVICE] Task updated:', taskId);
       return data;
     } catch (error) {
@@ -1293,14 +1605,47 @@ export class SupabaseService {
   /**
    * Delete a task
    */
-  async deleteTask(userId: string, taskId: string): Promise<{ success: boolean, error: string | null }> {
-    return this.deleteRecord('tasks', userId, taskId, 'task');
+  async deleteTask(
+    userId: string,
+    taskId: string,
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<{ success: boolean, error: string | null }> {
+    // Fetch task title before deletion for logging
+    const { data: task } = await this.client
+      .from('tasks')
+      .select('title')
+      .eq('id', taskId)
+      .eq('user_id', userId)
+      .single();
+
+    const result = await this.deleteRecord('tasks', userId, taskId, 'task');
+
+    if (result.success) {
+      await this.logActivity(
+        userId,
+        'task',
+        taskId,
+        task?.title || 'Unknown Task',
+        'delete',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+    }
+
+    return result;
   }
 
   /**
    * Complete a task with optional notes
    */
-  async completeTask(userId: string, taskId: string, notes?: string, actualDuration?: number): Promise<any> {
+  async completeTask(
+    userId: string,
+    taskId: string,
+    notes?: string,
+    actualDuration?: number,
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<any> {
     try {
       // Validate taskId format
       if (!this.isValidUUID(taskId)) {
@@ -1308,6 +1653,14 @@ export class SupabaseService {
         console.error('❌ [SUPABASE SERVICE] Invalid UUID:', taskId);
         throw error;
       }
+
+      // Fetch old task for change tracking
+      const { data: oldTask } = await this.client
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .eq('user_id', userId)
+        .single();
 
       const updateData: any = {
         status: 'completed',
@@ -1331,6 +1684,18 @@ export class SupabaseService {
         throw error;
       }
 
+      // Log activity
+      await this.logActivity(
+        userId,
+        'task',
+        taskId,
+        data.title || oldTask?.title,
+        'complete',
+        { status: { old: oldTask?.status || 'pending', new: 'completed' } },
+        options?.source || 'user',
+        options?.agentType || null
+      );
+
       console.log('✅ [SUPABASE SERVICE] Task completed:', taskId);
       return data;
     } catch (error) {
@@ -1346,25 +1711,30 @@ export class SupabaseService {
   /**
    * Create a new goal in the user's schema
    */
-  async createGoal(userId: string, goalData: {
-    title: string;
-    description?: string;
-    category?: string;
-    category_id?: string;
-    targetDate?: string;
-    status?: 'active' | 'completed' | 'paused' | 'abandoned';
-    progress?: number;
-    milestones?: any[];
-    goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
-    parentGoalId?: string;
-    keyResults?: any[];
-    blockers?: any[];
-    resourcesNeeded?: any[];
-    reflectionPrompts?: Record<string, any>;
-    priorityScore?: number;
-    energyRequirement?: 'low' | 'medium' | 'high';
-    reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
-  }): Promise<any> {
+  async createGoal(
+    userId: string,
+    goalData: {
+      title: string;
+      description?: string;
+      category?: string;
+      category_id?: string;
+      targetDate?: string;
+      status?: 'active' | 'completed' | 'paused' | 'abandoned';
+      progress?: number;
+      milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
+      goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
+      parentGoalId?: string;
+      keyResults?: any[];
+      blockers?: any[];
+      resourcesNeeded?: any[];
+      reflectionPrompts?: Record<string, any>;
+      priorityScore?: number;
+      energyRequirement?: 'low' | 'medium' | 'high';
+      reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+    },
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<any> {
     try {
       console.log('[SUPABASE SERVICE] Creating goal for user:', userId);
 
@@ -1383,6 +1753,7 @@ export class SupabaseService {
           status: goalData.status || 'active',
           progress: goalData.progress || 0,
           milestones: goalData.milestones,
+          milestone_type: goalData.milestoneType || 'dated',
           goal_type: goalData.goalType || 'SMART',
           parent_goal_id: goalData.parentGoalId,
           key_results: goalData.keyResults || [],
@@ -1400,6 +1771,18 @@ export class SupabaseService {
         console.error('❌ [SUPABASE SERVICE] Error creating goal:', error);
         throw error;
       }
+
+      // Log activity
+      await this.logActivity(
+        userId,
+        'goal',
+        data.id,
+        goalData.title,
+        'create',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
 
       console.log('✅ [SUPABASE SERVICE] Goal created:', data.id);
       return data;
@@ -1460,7 +1843,12 @@ export class SupabaseService {
       }
 
       console.log(`✅ [SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
-      return filteredGoals;
+
+      // Map category_name to category for frontend compatibility
+      return filteredGoals.map((g: any) => ({
+        ...g,
+        category: g.category_name || g.category  // Use category_name from RPC, fallback to category
+      }));
     } catch (error) {
       console.error('❌ [SUPABASE SERVICE] Exception getting goals:', error);
       return [];
@@ -1470,25 +1858,31 @@ export class SupabaseService {
   /**
    * Update a goal
    */
-  async updateGoal(userId: string, goalId: string, updates: {
-    title?: string;
-    description?: string;
-    category?: string;
-    category_id?: string;
-    targetDate?: string;
-    status?: 'active' | 'completed' | 'paused' | 'abandoned';
-    progress?: number;
-    milestones?: any[];
-    goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
-    parentGoalId?: string;
-    keyResults?: any[];
-    blockers?: any[];
-    resourcesNeeded?: any[];
-    reflectionPrompts?: Record<string, any>;
-    priorityScore?: number;
-    energyRequirement?: 'low' | 'medium' | 'high';
-    reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
-  }): Promise<any> {
+  async updateGoal(
+    userId: string,
+    goalId: string,
+    updates: {
+      title?: string;
+      description?: string;
+      category?: string;
+      category_id?: string;
+      targetDate?: string;
+      status?: 'active' | 'completed' | 'paused' | 'abandoned';
+      progress?: number;
+      milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
+      goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
+      parentGoalId?: string;
+      keyResults?: any[];
+      blockers?: any[];
+      resourcesNeeded?: any[];
+      reflectionPrompts?: Record<string, any>;
+      priorityScore?: number;
+      energyRequirement?: 'low' | 'medium' | 'high';
+      reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+    },
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<any> {
     try {
       // Validate goalId format
       if (!this.isValidUUID(goalId)) {
@@ -1498,6 +1892,14 @@ export class SupabaseService {
       }
 
       console.log('🔄 [SUPABASE SERVICE] Updating goal:', goalId);
+
+      // Fetch old goal for change tracking
+      const { data: oldGoal } = await this.client
+        .from('goals')
+        .select('*')
+        .eq('id', goalId)
+        .eq('user_id', userId)
+        .single();
 
       const updateData: any = {
         updated_at: new Date().toISOString()
@@ -1509,6 +1911,7 @@ export class SupabaseService {
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.progress !== undefined) updateData.progress = updates.progress;
       if (updates.milestones !== undefined) updateData.milestones = updates.milestones;
+      if (updates.milestoneType !== undefined) updateData.milestone_type = updates.milestoneType;
       if (updates.goalType !== undefined) updateData.goal_type = updates.goalType;
       if (updates.parentGoalId !== undefined) updateData.parent_goal_id = updates.parentGoalId;
       if (updates.keyResults !== undefined) updateData.key_results = updates.keyResults;
@@ -1538,6 +1941,23 @@ export class SupabaseService {
         throw error;
       }
 
+      // Log activity with changes
+      const changes = this.computeChanges(
+        oldGoal,
+        updateData,
+        ['title', 'description', 'target_date', 'status', 'progress', 'category', 'category_id']
+      );
+      await this.logActivity(
+        userId,
+        'goal',
+        goalId,
+        data.title || oldGoal?.title,
+        'update',
+        changes,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+
       console.log('✅ [SUPABASE SERVICE] Goal updated:', goalId);
       return data;
     } catch (error) {
@@ -1549,8 +1969,35 @@ export class SupabaseService {
   /**
    * Delete a goal
    */
-  async deleteGoal(userId: string, goalId: string): Promise<{ success: boolean, error: string | null }> {
-    return this.deleteRecord('goals', userId, goalId, 'goal');
+  async deleteGoal(
+    userId: string,
+    goalId: string,
+    options?: { source?: ActivitySource; agentType?: string }
+  ): Promise<{ success: boolean, error: string | null }> {
+    // Fetch goal title before deletion for logging
+    const { data: goal } = await this.client
+      .from('goals')
+      .select('title')
+      .eq('id', goalId)
+      .eq('user_id', userId)
+      .single();
+
+    const result = await this.deleteRecord('goals', userId, goalId, 'goal');
+
+    if (result.success) {
+      await this.logActivity(
+        userId,
+        'goal',
+        goalId,
+        goal?.title || 'Unknown Goal',
+        'delete',
+        null,
+        options?.source || 'user',
+        options?.agentType || null
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -1818,6 +2265,136 @@ export class SupabaseService {
         filter: `user_id=eq.${userId}`
       }, callback)
       .subscribe();
+  }
+
+  // ============================================================================
+  // LIFE PLAN MANAGEMENT METHODS
+  // ============================================================================
+
+  /**
+   * Get the active life plan for a user
+   */
+  async getPlan(userId: string): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('life_plans')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows returned - user has no plan yet
+          return null;
+        }
+        console.error('Error fetching plan:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception fetching plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new life plan for a user
+   */
+  async createPlan(userId: string, planData: {
+    title?: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      // Archive any existing active plan
+      await this.client
+        .from('life_plans')
+        .update({ status: 'archived' })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      const { data, error } = await this.client
+        .from('life_plans')
+        .insert({
+          user_id: userId,
+          title: planData.title || 'My Life Plan',
+          content: planData.content || '',
+          horizon_start: planData.horizonStart,
+          horizon_end: planData.horizonEnd,
+          status: planData.status || 'active'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating plan:', error);
+        return null;
+      }
+
+      console.log('Plan created:', data.id);
+      return data;
+    } catch (error) {
+      console.error('Exception creating plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update a life plan
+   */
+  async updatePlan(userId: string, planId: string, updates: {
+    title?: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      if (!this.isValidUUID(planId)) {
+        console.error('Invalid plan ID:', planId);
+        return null;
+      }
+
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.content !== undefined) updateData.content = updates.content;
+      if (updates.horizonStart !== undefined) updateData.horizon_start = updates.horizonStart;
+      if (updates.horizonEnd !== undefined) updateData.horizon_end = updates.horizonEnd;
+      if (updates.status !== undefined) updateData.status = updates.status;
+
+      const { data, error } = await this.client
+        .from('life_plans')
+        .update(updateData)
+        .eq('id', planId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating plan:', error);
+        return null;
+      }
+
+      console.log('Plan updated:', planId);
+      return data;
+    } catch (error) {
+      console.error('Exception updating plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete a life plan
+   */
+  async deletePlan(userId: string, planId: string): Promise<{ success: boolean; error: string | null }> {
+    return this.deleteRecord('life_plans', userId, planId, 'plan');
   }
 }
 

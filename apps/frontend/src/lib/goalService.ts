@@ -10,6 +10,7 @@ export interface Goal {
   target_date?: string
   status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
   progress?: number
+  milestone_type?: 'dated' | 'ordered'
   milestones?: Array<{
     title: string
     completed: boolean
@@ -106,6 +107,7 @@ export async function createUserGoal(
     target_date?: string
     status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
     progress?: number
+    milestone_type?: 'dated' | 'ordered'
     milestones?: Array<{
       title: string
       completed: boolean

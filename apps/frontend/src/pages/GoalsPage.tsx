@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
@@ -8,6 +8,7 @@ import { GoalDetailPanel } from '../components/GoalDetailPanel'
 import { GoalForm } from '../components/GoalForm'
 import { EmptyState } from '../components/EmptyState'
 import { getColors } from '../styles/colors'
+import { supabase } from '../lib/supabase'
 
 export function GoalsPage() {
   const { user, session } = useAuth()
@@ -19,33 +20,91 @@ export function GoalsPage() {
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined)
-  useEffect(() => {
-    loadGoals()
-  }, [user, session])
+  const selectedGoalIdRef = useRef<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const loadGoals = async () => {
+  // Keep selected goal ID ref in sync
+  useEffect(() => {
+    selectedGoalIdRef.current = selectedGoal?.id || null
+  }, [selectedGoal])
+
+  // Load goals and realtime subscription - all in one effect like Calendar
+  useEffect(() => {
     if (!user || !session) return
 
-    setLoading(true)
-    setError(null)
-    try {
-      const { goals: userGoals, error: fetchError } = await fetchUserGoals(user, session.access_token, {})
+    let isSubscribed = true
+    let refreshTimer: NodeJS.Timeout | null = null
 
-      if (fetchError) {
-        setError(fetchError)
-      } else {
-        setGoals(userGoals || [])
-        // Select first goal if none selected
-        if (!selectedGoal && userGoals && userGoals.length > 0) {
-          setSelectedGoal(userGoals[0])
+    const loadGoals = async () => {
+      if (!isSubscribed) return
+
+      setLoading(true)
+      setError(null)
+      try {
+        const { goals: userGoals, error: fetchError } = await fetchUserGoals(user, session.access_token, {})
+
+        if (!isSubscribed) return
+
+        if (fetchError) {
+          setError(fetchError)
+        } else {
+          setGoals(userGoals || [])
+          // Update selectedGoal with fresh data
+          const currentSelectedId = selectedGoalIdRef.current
+          if (currentSelectedId && userGoals) {
+            const updatedSelected = userGoals.find(g => g.id === currentSelectedId)
+            if (updatedSelected) {
+              setSelectedGoal(updatedSelected)
+            }
+          } else if (!currentSelectedId && userGoals && userGoals.length > 0) {
+            setSelectedGoal(userGoals[0])
+          }
+        }
+      } catch (err: any) {
+        if (isSubscribed) {
+          setError(err.message || 'Failed to load goals')
+        }
+      } finally {
+        if (isSubscribed) {
+          setLoading(false)
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load goals')
-    } finally {
-      setLoading(false)
     }
-  }
+
+    loadGoals()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`goals-page-${user.id}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'goals',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('[GoalsPage] Real-time goals change:', payload.eventType)
+          // Debounce: clear existing timer and set new one
+          if (refreshTimer) {
+            clearTimeout(refreshTimer)
+          }
+          refreshTimer = setTimeout(() => {
+            loadGoals()
+          }, 500)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isSubscribed = false
+      if (refreshTimer) {
+        clearTimeout(refreshTimer)
+      }
+      supabase.removeChannel(channel)
+    }
+  }, [user, session, refreshKey])
 
   const handleCreateGoal = () => {
     setEditingGoal(undefined)
@@ -64,7 +123,7 @@ export function GoalsPage() {
     try {
       await deleteUserGoal(user, session.access_token, selectedGoal.id!)
       setSelectedGoal(null)
-      await loadGoals()
+      // Realtime will refresh the list
     } catch (error) {
       console.error('Error deleting goal:', error)
       alert('Failed to delete goal. Please try again.')
@@ -74,30 +133,25 @@ export function GoalsPage() {
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
     if (!user || !session) return
 
-    console.log('handleSaveGoal called with:', goalData)
-
     try {
       if (goalData.id) {
-        // Update existing goal
-        console.log('Updating goal with category:', goalData.category)
-        await updateUserGoal(user, session.access_token, goalData.id, {
-          title: goalData.title,
-          description: goalData.description,
-          category: goalData.category
-        })
+        // Update existing goal - pass all fields from the form
+        const { id, ...updates } = goalData
+        await updateUserGoal(user, session.access_token, id, updates)
       } else {
         // Create new goal
         if (!goalData.title) {
           throw new Error('Goal title is required')
         }
-        console.log('Creating goal with category:', goalData.category)
         await createUserGoal(user, session.access_token, {
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category
+          category: goalData.category,
+          milestones: goalData.milestones,
+          milestone_type: goalData.milestone_type
         })
       }
-      await loadGoals()
+      // Realtime will refresh the list
       setIsFormOpen(false)
     } catch (error) {
       console.error('Error saving goal:', error)
@@ -220,6 +274,7 @@ export function GoalsPage() {
             goal={selectedGoal}
             onEdit={handleEditGoal}
             onDelete={handleDeleteGoal}
+            onUpdate={() => setRefreshKey(k => k + 1)}
           />
         </div>
       </div>

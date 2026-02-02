@@ -301,6 +301,23 @@ describe('RRULE Utilities', () => {
       expect(result?.rrule).toContain('TH')
     })
 
+    it('should NOT duplicate weekday entries (regression test)', () => {
+      // This was a bug: "tuesday thursday" produced BYDAY=TU,TU,TH,TH
+      const result = parseNaturalLanguageRecurrence('tuesday thursday 7:30pm')
+      expect(result).toBeTruthy()
+      expect(result?.rrule).toContain('BYDAY=')
+
+      // Extract BYDAY value and check for no duplicates
+      const bydayMatch = result?.rrule.match(/BYDAY=([A-Z,]+)/)
+      expect(bydayMatch).toBeTruthy()
+      const days = bydayMatch![1].split(',')
+      const uniqueDays = [...new Set(days)]
+      expect(days.length).toBe(uniqueDays.length) // No duplicates
+      expect(days).toContain('TU')
+      expect(days).toContain('TH')
+      expect(days.length).toBe(2) // Only 2 days
+    })
+
     it('should parse "every 2 weeks" pattern', () => {
       const result = parseNaturalLanguageRecurrence('every 2 weeks starting tomorrow')
       expect(result).toBeTruthy()

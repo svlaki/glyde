@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
@@ -8,6 +8,7 @@ import { GoalForm } from './GoalForm'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
+import { supabase } from '../lib/supabase'
 
 export function GoalsSection() {
   const { user, session } = useAuth()
@@ -22,34 +23,84 @@ export function GoalsSection() {
   const [editingGoal, setEditingGoal] = useState<Goal | undefined>(undefined)
   // For mobile: track whether showing list or detail view
   const [showingDetail, setShowingDetail] = useState(false)
+  const selectedGoalIdRef = useRef<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
+  // Keep selected goal ID ref in sync
   useEffect(() => {
-    loadGoals()
-  }, [user, session])
+    selectedGoalIdRef.current = selectedGoal?.id || null
+  }, [selectedGoal])
 
-  const loadGoals = async () => {
+  // Load goals and realtime subscription - all in one effect like Calendar
+  useEffect(() => {
     if (!user || !session) return
 
-    setLoading(true)
-    setError(null)
-    try {
-      const { goals: userGoals, error: fetchError } = await fetchUserGoals(user, session.access_token, {})
+    let isSubscribed = true
+    let refreshTimer: NodeJS.Timeout | null = null
 
-      if (fetchError) {
-        setError(fetchError)
-      } else {
-        setGoals(userGoals || [])
-        // Select first goal if none selected
-        if (!selectedGoal && userGoals && userGoals.length > 0) {
-          setSelectedGoal(userGoals[0])
+    const loadGoals = async () => {
+      if (!isSubscribed) return
+
+      setLoading(true)
+      setError(null)
+      try {
+        const { goals: userGoals, error: fetchError } = await fetchUserGoals(user, session.access_token, {})
+
+        if (!isSubscribed) return
+
+        if (fetchError) {
+          setError(fetchError)
+        } else {
+          setGoals(userGoals || [])
+          const currentSelectedId = selectedGoalIdRef.current
+          if (currentSelectedId && userGoals) {
+            const updatedSelected = userGoals.find(g => g.id === currentSelectedId)
+            if (updatedSelected) {
+              setSelectedGoal(updatedSelected)
+            }
+          } else if (!currentSelectedId && userGoals && userGoals.length > 0) {
+            setSelectedGoal(userGoals[0])
+          }
+        }
+      } catch (err: any) {
+        if (isSubscribed) {
+          setError(err.message || 'Failed to load goals')
+        }
+      } finally {
+        if (isSubscribed) {
+          setLoading(false)
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load goals')
-    } finally {
-      setLoading(false)
     }
-  }
+
+    loadGoals()
+
+    // Realtime subscription
+    const channel = supabase
+      .channel(`goals-section-${user.id}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'goals',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          if (refreshTimer) clearTimeout(refreshTimer)
+          refreshTimer = setTimeout(() => {
+            loadGoals()
+          }, 500)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isSubscribed = false
+      if (refreshTimer) clearTimeout(refreshTimer)
+      supabase.removeChannel(channel)
+    }
+  }, [user, session, refreshKey])
 
   const handleCreateGoal = () => {
     setEditingGoal(undefined)
@@ -68,7 +119,7 @@ export function GoalsSection() {
     try {
       await deleteUserGoal(user, session.access_token, selectedGoal.id!)
       setSelectedGoal(null)
-      await loadGoals()
+      // Realtime will refresh
     } catch (error) {
       console.error('Error deleting goal:', error)
       alert('Failed to delete goal. Please try again.')
@@ -78,42 +129,26 @@ export function GoalsSection() {
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
     if (!user || !session) return
 
-    console.log('handleSaveGoal called with:', goalData)
-
     try {
       if (goalData.id) {
-        // Update existing goal
-        console.log('Updating goal with category:', goalData.category)
-        await updateUserGoal(user, session.access_token, goalData.id, {
-          title: goalData.title,
-          description: goalData.description,
-          category: goalData.category
-        })
+        // Update existing goal - pass all fields from the form
+        const { id, ...updates } = goalData
+        await updateUserGoal(user, session.access_token, id, updates)
       } else {
         // Create new goal
         if (!goalData.title) {
           throw new Error('Goal title is required')
         }
-        console.log('Creating goal with category:', goalData.category)
         await createUserGoal(user, session.access_token, {
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category
+          category: goalData.category,
+          milestones: goalData.milestones,
+          milestone_type: goalData.milestone_type
         })
       }
 
-      // Reload goals
-      const { goals: userGoals } = await fetchUserGoals(user, session.access_token, {})
-      setGoals(userGoals || [])
-
-      // Update selected goal with fresh data if it was edited
-      if (goalData.id && selectedGoal?.id === goalData.id) {
-        const updatedGoal = userGoals?.find(g => g.id === goalData.id)
-        if (updatedGoal) {
-          setSelectedGoal(updatedGoal)
-        }
-      }
-
+      // Realtime will refresh the list
       setIsFormOpen(false)
     } catch (error) {
       console.error('Error saving goal:', error)
@@ -221,6 +256,7 @@ export function GoalsSection() {
             <GoalDetailPanel
               goal={selectedGoal}
               onEdit={handleEditGoal}
+              onUpdate={() => setRefreshKey(k => k + 1)}
               onDelete={() => {
                 handleDeleteGoal()
                 setShowingDetail(false)
@@ -392,6 +428,7 @@ export function GoalsSection() {
           <GoalDetailPanel
             goal={selectedGoal}
             onEdit={handleEditGoal}
+            onUpdate={() => setRefreshKey(k => k + 1)}
             onDelete={handleDeleteGoal}
           />
         </div>

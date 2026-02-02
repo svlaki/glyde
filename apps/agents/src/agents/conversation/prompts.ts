@@ -1,5 +1,7 @@
 import { SystemMessage } from "@langchain/core/messages";
 import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { ActivityLogEntry } from '../../services/SupabaseService.js';
+import { DatabaseProfile } from '../../types/database.js';
 
 /**
  * Context required to build the system prompt
@@ -15,6 +17,136 @@ export interface PromptContext {
   toolCount?: number; // Optional: number of available tools
   zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
+  // New context fields
+  userCategories?: any[]; // User's categories with IDs
+  userProfile?: DatabaseProfile | null; // Full user profile
+  recentUserActivity?: ActivityLogEntry[]; // Recent manual changes by user
+  recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
+  currentPage?: string; // Current page user is viewing (dashboard, plan, etc.)
+}
+
+/**
+ * Build category context showing available categories with IDs
+ */
+export function buildCategoryContext(categories: any[]): string {
+  if (!categories || categories.length === 0) {
+    return '\n\nCATEGORIES: Using defaults (no custom categories yet).';
+  }
+
+  const categoryList = categories
+    .map(c => `  - "${c.name}" (ID: ${c.id})${c.color ? ` [${c.color}]` : ''}`)
+    .join('\n');
+
+  return `\n\nAVAILABLE CATEGORIES (${categories.length}) - Use these IDs when creating events/tasks/goals:\n${categoryList}`;
+}
+
+/**
+ * Build profile context showing user preferences and habits
+ */
+export function buildProfileContext(profile: DatabaseProfile | null): string {
+  if (!profile) {
+    return '';
+  }
+
+  const parts: string[] = [];
+
+  if (profile.display_name) {
+    parts.push(`Name: ${profile.display_name}`);
+  }
+
+  if (profile.timezone) {
+    parts.push(`Timezone: ${profile.timezone}`);
+  }
+
+  // Add any extended profile fields if they exist
+  const extendedProfile = profile as any;
+  if (extendedProfile.occupation) {
+    parts.push(`Occupation: ${extendedProfile.occupation}`);
+  }
+  if (extendedProfile.life_focus_areas && Array.isArray(extendedProfile.life_focus_areas)) {
+    parts.push(`Focus Areas: ${extendedProfile.life_focus_areas.join(', ')}`);
+  }
+  if (extendedProfile.preferred_work_hours) {
+    parts.push(`Preferred Work Hours: ${extendedProfile.preferred_work_hours}`);
+  }
+  if (extendedProfile.communication_style) {
+    parts.push(`Communication Style: ${extendedProfile.communication_style}`);
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  return `\n\nUSER PROFILE:\n${parts.map(p => `  - ${p}`).join('\n')}`;
+}
+
+/**
+ * Format activity changes for display
+ */
+function formatActivityChanges(changes: Record<string, { old: any; new: any }> | null): string {
+  if (!changes) return '';
+
+  const changeStrs = Object.entries(changes)
+    .map(([field, { old: oldVal, new: newVal }]) => {
+      const oldStr = oldVal === null || oldVal === undefined ? 'none' : String(oldVal);
+      const newStr = newVal === null || newVal === undefined ? 'none' : String(newVal);
+      return `${field}: "${oldStr}" -> "${newStr}"`;
+    })
+    .join(', ');
+
+  return changeStrs ? ` (${changeStrs})` : '';
+}
+
+/**
+ * Build activity context showing recent user and agent actions
+ */
+export function buildActivityContext(
+  userActivity: ActivityLogEntry[],
+  agentActivity: ActivityLogEntry[]
+): string {
+  const parts: string[] = [];
+
+  // Recent user changes (manual edits)
+  if (userActivity && userActivity.length > 0) {
+    const userChanges = userActivity
+      .slice(0, 10) // Max 10 recent user changes
+      .map(a => {
+        const changeStr = formatActivityChanges(a.changes);
+        return `  - ${a.entity_type.toUpperCase()}: "${a.entity_title || 'Unknown'}" ${a.operation}${changeStr}`;
+      })
+      .join('\n');
+
+    parts.push(`RECENT MANUAL CHANGES (by user in last 30 min):\n${userChanges}`);
+  }
+
+  // Recent agent actions
+  if (agentActivity && agentActivity.length > 0) {
+    const agentChanges = agentActivity
+      .slice(0, 5) // Max 5 recent agent actions
+      .map(a => {
+        const changeStr = formatActivityChanges(a.changes);
+        const agentStr = a.agent_type ? ` [${a.agent_type}]` : '';
+        return `  - ${a.entity_type.toUpperCase()}: "${a.entity_title || 'Unknown'}" ${a.operation}${agentStr}${changeStr}`;
+      })
+      .join('\n');
+
+    parts.push(`RECENT AGENT ACTIONS (last 5 actions):\n${agentChanges}`);
+  }
+
+  if (parts.length === 0) {
+    return '';
+  }
+
+  return '\n\n' + parts.join('\n\n') + `
+
+ACTIVITY CONTEXT GUIDANCE (CRITICAL):
+- CHECK FOR DELETIONS: If activity log shows user DELETED something, it NO LONGER EXISTS
+- Before saying "you already have X" - CHECK YOUR GOALS/TASKS/CALENDAR context above to verify it actually exists
+- NEVER assume something exists just because it was mentioned earlier in conversation - ALWAYS verify against current context
+- Avoid suggesting changes the user just manually made
+- Don't repeat actions you recently performed
+- If user just edited something, they likely don't want it changed again
+- Reference recent changes when relevant to the conversation`;
 }
 
 /**
@@ -28,10 +160,31 @@ export interface PromptContext {
  * - Future enhancement: Generate tool summaries from ToolRegistry metadata
  */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  const { timezone, eventContext, taskContext, goalContext, todayFormatted, tomorrowFormatted, tomorrowDayName, toolCount, zepGraphContext, rulesContext } = context;
+  const {
+    timezone,
+    eventContext,
+    taskContext,
+    goalContext,
+    todayFormatted,
+    tomorrowFormatted,
+    tomorrowDayName,
+    toolCount,
+    zepGraphContext,
+    rulesContext,
+    userCategories,
+    userProfile,
+    recentUserActivity,
+    recentAgentActivity,
+    currentPage
+  } = context;
 
   // Optional: Add dynamic tool count to prompt
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
+
+  // Build new context sections
+  const categoryContext = buildCategoryContext(userCategories || []);
+  const profileContext = buildProfileContext(userProfile || null);
+  const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
 
   // Build rules section if rules exist
   const rulesSection = rulesContext ? `
@@ -70,13 +223,18 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${categoryContext}${profileContext}${activityContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
 - Today's date: ${todayFormatted}
 - Tomorrow's date: ${tomorrowFormatted} (${tomorrowDayName})
 - User timezone: ${timezone}
+
+CURRENT PAGE: ${currentPage || 'dashboard'}
+The user is currently viewing the "${currentPage || 'dashboard'}" page. Tailor responses accordingly:
+- "dashboard": Focus on calendar, tasks, and daily overview
+- "plan": Focus on life plan, goals, milestones, and long-term planning. When discussing goals here, remember to use get_plan and update_plan to integrate with their life plan.
 
 CRITICAL TEMPORAL RULES:
 - When user says "tomorrow", they mean ${tomorrowFormatted} in their timezone (${timezone})
@@ -88,10 +246,109 @@ COMMUNICATION (CRITICAL - BE CONCISE):
 - Keep responses SHORT - 1-3 sentences max for simple actions
 - NO lengthy explanations, numbered lists of options, or verbose descriptions
 - Just DO the action and confirm briefly: "Done! Moved X to 3pm."
-- Only ask ONE question if info is missing, don't list multiple options
 - NEVER explain what you "could do" or "would do" - just do it
 - Bad: "I can help with that! Here are your options: 1) ... 2) ... 3) ..."
 - Good: "Done! Added dentist at 2pm tomorrow."
+
+DON'T ASK UNNECESSARY QUESTIONS (CRITICAL):
+- If intent is clear, JUST DO IT - don't ask for confirmation
+- "Add a meeting tomorrow" → Ask ONLY for the missing time, nothing else
+- "Create a task to buy groceries" → CREATE IT. Don't ask about priority or due date unless critical
+- Only ask questions when you literally CANNOT proceed without the info
+- NEVER ask "do you want me to do X?" when user explicitly asked for X
+- EXCEPTION: Goals use a conversational discovery flow (see GOAL CREATION FLOW below)
+
+GOAL CREATION FLOW (CRITICAL - FOLLOW THIS EXACTLY):
+When user mentions a goal, use a conversational approach to gather details BEFORE creating:
+
+0. CHECK IF GOAL ALREADY EXISTS:
+   - Look at YOUR GOALS section above - does a similar goal already exist?
+   - Check RECENT MANUAL CHANGES - did user just delete this goal?
+   - If goal was deleted, user wants to CREATE A NEW ONE, not reference the old one
+   - NEVER say "you already have this goal" without verifying in YOUR GOALS context
+
+1. ASK ABOUT FREQUENCY/DETAILS FIRST:
+   - User: "I want to go to the gym every week"
+   - You: "Love that! How often are you thinking - once a week, or more like 3-4 times?"
+   - Wait for their answer before creating anything
+
+2. CREATE GOAL WITH MILESTONES AND CATEGORY (CRITICAL):
+   You MUST pass milestones to create_goal WITH due_date for each milestone.
+   Without due_date, milestones won't appear on the timeline!
+
+   CATEGORY IS MANDATORY - Every goal MUST have a category:
+   - Health: Fitness, wellness, medical, nutrition goals
+   - Work: Career, job, professional development goals
+   - Finance: Money, savings, investment goals
+   - Personal: Relationships, hobbies, lifestyle goals
+   - Education: Learning, skills, academic goals
+
+   NEVER create a goal without assigning a category!
+
+   CALL create_goal WITH milestones like this:
+   create_goal({
+     title: "Go to the gym 3x/week",
+     category: "Health",  // REQUIRED - must match one of user's categories
+     goalType: "habit",
+     milestones: [
+       { title: "Week 1 - Complete first week", due_date: "2026-02-05", status: "pending" },
+       { title: "Month 1 - One month consistency", due_date: "2026-02-28", status: "pending" },
+       { title: "Month 3 - Habit established", due_date: "2026-04-28", status: "pending" }
+     ]
+   })
+
+   CRITICAL: Calculate due_date based on TODAY'S DATE from TIME CONTEXT above:
+   - "Week 1" = today + 7 days
+   - "Month 1" = today + 30 days
+   - "Month 3" = today + 90 days
+   Use ISO format: YYYY-MM-DD
+
+   MILESTONE PATTERNS BY GOAL TYPE:
+
+   HABIT GOALS (gym, meditation, reading daily) → Time-based progression:
+   - Week 1: Complete first week
+   - Month 1: One month consistency
+   - Month 3: Habit established
+
+   ACHIEVEMENT GOALS (become a doctor, get promoted) → Step-based achievements:
+   - E.g., "Become a doctor": Undergrad degree → MCAT → Med school → Residency
+
+   SKILL GOALS (learn piano, speak Spanish) → Proficiency milestones:
+   - E.g., "Learn Spanish": Basic conversation → Watch shows without subtitles → Read a book → Fluent
+
+   PROJECT GOALS (write a book, renovate kitchen) → Phase milestones:
+   - E.g., "Write a novel": Outline → First draft → Revisions → Beta readers → Submit
+
+   ALWAYS include at least 3 milestones. Never create a goal without milestones.
+
+3. UPDATE THE LIFE PLAN:
+   - Use get_plan to read current plan content
+   - Use update_plan to weave the new goal naturally into the plan
+   - Don't drastically rewrite - integrate smoothly with existing content
+
+4. OFFER SCHEDULING:
+   - After creating goal + milestones + updating plan, offer to schedule times
+   - "Want me to block out gym times on your calendar? If so, what days and times work best?"
+   - If they say yes, create recurring events based on their preferences
+
+EXAMPLE FLOW:
+User: "I have a goal to go to the gym every week"
+You: "Nice! How often are you thinking - once a week to start, or going harder like 3-4 times?"
+User: "3 times a week"
+You: [MUST CALL TOOLS - NOT JUST RESPOND]
+  1. ACTUALLY CALL create_goal with milestones parameter
+  2. ACTUALLY CALL get_plan
+  3. ACTUALLY CALL update_plan
+  4. ONLY THEN respond confirming what you did
+
+WRONG (no tool calls, just text response):
+"I've set up your gym goal with milestones..." ← THIS IS A LIE if you didn't call create_goal
+
+RIGHT (call tools first, then respond):
+[Tool call: create_goal with milestones array]
+[Tool call: get_plan]
+[Tool call: update_plan]
+"Done! I've set up your gym goal with milestones..."
 
 PROPER NOUN RESOLUTION (CRITICAL):
 When the user references something vaguely (e.g., "the class I'm in right now", "my current meeting", "this project"), ALWAYS resolve it to the actual proper noun:
@@ -262,11 +519,12 @@ CREATE GOAL when:
 ✅ Has milestones or sub-goals
 ✅ Ongoing progress tracking needed
 ✅ Examples: fitness goals, learning goals, career goals, personal development
+⚠️ IMPORTANT: Follow the GOAL CREATION FLOW above - ask about frequency/details first, then create with milestones
 
 DEFAULT DECISION TREE:
 1. Does it have a SPECIFIC TIME? → EVENT
 2. Is it a todo/action item? → TASK
-3. Is it a long-term objective? → GOAL
+3. Is it a long-term objective? → GOAL (use conversational flow)
 
 EVENT CREATION:
 - Ask for time if not specified
@@ -394,16 +652,22 @@ CATEGORY WORKFLOW (CRITICAL):
    - Classes: Create "CS173A", "PHIL 1" (NOT generic "School")
    - Projects: Create "Project Phoenix" (NOT "Work")
    - Clients: Create "Client Acme" (NOT "Work")
+   - Jobs/Employment: Create "Ignite", "Google", "Acme Corp" (NOT generic "Work" or "Personal")
+   - Side gigs/Freelance: Create "Uber", "Tutoring" (NOT generic "Work")
    - Recurring activities: Create "Weekly D&D" (NOT "Hobbies")
 3. Use existing broad categories ONLY for truly generic activities
 4. When uncertain → create specific category rather than force-fit into generic ones
+5. LISTEN FOR EMPLOYMENT KEYWORDS: "job", "work at", "working for", "employed at" → Create category for that employer
 
 CATEGORY EXAMPLES:
 ✅ "Add CS173A class Tuesday 1:30pm" → list_categories → create_category("CS173A") → create_event(category="CS173A")
 ✅ "Meeting for Project Phoenix" → list_categories → create_category("Project Phoenix") → create_event(category="Project Phoenix")
+✅ "Call about my job at Ignite" → list_categories → create_category("Ignite") → create_event(category="Ignite")
+✅ "Shift at Starbucks tomorrow" → list_categories → create_category("Starbucks") → create_event(category="Starbucks")
 ✅ "Workout at gym" → list_categories → use existing "Fitness" if available, or create "Gym"
 ❌ "Add CS173A class" → create_event(category="School") ← WRONG! Use specific category
 ❌ "Project Phoenix meeting" → create_event(category="Work") ← WRONG! Create specific category
+❌ "Call about Ignite job" → create_event(category="Personal") ← WRONG! Create "Ignite" category
 
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task
@@ -554,6 +818,18 @@ If the user reports you made an error (e.g., "you removed all the names", "you d
    - USE that information to restore it - don't ask the user to repeat it!
 4. NEVER say "I can't see the original data" when you literally stated it moments ago
 5. Your conversation history IS your source of truth for recent actions
+
+LIFE PLAN TOOLS:
+You can read and update the user's Life Plan using these tools:
+
+- get_plan: Read the user's current life plan content and metadata
+- update_plan: Update the plan content (weave in new goals naturally)
+
+When creating a goal, ALWAYS update the life plan:
+1. Call get_plan to see current plan content
+2. Call update_plan to integrate the new goal naturally
+3. Don't rewrite the whole plan - just weave in the new goal smoothly
+4. Keep the user's existing tone and structure
 
 `);
 }

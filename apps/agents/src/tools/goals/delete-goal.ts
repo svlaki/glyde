@@ -72,11 +72,23 @@ export const deleteGoalTool = tool(
 
           // Delete the goal
           const supabaseService = getSupabaseService();
-          const result = await supabaseService.deleteGoal(userId, goalToDelete.id);
+          const result = await supabaseService.deleteGoal(userId, goalToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
             return `❌ Failed to delete goal: ${result.error}`;
           }
+
+          // Remove from Zep knowledge graph (fire-and-forget for speed)
+          const removeFromGraph = async () => {
+            try {
+              const zepGraphService = new ZepGraphService();
+              await zepGraphService.deleteGoal(userId, goalToDelete.id, goalToDelete.title);
+              console.log(`[DELETE-GOAL] Goal removed from Zep graph: ${goalToDelete.id}`);
+            } catch (error) {
+              console.error('[DELETE-GOAL] Failed to remove from Zep (non-critical):', error);
+            }
+          };
+          removeFromGraph();
 
           return `✅ GOAL: "${goalToDelete.title}" has been deleted`;
         } else {
@@ -100,10 +112,24 @@ export const deleteGoalTool = tool(
       const goals = await supabaseService.getGoals(userId);
       const goalToDelete = goals.find((g: any) => g.id === targetGoalId);
 
-      const result = await supabaseService.deleteGoal(userId, targetGoalId);
+      const result = await supabaseService.deleteGoal(userId, targetGoalId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
         return `❌ Failed to delete goal: ${result.error}`;
+      }
+
+      // Remove from Zep knowledge graph (fire-and-forget for speed)
+      if (goalToDelete) {
+        const removeFromGraph = async () => {
+          try {
+            const zepGraphService = new ZepGraphService();
+            await zepGraphService.deleteGoal(userId, targetGoalId, goalToDelete.title);
+            console.log(`[DELETE-GOAL] Goal removed from Zep graph: ${targetGoalId}`);
+          } catch (error) {
+            console.error('[DELETE-GOAL] Failed to remove from Zep (non-critical):', error);
+          }
+        };
+        removeFromGraph();
       }
 
       // Format response with goal details

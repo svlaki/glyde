@@ -62,11 +62,23 @@ export const deleteTaskTool = tool(
 
           // Delete the task
           const supabaseService = getSupabaseService();
-          const result = await supabaseService.deleteTask(userId, taskToDelete.id);
+          const result = await supabaseService.deleteTask(userId, taskToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
             return `❌ Failed to delete task: ${result.error}`;
           }
+
+          // Remove from Zep knowledge graph (fire-and-forget for speed)
+          const removeFromGraph = async () => {
+            try {
+              const zepGraphService = new ZepGraphService();
+              await zepGraphService.deleteTask(userId, taskToDelete.id, taskToDelete.title);
+              console.log(`[DELETE-TASK] Task removed from Zep graph: ${taskToDelete.id}`);
+            } catch (error) {
+              console.error('[DELETE-TASK] Failed to remove from Zep (non-critical):', error);
+            }
+          };
+          removeFromGraph();
 
           // Format due date for response
           let dueInfo = '';
@@ -99,10 +111,24 @@ export const deleteTaskTool = tool(
       const tasks = await supabaseService.getTasks(userId);
       const taskToDelete = tasks.find((t: any) => t.id === targetTaskId);
 
-      const result = await supabaseService.deleteTask(userId, targetTaskId);
+      const result = await supabaseService.deleteTask(userId, targetTaskId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
         return `❌ Failed to delete task: ${result.error}`;
+      }
+
+      // Remove from Zep knowledge graph (fire-and-forget for speed)
+      if (taskToDelete) {
+        const removeFromGraph = async () => {
+          try {
+            const zepGraphService = new ZepGraphService();
+            await zepGraphService.deleteTask(userId, targetTaskId, taskToDelete.title);
+            console.log(`[DELETE-TASK] Task removed from Zep graph: ${targetTaskId}`);
+          } catch (error) {
+            console.error('[DELETE-TASK] Failed to remove from Zep (non-critical):', error);
+          }
+        };
+        removeFromGraph();
       }
 
       // Format response with task details

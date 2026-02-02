@@ -4,15 +4,16 @@ import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { SupabaseService } from '../../services/SupabaseService.js';
+import { SupabaseService, ActivityLogEntry } from '../../services/SupabaseService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
-import { AgentContext, AgentResponse } from '../../types/agents.js';
-import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { AgentContext, AgentResponse, ImageContent } from '../../types/agents.js';
+import { getCurrentTimeInTimezone, isValidTimezone } from '../../utils/timezoneUtils.js';
 import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { buildSystemPrompt } from './prompts.js';
+import { DatabaseProfile, DatabaseCategory } from '../../types/database.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -34,6 +35,26 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  userCategories: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
+  userProfile: Annotation<DatabaseProfile | null>({
+    reducer: (_existing, update) => update ?? _existing,
+    default: () => null,
+  }),
+  recentUserActivity: Annotation<ActivityLogEntry[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
+  recentAgentActivity: Annotation<ActivityLogEntry[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
+  currentPage: Annotation<string>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => 'dashboard',
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -54,19 +75,33 @@ export class ConversationAgent extends BaseAgent {
     try {
       // Load memory context using Graphiti
       const memoryContext = await this.loadMemoryContext(context, 'conversation');
-      
-      // Pre-load user events for LangGraph context (still needed for immediate calendar operations)
-      const supabaseService = new SupabaseService();
-      
-      // Get user profile to fetch timezone
-      const userProfile = await supabaseService.getProfile(context.userId);
-      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      if (!userProfile?.timezone) {
-        console.warn(`[CONVERSATION AGENT] User profile missing timezone, falling back to ${userTimezone}`);
+      // Pre-load user data for LangGraph context
+      const supabaseService = new SupabaseService();
+
+      // Parallel data fetching for better performance
+      const [userProfile, allEvents, allTasks, allGoals, userCategories, recentUserActivity, recentAgentActivity] = await Promise.all([
+        supabaseService.getProfile(context.userId),
+        supabaseService.getEvents(context.userId),
+        supabaseService.getTasks(context.userId),
+        supabaseService.getGoals(context.userId),
+        supabaseService.getCategories(context.userId),
+        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
+        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5), // Last 5 agent actions
+      ]);
+
+      // Resolve timezone with validation
+      let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+
+      // Validate timezone - fall back to UTC if invalid
+      if (!isValidTimezone(userTimezone)) {
+        console.error(`[CONVERSATION AGENT] Invalid timezone "${userTimezone}", falling back to UTC`);
+        userTimezone = 'UTC';
+      } else if (!userProfile?.timezone) {
+        console.warn(`[CONVERSATION AGENT] User profile missing timezone, using ${userTimezone}`);
       }
 
-      console.log(`[CONVERSATION AGENT] Using user timezone: ${userTimezone}`);
+      console.log(`[CONVERSATION AGENT] Using validated timezone: ${userTimezone}`);
 
       // Add current message to Zep BEFORE context retrieval so it's included in context
       try {
@@ -75,20 +110,23 @@ export class ConversationAgent extends BaseAgent {
         console.warn('Failed to add user message to Zep:', error);
       }
 
-      // Get events as UTC - we'll format them for display in the agent prompt
-      // Filter to only include events that haven't ended yet (including ongoing multi-day events)
+      // Filter and limit events (max 15 future/ongoing events)
       const now = new Date();
-      const allEvents = await supabaseService.getEvents(context.userId);
-      const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
-      console.log(`Loading ${userEvents?.length || 0} future/ongoing events (filtered from ${allEvents?.length || 0} total) for user ${context.userId}`);
+      const userEvents = allEvents
+        .filter(event => new Date(event.end_time) >= now)
+        .slice(0, 15);
+      console.log(`Loading ${userEvents?.length || 0} future/ongoing events (limited from ${allEvents?.length || 0} total) for user ${context.userId}`);
 
-      // Get user tasks
-      const userTasks = await supabaseService.getTasks(context.userId);
-      console.log(`Loading ${userTasks?.length || 0} tasks for user ${context.userId}`);
+      // Limit tasks (max 10)
+      const userTasks = allTasks.slice(0, 10);
+      console.log(`Loading ${userTasks?.length || 0} tasks (limited from ${allTasks?.length || 0} total) for user ${context.userId}`);
 
-      // Get user goals
-      const userGoals = await supabaseService.getGoals(context.userId);
-      console.log(`Loading ${userGoals?.length || 0} goals for user ${context.userId}`);
+      // Limit goals (max 8)
+      const userGoals = allGoals.slice(0, 8);
+      console.log(`Loading ${userGoals?.length || 0} goals (limited from ${allGoals?.length || 0} total) for user ${context.userId}`);
+
+      console.log(`Loading ${userCategories?.length || 0} categories for user ${context.userId}`);
+      console.log(`Loading ${recentUserActivity?.length || 0} recent user activities, ${recentAgentActivity?.length || 0} recent agent activities`);
 
       // Build conversation history from context
       const messages: BaseMessage[] = [];
@@ -98,17 +136,20 @@ export class ConversationAgent extends BaseAgent {
         // Keep last 10 messages for context (5 exchanges)
         const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
-          // Ensure content is a string
-          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-          
           if (msg.role === 'user') {
-            messages.push(new HumanMessage(content));
+            // Handle multipart content (text + images from recent messages)
+            if (Array.isArray(msg.content)) {
+              messages.push(new HumanMessage({ content: msg.content as any }));
+            } else {
+              messages.push(new HumanMessage(msg.content));
+            }
           } else if (msg.role === 'assistant') {
-            messages.push(new AIMessage(content));
+            const textContent = typeof msg.content === 'string' ? msg.content : '';
+            messages.push(new AIMessage(textContent));
           }
         }
       }
-      
+
       // Add the current message
       messages.push(new HumanMessage(message));
       
@@ -120,6 +161,11 @@ export class ConversationAgent extends BaseAgent {
         userEvents: userEvents || [],
         userTasks: userTasks || [],
         userGoals: userGoals || [],
+        userCategories: userCategories || [],
+        userProfile: userProfile || null,
+        recentUserActivity: recentUserActivity || [],
+        recentAgentActivity: recentAgentActivity || [],
+        currentPage: (context as any).currentPage || 'dashboard',
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -177,8 +223,9 @@ IMPORTANT INSTRUCTIONS:
   /**
    * Stream message processing for token-by-token output.
    * Uses LangGraph's streamEvents() method.
+   * Supports optional images for vision capabilities.
    */
-  async *streamMessage(context: AgentContext, message: string): AsyncGenerator<{
+  async *streamMessage(context: AgentContext, message: string, images: ImageContent[] = []): AsyncGenerator<{
     type: 'text-delta' | 'tool-start' | 'tool-end' | 'error' | 'status';
     content?: string;
     toolName?: string;
@@ -192,19 +239,37 @@ IMPORTANT INSTRUCTIONS:
 
       // Parallel data fetching - run all async operations concurrently
       // This significantly reduces time-to-first-token
-      const [memoryContext, userProfile, allEvents, userTasks] = await Promise.all([
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userCategories, recentUserActivity, recentAgentActivity] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
+        supabaseService.getGoals(context.userId),
+        supabaseService.getCategories(context.userId),
+        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
+        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
       ]);
 
-      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
-      console.log(`🌊 [CONVERSATION AGENT] Streaming with timezone: ${userTimezone}`);
+      // Resolve timezone with validation
+      let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      // Filter to only include events that haven't ended yet
+      // Validate timezone - fall back to UTC if invalid
+      if (!isValidTimezone(userTimezone)) {
+        console.error(`🌊 [CONVERSATION AGENT] Invalid timezone "${userTimezone}", falling back to UTC`);
+        userTimezone = 'UTC';
+      }
+
+      console.log(`🌊 [CONVERSATION AGENT] Streaming with validated timezone: ${userTimezone}`);
+
+      // Filter and limit events (max 15 future/ongoing events)
       const now = new Date();
-      const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
+      const userEvents = allEvents
+        .filter(event => new Date(event.end_time) >= now)
+        .slice(0, 15);
+
+      // Limit tasks and goals
+      const userTasks = allTasks.slice(0, 10);
+      const userGoals = allGoals.slice(0, 8);
 
       // Build conversation history from context
       const messages: BaseMessage[] = [];
@@ -214,18 +279,38 @@ IMPORTANT INSTRUCTIONS:
         // Keep last 10 messages for context (5 exchanges)
         const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
-          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-
           if (msg.role === 'user') {
-            messages.push(new HumanMessage(content));
+            // Handle multipart content (text + images from recent messages)
+            if (Array.isArray(msg.content)) {
+              messages.push(new HumanMessage({ content: msg.content as any }));
+            } else {
+              messages.push(new HumanMessage(msg.content));
+            }
           } else if (msg.role === 'assistant') {
-            messages.push(new AIMessage(content));
+            // Assistant messages are always text-only
+            const textContent = typeof msg.content === 'string' ? msg.content : '';
+            messages.push(new AIMessage(textContent));
           }
         }
       }
 
-      // Add the current message
-      messages.push(new HumanMessage(message));
+      // Add the current message (with images if present)
+      if (images.length > 0) {
+        // Build multipart content for vision
+        const contentParts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string; detail?: string } }> = [
+          { type: 'text', text: message }
+        ];
+        for (const img of images) {
+          contentParts.push({
+            type: 'image_url',
+            image_url: { url: img.image_url.url, detail: img.image_url.detail || 'auto' }
+          });
+        }
+        messages.push(new HumanMessage({ content: contentParts }));
+        console.log(`[CONVERSATION AGENT] Added message with ${images.length} image(s)`);
+      } else {
+        messages.push(new HumanMessage(message));
+      }
 
       // Build initial state
       const initialState = {
@@ -234,6 +319,12 @@ IMPORTANT INSTRUCTIONS:
         timezone: userTimezone,
         userEvents: userEvents || [],
         userTasks: userTasks || [],
+        userGoals: userGoals || [],
+        userCategories: userCategories || [],
+        userProfile: userProfile || null,
+        recentUserActivity: recentUserActivity || [],
+        recentAgentActivity: recentAgentActivity || [],
+        currentPage: (context as any).currentPage || 'dashboard',
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
@@ -435,6 +526,7 @@ IMPORTANT INSTRUCTIONS:
       // Pass tool count from ToolRegistry for dynamic prompt generation
       // Include Zep's pre-formatted context block with user summary and relevant facts
       // Include user rules for behavioral guidance
+      // Include categories, profile, and recent activity for context awareness
       const systemMessage = buildSystemPrompt({
         timezone: state.timezone,
         eventContext,
@@ -445,7 +537,12 @@ IMPORTANT INSTRUCTIONS:
         tomorrowDayName,
         toolCount: tools.length,
         zepGraphContext: zepThreadContext, // Use Zep's built-in context block
-        rulesContext // User's custom rules
+        rulesContext, // User's custom rules
+        userCategories: state.userCategories, // Available categories with IDs
+        userProfile: state.userProfile, // User profile with preferences
+        recentUserActivity: state.recentUserActivity, // Recent manual changes
+        recentAgentActivity: state.recentAgentActivity, // Recent agent actions
+        currentPage: state.currentPage // Current page user is viewing
       });
 
 

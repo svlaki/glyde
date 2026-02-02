@@ -123,6 +123,15 @@ TIME OPTIONS FORMAT:
 - The system will parse the time from whichever option the user picks
 - Always include 3-4 time options that make sense for the activity
 
+CRITICAL - AVOID DUPLICATE SUGGESTIONS:
+- BEFORE suggesting to schedule time for a task or goal, check if the user ALREADY HAS TIME SCHEDULED for it today
+- Look at the CALENDAR section for events with similar titles (e.g., "Focus: CS 525", "CS 525 work", or events in the same category as the task)
+- If there's ALREADY an event today for that task/goal/activity, DO NOT suggest scheduling more time for it
+- Examples of duplicates to AVOID:
+  - Task "CS 525 Project Proposal" exists AND calendar shows "Focus: CS 525" today -> SKIP this suggestion
+  - Goal "Exercise more" exists AND calendar shows "Gym" or "Workout" today -> SKIP this suggestion
+  - Task in category "CS 247B" exists AND calendar shows any CS 247B event today (not just lectures) -> Check if it's focus time
+
 CRITICAL - AVOID CALENDAR CONFLICTS:
 - ALWAYS check the CALENDAR section above before suggesting times
 - DO NOT suggest times that overlap with existing events
@@ -260,16 +269,22 @@ CRITICAL RULES:
    - Account for the duration of what you're scheduling
    - Only offer times that are actually FREE
 
-4. **Only suggest things that result in creating something**
+4. **DO NOT SUGGEST THINGS THE USER ALREADY HAS SCHEDULED TODAY**
+   - Before suggesting "schedule time for [TASK]", check if there's already a focus/work event for that task TODAY
+   - If calendar shows "Focus: CS 525" or similar, DO NOT suggest scheduling CS 525 time
+   - Look for events in the same CATEGORY as the task - if the task is in "CS 247B" category and there's already a CS 247B focus event today, skip it
+   - This is the most common mistake - always verify the task doesn't already have time allocated TODAY
+
+5. **Only suggest things that result in creating something**
    - Events (scheduling time for tasks, goals, breaks, prep)
    - Tasks (adding new to-dos)
    - Goals (creating new goals)
 
-5. **Be specific** - use actual task/goal names from the context
+6. **Be specific** - use actual task/goal names from the context
 
-6. **Maximum 2-3 interactions per generation**
+7. **Maximum 2-3 interactions per generation**
 
-7. **Duration is in MINUTES** (30, 45, 60, 90, 120)
+8. **Duration is in MINUTES** (30, 45, 60, 90, 120)
 
 CORRECT STRUCTURE FOR YES_NO:
 create_interaction(
@@ -303,7 +318,9 @@ WRONG (will not work):
 - Asking "want to prioritize?" → we can't handle that
 - Suggesting 9:00am when there's a meeting at 9:00am → creates conflict!
 - Suggesting a 2-hour block at 2pm when there's a 3pm event → overlap!
-- Not checking the CALENDAR before picking time options → causes double-booking`);
+- Not checking the CALENDAR before picking time options → causes double-booking
+- Suggesting "schedule focus time for CS 525" when calendar already shows "Focus: CS 525" today → DUPLICATE!
+- Suggesting time for a task that already has dedicated time on today's calendar → user already planned this!`);
 }
 
 /**

@@ -2,8 +2,10 @@
   "mcpServers": {
     "supabase": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@supabase/mcp-server-supabase@latest",
         "--project-ref=furwuyjptohobrvyyzfy"
@@ -12,52 +14,22 @@
         "SUPABASE_ACCESS_TOKEN": "sbp_9a38a2935f739393e072a590546ab18db373ee13"
       }
     },
-    "serena": {
-      "type": "stdio",
-      "command": "C:\\Users\\pipej\\.local\\bin\\uvx.exe",
-      "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena-mcp-server"
-      ],
-      "env": {}
-    },
-    "context7": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp@latest"
-      ],
-      "env": {}
-    },
-    "code-index": {
-      "type": "stdio",
-      "command": "C:\\Users\\pipej\\.local\\bin\\uvx.exe",
-      "args": [
-        "--from",
-        "git+https://github.com/johnhuang316/code-index-mcp",
-        "code-index-mcp"
-      ],
-      "env": {}
-    },
-    "zep-docs": {
-      "type": "sse",
-      "url": "https://docs-mcp.getzep.com/sse"
-    },
     "sequential-thinking": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "env": {}
+      ]
     },
     "memory-bank": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@allpepper/memory-bank-mcp@latest"
       ],
@@ -67,43 +39,49 @@
     },
     "playwright": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@playwright/mcp@latest"
-      ],
-      "env": {}
+      ]
     },
-    "github": {
+    "docker": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
-        "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
-      }
+        "docker-mcp"
+      ]
     },
     "postgresql": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "@henkey/postgres-mcp-server",
         "--connection-string",
         "postgresql://postgres:postgres@localhost:54322/postgres"
-      ],
-      "env": {}
+      ]
     },
-    "docker": {
+    "context7": {
       "type": "stdio",
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
-        "docker-mcp"
-      ],
-      "env": {}
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "zep-docs": {
+      "type": "sse",
+      "url": "https://docs-mcp.getzep.com/sse"
     }
   }
 }
