@@ -190,8 +190,26 @@ export class ZepOnboardingSeedService {
 
   /**
    * Seeds structured entities in Zep graph
+   * Includes deduplication check to prevent duplicate entities on re-onboarding
    */
   private async seedGraphEntities(userId: string, data: OnboardingDataV2): Promise<void> {
+    // Check for existing onboarding data to prevent duplicates
+    try {
+      const existingPrefs = await this.graphService.searchUserGraphAdvanced(
+        userId,
+        'preference_type identity full_name',
+        { entityTypes: ['UserPreference'], scope: 'nodes' }
+      );
+
+      if (existingPrefs.nodes && existingPrefs.nodes.length > 0) {
+        console.log(`[ZepOnboardingSeed] User ${userId} already has onboarding data in graph, skipping to prevent duplicates`);
+        return;
+      }
+    } catch (error: any) {
+      // If search fails, proceed with seeding (user may not exist in Zep yet)
+      console.log(`[ZepOnboardingSeed] Could not check for existing data (may be new user): ${error.message}`);
+    }
+
     // Seed UserPreference entities for demographics and settings
     await this.seedUserPreferences(userId, data);
 
@@ -343,6 +361,7 @@ export class ZepOnboardingSeedService {
       try {
         const description = HABIT_DESCRIPTIONS[habitId] || habitId;
         await this.graphService.addUserPattern(userId, {
+          pattern_key: `onboarding_habit_${habitId}`,  // Unique key for deduplication
           pattern_type: 'self_reported_challenge',
           description: description,
           confidence_score: 0.9, // High confidence - user self-reported

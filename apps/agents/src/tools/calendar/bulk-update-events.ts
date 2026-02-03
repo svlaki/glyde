@@ -66,8 +66,20 @@ export const bulkUpdateEventsTool = tool(
           return searchText.includes(searchQuery.toLowerCase());
         });
 
-        eventsToUpdate = matchingEvents;
-        console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Found ${eventsToUpdate.length} events matching: "${searchQuery}"`);
+        // IMPORTANT: Deduplicate by event ID
+        // getEvents() returns expanded recurring instances that all share the same parent ID
+        // We only want to update each unique parent event once
+        const uniqueEventIds = new Set<string>();
+        const deduplicatedEvents: any[] = [];
+        for (const event of matchingEvents) {
+          if (!uniqueEventIds.has(event.id)) {
+            uniqueEventIds.add(event.id);
+            deduplicatedEvents.push(event);
+          }
+        }
+
+        eventsToUpdate = deduplicatedEvents;
+        console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Found ${matchingEvents.length} event instances matching: "${searchQuery}" (${deduplicatedEvents.length} unique parent events)`);
       } catch (error) {
         console.error('❌ [BULK-UPDATE-EVENTS TOOL] Search error:', error);
         throw new Error(`Failed to search for events: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -151,14 +163,18 @@ export const bulkUpdateEventsTool = tool(
       result += ` (set ${updateFields.join(', ')})`;
     }
 
-    // Add sample of updated events
-    if (updatedEventTitles.length > 0) {
-      const sampleSize = Math.min(5, updatedEventTitles.length);
-      const sample = updatedEventTitles.slice(0, sampleSize);
-      result += `\n\nUpdated events include: ${sample.join(', ')}`;
+    // Add a clear completion message to prevent agent from looping
+    result += `\n\n✅ BULK UPDATE COMPLETE - No further action needed.`;
 
-      if (updatedEventTitles.length > sampleSize) {
-        result += ` and ${updatedEventTitles.length - sampleSize} more`;
+    // Add unique event titles (deduplicated)
+    if (updatedEventTitles.length > 0) {
+      const uniqueTitles = [...new Set(updatedEventTitles)];
+      const sampleSize = Math.min(5, uniqueTitles.length);
+      const sample = uniqueTitles.slice(0, sampleSize);
+      result += `\n\nUpdated events: ${sample.join(', ')}`;
+
+      if (uniqueTitles.length > sampleSize) {
+        result += ` and ${uniqueTitles.length - sampleSize} more`;
       }
     }
 

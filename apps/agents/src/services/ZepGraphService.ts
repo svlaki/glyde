@@ -287,6 +287,7 @@ export class ZepGraphService {
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('CalendarEvent', {
+          supabase_id: event.eventId,  // Store Supabase UUID for precise matching
           title: event.title,
           category: event.category || 'personal',
           duration_minutes: event.duration_minutes,
@@ -362,6 +363,7 @@ export class ZepGraphService {
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('Task', {
+          supabase_id: task.taskId,  // Store Supabase UUID for precise matching
           title: task.title,
           priority: task.priority || 'medium',
           category: task.category,
@@ -412,6 +414,7 @@ export class ZepGraphService {
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('Goal', {
+          supabase_id: goal.goalId,  // Store Supabase UUID for precise matching
           title: goal.title,
           goal_type: goal.goal_type,
           status: goal.status || 'active',
@@ -456,11 +459,12 @@ export class ZepGraphService {
   /**
    * Add detected behavioral pattern to user's graph
    */
-  async addUserPattern(userId: string, pattern: Partial<IPatternEntity>): Promise<void> {
+  async addUserPattern(userId: string, pattern: Partial<IPatternEntity> & { pattern_key?: string }): Promise<void> {
     try {
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('Pattern', {
+          pattern_key: pattern.pattern_key,  // Unique key for deduplication
           pattern_type: pattern.pattern_type,
           description: pattern.description,
           confidence_score: pattern.confidence_score || 0.5,

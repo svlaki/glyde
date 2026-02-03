@@ -168,29 +168,10 @@ export class OnboardingService {
   private static async clearPreviousOnboardingData(userId: string): Promise<void> {
     const supabase = getSupabaseService().getClient();
 
-    // Delete all existing categories for this user
-    const { error: categoriesError } = await supabase
-      .from('categories')
-      .delete()
-      .eq('user_id', userId);
-
-    if (categoriesError) {
-      console.warn(`⚠️ Failed to clear categories: ${categoriesError.message}`);
-    } else {
-      console.log(`✅ Cleared existing categories for user`);
-    }
-
-    // Delete all existing goals for this user
-    const { error: goalsError } = await supabase
-      .from('goals')
-      .delete()
-      .eq('user_id', userId);
-
-    if (goalsError) {
-      console.warn(`⚠️ Failed to clear goals: ${goalsError.message}`);
-    } else {
-      console.log(`✅ Cleared existing goals for user`);
-    }
+    // NOTE: We intentionally DO NOT delete categories or goals here
+    // Users may have existing data they want to preserve across re-onboarding
+    // Categories and goals are created additively during onboarding
+    console.log(`✅ Preserving existing categories and goals for user`);
 
     // Reset profile onboarding-related fields
     const { error: profileError } = await supabase
@@ -220,13 +201,24 @@ export class OnboardingService {
 
   /**
    * Create goals for the user in their schema
+   * Checks for existing goals with same title to prevent duplicates
    */
   private static async createGoalsForUser(userId: string, goals: string[]): Promise<void> {
     const supabase = getSupabaseService();
 
-    console.log(`Creating ${goals.length} goals for user...`);
+    // Get existing goals to check for duplicates
+    const existingGoals = await supabase.getGoals(userId);
+    const existingTitles = new Set(existingGoals.map((g: any) => g.title?.toLowerCase()));
+
+    console.log(`Creating goals for user (${existingGoals.length} existing, ${goals.length} new)...`);
 
     for (const goalTitle of goals) {
+      // Skip if goal with same title already exists
+      if (existingTitles.has(goalTitle.toLowerCase())) {
+        console.log(`⏭️  Skipping duplicate goal: ${goalTitle}`);
+        continue;
+      }
+
       try {
         await supabase.createGoal(userId, {
           title: goalTitle,
@@ -246,9 +238,17 @@ export class OnboardingService {
 
   /**
    * Create categories for the selected aspects
+   * NOTE: Skips if user already has categories to preserve existing setup during re-onboarding
    */
   private static async createCategoriesForAspects(userId: string, aspects: string[]): Promise<void> {
     const categoryService = new CategoryService();
+
+    // Check if user already has categories - if so, preserve them completely
+    const existingCategories = await categoryService.getCategories(userId);
+    if (existingCategories && existingCategories.length > 0) {
+      console.log(`✅ User already has ${existingCategories.length} categories, preserving existing setup`);
+      return;
+    }
 
     // Predefined colors for common aspects
     const aspectColors: Record<string, string> = {
