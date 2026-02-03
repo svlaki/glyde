@@ -1201,6 +1201,24 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     </div>
                   ))}
 
+                  {/* Vertical day separator lines in edit mode */}
+                  {isInEditMode && dayIndex > 31 && dayIndex < 34 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '1px',
+                        background: isDarkMode
+                          ? 'rgba(255, 255, 255, 0.08)'
+                          : 'rgba(0, 0, 0, 0.06)',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}
+                    />
+                  )}
+
                   {/* Events for this day */}
                   {dayEvents.map((event) => {
                     const startTime = new Date(event.start_time)
@@ -1210,65 +1228,37 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     const eventColor = getEventColor(event)
                     const isBeingDragged = isDragging && draggingEvent?.id === event.id
 
-                    // Calculate drag offset
+                    // Calculate drag offset (vertical and horizontal)
                     let dragOffset = 0
+                    let horizontalOffset = 0
                     let showInThisColumn = true
-                    // Convert dayIndex to rect index for comparison (only for visible columns 7, 8, 9)
+                    // Convert dayIndex to rect index for comparison (only for visible columns 31, 32, 33)
                     const rectIndex = dayIndex >= 31 && dayIndex < 34 ? dayIndex - 31 : -1
                     if (isBeingDragged) {
+                      // Vertical offset (snap to 15-minute intervals)
                       const rawDragOffset = dragCurrentY - dragStartY
                       const newMinutesRaw = startMinutes + rawDragOffset
                       const snappedMinutes = Math.round(newMinutesRaw / 15) * 15
                       dragOffset = snappedMinutes - startMinutes
 
-                      // If dragging to a different column, hide from source column
-                      if (targetDayIndex !== null && targetDayIndex !== rectIndex && sourceDayIndex === rectIndex) {
-                        showInThisColumn = false
+                      // Horizontal offset: calculate which column the event should snap to
+                      // Event appears in the source column but translates horizontally to follow finger
+                      if (targetDayIndex !== null && sourceDayIndex !== null) {
+                        // Calculate column difference between target and current event's column
+                        const sourceColIndex = sourceDayIndex - 31  // Convert to 0-2 range
+                        const targetColIndex = targetDayIndex - 31  // Convert to 0-2 range
+
+                        // Only show in source column, with horizontal transform applied
+                        if (sourceColIndex !== rectIndex) {
+                          showInThisColumn = false
+                        } else {
+                          // Calculate horizontal pixel offset to move event to target column
+                          horizontalOffset = (targetColIndex - sourceColIndex) * columnWidth
+                        }
                       }
                     }
 
-                    // Show ghost preview in target column
-                    if (isDragging && draggingEvent && targetDayIndex === rectIndex && sourceDayIndex !== rectIndex) {
-                      const draggedStartTime = new Date(draggingEvent.start_time)
-                      const draggedEndTime = new Date(draggingEvent.end_time)
-                      const draggedStartMinutes = draggedStartTime.getHours() * 60 + draggedStartTime.getMinutes()
-                      const draggedDuration = (draggedEndTime.getTime() - draggedStartTime.getTime()) / (1000 * 60)
-                      const rawOffset = dragCurrentY - dragStartY
-                      const previewMinutes = Math.round((draggedStartMinutes + rawOffset) / 15) * 15
-                      const previewColor = getEventColor(draggingEvent)
-
-                      return (
-                        <div
-                          key={`preview-${event.id}`}
-                          style={{
-                            position: 'absolute',
-                            left: '4px',
-                            right: '4px',
-                            top: `${previewMinutes}px`,
-                            height: `${Math.max(draggedDuration, 15)}px`,
-                            background: hexToRgba(previewColor, 0.2),
-                            borderLeft: `3px dashed ${previewColor}`,
-                            borderRadius: '4px',
-                            padding: '4px',
-                            opacity: 0.7,
-                            pointerEvents: 'none',
-                            zIndex: 50
-                          }}
-                        >
-                          <div style={{
-                            fontSize: '11px',
-                            fontWeight: '500',
-                            color: previewColor,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {draggingEvent.title}
-                          </div>
-                        </div>
-                      )
-                    }
-
+                    // Ghost preview no longer needed - event follows finger directly
                     if (!showInThisColumn) return null
 
                     return (
@@ -1323,6 +1313,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           opacity: isBeingDragged ? 0.8 : 1,
                           transition: isBeingDragged ? 'none' : 'all 0.2s',
                           touchAction: 'none',
+                          // Apply horizontal transform when dragging across days
+                          transform: isBeingDragged && horizontalOffset !== 0
+                            ? `translateX(${horizontalOffset}px)`
+                            : undefined,
                           ...(touchedEvent?.id === event.id && isInEditMode && {
                             boxShadow: isDarkMode
                               ? '0 0 0 2px rgba(255, 255, 255, 0.5), 0 0 0 6px rgba(96, 165, 250, 0.6)'
