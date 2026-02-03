@@ -24,6 +24,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   const { categories, refreshCategories } = useCategories()
 
   const [title, setTitle] = useState('')
+  const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [startDate, setStartDate] = useState<Date>(new Date())
@@ -46,6 +47,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
+      setLocation(event.location || '')
       setDescription(event.description || '')
       setCategory(event.category || '')
 
@@ -66,6 +68,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
     } else {
       // Reset for new event
       setTitle('')
+      setLocation('')
       setDescription('')
       setCategory('')
 
@@ -169,6 +172,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
+    if (!location.trim()) return
     if (!startDate || !endDate) return
 
     setLoading(true)
@@ -204,7 +208,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
           rrule,
           category || 'Personal',
           description.trim() || undefined,
-          undefined, // location
+          location.trim(),
           endType === 'until' && untilDate ? new Date(untilDate).toISOString() : undefined,
           session?.access_token
         )
@@ -219,6 +223,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
         await onSave({
           id: createdEvent?.id,
           title: title.trim(),
+          location: location.trim(),
           description: description.trim() || undefined,
           category: category || undefined,
           start_time: startISO,
@@ -229,6 +234,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
         await onSave({
           id: event?.id,
           title: title.trim(),
+          location: location.trim(),
           description: description.trim() || undefined,
           category: category || undefined,
           start_time: startISO,
@@ -282,83 +288,96 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
     return cat?.color || '#999'
   }
 
+  const titleInput = (
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      required
+      placeholder="Event title"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: '20px',
+        fontWeight: '600',
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={event?.id ? 'Edit Event' : 'New Event'}
+      headerContent={titleInput}
       maxWidth="500px"
+      preventAutoFocus={!!event?.id}
     >
       <form onSubmit={handleSubmit} style={{
-        padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 'clamp(12px, 2vh, 16px)',
-        overflowY: 'auto',
         flex: 1,
         minHeight: 0
       }}>
-        {/* Title */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: colors.textSecondary,
-            marginBottom: '6px'
-          }}>
-            Event Title *
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            placeholder="e.g., Team Meeting, Dentist Appointment"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textPrimary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px'
-            }}
-          />
-        </div>
+        {/* Form Body */}
+        <div style={{
+          padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'clamp(12px, 2vh, 16px)',
+          overflowY: 'auto',
+          flex: 1,
+          minHeight: 0
+        }}>
+          {/* Location */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: colors.textSecondary,
+              marginBottom: '6px'
+            }}>
+              Location *
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              required
+              placeholder="Add location"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
+          </div>
 
-        {/* Start Date & Time */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: colors.textSecondary,
-            marginBottom: '6px'
-          }}>
-            Start Date & Time *
-          </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {/* Date */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: colors.textSecondary,
+              marginBottom: '6px'
+            }}>
+              Date
+            </label>
             <input
               type="date"
               value={formatDateForInput(startDate)}
               onChange={(e) => handleDateChange(e.target.value, true)}
               style={{
-                flex: 1,
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-            <input
-              type="time"
-              value={formatTimeForInput(startDate)}
-              onChange={(e) => handleTimeChange(e.target.value, true)}
-              style={{
-                flex: 1,
+                width: '100%',
                 padding: '10px 12px',
                 fontSize: '14px',
                 background: colors.bgPrimary,
@@ -368,50 +387,50 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
               }}
             />
           </div>
-        </div>
 
-        {/* End Date & Time */}
-        <div>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: colors.textSecondary,
-            marginBottom: '6px'
-          }}>
-            End Date & Time *
-          </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="date"
-              value={formatDateForInput(endDate)}
-              onChange={(e) => handleDateChange(e.target.value, false)}
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-            <input
-              type="time"
-              value={formatTimeForInput(endDate)}
-              onChange={(e) => handleTimeChange(e.target.value, false)}
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
+          {/* Time: Start → End */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: colors.textSecondary,
+              marginBottom: '6px'
+            }}>
+              Time
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="time"
+                value={formatTimeForInput(startDate)}
+                onChange={(e) => handleTimeChange(e.target.value, true)}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  background: colors.bgPrimary,
+                  color: colors.textPrimary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px'
+                }}
+              />
+              <span style={{ color: colors.textSecondary, fontSize: '18px', flexShrink: 0 }}>→</span>
+              <input
+                type="time"
+                value={formatTimeForInput(endDate)}
+                onChange={(e) => handleTimeChange(e.target.value, false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  background: colors.bgPrimary,
+                  color: colors.textPrimary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px'
+                }}
+              />
+            </div>
           </div>
-        </div>
 
         {/* Aspect */}
         <div style={{ position: 'relative' }}>
@@ -450,11 +469,6 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                   background: getCategoryColor(category),
                   flexShrink: 0
                 }} />
-                {categories.find(c => c.name === category)?.icon && (
-                  <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                    {categories.find(c => c.name === category)?.icon}
-                  </span>
-                )}
                 <span>{category}</span>
               </>
             ) : (
@@ -535,9 +549,6 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                     background: cat.color || '#999',
                     flexShrink: 0
                   }} />
-                  {cat.icon && (
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                  )}
                   <span>{cat.name}</span>
                 </div>
               ))}
@@ -708,9 +719,9 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          border: daysOfWeek.includes(day.value) ? 'none' : `1px solid ${colors.border}`,
-                          background: daysOfWeek.includes(day.value) ? colors.accent : 'transparent',
-                          color: daysOfWeek.includes(day.value) ? '#fff' : colors.textSecondary,
+                          border: `1px solid ${daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
+                          background: daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
+                          color: daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
                           fontSize: '12px',
                           fontWeight: '600',
                           cursor: 'pointer'
@@ -830,66 +841,49 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
           </div>
         )}
 
-        {/* Actions */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          marginTop: '8px',
-          justifyContent: event?.id ? 'space-between' : 'flex-end',
-          paddingTop: '16px',
-          borderTop: `1px solid ${colors.border}`
-        }}>
-          {/* Delete button (only for existing events) */}
-          {event?.id && onDelete && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: 'transparent',
-                color: '#ef4444',
-                border: `1px solid #ef4444`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Delete
-            </button>
-          )}
+          {/* Actions */}
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            marginTop: '8px',
+            justifyContent: event?.id ? 'space-between' : 'flex-end',
+            paddingTop: '16px',
+            borderTop: `1px solid ${colors.border}`
+          }}>
+            {/* Delete button (only for existing events) */}
+            {event?.id && onDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={loading}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  background: 'transparent',
+                  color: '#ef4444',
+                  border: `1px solid #ef4444`,
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.5 : 1
+                }}
+              >
+                Delete
+              </button>
+            )}
 
-          <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
             <button
               type="submit"
-              disabled={loading || !title.trim()}
+              disabled={loading || !title.trim() || !location.trim()}
               className="btn btn-primary"
               style={{
                 padding: '10px 20px',
                 fontSize: '14px',
-                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim()) ? 0.5 : 1
+                marginLeft: 'auto',
+                cursor: (loading || !title.trim() || !location.trim()) ? 'not-allowed' : 'pointer',
+                opacity: (loading || !title.trim() || !location.trim()) ? 0.5 : 1
               }}
             >
-              {loading ? 'Saving...' : event?.id ? 'Update Event' : 'Create Event'}
+              {loading ? 'Saving...' : event?.id ? 'Save' : 'Create'}
             </button>
           </div>
         </div>

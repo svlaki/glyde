@@ -10,10 +10,11 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps) {
-  const { user, signOut } = useAuth()
+  const { user, signOut, preferredName } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
   // Don't render on mobile - MobileHeader is used instead
   if (isMobile) {
@@ -23,7 +24,6 @@ export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps)
   const navItems = [
     { label: 'Plan', path: '/plan' },
     { label: 'Aspects', path: '/aspects' },
-    { label: 'Rules', path: '/rules' },
     { label: 'Connections', path: '/connections' },
     { label: 'Profile', path: '/profile' }
   ]
@@ -98,7 +98,7 @@ export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps)
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 15px)' }}>
-        <span style={{ fontSize: 'clamp(11px, 2vw, 13px)', color: colors.textSecondary, display: window.innerWidth < 600 ? 'none' : 'inline' }}>{user?.email}</span>
+        <span style={{ fontSize: 'clamp(11px, 2vw, 13px)', color: colors.textSecondary, display: window.innerWidth < 600 ? 'none' : 'inline' }}>Hello, {displayName}</span>
         <button
           onClick={toggleDarkMode}
           style={{

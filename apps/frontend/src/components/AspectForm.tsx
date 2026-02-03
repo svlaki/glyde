@@ -82,42 +82,36 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
     }
   }
 
+  const nameInput = (
+    <input
+      type="text"
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      required
+      placeholder="Aspect name"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: '20px',
+        fontWeight: '600',
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={aspect ? 'Edit Aspect' : 'Create New Aspect'}
+      headerContent={nameInput}
       maxWidth="500px"
+      preventAutoFocus={!!aspect}
     >
       <form onSubmit={handleSubmit} style={{ padding: '20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Name */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: colors.textSecondary,
-                marginBottom: '6px'
-              }}>
-                Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px'
-                }}
-              />
-            </div>
 
             {/* Description */}
             <div>
@@ -165,9 +159,9 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                     type="button"
                     onClick={() => setColor(presetColor)}
                     style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
+                      width: '16px',
+                      height: '16pxpx',
+                      borderRadius: '4px',
                       background: presetColor,
                       border: color === presetColor ? `3px solid ${colors.textPrimary}` : 'none',
                       cursor: 'pointer',
@@ -193,7 +187,7 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                 color: colors.textSecondary,
                 marginBottom: '6px'
               }}>
-                Context (optional)
+                Optional additional context
               </label>
               <textarea
                 value={context}

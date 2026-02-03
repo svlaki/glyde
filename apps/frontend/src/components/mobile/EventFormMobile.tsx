@@ -54,6 +54,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   const { categories, refreshCategories } = useCategories()
 
   const [title, setTitle] = useState('')
+  const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [startDate, setStartDate] = useState<Date>(new Date())
@@ -83,6 +84,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   useEffect(() => {
     if (event) {
       setTitle(event.title || '')
+      setLocation(event.location || '')
       setDescription(event.description || '')
       setCategory(event.category || '')
 
@@ -94,6 +96,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
       }
     } else {
       setTitle('')
+      setLocation('')
       setDescription('')
       setCategory('')
 
@@ -168,6 +171,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!title.trim()) return
+    if (!location.trim()) return
 
     setLoading(true)
     try {
@@ -198,7 +202,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
           rrule,
           category || 'Personal',
           description.trim() || undefined,
-          undefined,
+          location.trim(),
           endType === 'until' && untilDate ? new Date(untilDate).toISOString() : undefined,
           session?.access_token
         )
@@ -212,6 +216,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
         await onSave({
           ...(createdEvent?.id ? { id: createdEvent.id } : {}),
           title: title.trim(),
+          location: location.trim(),
           description: description.trim() || undefined,
           category: category || undefined,
           start_time: startISO,
@@ -221,6 +226,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
         await onSave({
           ...(event?.id ? { id: event.id } : {}),
           title: title.trim(),
+          location: location.trim(),
           description: description.trim() || undefined,
           category: category || undefined,
           start_time: startISO,
@@ -302,6 +308,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
             }}
           />
           <Dialog.Content
+            onOpenAutoFocus={event?.id ? (e) => e.preventDefault() : undefined}
             style={{
               position: 'fixed',
               top: '50%',
@@ -320,37 +327,30 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
               outline: 'none'
             }}
           >
-            {/* Header */}
+            {/* Header with Title Input */}
             <div style={{
-              padding: '12px 16px',
+              padding: '16px',
               borderBottom: `1px solid ${colors.border}`,
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              flexShrink: 0
             }}>
-              <Dialog.Title style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: colors.textPrimary }}>
-                {event?.id ? 'Edit Event' : 'New Event'}
-              </Dialog.Title>
-              <Dialog.Close asChild>
-                <button
+              <Dialog.Title asChild>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Event title"
                   style={{
+                    width: '100%',
+                    padding: '0',
+                    fontSize: '20px',
+                    fontWeight: '600',
                     background: 'transparent',
                     border: 'none',
-                    fontSize: '24px',
-                    color: colors.textSecondary,
-                    cursor: 'pointer',
-                    padding: '0',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                    outline: 'none',
+                    color: colors.textPrimary
                   }}
-                >
-                  ×
-                </button>
-              </Dialog.Close>
+                />
+              </Dialog.Title>
             </div>
 
             {/* Form */}
@@ -366,7 +366,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                 minHeight: 0
               }}
             >
-              {/* Title */}
+              {/* Location */}
               <div>
                 <label style={{
                   fontSize: '12px',
@@ -375,13 +375,14 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   marginBottom: '4px',
                   display: 'block'
                 }}>
-                  Event Title *
+                  Location *
                 </label>
                 <input
                   type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Add title"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Add location"
+                  required
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -482,7 +483,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                 )}
               </div>
 
-              {/* Category */}
+              {/* Aspect */}
               <div>
                 <label style={{
                   fontSize: '12px',
@@ -491,7 +492,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   marginBottom: '4px',
                   display: 'block'
                 }}>
-                  Aspect/Category
+                  Aspect
                 </label>
                 <div style={{ position: 'relative' }}>
                   <button
@@ -582,7 +583,6 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                             background: cat.color,
                             flexShrink: 0
                           }} />
-                          {cat.icon && <span>{cat.icon}</span>}
                           {cat.name}
                         </div>
                       ))}
@@ -685,12 +685,13 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
 
             {/* Footer with Save Button */}
             <div style={{
-              padding: '16px',
+              padding: '12px 16px',
               borderTop: `1px solid ${colors.border}`,
               background: colors.bgSecondary,
               display: 'flex',
               gap: '12px',
-              flexShrink: 0
+              flexShrink: 0,
+              justifyContent: event?.id ? 'space-between' : 'flex-end'
             }}>
               {event?.id && onDelete && (
                 <button
@@ -698,15 +699,15 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   onClick={handleDelete}
                   disabled={loading}
                   style={{
-                    padding: '14px 16px',
-                    fontSize: '15px',
+                    padding: '10px 14px',
+                    fontSize: '14px',
                     fontWeight: '600',
                     background: 'transparent',
                     color: '#ef4444',
                     border: '1.5px solid #ef4444',
                     borderRadius: '8px',
                     cursor: loading ? 'not-allowed' : 'pointer',
-                    minHeight: '48px',
+                    minHeight: '40px',
                     opacity: loading ? 0.5 : 1
                   }}
                 >
@@ -714,41 +715,20 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                 </button>
               )}
               <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: '14px 16px',
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  border: `1.5px solid ${colors.border}`,
-                  borderRadius: '8px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  minHeight: '48px',
-                  opacity: loading ? 0.5 : 1
-                }}
-              >
-                Cancel
-              </button>
-              <button
                 type="submit"
                 onClick={() => handleSubmit()}
-                disabled={loading || !title.trim()}
+                disabled={loading || !title.trim() || !location.trim()}
                 style={{
-                  flex: 2,
-                  padding: '14px 16px',
-                  fontSize: '15px',
+                  padding: '10px 14px',
+                  fontSize: '14px',
                   fontWeight: '600',
                   background: '#000',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                  minHeight: '48px',
-                  opacity: (loading || !title.trim()) ? 0.5 : 1
+                  cursor: (loading || !title.trim() || !location.trim()) ? 'not-allowed' : 'pointer',
+                  minHeight: '40px',
+                  opacity: (loading || !title.trim() || !location.trim()) ? 0.5 : 1
                 }}
               >
                 {loading ? 'Saving...' : 'Save'}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Modal } from './Modal'
 import { createRecurringEvent } from '../lib/calendarService'
-import { buildRRuleFromForm, RECURRENCE_PRESETS, getNextOccurrences } from '../lib/recurrenceUtils'
+import { buildRRuleFromForm, getNextOccurrences } from '../lib/recurrenceUtils'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
 
@@ -13,7 +13,7 @@ interface CreateRecurringEventModalProps {
   user: User | null
 }
 
-type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom'
+type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: CreateRecurringEventModalProps) {
   const { isDarkMode } = useDarkMode()
@@ -42,16 +42,6 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<Date[]>([])
 
-  const dayOptions = [
-    { label: 'Monday', value: 'MO' },
-    { label: 'Tuesday', value: 'TU' },
-    { label: 'Wednesday', value: 'WE' },
-    { label: 'Thursday', value: 'TH' },
-    { label: 'Friday', value: 'FR' },
-    { label: 'Saturday', value: 'SA' },
-    { label: 'Sunday', value: 'SU' }
-  ]
-
   // Update preview when recurrence changes
   const updatePreview = () => {
     try {
@@ -75,7 +65,6 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
     }
   }
 
-  // Update preview when relevant fields change
   useEffect(() => {
     updatePreview()
   }, [pattern, interval, daysOfWeek, dayOfMonth, endType, count, untilDate, startTime])
@@ -96,7 +85,6 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         return
       }
 
-      // Build RRULE
       const rrule = buildRRuleFromForm({
         pattern,
         interval,
@@ -157,366 +145,439 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Create Recurring Event" maxWidth="700px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* Form content */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {/* Title */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Event Title
-            </label>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create Recurring Event" maxWidth="500px">
+      <form onSubmit={handleSubmit} style={{
+        padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'clamp(12px, 2vh, 16px)',
+        overflowY: 'auto',
+        flex: 1,
+        minHeight: 0
+      }}>
+        {/* Title */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Event Title *
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g., Team Standup"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px'
+            }}
+          />
+        </div>
+
+        {/* Start Date & Time */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Start Date & Time *
+          </label>
+          <input
+            type="datetime-local"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px'
+            }}
+          />
+        </div>
+
+        {/* Recurrence Pattern */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Recurrence Pattern
+          </label>
+          <select
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value as RecurrencePattern)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgSecondary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px'
+            }}
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+
+        {/* Interval */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Repeat Every
+          </label>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Team Standup"
+              type="number"
+              min="1"
+              value={interval}
+              onChange={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
               style={{
-                width: '100%',
-                padding: '10px',
+                width: '60px',
+                padding: '8px',
+                fontSize: '14px',
+                background: colors.bgSecondary,
+                color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                textAlign: 'center'
               }}
             />
+            <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+              {pattern === 'daily' ? 'day(s)' : pattern === 'weekly' ? 'week(s)' : pattern === 'monthly' ? 'month(s)' : 'year(s)'}
+            </span>
           </div>
+        </div>
 
-          {/* Start time */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Start Date & Time
+        {/* Days of Week (for weekly) */}
+        {pattern === 'weekly' && (
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: colors.textSecondary,
+              marginBottom: '6px'
+            }}>
+              Days of Week
             </label>
-            <input
-              type="datetime-local"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Recurrence pattern */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Recurrence Pattern
-            </label>
-            <select
-              value={pattern}
-              onChange={(e) => setPattern(e.target.value as RecurrencePattern)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </div>
-
-          {/* Interval */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Repeat Every
-            </label>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <input
-                type="number"
-                min="1"
-                value={interval}
-                onChange={(e) => setInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                style={{
-                  width: '80px',
-                  padding: '10px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  backgroundColor: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <span style={{ color: colors.textSecondary }}>
-                {pattern === 'daily' ? 'day(s)' : pattern === 'weekly' ? 'week(s)' : pattern === 'monthly' ? 'month(s)' : 'year(s)'}
-              </span>
-            </div>
-          </div>
-
-          {/* Days of week (for weekly) */}
-          {pattern === 'weekly' && (
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-                Days of Week
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px' }}>
-                {dayOptions.map((day) => (
-                  <label key={day.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={daysOfWeek.includes(day.value)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setDaysOfWeek([...daysOfWeek, day.value])
-                        } else {
-                          setDaysOfWeek(daysOfWeek.filter((d) => d !== day.value))
-                        }
-                      }}
-                    />
-                    <span style={{ color: colors.textPrimary, fontSize: '14px' }}>{day.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Day of month (for monthly) */}
-          {pattern === 'monthly' && (
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-                Day of Month
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={dayOfMonth}
-                onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
-                style={{
-                  width: '100px',
-                  padding: '10px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  backgroundColor: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          )}
-
-          {/* End condition */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              End Condition
-            </label>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              {(['never', 'after', 'until'] as const).map((option) => (
-                <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    value={option}
-                    checked={endType === option}
-                    onChange={(e) => setEndType(e.target.value as typeof endType)}
-                  />
-                  <span style={{ color: colors.textPrimary, fontSize: '14px', textTransform: 'capitalize' }}>
-                    {option === 'never' ? 'Never' : option === 'after' ? 'After N occurrences' : 'Until date'}
-                  </span>
-                </label>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Su', value: 'SU' },
+                { label: 'M', value: 'MO' },
+                { label: 'Tu', value: 'TU' },
+                { label: 'W', value: 'WE' },
+                { label: 'Th', value: 'TH' },
+                { label: 'F', value: 'FR' },
+                { label: 'Sa', value: 'SA' }
+              ].map((day) => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => {
+                    if (daysOfWeek.includes(day.value)) {
+                      if (daysOfWeek.length > 1) {
+                        setDaysOfWeek(daysOfWeek.filter(d => d !== day.value))
+                      }
+                    } else {
+                      setDaysOfWeek([...daysOfWeek, day.value])
+                    }
+                  }}
+                  style={{
+                    minWidth: '32px',
+                    height: '32px',
+                    padding: '0 6px',
+                    borderRadius: '16px',
+                    border: `1px solid ${daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
+                    background: daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
+                    color: daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {day.label}
+                </button>
               ))}
             </div>
+          </div>
+        )}
 
-            {endType === 'after' && (
+        {/* Day of Month (for monthly) */}
+        {pattern === 'monthly' && (
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '500',
+              color: colors.textSecondary,
+              marginBottom: '6px'
+            }}>
+              Day of Month
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="31"
+              value={dayOfMonth}
+              onChange={(e) => setDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+              style={{
+                width: '60px',
+                padding: '8px',
+                fontSize: '14px',
+                background: colors.bgSecondary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                textAlign: 'center'
+              }}
+            />
+          </div>
+        )}
+
+        {/* End Condition */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            End Condition
+          </label>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            {(['never', 'after', 'until'] as const).map((option) => (
+              <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  value={option}
+                  checked={endType === option}
+                  onChange={(e) => setEndType(e.target.value as typeof endType)}
+                />
+                <span style={{ color: colors.textSecondary, fontSize: '13px' }}>
+                  {option === 'never' ? 'Never' : option === 'after' ? 'After' : 'Until'}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {endType === 'after' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <input
                 type="number"
                 min="1"
                 value={count}
                 onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
-                placeholder="Number of occurrences"
                 style={{
-                  width: '100%',
-                  padding: '10px',
+                  width: '60px',
+                  padding: '8px',
+                  fontSize: '14px',
+                  background: colors.bgSecondary,
+                  color: colors.textPrimary,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
-                  backgroundColor: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  fontSize: '14px',
-                  boxSizing: 'border-box'
+                  textAlign: 'center'
                 }}
               />
-            )}
-
-            {endType === 'until' && (
-              <input
-                type="date"
-                value={untilDate}
-                onChange={(e) => setUntilDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  backgroundColor: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                  marginTop: '10px'
-                }}
-              />
-            )}
-          </div>
-
-          {/* Category */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Category
-            </label>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g., Work"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Description */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
-              rows={3}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box',
-                fontFamily: 'inherit'
-              }}
-            />
-          </div>
-
-          {/* Location */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: colors.textPrimary, fontWeight: '500' }}>
-              Location
-            </label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Optional location"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: colors.bgPrimary,
-                color: colors.textPrimary,
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Preview */}
-          {preview.length > 0 && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: `${colors.accent}15`,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              marginBottom: '20px'
-            }}>
-              <p style={{ color: colors.textSecondary, fontSize: '12px', margin: '0 0 8px 0' }}>Next occurrences:</p>
-              {preview.map((date, idx) => (
-                <div key={idx} style={{ color: colors.textPrimary, fontSize: '13px', marginBottom: '4px' }}>
-                  • {date.toLocaleString()}
-                </div>
-              ))}
+              <span style={{ fontSize: '13px', color: colors.textSecondary }}>occurrences</span>
             </div>
           )}
 
-          {/* Error message */}
-          {error && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: '#fee',
-              border: '1px solid #fcc',
-              borderRadius: '6px',
-              marginBottom: '20px',
-              color: '#c33',
-              fontSize: '14px'
-            }}>
-              {error}
-            </div>
+          {endType === 'until' && (
+            <input
+              type="date"
+              value={untilDate}
+              onChange={(e) => setUntilDate(e.target.value)}
+              style={{
+                padding: '10px 12px',
+                fontSize: '14px',
+                background: colors.bgPrimary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px'
+              }}
+            />
           )}
         </div>
 
-        {/* Form footer with buttons */}
+        {/* Category */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Category
+          </label>
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g., Work"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px'
+            }}
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional description"
+            rows={2}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        {/* Location */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '13px',
+            fontWeight: '500',
+            color: colors.textSecondary,
+            marginBottom: '6px'
+          }}>
+            Location
+          </label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Optional location"
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textPrimary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px'
+            }}
+          />
+        </div>
+
+        {/* Preview */}
+        {preview.length > 0 && (
+          <div style={{
+            padding: '10px',
+            background: colors.bgSecondary,
+            borderRadius: '6px',
+            fontSize: '12px'
+          }}>
+            <p style={{ color: colors.textSecondary, margin: '0 0 6px 0' }}>Next occurrences:</p>
+            {preview.map((date, idx) => (
+              <div key={idx} style={{ color: colors.textPrimary, marginBottom: '2px' }}>
+                • {date.toLocaleString()}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <div style={{
+            padding: '10px',
+            backgroundColor: '#fee',
+            border: '1px solid #fcc',
+            borderRadius: '6px',
+            color: '#c33',
+            fontSize: '13px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Buttons */}
         <div style={{
-          padding: '20px',
-          borderTop: `1px solid ${colors.border}`,
           display: 'flex',
-          gap: '10px',
-          justifyContent: 'flex-end'
+          gap: '12px',
+          justifyContent: 'flex-end',
+          paddingTop: '8px',
+          borderTop: `1px solid ${colors.border}`
         }}>
           <button
             type="button"
             onClick={handleClose}
             disabled={loading}
             style={{
-              padding: '10px 16px',
+              padding: '10px 20px',
+              fontSize: '14px',
+              background: colors.bgPrimary,
+              color: colors.textSecondary,
               border: `1px solid ${colors.border}`,
               borderRadius: '6px',
-              backgroundColor: 'transparent',
-              color: colors.textPrimary,
               cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1,
-              fontSize: '14px',
-              fontWeight: '500'
+              opacity: loading ? 0.5 : 1
             }}
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !title.trim()}
+            className="btn btn-primary"
             style={{
-              padding: '10px 16px',
-              border: 'none',
-              borderRadius: '6px',
-              backgroundColor: colors.accent,
-              color: 'white',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
+              padding: '10px 20px',
               fontSize: '14px',
-              fontWeight: '500'
+              cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
+              opacity: (loading || !title.trim()) ? 0.5 : 1
             }}
           >
             {loading ? 'Creating...' : 'Create Event'}

@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
 import { PageHeader } from '../components/PageHeader'
 import { Calendar } from '../components/Calendar'
-import { ChatBot } from '../components/ChatBot'
+import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
 import { TodoList } from '../components/TodoList'
 import { GlobalSearch } from '../components/GlobalSearch'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
-import { mobileStyles } from '../styles/mobileStyles'
+import { mobileStyles, mobileSpacing, mobileHeaderStyles } from '../styles/mobileStyles'
 import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
 import { MobileMenu } from '../components/mobile/MobileMenu'
 
@@ -27,6 +27,19 @@ function CalendarPageMobile() {
   const colors = getColors(isDarkMode)
   const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const chatBotRef = useRef<ChatBotHandle>(null)
+  const [chatIsLoading, setChatIsLoading] = useState(false)
+
+  // Poll ChatBot loading state for header display
+  useEffect(() => {
+    if (activeTab !== 'chat') return
+    const interval = setInterval(() => {
+      if (chatBotRef.current) {
+        setChatIsLoading(chatBotRef.current.isLoading)
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }, [activeTab])
 
   const tabs = [
     { id: 'calendar' as const, label: 'Calendar' },
@@ -45,13 +58,13 @@ function CalendarPageMobile() {
     }
   }
 
-  // Reusable header for non-calendar tabs
+  // Reusable header for non-calendar tabs - uses global mobileHeaderStyles
   const renderHeader = () => (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      marginBottom: '16px',
+      gap: mobileHeaderStyles.gap,
+      marginBottom: mobileHeaderStyles.marginBottom,
       flexShrink: 0
     }}>
       <button
@@ -60,11 +73,11 @@ function CalendarPageMobile() {
           background: 'transparent',
           border: 'none',
           color: colors.textPrimary,
-          fontSize: '22px',
-          padding: '4px',
+          fontSize: mobileHeaderStyles.buttonFontSize,
+          padding: mobileHeaderStyles.buttonPadding,
           cursor: 'pointer',
-          minWidth: '32px',
-          minHeight: '32px',
+          minWidth: mobileHeaderStyles.buttonMinSize,
+          minHeight: mobileHeaderStyles.buttonMinSize,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -73,15 +86,62 @@ function CalendarPageMobile() {
         ☰
       </button>
       <h2 style={{
-        fontSize: '22px',
-        fontWeight: '700',
+        fontSize: mobileHeaderStyles.titleFontSize,
+        fontWeight: mobileHeaderStyles.titleFontWeight,
         color: colors.textPrimary,
         margin: 0,
-        letterSpacing: '-0.02em',
-        flex: 1
+        letterSpacing: mobileHeaderStyles.titleLetterSpacing,
+        flex: activeTab === 'chat' ? 0 : 1
       }}>
         {getHeaderTitle()}
       </h2>
+      {/* Chat tab: show status indicator and trash button */}
+      {activeTab === 'chat' && (
+        <>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            flex: 1,
+            marginLeft: '8px',
+          }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: chatIsLoading ? '#fbbf24' : '#4ade80',
+              flexShrink: 0,
+            }} />
+            <span style={{
+              fontSize: '12px',
+              color: colors.textTertiary,
+              fontWeight: '500',
+              lineHeight: 1,
+            }}>
+              {chatIsLoading ? 'Typing...' : 'Online'}
+            </span>
+          </div>
+          <button
+            onClick={() => chatBotRef.current?.clearChat()}
+            title="Clear conversation"
+            style={{
+              padding: '4px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              color: colors.textTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: mobileHeaderStyles.buttonMinSize,
+              minHeight: mobileHeaderStyles.buttonMinSize,
+            }}
+          >
+            <ClearIcon size={14} />
+          </button>
+        </>
+      )}
     </div>
   )
 
@@ -90,39 +150,46 @@ function CalendarPageMobile() {
       {/* Content area - changes based on active tab */}
       <div style={{
         ...mobileStyles.scrollContainer,
-        // Calendar tab: disable outer scroll, let inner calendar scroll
-        // Other tabs: enable outer scroll
-        overflow: activeTab === 'calendar' ? 'hidden' : 'auto',
-        // Calendar tab needs flex container for proper height chain
+        // All tabs: disable outer scroll, let inner components handle scroll
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         background: colors.bgPrimary,
-        paddingLeft: 'clamp(12px, 2.5vw, 16px)',
-        paddingRight: 'clamp(12px, 2.5vw, 16px)',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-        paddingBottom: 'calc(70px + env(safe-area-inset-bottom, 0px))'
+        paddingLeft: mobileSpacing.paddingX,
+        paddingRight: mobileSpacing.paddingX,
+        paddingTop: mobileSpacing.paddingTopSafe,
+        paddingBottom: mobileSpacing.paddingBottomWithTabs
       }}>
         {activeTab === 'calendar' && <CalendarMobileWrapper />}
         {activeTab === 'chat' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            overflow: 'hidden',
+            // Extend chat to the edge of the tab bar
+            marginBottom: `calc(-1 * ${mobileSpacing.paddingBottomWithTabs})`,
+            paddingBottom: mobileSpacing.paddingBottomWithTabs
+          }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
-              <ChatBot />
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
+              <ChatBot ref={chatBotRef} mobileEmbedded hideHeader />
             </div>
           </div>
         )}
         {activeTab === 'todos' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
               <TodoList hideHeader />
             </div>
           </div>
         )}
         {activeTab === 'agents' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
               <AgentInteractions hideHeader />
             </div>
           </div>

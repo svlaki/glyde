@@ -199,10 +199,10 @@ export function RecurringEventView({
               onClick={handleEditClick}
               style={{
                 padding: '10px 16px',
-                border: 'none',
+                border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
-                backgroundColor: colors.accent,
-                color: 'white',
+                backgroundColor: 'transparent',
+                color: colors.textPrimary,
                 cursor: 'pointer',
                 fontSize: '14px',
                 fontWeight: '500'
@@ -261,7 +261,7 @@ export function RecurringEventView({
                 }}
               >
                 <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  📍 This Instance Only
+                  This Instance Only
                 </div>
                 <div style={{ fontSize: '12px', color: colors.textSecondary }}>
                   Affects only this {startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} instance
@@ -294,7 +294,7 @@ export function RecurringEventView({
               }}
             >
               <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                ♻️ Entire Series
+                Entire Series
               </div>
               <div style={{ fontSize: '12px', color: colors.textSecondary }}>
                 Affects all instances of this recurring event

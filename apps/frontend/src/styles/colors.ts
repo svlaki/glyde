@@ -16,6 +16,9 @@ export const colors = {
     textPrimary: '#2c2825',    // Warm charcoal
     textSecondary: '#5e5852',  // Warm medium gray
     textTertiary: '#8f8882',   // Warm light gray
+
+    // Accent
+    accent: '#2c2825',         // Same as textPrimary for consistency
   },
   dark: {
     // Backgrounds - Warmer dark stones
@@ -32,6 +35,9 @@ export const colors = {
     textPrimary: '#f2efe9',    // Warm off-white
     textSecondary: '#beb6b0',  // Warm light gray
     textTertiary: '#8f8882',   // Muted warm gray
+
+    // Accent
+    accent: '#f2efe9',         // Same as textPrimary for consistency
   }
 }
 

@@ -3,10 +3,11 @@ import { PageHeader } from '../components/PageHeader'
 import { ProfileStats } from '../components/ProfileStats'
 import { ProfileSettings } from '../components/ProfileSettings'
 import { GoalsSection } from '../components/GoalsSection'
+import { RulesSection } from '../components/RulesSection'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
-import { mobileStyles } from '../styles/mobileStyles'
+import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
 
 export function ProfilePage() {
   const { isMobile } = usePlatform()
@@ -29,9 +30,10 @@ function ProfilePageMobile() {
       <div style={{
         ...mobileStyles.scrollContainer,
         background: colors.bgPrimary,
-        padding: '20px',
-        paddingTop: '16px',
-        paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
+        paddingLeft: mobileSpacing.paddingX,
+        paddingRight: mobileSpacing.paddingX,
+        paddingTop: mobileSpacing.paddingTop,
+        paddingBottom: mobileSpacing.paddingBottomNoTabs
       }}>
         <div style={{
           display: 'flex',
@@ -40,6 +42,7 @@ function ProfilePageMobile() {
         }}>
           <ProfileStats />
           <GoalsSection />
+          <RulesSection />
           <ProfileSettings />
         </div>
       </div>
@@ -78,6 +81,9 @@ function ProfilePageDesktop() {
 
           {/* Goals Section */}
           <GoalsSection />
+
+          {/* Rules Section */}
+          <RulesSection />
 
           {/* Settings Section */}
           <ProfileSettings />

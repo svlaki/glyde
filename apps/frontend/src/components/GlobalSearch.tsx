@@ -180,7 +180,7 @@ export function GlobalSearch({
           e.currentTarget.style.borderColor = colors.border
         }}
       >
-        <span style={{ fontSize: '14px' }}>🔍</span>
+        <span style={{ fontSize: '14px' }}></span>
         <span>Search...</span>
         <span style={{
           padding: '2px 6px',

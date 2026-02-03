@@ -9,9 +9,10 @@ interface MobileMenuProps {
 }
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
-  const { signOut } = useAuth()
+  const { signOut, preferredName, user } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
   const handleSignOut = () => {
     onClose()
@@ -77,6 +78,13 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             }}>
               Glyde
             </Drawer.Title>
+            <p style={{
+              fontSize: '14px',
+              color: colors.textSecondary,
+              margin: '8px 0 0 0'
+            }}>
+              Hello, {displayName}
+            </p>
           </div>
 
           {/* Menu items */}
@@ -84,11 +92,14 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             <a href="/calendar" onClick={onClose} style={getActiveStyle('/calendar')}>
               Calendar
             </a>
+            <a href="/plan" onClick={onClose} style={getActiveStyle('/plan')}>
+              Plan
+            </a>
             <a href="/aspects" onClick={onClose} style={getActiveStyle('/aspects')}>
               Aspects
             </a>
-            <a href="/rules" onClick={onClose} style={getActiveStyle('/rules')}>
-              Rules
+            <a href="/connections" onClick={onClose} style={getActiveStyle('/connections')}>
+              Connections
             </a>
             <a href="/profile" onClick={onClose} style={getActiveStyle('/profile')}>
               Profile

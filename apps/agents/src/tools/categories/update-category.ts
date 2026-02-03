@@ -3,7 +3,7 @@ import { z } from "zod";
 import CategoryService from "../../services/CategoryService.js";
 
 export const updateCategoryTool = tool(
-  async ({ name, newName, color, icon, description, context }, config) => {
+  async ({ name, newName, color, description, context }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "❌ User ID required";
@@ -20,7 +20,6 @@ export const updateCategoryTool = tool(
       const updates: any = {};
       if (newName) updates.name = newName;
       if (color) updates.color = color;
-      if (icon !== undefined) updates.icon = icon;
       if (description !== undefined) updates.description = description;
       if (context !== undefined) updates.context = context;
 
@@ -38,12 +37,11 @@ export const updateCategoryTool = tool(
   },
   {
     name: "update_category",
-    description: "Update an existing category's properties. Use this to change category colors, icons, descriptions, or AI context based on user preferences or learned patterns.",
+    description: "Update an existing category's properties. Use this to change category colors, descriptions, or AI context based on user preferences or learned patterns.",
     schema: z.object({
       name: z.string().describe("Current category name to update"),
       newName: z.string().optional().nullable().describe("New name for the category"),
       color: z.string().optional().nullable().describe("New hex color code"),
-      icon: z.string().optional().nullable().describe("New emoji icon"),
       description: z.string().optional().nullable().describe("New description"),
       context: z.record(z.any()).optional().nullable().describe("Updated AI context object"),
     }),

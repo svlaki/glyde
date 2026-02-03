@@ -137,7 +137,21 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       flexDirection: 'column',
       gap: '24px'
     }}>
-      {/* Header */}
+      {/* Aspect Description */}
+        {aspect.description && (
+          <div style={{
+            padding: '12px',
+            background: colors.bgHover,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '6px',
+            fontSize: '13px',
+            color: colors.textPrimary,
+            lineHeight: '1.5'
+          }}>
+            {aspect.description}
+          </div>
+        )}
+      {/* Stats */}
       <div style={{
         paddingBottom: '16px',
         borderBottom: `1px solid ${colors.border}`
@@ -148,16 +162,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
           gap: '12px',
           marginBottom: '12px'
         }}>
-          {aspect.icon && <span style={{ fontSize: '24px' }}>{aspect.icon}</span>}
           <div style={{ flex: 1 }}>
-            <h3 style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: colors.textPrimary,
-              margin: '0 0 4px 0'
-            }}>
-              {aspect.name}
-            </h3>
             <div style={{
               fontSize: '13px',
               color: colors.textSecondary,
@@ -230,20 +235,6 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
           )}
         </div>
 
-        {/* Aspect Description */}
-        {aspect.description && (
-          <div style={{
-            padding: '12px',
-            background: colors.bgHover,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '6px',
-            fontSize: '13px',
-            color: colors.textPrimary,
-            lineHeight: '1.5'
-          }}>
-            {aspect.description}
-          </div>
-        )}
       </div>
 
       {/* No items message */}

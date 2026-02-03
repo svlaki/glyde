@@ -38,9 +38,6 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-        {aspect.icon && (
-          <span style={{ fontSize: '20px' }}>{aspect.icon}</span>
-        )}
         <div style={{ flex: 1 }}>
           <div style={{
             fontSize: '14px',

@@ -11,7 +11,6 @@ import { Auth } from './src/components/Auth'
 import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
 import { AspectsPage } from './src/pages/AspectsPage'
-import { RulesPage } from './src/pages/RulesPage'
 import { ConnectionsPage } from './src/pages/ConnectionsPage'
 import { PlanPage } from './src/pages/PlanPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
@@ -69,13 +68,7 @@ function App() {
                 />
                 <Route
                   path="/rules"
-                  element={
-                    <ProtectedRoute>
-                      <OnboardingCheck>
-                        <RulesPage />
-                      </OnboardingCheck>
-                    </ProtectedRoute>
-                  }
+                  element={<Navigate to="/profile" replace />}
                 />
                 <Route
                   path="/connections"

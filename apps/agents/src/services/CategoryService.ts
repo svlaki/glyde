@@ -6,7 +6,6 @@ export interface Category {
   user_id: string;
   name: string;
   color: string;
-  icon?: string;
   description?: string;
   context: CategoryContext;
   display_order: number;
@@ -26,7 +25,6 @@ export interface CategoryContext {
 export interface CategoryCreateInput {
   name: string;
   color: string;
-  icon?: string;
   description?: string;
   context?: Partial<CategoryContext>;
 }
@@ -135,7 +133,6 @@ export class CategoryService {
           user_id: userId,
           name: input.name.trim(),
           color: input.color.trim(),
-          icon: input.icon?.trim(),
           description: input.description?.trim(),
           context: input.context || {},
         })
@@ -183,7 +180,6 @@ export class CategoryService {
           user_id: userId,
           name: input.name.trim(),
           color: input.color.trim(),
-          icon: input.icon?.trim(),
           description: input.description?.trim(),
           context: input.context || {},
         }, {
@@ -241,7 +237,6 @@ export class CategoryService {
       const updateData: any = {};
       if (updates.name !== undefined) updateData.name = updates.name.trim();
       if (updates.color !== undefined) updateData.color = updates.color.trim();
-      if (updates.icon !== undefined) updateData.icon = updates.icon?.trim();
       if (updates.description !== undefined) updateData.description = updates.description?.trim();
       if (updates.context !== undefined) updateData.context = updates.context;
 

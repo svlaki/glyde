@@ -211,11 +211,32 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     setMilestones(milestones.filter((_, i) => i !== index))
   }
 
+  const titleInput = (
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      required
+      placeholder="Goal title"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: '20px',
+        fontWeight: '600',
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={goal ? 'Edit Goal' : 'Create New Goal'}
+      headerContent={titleInput}
+      preventAutoFocus={!!goal}
     >
       <form onSubmit={handleSubmit} style={{
         padding: '20px',
@@ -223,34 +244,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         flexDirection: 'column',
         gap: '16px'
       }}>
-          {/* Title */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Goal Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="e.g., Learn to play piano, Get in shape, Start a business"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-          </div>
 
           {/* Aspect */}
           <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -292,7 +285,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                           background: getCategoryColor(category),
                           flexShrink: 0
                         }} />
-                        {cat.icon && <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>}
                         <span>{category}</span>
                       </>
                     ) : (
@@ -379,9 +371,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       background: getCategoryColor(cat.name),
                       flexShrink: 0
                     }} />
-                    {cat.icon && (
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                    )}
                     <span>{cat.name}</span>
                   </div>
                 ))}
