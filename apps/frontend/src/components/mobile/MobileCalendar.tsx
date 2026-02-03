@@ -614,18 +614,31 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     return `${displayHour} ${ampm}`
   }
 
-  const handleUpdateEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
+  const handleUpdateEvent = async (eventId: string, updates: Partial<CalendarEvent>, optimistic = false) => {
     if (!user || !session) return
+
+    // Optimistic update: apply changes immediately to prevent visual snap-back
+    if (optimistic) {
+      setEvents(prevEvents =>
+        prevEvents.map(e => (e.id === eventId ? { ...e, ...updates } : e))
+      )
+    }
 
     try {
       const { event: updatedEvent } = await updateEvent(user, eventId, updates, session.access_token)
-      if (updatedEvent) {
+      // Only update state from server response if not already optimistically updated
+      if (updatedEvent && !optimistic) {
         setEvents(prevEvents =>
           prevEvents.map(e => (e.id === eventId ? { ...e, ...updates } : e))
         )
       }
     } catch (error) {
       console.error('Error updating event:', error)
+      // Rollback optimistic update on error by reloading events
+      if (optimistic) {
+        const { events: userEvents } = await fetchExpandedEvents(user, session.access_token)
+        setEvents(userEvents || [])
+      }
     }
   }
 
@@ -788,7 +801,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     }
   }
 
-  const handleEventTouchEnd = async () => {
+  const handleEventTouchEnd = () => {
     const touchDuration = Date.now() - touchStartTimeRef.current
 
     if (eventTouchTimer) {
@@ -796,7 +809,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
       setEventTouchTimer(null)
     }
 
-    // If dragging, complete the drag
+    // Capture drag data before resetting state
+    let pendingUpdate: { eventId: string; startTime: string; endTime: string } | null = null
+
+    // If dragging, prepare the update
     if (isDraggingRef.current && draggingEventRef.current) {
       const deltaY = dragCurrentYRef.current - dragStartYRef.current
       const rawDeltaMinutes = deltaY
@@ -827,10 +843,11 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
 
         const newEnd = new Date(newStart.getTime() + duration)
 
-        await handleUpdateEvent(draggingEventRef.current.id, {
-          start_time: newStart.toISOString(),
-          end_time: newEnd.toISOString()
-        })
+        pendingUpdate = {
+          eventId: draggingEventRef.current.id,
+          startTime: newStart.toISOString(),
+          endTime: newEnd.toISOString()
+        }
       }
     } else if (!hasMovedRef.current && touchDuration < 200 && touchedEventRef.current) {
       // Quick tap - open event form
@@ -844,7 +861,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
       }
     }
 
-    // Reset all state
+    // Reset all state IMMEDIATELY (before async update)
     touchedEventRef.current = null
     isInEditModeRef.current = false
     isDraggingRef.current = false
@@ -860,6 +877,20 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     targetDayIndexRef.current = null
     sourceDayIndexRef.current = null
 
+    // Reset scroll gesture state to ensure scrolling works after event drag
+    if (scrollGestureRef.current.momentumRafId) {
+      cancelAnimationFrame(scrollGestureRef.current.momentumRafId)
+      scrollGestureRef.current.momentumRafId = null
+    }
+    if (scrollGestureRef.current.rafId) {
+      cancelAnimationFrame(scrollGestureRef.current.rafId)
+      scrollGestureRef.current.rafId = null
+    }
+    scrollGestureRef.current.phase = 'idle'
+    scrollGestureRef.current.direction = null
+    scrollGestureRef.current.velocityX = 0
+    scrollGestureRef.current.velocityY = 0
+
     setTouchedEvent(null)
     setIsInEditMode(false)
     setIsDragging(false)
@@ -870,6 +901,14 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     setDragCurrentX(0)
     setTargetDayIndex(null)
     setSourceDayIndex(null)
+
+    // Perform the update AFTER state reset with optimistic update to prevent snap-back
+    if (pendingUpdate) {
+      handleUpdateEvent(pendingUpdate.eventId, {
+        start_time: pendingUpdate.startTime,
+        end_time: pendingUpdate.endTime
+      }, true)  // optimistic = true
+    }
   }
 
   return (
