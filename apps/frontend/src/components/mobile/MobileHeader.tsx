@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
+import { mobileHeaderStyles } from '../../styles/mobileStyles'
 import { MobileMenu } from './MobileMenu'
 
 interface MobileHeaderProps {
@@ -18,14 +19,13 @@ export function MobileHeader({ title, onBack, actions, showMenu = false }: Mobil
   return (
     <>
       <header style={{
-        minHeight: '56px',
         background: colors.bgSecondary,
-        borderBottom: `1px solid ${colors.border}`,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
-        paddingTop: 'max(env(safe-area-inset-top), 8px)',
-        paddingBottom: '8px',
+        gap: mobileHeaderStyles.gap,
+        padding: `0 ${mobileHeaderStyles.paddingX}`,
+        paddingTop: mobileHeaderStyles.paddingTop,
+        paddingBottom: mobileHeaderStyles.paddingBottom,
         flexShrink: 0,
         position: 'sticky',
         top: 0,
@@ -38,12 +38,11 @@ export function MobileHeader({ title, onBack, actions, showMenu = false }: Mobil
               background: 'transparent',
               border: 'none',
               color: colors.textPrimary,
-              fontSize: '24px',
-              padding: '8px',
-              marginRight: '8px',
+              fontSize: mobileHeaderStyles.buttonFontSize,
+              padding: mobileHeaderStyles.buttonPadding,
               cursor: 'pointer',
-              minWidth: '44px',
-              minHeight: '44px',
+              minWidth: mobileHeaderStyles.buttonMinSize,
+              minHeight: mobileHeaderStyles.buttonMinSize,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -59,12 +58,11 @@ export function MobileHeader({ title, onBack, actions, showMenu = false }: Mobil
               background: 'transparent',
               border: 'none',
               color: colors.textPrimary,
-              fontSize: '24px',
-              padding: '8px',
-              marginRight: '8px',
+              fontSize: mobileHeaderStyles.buttonFontSize,
+              padding: mobileHeaderStyles.buttonPadding,
               cursor: 'pointer',
-              minWidth: '44px',
-              minHeight: '44px',
+              minWidth: mobileHeaderStyles.buttonMinSize,
+              minHeight: mobileHeaderStyles.buttonMinSize,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -75,8 +73,9 @@ export function MobileHeader({ title, onBack, actions, showMenu = false }: Mobil
         )}
         <h1 style={{
           flex: 1,
-          fontSize: '18px',
-          fontWeight: '600',
+          fontSize: mobileHeaderStyles.titleFontSize,
+          fontWeight: mobileHeaderStyles.titleFontWeight,
+          letterSpacing: mobileHeaderStyles.titleLetterSpacing,
           margin: 0,
           color: colors.textPrimary
         }}>

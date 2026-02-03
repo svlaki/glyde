@@ -6,12 +6,14 @@ import { getColors } from '../styles/colors'
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  title: string
+  title?: string
+  headerContent?: ReactNode
   children: ReactNode
   maxWidth?: string
+  preventAutoFocus?: boolean
 }
 
-export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, headerContent, children, maxWidth = '600px', preventAutoFocus = false }: ModalProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 
@@ -27,6 +29,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
           }}
         />
         <Dialog.Content
+          onOpenAutoFocus={preventAutoFocus ? (e) => e.preventDefault() : undefined}
           style={{
             position: 'fixed',
             top: '50%',
@@ -45,42 +48,31 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
           }}
         >
           {/* Header */}
-          <div style={{
-            padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
-            borderBottom: `1px solid ${colors.border}`,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0
-          }}>
-            <Dialog.Title style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: colors.textPrimary,
-              margin: 0
+          {(title || headerContent) && (
+            <div style={{
+              padding: 'clamp(12px, 2.5vh, 16px) clamp(12px, 3vw, 20px)',
+              borderBottom: title ? `1px solid ${colors.border}` : 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0
             }}>
-              {title}
-            </Dialog.Title>
-            <Dialog.Close asChild>
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '24px',
-                  color: colors.textSecondary,
-                  cursor: 'pointer',
-                  padding: '0',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                ×
-              </button>
-            </Dialog.Close>
-          </div>
+              {headerContent ? (
+                <Dialog.Title asChild>
+                  <div style={{ width: '100%' }}>{headerContent}</div>
+                </Dialog.Title>
+              ) : (
+                <Dialog.Title style={{
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: colors.textPrimary,
+                  margin: 0
+                }}>
+                  {title}
+                </Dialog.Title>
+              )}
+            </div>
+          )}
 
           {/* Children (form content) */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>

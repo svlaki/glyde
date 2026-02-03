@@ -1,5 +1,15 @@
 {
   "appId": "com.svlaki.glyde",
   "appName": "Glyde",
-  "webDir": "dist"
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic",
+    "scrollEnabled": false
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "none",
+      "resizeOnFullScreen": false
+    }
+  }
 }

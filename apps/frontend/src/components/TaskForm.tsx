@@ -170,12 +170,33 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     return cat?.color || '#999'
   }
 
+  const titleInput = (
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      required
+      placeholder="Task title"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: '20px',
+        fontWeight: '600',
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={task ? 'Edit Task' : 'Create New Task'}
+      headerContent={titleInput}
       maxWidth="500px"
+      preventAutoFocus={!!task}
     >
       <form onSubmit={handleSubmit} style={{
         padding: '20px',
@@ -183,34 +204,6 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
         flexDirection: 'column',
         gap: '16px'
       }}>
-          {/* Title */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Task Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="e.g., Call dentist, Buy groceries, Submit report"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-          </div>
 
           {/* Aspect */}
           <div style={{ position: 'relative' }}>
