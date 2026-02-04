@@ -1,8 +1,10 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
+import { DesktopMenu } from './DesktopMenu'
 
 interface PageHeaderProps {
   showNav?: boolean
@@ -10,121 +12,137 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps) {
-  const { user, signOut, preferredName } = useAuth()
+  const { preferredName, user } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
   const displayName = preferredName || user?.email?.split('@')[0] || 'there'
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Don't render on mobile - MobileHeader is used instead
   if (isMobile) {
     return null
   }
 
-  const navItems = [
-    { label: 'Plan', path: '/plan' },
-    { label: 'Aspects', path: '/aspects' },
-    { label: 'Connections', path: '/connections' },
-    { label: 'Profile', path: '/profile' }
-  ]
-
   return (
-    <header style={{
-      height: 'clamp(50px, 8vh, 60px)',
-      background: colors.bgSecondary,
-      borderBottom: `1px solid ${colors.border}`,
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 clamp(15px, 4vw, 30px)',
-      flexShrink: 0,
-      justifyContent: 'space-between'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(20px, 5vw, 40px)' }}>
-        <a
-          href="/calendar"
-          className="serif"
-          style={{
-            fontSize: 'clamp(20px, 5vw, 26px)',
-            fontWeight: '700',
-            margin: 0,
-            textDecoration: 'none',
-            color: colors.textPrimary,
-            cursor: 'pointer'
-          }}
-        >
-          Glyde
-        </a>
-        {showNav && (
-          <nav style={{ display: 'flex', gap: 'clamp(4px, 1vw, 8px)' }}>
-            {navItems.map(item => {
-              const isActive = window.location.pathname === item.path
-              return (
-                <a
-                  key={item.path}
-                  href={item.path}
-                  className="serif"
-                  style={{
-                    padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)',
-                    fontSize: 'clamp(14px, 3vw, 16px)',
-                    fontWeight: '500',
-                    color: colors.textPrimary,
-                    textDecoration: 'none',
-                    borderRadius: '6px',
-                    background: isActive ? colors.bgHover : 'transparent',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = colors.bgHover
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.background = 'transparent'
-                    }
-                  }}
-                >
-                  {item.label}
-                </a>
-              )
-            })}
-          </nav>
-        )}
-        {/* Search Component */}
+    <>
+      <header style={{
+        height: '56px',
+        background: colors.bgSecondary,
+        borderBottom: `1px solid ${colors.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 16px',
+        flexShrink: 0,
+        gap: '16px'
+      }}>
+        {/* Left side: Menu button + Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Hamburger menu button */}
+          <button
+            onClick={() => setIsMenuOpen(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: colors.textPrimary,
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.15s'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+            title="Menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+
+          {/* Logo */}
+          <a
+            href="/calendar"
+            className="serif"
+            style={{
+              ...typography.headingLg,
+              fontWeight: 700,
+              textDecoration: 'none',
+              color: colors.textPrimary,
+              cursor: 'pointer'
+            }}
+          >
+            Glyde
+          </a>
+        </div>
+
+        {/* Center: Search Component (if provided) */}
         {searchComponent && (
-          <div style={{ marginLeft: '20px' }}>
+          <div style={{ flex: 1, maxWidth: '400px' }}>
             {searchComponent}
           </div>
         )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 15px)' }}>
-        <span style={{ fontSize: 'clamp(11px, 2vw, 13px)', color: colors.textSecondary, display: window.innerWidth < 600 ? 'none' : 'inline' }}>Hello, {displayName}</span>
-        <button
-          onClick={toggleDarkMode}
-          style={{
-            padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2vw, 12px)',
-            background: colors.bgHover,
-            color: colors.textSecondary,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: 'clamp(12px, 2.5vw, 14px)',
-            transition: 'all 0.2s',
-            minHeight: '36px'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = colors.bgTertiary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = colors.bgHover
-          }}
-        >
-          {isDarkMode ? 'Light' : 'Dark'}
-        </button>
-        <button onClick={signOut} className="btn btn-secondary" style={{ padding: 'clamp(6px, 1.5vw, 8px) clamp(12px, 2.5vw, 16px)', fontSize: 'clamp(12px, 2.5vw, 14px)', minHeight: '36px' }}>
-          Sign Out
-        </button>
-      </div>
-    </header>
+
+        {/* Right side: greeting + dark mode toggle */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{
+            ...typography.bodySm,
+            color: colors.textSecondary
+          }}>
+            Hello, {displayName}
+          </span>
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              background: colors.bgTertiary,
+              color: colors.textSecondary,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = colors.bgHover
+              e.currentTarget.style.color = colors.textPrimary
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = colors.bgTertiary
+              e.currentTarget.style.color = colors.textSecondary
+            }}
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDarkMode ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Desktop Menu Drawer */}
+      <DesktopMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+    </>
   )
 }

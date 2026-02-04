@@ -5,6 +5,8 @@ import { CalendarEvent, updateRecurringEvent } from '../lib/calendarService'
 import { buildRRuleFromForm, parseRRuleToForm, getNextOccurrences } from '../lib/recurrenceUtils'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
+import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 
 interface EditRecurringEventModalProps {
   isOpen: boolean
@@ -198,14 +200,14 @@ export function EditRecurringEventModal({
     borderRadius: '6px',
     backgroundColor: colors.bgPrimary,
     color: colors.textPrimary,
-    fontSize: '14px',
+    fontSize: fontSize.base,
     boxSizing: 'border-box' as const
   }
 
   const labelStyle = {
     display: 'block',
-    fontSize: '13px',
-    fontWeight: '500' as const,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium as const,
     color: colors.textSecondary,
     marginBottom: '6px'
   }
@@ -228,7 +230,7 @@ export function EditRecurringEventModal({
           border: `1px solid ${colors.border}`,
           borderRadius: '6px'
         }}>
-          <p style={{ color: colors.textSecondary, fontSize: '13px', margin: 0 }}>
+          <p style={{ color: colors.textSecondary, fontSize: fontSize.sm, margin: 0 }}>
             Changes will apply to the entire recurring series.
           </p>
         </div>
@@ -308,8 +310,8 @@ export function EditRecurringEventModal({
                       backgroundColor: isSelected ? colors.textPrimary : 'transparent',
                       color: isSelected ? colors.bgPrimary : colors.textSecondary,
                       cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: '500'
+                      fontSize: fontSize.xs,
+                      fontWeight: fontWeight.medium
                     }}
                   >
                     {day.label}
@@ -419,9 +421,9 @@ export function EditRecurringEventModal({
             border: `1px solid ${colors.border}`,
             borderRadius: '6px'
           }}>
-            <p style={{ color: colors.textSecondary, fontSize: '12px', margin: '0 0 8px 0' }}>Next occurrences:</p>
+            <p style={{ color: colors.textSecondary, fontSize: fontSize.xs, margin: '0 0 8px 0' }}>Next occurrences:</p>
             {preview.map((date, idx) => (
-              <div key={idx} style={{ color: colors.textPrimary, fontSize: '13px', marginBottom: '4px' }}>
+              <div key={idx} style={{ color: colors.textPrimary, fontSize: fontSize.sm, marginBottom: '4px' }}>
                 {date.toLocaleString()}
               </div>
             ))}
@@ -444,40 +446,15 @@ export function EditRecurringEventModal({
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px' }}>
-          <button
-            type="button"
+          <CancelTextButton
             onClick={handleClose}
             disabled={loading}
-            style={{
-              padding: '10px 16px',
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              backgroundColor: colors.bgPrimary,
-              color: colors.textPrimary,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1,
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary"
-            style={{
-              padding: '10px 16px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-              fontSize: '14px',
-              fontWeight: '500'
-            }}
-          >
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
+          />
+          <SaveTextButton
+            onClick={(e) => handleSubmit(e)}
+            disabled={!title.trim()}
+            loading={loading}
+          />
         </div>
       </form>
     </Modal>

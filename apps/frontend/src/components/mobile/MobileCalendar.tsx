@@ -5,6 +5,7 @@ import { useDarkMode } from '../../lib/darkModeContext'
 import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent } from '../../lib/calendarService'
 import { supabase } from '../../lib/supabase'
 import { getColors, hexToRgba } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
 import { EventForm } from '../EventForm'
 import { EventFormMobile } from './EventFormMobile'
 import { RecurringEventView } from '../RecurringEventView'
@@ -43,6 +44,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -926,10 +928,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               <div key={index} style={{
                 padding: '4px 2px',
                 textAlign: 'center',
-                fontSize: '10px',
-                fontWeight: '500',
-                color: colors.textTertiary,
-                textTransform: 'uppercase'
+                ...typography.labelSm,
+                color: colors.textTertiary
               }}>
                 {day}
               </div>
@@ -968,8 +968,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   }}
                 >
                   <div style={{
-                    fontSize: '12px',
-                    fontWeight: isToday ? '600' : '400',
+                    ...typography.bodySm,
+                    fontWeight: isToday ? 600 : 400,
                     color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : 'inherit',
                     background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : 'transparent',
                     width: '22px',
@@ -1011,13 +1011,14 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                             borderLeft: `2px solid ${eventColor}`,
                             color: colors.textPrimary,
                             fontSize: '9px',
+                            fontFamily: typography.bodySm.fontFamily,
                             padding: '2px 3px',
                             borderRadius: '2px',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
-                            fontWeight: '500'
+                            fontWeight: 500
                           }}
                         >
                           {event.title}
@@ -1028,9 +1029,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     {dayEvents.length > 2 && (
                       <div style={{
                         fontSize: '8px',
+                        fontFamily: typography.bodySm.fontFamily,
                         color: colors.textSecondary,
                         padding: '1px 3px',
-                        fontWeight: '500'
+                        fontWeight: 500
                       }}>
                         +{dayEvents.length - 2} more
                       </div>
@@ -1076,8 +1078,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '12px',
-                  fontWeight: '400',
+                  ...typography.bodySm,
+                  fontWeight: 400,
                   color: colors.textTertiary,
                   background: colors.bgPrimary,
                   zIndex: 30,
@@ -1102,6 +1104,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         right: 0,
                         transform: 'translateY(-50%)',
                         fontSize: '9px',
+                        fontFamily: typography.bodySm.fontFamily,
                         color: colors.textTertiary,
                         background: colors.bgPrimary,
                         textAlign: 'center',
@@ -1123,8 +1126,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   }}>
                     <span style={{
                       fontSize: '9px',
-                      fontWeight: '600',
-                      color: '#ef4444',
+                      fontFamily: typography.bodySm.fontFamily,
+                      fontWeight: 600,
+                      color: colors.error,
                       background: colors.bgPrimary,
                       whiteSpace: 'nowrap'
                     }}>
@@ -1159,9 +1163,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '5px',
-                      fontSize: '12px',
-                      fontWeight: '400',
-                      color: todayDate ? '#ef4444' : colors.textPrimary,
+                      ...typography.bodySm,
+                      fontWeight: 400,
+                      color: todayDate ? colors.error : colors.textPrimary,
                       background: colors.bgPrimary,
                       zIndex: 10,
                       borderBottom: `1px solid ${colors.border}`
@@ -1367,8 +1371,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         }}
                       >
                         <div style={{
-                          fontSize: '11px',
-                          fontWeight: '600',
+                          ...typography.labelMd,
+                          fontWeight: 600,
                           color: eventColor,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -1380,6 +1384,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         {duration >= 30 && (
                           <div style={{
                             fontSize: '9px',
+                            fontFamily: typography.bodySm.fontFamily,
                             color: eventColor,
                             opacity: 0.8,
                             marginTop: '1px'
@@ -1422,7 +1427,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   transform: 'translateY(-50%)'
                 }}>
                   <span style={{
-                    fontSize: '11px',
+                    ...typography.labelMd,
                     color: colors.textTertiary,
                     width: '50px',
                     textAlign: 'right',
@@ -1452,7 +1457,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               transform: 'translateY(-50%)'
             }}>
               <span style={{
-                fontSize: '11px',
+                ...typography.labelMd,
                 color: colors.textTertiary,
                 width: '50px',
                 textAlign: 'right',
@@ -1505,10 +1510,11 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                 alignItems: 'center'
               }}>
                 <div style={{
-                  background: '#ef4444',
+                  background: colors.error,
                   color: '#fff',
-                  fontSize: '10px',
-                  fontWeight: '600',
+                  ...typography.labelSm,
+                  textTransform: 'none',
+                  fontWeight: 600,
                   padding: '2px 6px',
                   borderRadius: '4px',
                   marginLeft: '4px',
@@ -1604,8 +1610,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   }}
                 >
                   <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
+                    ...typography.bodySm,
+                    fontWeight: 600,
                     color: eventColor,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -1615,7 +1621,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}>♻️</span>}
                   </div>
                   <div style={{
-                    fontSize: '11px',
+                    ...typography.labelMd,
                     color: eventColor,
                     opacity: 0.8,
                     marginTop: '2px'

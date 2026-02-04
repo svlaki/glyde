@@ -7,6 +7,8 @@ import { fetchUserTasks, Task } from '../lib/taskService'
 import { Category } from '../lib/categoryService'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight, lineHeight } from '../styles/typography'
+import { EditButton, DeleteButton } from './ui/IconButtons'
 
 interface GoalsByAspectProps {
   aspect: Category | null
@@ -95,7 +97,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
         padding: '40px',
         textAlign: 'center',
         color: colors.textSecondary,
-        fontSize: '14px'
+        fontSize: fontSize.base
       }}>
         Loading...
       </div>
@@ -144,9 +146,9 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
             background: colors.bgHover,
             border: `1px solid ${colors.border}`,
             borderRadius: '6px',
-            fontSize: '13px',
+            fontSize: fontSize.sm,
             color: colors.textPrimary,
-            lineHeight: '1.5'
+            lineHeight: lineHeight.normal
           }}>
             {aspect.description}
           </div>
@@ -164,7 +166,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
         }}>
           <div style={{ flex: 1 }}>
             <div style={{
-              fontSize: '13px',
+              fontSize: fontSize.sm,
               color: colors.textSecondary,
               display: 'flex',
               gap: '12px'
@@ -180,56 +182,22 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
           {(onEdit || onDelete) && (
             <div style={{ display: 'flex', gap: '6px' }}>
               {onEdit && (
-                <button
+                <EditButton
                   onClick={(e) => {
                     e.stopPropagation()
                     onEdit()
                   }}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '11px',
-                    background: colors.bgPrimary,
-                    color: colors.textSecondary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = colors.bgTertiary
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = colors.bgPrimary
-                  }}
-                >
-                  Edit
-                </button>
+                  title="Edit aspect"
+                                  />
               )}
               {onDelete && (
-                <button
+                <DeleteButton
                   onClick={(e) => {
                     e.stopPropagation()
                     onDelete()
                   }}
-                  style={{
-                    padding: '4px 10px',
-                    fontSize: '11px',
-                    background: colors.bgPrimary,
-                    color: '#c00',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = isDarkMode ? colors.bgTertiary : '#fee'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = colors.bgPrimary
-                  }}
-                >
-                  Delete
-                </button>
+                  title="Delete aspect"
+                                  />
               )}
             </div>
           )}
@@ -249,8 +217,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       {currentEvents.length > 0 && (
         <div>
           <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '12px',
             textTransform: 'uppercase',
@@ -282,15 +250,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 }}
               >
                 <div style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
+                  fontSize: fontSize.base,
+                  fontWeight: fontWeight.semibold,
                   color: colors.textPrimary,
                   marginBottom: '4px'
                 }}>
                   {event.title}
                 </div>
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: fontSize.xs,
                   color: colors.textSecondary
                 }}>
                   {new Date(event.start_time).toLocaleString('en-US', {
@@ -303,10 +271,10 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 </div>
                 {event.description && (
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
-                    lineHeight: '1.4'
+                    lineHeight: lineHeight.tight
                   }}>
                     {event.description}
                   </div>
@@ -321,8 +289,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       {activeTasks.length > 0 && (
         <div>
           <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '12px',
             textTransform: 'uppercase',
@@ -360,21 +328,21 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                   marginBottom: '4px'
                 }}>
                   <div style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
                     color: colors.textPrimary
                   }}>
                     {task.title}
                   </div>
                   {task.status && (
                     <span style={{
-                      fontSize: '11px',
+                      fontSize: fontSize.xs,
                       padding: '2px 8px',
                       borderRadius: '12px',
                       background: task.status === 'completed' ? '#4ade80' :
                                  task.status === 'in_progress' ? '#fbbf24' : colors.bgTertiary,
                       color: task.status === 'completed' || task.status === 'in_progress' ? '#000' : colors.textSecondary,
-                      fontWeight: '500'
+                      fontWeight: fontWeight.medium
                     }}>
                       {task.status.replace('_', ' ')}
                     </span>
@@ -382,7 +350,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 </div>
                 {task.due_date && (
                   <div style={{
-                    fontSize: '12px',
+                    fontSize: fontSize.xs,
                     color: colors.textSecondary
                   }}>
                     Due: {new Date(task.due_date).toLocaleDateString('en-US', {
@@ -394,10 +362,10 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 )}
                 {task.description && (
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
-                    lineHeight: '1.4'
+                    lineHeight: lineHeight.tight
                   }}>
                     {task.description}
                   </div>
@@ -412,8 +380,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       {goals.length > 0 && (
         <div>
           <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '12px',
             textTransform: 'uppercase',
@@ -445,8 +413,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 }}
               >
                 <div style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
+                  fontSize: fontSize.base,
+                  fontWeight: fontWeight.semibold,
                   color: colors.textPrimary,
                   marginBottom: '4px'
                 }}>
@@ -454,9 +422,9 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 </div>
                 {goal.description && (
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary,
-                    lineHeight: '1.4'
+                    lineHeight: lineHeight.tight
                   }}>
                     {goal.description}
                   </div>
@@ -471,8 +439,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       {completedTasks.length > 0 && (
         <div>
           <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '12px',
             textTransform: 'uppercase',
@@ -510,26 +478,26 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                   marginBottom: '4px'
                 }}>
                   <div style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
                     color: colors.textPrimary
                   }}>
                     {task.title}
                   </div>
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: fontSize.xs,
                     padding: '2px 8px',
                     borderRadius: '12px',
                     background: '#4ade80',
                     color: '#000',
-                    fontWeight: '500'
+                    fontWeight: fontWeight.medium
                   }}>
                     completed
                   </span>
                 </div>
                 {task.due_date && (
                   <div style={{
-                    fontSize: '12px',
+                    fontSize: fontSize.xs,
                     color: colors.textSecondary
                   }}>
                     Due: {new Date(task.due_date).toLocaleDateString('en-US', {
@@ -541,10 +509,10 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 )}
                 {task.description && (
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
-                    lineHeight: '1.4'
+                    lineHeight: lineHeight.tight
                   }}>
                     {task.description}
                   </div>
@@ -559,8 +527,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
       {pastEvents.length > 0 && (
         <div>
           <h4 style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '12px',
             textTransform: 'uppercase',
@@ -592,15 +560,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 }}
               >
                 <div style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
+                  fontSize: fontSize.base,
+                  fontWeight: fontWeight.semibold,
                   color: colors.textPrimary,
                   marginBottom: '4px'
                 }}>
                   {event.title}
                 </div>
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: fontSize.xs,
                   color: colors.textSecondary
                 }}>
                   {new Date(event.start_time).toLocaleString('en-US', {
@@ -613,10 +581,10 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 </div>
                 {event.description && (
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
-                    lineHeight: '1.4'
+                    lineHeight: lineHeight.tight
                   }}>
                     {event.description}
                   </div>

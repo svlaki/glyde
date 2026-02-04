@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { createUserCategory, updateUserCategory, deleteUserCategory, Category } from '../lib/categoryService'
-import { PageHeader } from '../components/PageHeader'
 import { AspectCard } from '../components/AspectCard'
 import { AspectForm } from '../components/AspectForm'
 import { GoalsByAspect } from '../components/GoalsByAspect'
 import { EmptyState } from '../components/EmptyState'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
 import { mobileStyles } from '../styles/mobileStyles'
@@ -196,10 +197,18 @@ function AspectsPageDesktop() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
   const { categories, loading, error, refreshCategories } = useCategories()
   const [selectedAspect, setSelectedAspect] = useState<Category | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingAspect, setEditingAspect] = useState<Category | undefined>(undefined)
+
+  // Auto-select first aspect when categories load
+  useEffect(() => {
+    if (!selectedAspect && categories.length > 0) {
+      setSelectedAspect(categories[0])
+    }
+  }, [categories, selectedAspect])
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
@@ -250,44 +259,43 @@ function AspectsPageDesktop() {
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
-      background: colors.bgSecondary
+      background: colors.bgPrimary
     }}>
-      {/* Header */}
-      <PageHeader />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
 
-      {/* Main Content */}
+      {/* Main Content - offset by sidebar width */}
       <div style={{
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
-        minHeight: 0
+        minHeight: 0,
+        marginLeft: `${SIDEBAR_WIDTH}px`,
       }}>
         {/* Left Sidebar - Aspects List */}
         <div style={{
           width: '350px',
           borderRight: `1px solid ${colors.border}`,
-          background: colors.bgSecondary,
+          background: colors.bgPrimary,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Sidebar Header */}
+          {/* Sidebar Header - Mobile-style */}
           <div style={{
-            padding: '20px',
+            padding: '16px 20px',
             borderBottom: `1px solid ${colors.border}`,
-            background: colors.bgSecondary
+            background: colors.bgPrimary
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '8px'
+              alignItems: 'center'
             }}>
               <h2 style={{
-                fontSize: '18px',
-                fontWeight: '600',
+                ...typography.headingLg,
+                fontWeight: 600,
                 color: colors.textPrimary,
                 margin: 0
               }}>
@@ -295,13 +303,27 @@ function AspectsPageDesktop() {
               </h2>
               <button
                 onClick={handleCreateAspect}
-                className="btn btn-primary"
                 style={{
-                  padding: '8px 16px',
-                  fontSize: '13px'
+                  padding: '8px 14px',
+                  ...typography.labelLg,
+                  fontWeight: 500,
+                  background: colors.bgTertiary,
+                  color: colors.textSecondary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                  e.currentTarget.style.color = colors.textPrimary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = colors.bgTertiary
+                  e.currentTarget.style.color = colors.textSecondary
                 }}
               >
-                +
+                + New
               </button>
             </div>
           </div>

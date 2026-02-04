@@ -1,4 +1,5 @@
 import { useDarkMode } from '../lib/darkModeContext'
+import { fontSize, fontWeight } from '../styles/typography'
 
 interface EmptyStateProps {
   title: string
@@ -32,8 +33,8 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
         </div>
       )}
       <h3 style={{
-        fontSize: '16px',
-        fontWeight: '600',
+        fontSize: fontSize.lg,
+        fontWeight: fontWeight.semibold,
         color: isDarkMode ? '#999' : '#666',
         margin: '0 0 8px 0'
       }}>
@@ -41,7 +42,7 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
       </h3>
       {description && (
         <p style={{
-          fontSize: '14px',
+          fontSize: fontSize.base,
           color: isDarkMode ? '#666' : '#999',
           margin: '0 0 24px 0',
           maxWidth: '400px'
@@ -55,7 +56,7 @@ export function EmptyState({ title, description, icon, action }: EmptyStateProps
           className="btn btn-primary"
           style={{
             padding: '10px 20px',
-            fontSize: '14px'
+            fontSize: fontSize.base
           }}
         >
           {action.label}

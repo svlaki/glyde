@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
 import { Rule } from '../lib/ruleService'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
+import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 
 interface RuleFormProps {
   rule?: Rule
@@ -66,8 +68,8 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -82,7 +84,7 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -91,7 +93,7 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
             }}
           />
           <p style={{
-            fontSize: '12px',
+            fontSize: fontSize.xs,
             color: colors.textSecondary,
             marginTop: '4px'
           }}>
@@ -103,8 +105,8 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -115,7 +117,7 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
             alignItems: 'center',
             gap: '12px'
           }}>
-            <span style={{ fontSize: '12px', color: colors.textSecondary }}>Low</span>
+            <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>Low</span>
             <input
               type="range"
               min="1"
@@ -127,10 +129,10 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
                 accentColor: colors.textPrimary
               }}
             />
-            <span style={{ fontSize: '12px', color: colors.textSecondary }}>High</span>
+            <span style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>High</span>
           </div>
           <p style={{
-            fontSize: '12px',
+            fontSize: fontSize.xs,
             color: colors.textSecondary,
             marginTop: '4px'
           }}>
@@ -142,8 +144,8 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -157,7 +159,7 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -176,36 +178,16 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
           paddingTop: '16px',
           borderTop: `1px solid ${colors.border}`
         }}>
-          <button
-            type="button"
+          <CancelTextButton
             onClick={onClose}
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading || !ruleText.trim()}
-            className="btn btn-primary"
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              cursor: (loading || !ruleText.trim()) ? 'not-allowed' : 'pointer',
-              opacity: (loading || !ruleText.trim()) ? 0.5 : 1
-            }}
-          >
-            {loading ? 'Saving...' : rule ? 'Update Rule' : 'Create Rule'}
-          </button>
+          />
+          <SaveTextButton
+            onClick={(e) => handleSubmit(e)}
+            disabled={!ruleText.trim()}
+            loading={loading}
+            isCreate={!rule}
+          />
         </div>
       </form>
     </Modal>

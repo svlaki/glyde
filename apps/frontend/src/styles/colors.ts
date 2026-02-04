@@ -19,6 +19,14 @@ export const colors = {
 
     // Accent
     accent: '#2c2825',         // Same as textPrimary for consistency
+
+    // Semantic colors - Form states
+    error: '#ef4444',          // Red for errors
+    errorLight: '#fef2f2',     // Light red background
+    success: '#22c55e',        // Green for success
+    successLight: '#f0fdf4',   // Light green background
+    warning: '#f59e0b',        // Amber for warnings
+    warningLight: '#fffbeb',   // Light amber background
   },
   dark: {
     // Backgrounds - Warmer dark stones
@@ -38,6 +46,14 @@ export const colors = {
 
     // Accent
     accent: '#f2efe9',         // Same as textPrimary for consistency
+
+    // Semantic colors - Form states
+    error: '#f87171',          // Lighter red for dark mode
+    errorLight: '#450a0a',     // Dark red background
+    success: '#4ade80',        // Lighter green for dark mode
+    successLight: '#052e16',   // Dark green background
+    warning: '#fbbf24',        // Lighter amber for dark mode
+    warningLight: '#451a03',   // Dark amber background
   }
 }
 

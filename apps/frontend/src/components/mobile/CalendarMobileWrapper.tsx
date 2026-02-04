@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
 import { mobileHeaderStyles } from '../../styles/mobileStyles'
 import { MobileCalendar } from './MobileCalendar'
 import { MobileMenu } from './MobileMenu'
@@ -8,6 +9,7 @@ import { MobileMenu } from './MobileMenu'
 export function CalendarMobileWrapper() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
   const [currentDate, setCurrentDate] = useState(new Date())
   const [displayDate, setDisplayDate] = useState(new Date())  // For header display during scroll
   const [view, setView] = useState<'day' | '3day' | 'month'>('3day')
@@ -93,8 +95,7 @@ export function CalendarMobileWrapper() {
     padding: '4px 10px',
     border: 'none',
     borderRadius: '4px',
-    fontSize: '11px',
-    fontWeight: '500' as const,
+    ...typography.labelMd,
     cursor: 'pointer',
     transition: 'all 0.15s',
     minHeight: '28px'
@@ -249,11 +250,11 @@ export function CalendarMobileWrapper() {
         </button>
 
         <h2 style={{
-          fontSize: mobileHeaderStyles.titleFontSize,
-          fontWeight: mobileHeaderStyles.titleFontWeight,
+          ...typography.headingLg,
+          fontWeight: 700,
           color: colors.textPrimary,
           margin: 0,
-          letterSpacing: mobileHeaderStyles.titleLetterSpacing,
+          letterSpacing: '-0.02em',
           flex: 1
         }}>
           {getDateHeader()}
@@ -285,7 +286,7 @@ export function CalendarMobileWrapper() {
               ...compactButtonStyle,
               background: view === '3day' ? colors.bgHover : 'transparent',
               color: colors.textPrimary,
-              fontWeight: view === '3day' ? '600' : '400'
+              fontWeight: view === '3day' ? 600 : 400
             }}
           >
             Day
@@ -296,7 +297,7 @@ export function CalendarMobileWrapper() {
               ...compactButtonStyle,
               background: view === 'month' ? colors.bgHover : 'transparent',
               color: colors.textPrimary,
-              fontWeight: view === 'month' ? '600' : '400'
+              fontWeight: view === 'month' ? 600 : 400
             }}
           >
             Month

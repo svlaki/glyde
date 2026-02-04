@@ -4,6 +4,7 @@ import { useDarkMode } from '../lib/darkModeContext'
 import { useAuth } from '../lib/authContext'
 import { useCategories } from '../lib/categoryContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Goal, updateUserGoal } from '../lib/goalService'
 import { DndProvider, useDrag, useDrop } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
@@ -87,15 +88,15 @@ function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemPro
           pointerEvents: 'none'
         }}>
           <div style={{
-            fontSize: '12px',
-            fontWeight: '500',
+            fontSize: fontSize.xs,
+            fontWeight: fontWeight.medium,
             color: colors.textPrimary
           }}>
             {item.title}
           </div>
           {item.date && (
             <div style={{
-              fontSize: '11px',
+              fontSize: fontSize.xs,
               color: colors.textSecondary,
               marginTop: '2px'
             }}>
@@ -128,7 +129,7 @@ function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemPro
         cursor: 'default'
       }}>
         <div style={{
-          fontSize: '10px',
+          fontSize: fontSize.xs,
           color: colors.textSecondary,
           maxWidth: '80px',
           overflow: 'hidden',
@@ -199,15 +200,15 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
           pointerEvents: 'none'
         }}>
           <div style={{
-            fontSize: '12px',
-            fontWeight: '500',
+            fontSize: fontSize.xs,
+            fontWeight: fontWeight.medium,
             color: colors.textPrimary
           }}>
             {item.title}
           </div>
           {item.date && (
             <div style={{
-              fontSize: '11px',
+              fontSize: fontSize.xs,
               color: colors.textSecondary,
               marginTop: '2px'
             }}>
@@ -240,7 +241,7 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
         cursor: 'default'
       }}>
         <div style={{
-          fontSize: '10px',
+          fontSize: fontSize.xs,
           color: colors.textSecondary,
           maxWidth: '80px',
           overflow: 'hidden',
@@ -463,7 +464,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
         alignItems: 'center',
         justifyContent: 'center',
         color: colors.textSecondary,
-        fontSize: '14px',
+        fontSize: fontSize.base,
         background: bgColor,
         borderRadius: '8px'
       }}>
@@ -548,7 +549,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
             display: 'flex',
             gap: '20px',
             marginTop: '50px',
-            fontSize: '12px',
+            fontSize: fontSize.xs,
             color: colors.textSecondary
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -586,8 +587,8 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
       {!hideTitle && (
         <h3 style={{
           margin: '0 0 16px 0',
-          fontSize: '16px',
-          fontWeight: '600',
+          fontSize: fontSize.lg,
+          fontWeight: fontWeight.semibold,
           color: colors.textPrimary
         }}>
           Timeline
@@ -631,9 +632,9 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
             top: '-16px',
             left: '50%',
             transform: 'translateX(-50%)',
-            fontSize: '10px',
+            fontSize: fontSize.xs,
             color: ACCENT_COLORS.error,
-            fontWeight: '500',
+            fontWeight: fontWeight.medium,
             whiteSpace: 'nowrap'
           }}>
             Today
@@ -649,7 +650,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
               left: `${marker.position}%`,
               top: '10px',
               transform: 'translateX(-50%)',
-              fontSize: '10px',
+              fontSize: fontSize.xs,
               color: colors.textTertiary
             }}
           >
@@ -677,7 +678,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
         display: 'flex',
         gap: '20px',
         marginTop: '60px',
-        fontSize: '12px',
+        fontSize: fontSize.xs,
         color: colors.textSecondary
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

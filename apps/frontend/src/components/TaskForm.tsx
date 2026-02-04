@@ -7,9 +7,11 @@ import { useAuth } from '../lib/authContext'
 import { Task } from '../lib/taskService'
 import { AspectForm } from './AspectForm'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
 import { usePlatform } from '../hooks/usePlatform'
+import { SaveTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -180,8 +182,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
       style={{
         width: '100%',
         padding: '0',
-        fontSize: '20px',
-        fontWeight: '600',
+        fontSize: fontSize.xl,
+        fontWeight: fontWeight.semibold,
         background: 'transparent',
         color: colors.textPrimary,
         border: 'none',
@@ -209,8 +211,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
           <div style={{ position: 'relative' }}>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -221,7 +223,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -277,7 +279,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     padding: '10px 14px',
                     cursor: 'pointer',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: colors.textSecondary,
                     transition: 'background 0.15s ease'
                   }}
@@ -303,7 +305,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       color: colors.textPrimary,
                       transition: 'background 0.15s ease',
                       borderTop: `1px solid ${colors.borderLight}`
@@ -337,9 +339,9 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: isDarkMode ? '#f0f0f0' : '#000',
-                    fontWeight: '500',
+                    fontWeight: fontWeight.medium,
                     transition: 'background 0.15s ease',
                     borderTop: `2px solid ${colors.border}`
                   }}
@@ -361,8 +363,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -374,7 +376,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -417,7 +419,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   }}
                   style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
                 />
-                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Set due date</span>
+                <span style={{ fontSize: fontSize.base, color: colors.textPrimary }}>Set due date</span>
               </label>
             </div>
 
@@ -429,7 +431,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -458,7 +460,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -469,7 +471,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: showTimePicker ? colors.bgHover : colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -496,7 +498,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -579,8 +581,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -594,7 +596,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -613,36 +615,11 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !title.trim()}
-              className="btn btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
-            </button>
+            <SaveTextButton
+              onClick={(e) => handleSubmit(e)}
+              disabled={!title.trim()}
+              loading={loading}
+            />
           </div>
         </form>
 

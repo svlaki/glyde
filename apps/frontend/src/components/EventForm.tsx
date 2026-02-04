@@ -7,7 +7,9 @@ import { CalendarEvent, createRecurringEvent } from '../lib/calendarService'
 import { buildRRuleFromForm, getNextOccurrences } from '../lib/recurrenceUtils'
 import { AspectForm } from './AspectForm'
 import { getColors } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { Modal } from './Modal'
+import { DeleteButton, SaveTextButton } from './ui/IconButtons'
 
 interface EventFormProps {
   event?: CalendarEvent | null
@@ -21,6 +23,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
   const { categories, refreshCategories } = useCategories()
 
   const [title, setTitle] = useState('')
@@ -107,15 +110,28 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
         setRecurrencePreview([])
         return
       }
-      const rrule = buildRRuleFromForm({
+      const rruleParams: {
+        pattern: typeof recurrencePattern
+        interval: number
+        daysOfWeek: string[]
+        dayOfMonth: number
+        endType: typeof endType
+        count?: number
+        untilDate?: Date
+      } = {
         pattern: recurrencePattern,
         interval,
         daysOfWeek: recurrencePattern === 'weekly' ? daysOfWeek : [],
         dayOfMonth: recurrencePattern === 'monthly' ? dayOfMonth : 1,
-        endType,
-        count: endType === 'after' ? count : undefined,
-        untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
-      })
+        endType
+      }
+      if (endType === 'after' && count !== undefined) {
+        rruleParams.count = count
+      }
+      if (endType === 'until' && untilDate) {
+        rruleParams.untilDate = new Date(untilDate)
+      }
+      const rrule = buildRRuleFromForm(rruleParams)
       const occurrences = getNextOccurrences(rrule, startDate, 3)
       setRecurrencePreview(occurrences)
     } catch (err) {
@@ -126,7 +142,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
   // Helper functions for date/time inputs
   const formatDateForInput = (date: Date): string => {
-    return date.toISOString().split('T')[0]
+    return date.toISOString().split('T')[0] ?? ''
   }
 
   const formatTimeForInput = (date: Date): string => {
@@ -135,7 +151,10 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
   const handleDateChange = (dateStr: string, isStart: boolean) => {
     const currentDate = isStart ? startDate : endDate
-    const [year, month, day] = dateStr.split('-').map(Number)
+    const parts = dateStr.split('-').map(Number)
+    const year = parts[0] ?? 0
+    const month = parts[1] ?? 1
+    const day = parts[2] ?? 1
     const newDate = new Date(currentDate)
     newDate.setFullYear(year, month - 1, day)
 
@@ -153,7 +172,9 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
   const handleTimeChange = (timeStr: string, isStart: boolean) => {
     const currentDate = isStart ? startDate : endDate
-    const [hours, minutes] = timeStr.split(':').map(Number)
+    const parts = timeStr.split(':').map(Number)
+    const hours = parts[0] ?? 0
+    const minutes = parts[1] ?? 0
     const newDate = new Date(currentDate)
     newDate.setHours(hours, minutes, 0, 0)
 
@@ -191,15 +212,28 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       // Handle recurring event creation
       if (isRecurring && !event?.id && user) {
         // Build RRULE
-        const rrule = buildRRuleFromForm({
+        const rruleParams2: {
+          pattern: typeof recurrencePattern
+          interval: number
+          daysOfWeek: string[]
+          dayOfMonth: number
+          endType: typeof endType
+          count?: number
+          untilDate?: Date
+        } = {
           pattern: recurrencePattern,
           interval,
           daysOfWeek: recurrencePattern === 'weekly' ? daysOfWeek : [],
           dayOfMonth: recurrencePattern === 'monthly' ? dayOfMonth : 1,
-          endType,
-          count: endType === 'after' ? count : undefined,
-          untilDate: endType === 'until' && untilDate ? new Date(untilDate) : undefined
-        })
+          endType
+        }
+        if (endType === 'after' && count !== undefined) {
+          rruleParams2.count = count
+        }
+        if (endType === 'until' && untilDate) {
+          rruleParams2.untilDate = new Date(untilDate)
+        }
+        const rrule = buildRRuleFromForm(rruleParams2)
 
         const { event: createdEvent, error } = await createRecurringEvent(
           user,
@@ -221,22 +255,22 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
         // Call onSave with the created event to trigger a refresh
         await onSave({
-          id: createdEvent?.id,
+          ...(createdEvent?.id ? { id: createdEvent.id } : {}),
           title: title.trim(),
           location: location.trim(),
-          description: description.trim() || undefined,
-          category: category || undefined,
+          ...(description.trim() ? { description: description.trim() } : {}),
+          ...(category ? { category } : {}),
           start_time: startISO,
           end_time: endISO
         })
       } else {
         // Regular event
         await onSave({
-          id: event?.id,
+          ...(event?.id ? { id: event.id } : {}),
           title: title.trim(),
           location: location.trim(),
-          description: description.trim() || undefined,
-          category: category || undefined,
+          ...(description.trim() ? { description: description.trim() } : {}),
+          ...(category ? { category } : {}),
           start_time: startISO,
           end_time: endISO
         })
@@ -288,6 +322,33 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
     return cat?.color || '#999'
   }
 
+  // Mobile-style label component
+  const FormLabel = ({ children }: { children: React.ReactNode }) => (
+    <label style={{
+      display: 'block',
+      ...typography.labelLg,
+      fontWeight: 500,
+      color: colors.textSecondary,
+      marginBottom: '8px'
+    }}>
+      {children}
+    </label>
+  )
+
+  // Mobile-style input styles
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 14px',
+    fontSize: '16px', // iOS zoom prevention
+    fontFamily: fontFamily.sans,
+    background: colors.bgTertiary,
+    color: colors.textPrimary,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '10px',
+    outline: 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s'
+  }
+
   const titleInput = (
     <input
       type="text"
@@ -298,8 +359,8 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
       style={{
         width: '100%',
         padding: '0',
-        fontSize: '20px',
-        fontWeight: '600',
+        ...typography.headingLg,
+        fontWeight: 600,
         background: 'transparent',
         color: colors.textPrimary,
         border: 'none',
@@ -322,154 +383,84 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
         flex: 1,
         minHeight: 0
       }}>
-        {/* Form Body */}
+        {/* Form Body - Mobile-style spacing */}
         <div style={{
-          padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
+          padding: '16px 20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 'clamp(12px, 2vh, 16px)',
+          gap: '16px',
           overflowY: 'auto',
           flex: 1,
           minHeight: 0
         }}>
           {/* Location */}
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Location *
-            </label>
+            <FormLabel>Location *</FormLabel>
             <input
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               required
               placeholder="Add location"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
+              style={inputStyle}
             />
           </div>
 
           {/* Date */}
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Date
-            </label>
+            <FormLabel>Date</FormLabel>
             <input
               type="date"
               value={formatDateForInput(startDate)}
               onChange={(e) => handleDateChange(e.target.value, true)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
+              style={inputStyle}
             />
           </div>
 
           {/* Time: Start → End */}
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Time
-            </label>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <FormLabel>Time</FormLabel>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <input
                 type="time"
                 value={formatTimeForInput(startDate)}
                 onChange={(e) => handleTimeChange(e.target.value, true)}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px'
-                }}
+                style={{ ...inputStyle, flex: 1 }}
               />
-              <span style={{ color: colors.textSecondary, fontSize: '18px', flexShrink: 0 }}>→</span>
+              <span style={{ color: colors.textTertiary, fontSize: fontSize.base, flexShrink: 0 }}>to</span>
               <input
                 type="time"
                 value={formatTimeForInput(endDate)}
                 onChange={(e) => handleTimeChange(e.target.value, false)}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  background: colors.bgPrimary,
-                  color: colors.textPrimary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px'
-                }}
+                style={{ ...inputStyle, flex: 1 }}
               />
             </div>
           </div>
 
         {/* Aspect */}
         <div style={{ position: 'relative' }}>
-          <label style={{
-            display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
-            color: colors.textSecondary,
-            marginBottom: '6px'
-          }}>
-            Aspect
-          </label>
+          <FormLabel>Aspect</FormLabel>
           <div
             onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
             style={{
-              width: '100%',
-              padding: '10px 12px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textPrimary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
+              ...inputStyle,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              minHeight: '42px'
+              gap: '10px',
+              minHeight: '48px'
             }}
           >
             {category ? (
               <>
                 <div style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '10px',
+                  height: '10px',
                   borderRadius: '50%',
                   background: getCategoryColor(category),
                   flexShrink: 0
                 }} />
-                <span>{category}</span>
+                <span style={{ ...typography.bodyMd }}>{category}</span>
               </>
             ) : (
               <span style={{ color: colors.textSecondary }}>Select aspect...</span>
@@ -504,7 +495,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                 style={{
                   padding: '10px 14px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: fontSize.base,
                   color: colors.textSecondary,
                   transition: 'background 0.15s ease'
                 }}
@@ -530,7 +521,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: colors.textPrimary,
                     transition: 'background 0.15s ease',
                     borderTop: `1px solid ${colors.borderLight}`
@@ -564,9 +555,9 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  fontSize: '14px',
+                  fontSize: fontSize.base,
                   color: isDarkMode ? '#f0f0f0' : '#000',
-                  fontWeight: '500',
+                  fontWeight: fontWeight.medium,
                   transition: 'background 0.15s ease',
                   borderTop: `2px solid ${colors.border}`
                 }}
@@ -588,8 +579,8 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -603,7 +594,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -635,7 +626,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                 onChange={(e) => setIsRecurring(e.target.checked)}
                 style={{ width: '18px', height: '18px', cursor: 'pointer' }}
               />
-              <span style={{ fontSize: '14px', fontWeight: '500', color: colors.textPrimary }}>
+              <span style={{ fontSize: fontSize.base, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
                 Make this a recurring event
               </span>
             </label>
@@ -645,13 +636,13 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {/* Pattern */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Repeat:</label>
+                  <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, minWidth: '80px' }}>Repeat:</label>
                   <select
                     value={recurrencePattern}
                     onChange={(e) => setRecurrencePattern(e.target.value as any)}
                     style={{
                       padding: '8px 12px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       background: colors.bgSecondary,
                       color: colors.textPrimary,
                       border: `1px solid ${colors.border}`,
@@ -669,7 +660,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
                 {/* Interval */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Every:</label>
+                  <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, minWidth: '80px' }}>Every:</label>
                   <input
                     type="number"
                     min="1"
@@ -678,7 +669,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                     style={{
                       width: '60px',
                       padding: '8px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       background: colors.bgSecondary,
                       color: colors.textPrimary,
                       border: `1px solid ${colors.border}`,
@@ -686,7 +677,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                       textAlign: 'center'
                     }}
                   />
-                  <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+                  <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                     {recurrencePattern === 'daily' ? 'day(s)' : recurrencePattern === 'weekly' ? 'week(s)' : recurrencePattern === 'monthly' ? 'month(s)' : 'year(s)'}
                   </span>
                 </div>
@@ -722,8 +713,8 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                           border: `1px solid ${daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
                           background: daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
                           color: daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
-                          fontSize: '12px',
-                          fontWeight: '600',
+                          fontSize: fontSize.sm,
+                          fontWeight: fontWeight.semibold,
                           cursor: 'pointer'
                         }}
                       >
@@ -736,7 +727,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                 {/* Day of Month (for monthly) */}
                 {recurrencePattern === 'monthly' && (
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>On day:</label>
+                    <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, minWidth: '80px' }}>On day:</label>
                     <input
                       type="number"
                       min="1"
@@ -746,7 +737,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                       style={{
                         width: '60px',
                         padding: '8px',
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         background: colors.bgSecondary,
                         color: colors.textPrimary,
                         border: `1px solid ${colors.border}`,
@@ -759,13 +750,13 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
 
                 {/* End Condition */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label style={{ fontSize: '13px', color: colors.textSecondary, minWidth: '80px' }}>Ends:</label>
+                  <label style={{ fontSize: fontSize.sm, color: colors.textSecondary, minWidth: '80px' }}>Ends:</label>
                   <select
                     value={endType}
                     onChange={(e) => setEndType(e.target.value as any)}
                     style={{
                       padding: '8px 12px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       background: colors.bgSecondary,
                       color: colors.textPrimary,
                       border: `1px solid ${colors.border}`,
@@ -787,7 +778,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                         style={{
                           width: '60px',
                           padding: '8px',
-                          fontSize: '14px',
+                          fontSize: fontSize.base,
                           background: colors.bgSecondary,
                           color: colors.textPrimary,
                           border: `1px solid ${colors.border}`,
@@ -795,7 +786,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                           textAlign: 'center'
                         }}
                       />
-                      <span style={{ fontSize: '13px', color: colors.textSecondary }}>occurrences</span>
+                      <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>occurrences</span>
                     </>
                   )}
 
@@ -806,7 +797,7 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                       onChange={(e) => setUntilDate(e.target.value)}
                       style={{
                         padding: '8px 12px',
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         background: colors.bgSecondary,
                         color: colors.textPrimary,
                         border: `1px solid ${colors.border}`,
@@ -823,10 +814,10 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
                     padding: '10px',
                     background: colors.bgSecondary,
                     borderRadius: '6px',
-                    fontSize: '12px',
+                    fontSize: fontSize.sm,
                     color: colors.textSecondary
                   }}>
-                    <span style={{ fontWeight: '500' }}>Next occurrences:</span>
+                    <span style={{ fontWeight: fontWeight.medium }}>Next occurrences:</span>
                     <div style={{ marginTop: '4px' }}>
                       {recurrencePreview.map((date, idx) => (
                         <div key={idx}>
@@ -841,50 +832,30 @@ export function EventForm({ event, isOpen, onClose, onSave, onDelete }: EventFor
           </div>
         )}
 
-          {/* Actions */}
+          {/* Actions - Mobile-style buttons */}
           <div style={{
             display: 'flex',
             gap: '12px',
             marginTop: '8px',
             justifyContent: event?.id ? 'space-between' : 'flex-end',
-            paddingTop: '16px',
+            paddingTop: '20px',
             borderTop: `1px solid ${colors.border}`
           }}>
             {/* Delete button (only for existing events) */}
             {event?.id && onDelete && (
-              <button
-                type="button"
+              <DeleteButton
                 onClick={handleDelete}
                 disabled={loading}
-                style={{
-                  padding: '10px 20px',
-                  fontSize: '14px',
-                  background: 'transparent',
-                  color: '#ef4444',
-                  border: `1px solid #ef4444`,
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.5 : 1
-                }}
-              >
-                Delete
-              </button>
+                title="Delete event"
+              />
             )}
 
-            <button
-              type="submit"
-              disabled={loading || !title.trim() || !location.trim()}
-              className="btn btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                marginLeft: 'auto',
-                cursor: (loading || !title.trim() || !location.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim() || !location.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : event?.id ? 'Save' : 'Create'}
-            </button>
+            <SaveTextButton
+              onClick={(e) => handleSubmit(e)}
+              disabled={!title.trim() || !location.trim()}
+              loading={loading}
+              isCreate={!event?.id}
+            />
           </div>
         </div>
       </form>

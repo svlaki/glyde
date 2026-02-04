@@ -8,8 +8,11 @@ import { CalendarEvent, createRecurringEvent } from '../../lib/calendarService'
 import { buildRRuleFromForm, getNextOccurrences } from '../../lib/recurrenceUtils'
 import { AspectForm } from '../AspectForm'
 import { getColors } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
+import { Text } from '../ui/Text'
 import { DatePickerMobile } from './DatePickerMobile'
 import { TimePickerSlider } from './TimePickerSlider'
+import { SaveTextButton, DeleteTextButton } from '../ui/IconButtons'
 
 // Convert Date to picker value
 const dateToPickerValue = (date: Date) => {
@@ -51,6 +54,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
   const { categories, refreshCategories } = useCategories()
 
   const [title, setTitle] = useState('')
@@ -283,7 +287,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
   const fieldStyle = {
     flex: 1,
     padding: '10px 12px',
-    fontSize: '14px',
+    ...typography.bodyMd,
     background: colors.bgPrimary,
     border: `1px solid ${colors.border}`,
     borderRadius: '6px',
@@ -342,8 +346,8 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   style={{
                     width: '100%',
                     padding: '0',
-                    fontSize: '20px',
-                    fontWeight: '600',
+                    ...typography.headingLg,
+                    fontWeight: 600,
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
@@ -368,15 +372,9 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
             >
               {/* Location */}
               <div>
-                <label style={{
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  color: colors.textSecondary,
-                  marginBottom: '4px',
-                  display: 'block'
-                }}>
+                <Text as="label" variant="labelMd" color="secondary" style={{ marginBottom: '4px', display: 'block' }}>
                   Location *
-                </label>
+                </Text>
                 <input
                   type="text"
                   value={location}
@@ -386,7 +384,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   style={{
                     width: '100%',
                     padding: '12px',
-                    fontSize: '16px',
+                    ...typography.inputText,
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -424,11 +422,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   >
                     {formatTime(startDate)}
                   </div>
-                  <span style={{
-                    color: colors.textSecondary,
-                    fontSize: '18px',
-                    flexShrink: 0
-                  }}>→</span>
+                  <Text as="span" variant="headingLg" color="secondary" style={{ flexShrink: 0 }}>→</Text>
                   <div
                     onClick={() => {
                       setShowEndTimePicker(!showEndTimePicker)
@@ -485,15 +479,9 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
 
               {/* Aspect */}
               <div>
-                <label style={{
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  color: colors.textSecondary,
-                  marginBottom: '4px',
-                  display: 'block'
-                }}>
+                <Text as="label" variant="labelMd" color="secondary" style={{ marginBottom: '4px', display: 'block' }}>
                   Aspect
-                </label>
+                </Text>
                 <div style={{ position: 'relative' }}>
                   <button
                     type="button"
@@ -501,7 +489,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                     style={{
                       width: '100%',
                       padding: '12px',
-                      fontSize: '14px',
+                      ...typography.bodyMd,
                       background: colors.bgPrimary,
                       border: `1px solid ${colors.border}`,
                       borderRadius: '6px',
@@ -551,7 +539,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                         style={{
                           padding: '10px 12px',
                           cursor: 'pointer',
-                          fontSize: '14px',
+                          ...typography.bodyMd,
                           color: colors.textSecondary,
                           borderBottom: `1px solid ${colors.border}`
                         }}
@@ -571,7 +559,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            fontSize: '14px',
+                            ...typography.bodyMd,
                             color: colors.textPrimary,
                             background: category === cat.name ? colors.bgHover : 'transparent'
                           }}
@@ -594,9 +582,9 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                         style={{
                           padding: '10px 12px',
                           cursor: 'pointer',
-                          fontSize: '14px',
+                          ...typography.bodyMd,
+                          fontWeight: 500,
                           color: colors.textPrimary,
-                          fontWeight: '500',
                           borderTop: `1px solid ${colors.border}`
                         }}
                       >
@@ -609,15 +597,9 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
 
               {/* Description */}
               <div>
-                <label style={{
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  color: colors.textSecondary,
-                  marginBottom: '4px',
-                  display: 'block'
-                }}>
+                <Text as="label" variant="labelMd" color="secondary" style={{ marginBottom: '4px', display: 'block' }}>
                   Description
-                </label>
+                </Text>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -626,13 +608,12 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                   style={{
                     width: '100%',
                     padding: '12px',
-                    fontSize: '16px',
+                    ...typography.inputText,
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
-                    resize: 'none',
-                    fontFamily: 'inherit'
+                    resize: 'none'
                   }}
                 />
               </div>
@@ -656,7 +637,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                       onChange={(e) => setIsRecurring(e.target.checked)}
                       style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
                     />
-                    <span style={{ fontSize: '14px', color: colors.textPrimary }}>Repeat</span>
+                    <Text as="span" variant="bodyMd" color="primary">Repeat</Text>
                   </label>
 
                   {isRecurring && (
@@ -665,7 +646,7 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
                       onChange={(e) => setRecurrencePattern(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly')}
                       style={{
                         padding: '8px 12px',
-                        fontSize: '14px',
+                        ...typography.bodyMd,
                         background: colors.bgPrimary,
                         border: `1px solid ${colors.border}`,
                         borderRadius: '6px',
@@ -694,45 +675,18 @@ export function EventFormMobile({ event, isOpen, onClose, onSave, onDelete }: Ev
               justifyContent: event?.id ? 'space-between' : 'flex-end'
             }}>
               {event?.id && onDelete && (
-                <button
-                  type="button"
+                <DeleteTextButton
                   onClick={handleDelete}
-                  disabled={loading}
-                  style={{
-                    padding: '10px 14px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    background: 'transparent',
-                    color: '#ef4444',
-                    border: '1.5px solid #ef4444',
-                    borderRadius: '8px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    minHeight: '40px',
-                    opacity: loading ? 0.5 : 1
-                  }}
-                >
-                  Delete
-                </button>
+                  loading={loading}
+                  mobile
+                />
               )}
-              <button
-                type="submit"
+              <SaveTextButton
                 onClick={() => handleSubmit()}
-                disabled={loading || !title.trim() || !location.trim()}
-                style={{
-                  padding: '10px 14px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  background: '#000',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: (loading || !title.trim() || !location.trim()) ? 'not-allowed' : 'pointer',
-                  minHeight: '40px',
-                  opacity: (loading || !title.trim() || !location.trim()) ? 0.5 : 1
-                }}
-              >
-                {loading ? 'Saving...' : 'Save'}
-              </button>
+                disabled={!title.trim() || !location.trim()}
+                loading={loading}
+                mobile
+              />
             </div>
           </Dialog.Content>
         </Dialog.Portal>

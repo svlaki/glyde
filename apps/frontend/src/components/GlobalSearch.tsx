@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors, hexToRgba } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import {
   searchAll,
   SearchResult,
@@ -16,18 +17,24 @@ interface GlobalSearchProps {
   onSelectEvent?: (eventId: string) => void
   onSelectTask?: (taskId: string) => void
   onSelectGoal?: (goalId: string) => void
+  /** When true, renders the search UI inline without its own backdrop/modal wrapper */
+  inline?: boolean
+  /** Called when the search is closed (useful in inline mode for parent to dismiss) */
+  onClose?: () => void
 }
 
 export function GlobalSearch({
   onSelectEvent,
   onSelectTask,
-  onSelectGoal
+  onSelectGoal,
+  inline = false,
+  onClose
 }: GlobalSearchProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(inline)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -126,6 +133,7 @@ export function GlobalSearch({
     setQuery('')
     setResults([])
     setSelectedIndex(0)
+    onClose?.()
   }
 
   const handleSelectResult = (result: SearchResult) => {
@@ -154,7 +162,7 @@ export function GlobalSearch({
     })
   }
 
-  if (!isOpen) {
+  if (!isOpen && !inline) {
     return (
       <button
         onClick={() => setIsOpen(true)}
@@ -167,7 +175,7 @@ export function GlobalSearch({
           border: `1px solid ${colors.border}`,
           borderRadius: '6px',
           color: colors.textSecondary,
-          fontSize: '13px',
+          fontSize: fontSize.sm,
           cursor: 'pointer',
           transition: 'all 0.15s'
         }}
@@ -180,14 +188,14 @@ export function GlobalSearch({
           e.currentTarget.style.borderColor = colors.border
         }}
       >
-        <span style={{ fontSize: '14px' }}></span>
+        <span style={{ fontSize: fontSize.base }}></span>
         <span>Search...</span>
         <span style={{
           padding: '2px 6px',
           background: colors.bgSecondary,
           borderRadius: '4px',
-          fontSize: '11px',
-          fontWeight: '500'
+          fontSize: fontSize.xs,
+          fontWeight: fontWeight.medium
         }}>
           ⌘K
         </span>
@@ -195,9 +203,273 @@ export function GlobalSearch({
     )
   }
 
+  const searchUI = (
+    <div
+      style={{
+        background: colors.bgPrimary,
+        borderRadius: '12px',
+        boxShadow: inline ? 'none' : '0 20px 60px rgba(0, 0, 0, 0.3)',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Search Input */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '16px 20px',
+        borderBottom: `1px solid ${colors.border}`
+      }}>
+        <span style={{ fontSize: '18px', marginRight: '12px' }}>🔍</span>
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search events, tasks, and goals..."
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            fontSize: '16px',
+            color: colors.textPrimary
+          }}
+        />
+        {loading && (
+          <span style={{ color: colors.textSecondary, fontSize: fontSize.xs }}>
+            Searching...
+          </span>
+        )}
+        <button
+          onClick={closeSearch}
+          style={{
+            marginLeft: '12px',
+            padding: '4px 8px',
+            background: colors.bgTertiary,
+            border: 'none',
+            borderRadius: '4px',
+            color: colors.textSecondary,
+            fontSize: fontSize.xs,
+            cursor: 'pointer'
+          }}
+        >
+          ESC
+        </button>
+      </div>
+
+      {/* Filter Pills */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        padding: '12px 20px',
+        borderBottom: `1px solid ${colors.border}`
+      }}>
+        {(['event', 'task', 'goal'] as SearchResultType[]).map(type => (
+          <button
+            key={type}
+            onClick={() => toggleFilter(type)}
+            style={{
+              padding: '4px 12px',
+              background: activeFilters.includes(type)
+                ? (isDarkMode ? '#d0d0d0' : '#000')
+                : colors.bgTertiary,
+              color: activeFilters.includes(type)
+                ? (isDarkMode ? '#2a2a2a' : '#fff')
+                : colors.textSecondary,
+              border: 'none',
+              borderRadius: '16px',
+              fontSize: fontSize.xs,
+              fontWeight: fontWeight.medium,
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+          >
+            {getTypeIcon(type)} {getTypeLabel(type)}s
+          </button>
+        ))}
+      </div>
+
+      {/* Results */}
+      <div
+        ref={resultsRef}
+        style={{
+          maxHeight: '400px',
+          overflowY: 'auto',
+          padding: results.length > 0 ? '8px' : '0'
+        }}
+      >
+        {query.length >= 2 && results.length === 0 && !loading && (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: colors.textSecondary
+          }}>
+            No results found for "{query}"
+          </div>
+        )}
+
+        {query.length < 2 && (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            color: colors.textTertiary,
+            fontSize: fontSize.sm
+          }}>
+            Type at least 2 characters to search
+          </div>
+        )}
+
+        {results.map((result, index) => (
+          <div
+            key={`${result.type}-${result.id}`}
+            onClick={() => handleSelectResult(result)}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              padding: '12px 16px',
+              background: index === selectedIndex ? colors.bgHover : 'transparent',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'background 0.1s'
+            }}
+            onMouseEnter={() => setSelectedIndex(index)}
+          >
+            {/* Type Icon */}
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              background: result.categoryColor
+                ? hexToRgba(result.categoryColor, 0.15)
+                : colors.bgTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: fontSize.base,
+              flexShrink: 0
+            }}>
+              {getTypeIcon(result.type)}
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '2px'
+              }}>
+                <span style={{
+                  fontSize: fontSize.base,
+                  fontWeight: fontWeight.medium,
+                  color: colors.textPrimary,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {result.title}
+                </span>
+                {result.priority && result.priority !== 'low' && (
+                  <span style={{
+                    fontSize: fontSize.xs,
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    background: result.priority === 'urgent' ? '#fee' : result.priority === 'high' ? '#fef0e6' : '#fff9e6',
+                    color: result.priority === 'urgent' ? '#c00' : result.priority === 'high' ? '#c60' : '#880',
+                    fontWeight: fontWeight.medium
+                  }}>
+                    {result.priority}
+                  </span>
+                )}
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: fontSize.xs,
+                color: colors.textSecondary
+              }}>
+                <span style={{
+                  padding: '1px 6px',
+                  background: colors.bgTertiary,
+                  borderRadius: '3px',
+                  fontSize: fontSize.xs,
+                  textTransform: 'uppercase',
+                  fontWeight: fontWeight.medium
+                }}>
+                  {getTypeLabel(result.type)}
+                </span>
+                {result.category && (
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {result.categoryColor && (
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: result.categoryColor
+                      }} />
+                    )}
+                    {result.category}
+                  </span>
+                )}
+                <span>•</span>
+                <span>{result.preview}</span>
+              </div>
+            </div>
+
+            {/* Enter hint for selected */}
+            {index === selectedIndex && (
+              <span style={{
+                padding: '2px 6px',
+                background: colors.bgTertiary,
+                borderRadius: '4px',
+                fontSize: fontSize.xs,
+                color: colors.textSecondary,
+                alignSelf: 'center'
+              }}>
+                ↵
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        padding: '12px 20px',
+        borderTop: `1px solid ${colors.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontSize: fontSize.xs,
+        color: colors.textTertiary
+      }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <span>↑↓ Navigate</span>
+          <span>↵ Select</span>
+          <span>ESC Close</span>
+        </div>
+        {results.length > 0 && (
+          <span>{results.length} result{results.length !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+    </div>
+  )
+
+  // Inline mode: render search UI directly without backdrop/fixed positioning
+  if (inline) {
+    return searchUI
+  }
+
+  // Standalone mode: render with backdrop and fixed positioning
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={closeSearch}
         style={{
@@ -211,8 +483,6 @@ export function GlobalSearch({
           backdropFilter: 'blur(2px)'
         }}
       />
-
-      {/* Search Modal */}
       <div
         style={{
           position: 'fixed',
@@ -221,260 +491,10 @@ export function GlobalSearch({
           transform: 'translateX(-50%)',
           width: '100%',
           maxWidth: '600px',
-          background: colors.bgPrimary,
-          borderRadius: '12px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          zIndex: 1001,
-          overflow: 'hidden'
+          zIndex: 1001
         }}
       >
-        {/* Search Input */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: `1px solid ${colors.border}`
-        }}>
-          <span style={{ fontSize: '18px', marginRight: '12px' }}>🔍</span>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search events, tasks, and goals..."
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              background: 'transparent',
-              fontSize: '16px',
-              color: colors.textPrimary
-            }}
-          />
-          {loading && (
-            <span style={{ color: colors.textSecondary, fontSize: '12px' }}>
-              Searching...
-            </span>
-          )}
-          <button
-            onClick={closeSearch}
-            style={{
-              marginLeft: '12px',
-              padding: '4px 8px',
-              background: colors.bgTertiary,
-              border: 'none',
-              borderRadius: '4px',
-              color: colors.textSecondary,
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}
-          >
-            ESC
-          </button>
-        </div>
-
-        {/* Filter Pills */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '12px 20px',
-          borderBottom: `1px solid ${colors.border}`
-        }}>
-          {(['event', 'task', 'goal'] as SearchResultType[]).map(type => (
-            <button
-              key={type}
-              onClick={() => toggleFilter(type)}
-              style={{
-                padding: '4px 12px',
-                background: activeFilters.includes(type)
-                  ? (isDarkMode ? '#d0d0d0' : '#000')
-                  : colors.bgTertiary,
-                color: activeFilters.includes(type)
-                  ? (isDarkMode ? '#2a2a2a' : '#fff')
-                  : colors.textSecondary,
-                border: 'none',
-                borderRadius: '16px',
-                fontSize: '12px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              {getTypeIcon(type)} {getTypeLabel(type)}s
-            </button>
-          ))}
-        </div>
-
-        {/* Results */}
-        <div
-          ref={resultsRef}
-          style={{
-            maxHeight: '400px',
-            overflowY: 'auto',
-            padding: results.length > 0 ? '8px' : '0'
-          }}
-        >
-          {query.length >= 2 && results.length === 0 && !loading && (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: colors.textSecondary
-            }}>
-              No results found for "{query}"
-            </div>
-          )}
-
-          {query.length < 2 && (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: colors.textTertiary,
-              fontSize: '13px'
-            }}>
-              Type at least 2 characters to search
-            </div>
-          )}
-
-          {results.map((result, index) => (
-            <div
-              key={`${result.type}-${result.id}`}
-              onClick={() => handleSelectResult(result)}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                padding: '12px 16px',
-                background: index === selectedIndex ? colors.bgHover : 'transparent',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'background 0.1s'
-              }}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              {/* Type Icon */}
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                background: result.categoryColor
-                  ? hexToRgba(result.categoryColor, 0.15)
-                  : colors.bgTertiary,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '14px',
-                flexShrink: 0
-              }}>
-                {getTypeIcon(result.type)}
-              </div>
-
-              {/* Content */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '2px'
-                }}>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: colors.textPrimary,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {result.title}
-                  </span>
-                  {result.priority && result.priority !== 'low' && (
-                    <span style={{
-                      fontSize: '10px',
-                      padding: '2px 6px',
-                      borderRadius: '3px',
-                      background: result.priority === 'urgent' ? '#fee' : result.priority === 'high' ? '#fef0e6' : '#fff9e6',
-                      color: result.priority === 'urgent' ? '#c00' : result.priority === 'high' ? '#c60' : '#880',
-                      fontWeight: '500'
-                    }}>
-                      {result.priority}
-                    </span>
-                  )}
-                </div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '12px',
-                  color: colors.textSecondary
-                }}>
-                  <span style={{
-                    padding: '1px 6px',
-                    background: colors.bgTertiary,
-                    borderRadius: '3px',
-                    fontSize: '10px',
-                    textTransform: 'uppercase',
-                    fontWeight: '500'
-                  }}>
-                    {getTypeLabel(result.type)}
-                  </span>
-                  {result.category && (
-                    <span style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      {result.categoryColor && (
-                        <span style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: result.categoryColor
-                        }} />
-                      )}
-                      {result.category}
-                    </span>
-                  )}
-                  <span>•</span>
-                  <span>{result.preview}</span>
-                </div>
-              </div>
-
-              {/* Enter hint for selected */}
-              {index === selectedIndex && (
-                <span style={{
-                  padding: '2px 6px',
-                  background: colors.bgTertiary,
-                  borderRadius: '4px',
-                  fontSize: '10px',
-                  color: colors.textSecondary,
-                  alignSelf: 'center'
-                }}>
-                  ↵
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          padding: '12px 20px',
-          borderTop: `1px solid ${colors.border}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '11px',
-          color: colors.textTertiary
-        }}>
-          <div style={{ display: 'flex', gap: '16px' }}>
-            <span>↑↓ Navigate</span>
-            <span>↵ Select</span>
-            <span>ESC Close</span>
-          </div>
-          {results.length > 0 && (
-            <span>{results.length} result{results.length !== 1 ? 's' : ''}</span>
-          )}
-        </div>
+        {searchUI}
       </div>
     </>
   )

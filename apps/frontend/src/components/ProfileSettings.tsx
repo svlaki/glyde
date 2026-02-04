@@ -4,6 +4,7 @@ import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserProfile, UserProfile } from '../lib/profileService'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 
 interface ProfileSection {
   key: keyof UserProfile
@@ -64,7 +65,7 @@ export function ProfileSettings() {
         padding: '40px',
         textAlign: 'center',
         color: colors.textSecondary,
-        fontSize: '14px'
+        fontSize: fontSize.base
       }}>
         Loading profile...
       </div>
@@ -122,8 +123,8 @@ export function ProfileSettings() {
                 }}>{section.icon}</span>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{
-                    fontSize: '14px',
-                    fontWeight: '400',
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.normal,
                     color: colors.textPrimary
                   }}>
                     {section.label}
@@ -161,18 +162,18 @@ export function ProfileSettings() {
                         borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'}`
                       }}>
                         <div style={{
-                          fontSize: '12px',
-                          fontWeight: '400',
+                          fontSize: fontSize.xs,
+                          fontWeight: fontWeight.normal,
                           color: colors.textSecondary,
                           marginBottom: '4px'
                         }}>
                           {key.replace(/_/g, ' ')}
                         </div>
                         <div style={{
-                          fontSize: '14px',
+                          fontSize: fontSize.base,
                           color: colors.textPrimary,
                           whiteSpace: 'pre-wrap',
-                          lineHeight: '1.5'
+                          lineHeight: lineHeight.normal
                         }}>
                           {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
                         </div>
@@ -184,7 +185,7 @@ export function ProfileSettings() {
                     padding: '20px',
                     textAlign: 'center',
                     color: colors.textSecondary,
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     opacity: 0.5
                   }}>
                     No data

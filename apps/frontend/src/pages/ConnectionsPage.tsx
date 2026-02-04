@@ -1,6 +1,7 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { PageHeader } from '../components/PageHeader'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
 import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
@@ -84,42 +85,41 @@ function FileIcon({ color }: { color: string }) {
 function ConnectionsPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
 
   return (
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
-      background: colors.bgSecondary
+      background: colors.bgPrimary
     }}>
-      <PageHeader />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
 
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        maxWidth: '800px',
-        margin: '0 auto',
-        width: '100%'
+        marginLeft: `${SIDEBAR_WIDTH}px`,
+        padding: '0 24px',
       }}>
         <div style={{
           padding: '24px 20px',
           borderBottom: `1px solid ${colors.border}`,
-          background: colors.bgSecondary
+          background: colors.bgPrimary
         }}>
           <h1 style={{
-            fontSize: '24px',
-            fontWeight: '600',
+            ...typography.headingXl,
+            fontWeight: 600,
             color: colors.textPrimary,
-            margin: 0,
-            fontFamily: "'EB Garamond', Georgia, serif"
+            margin: 0
           }}>
             Connections
           </h1>
           <p style={{
-            fontSize: '14px',
+            ...typography.bodyMd,
             color: colors.textSecondary,
             margin: '8px 0 0 0'
           }}>
@@ -167,10 +167,10 @@ function ConnectionsPageDesktop() {
         <div style={{
           padding: '16px 20px',
           borderTop: `1px solid ${colors.border}`,
-          background: colors.bgSecondary
+          background: colors.bgPrimary
         }}>
           <p style={{
-            fontSize: '12px',
+            ...typography.bodySm,
             color: colors.textSecondary,
             margin: 0,
             textAlign: 'center'

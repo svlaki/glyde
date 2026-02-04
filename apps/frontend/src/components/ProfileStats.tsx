@@ -5,6 +5,7 @@ import { useCategories } from '../lib/categoryContext'
 import { fetchUserTasks } from '../lib/taskService'
 import { fetchUserGoals } from '../lib/goalService'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 
 interface StatsCardProps {
   label: string
@@ -29,16 +30,16 @@ function StatsCard({ label, value, icon }: StatsCardProps) {
       textAlign: 'center'
     }}>
       <div style={{
-        fontSize: '20px',
-        fontWeight: '500',
+        fontSize: fontSize.xl,
+        fontWeight: fontWeight.medium,
         color: colors.textPrimary
       }}>
         {value}
       </div>
       <div style={{
-        fontSize: '11px',
+        fontSize: fontSize.xs,
         color: colors.textSecondary,
-        fontWeight: '400'
+        fontWeight: fontWeight.normal
       }}>
         {label}
       </div>
@@ -91,7 +92,7 @@ export function ProfileStats() {
         padding: '40px',
         textAlign: 'center',
         color: colors.textSecondary,
-        fontSize: '14px'
+        fontSize: fontSize.base
       }}>
         Loading stats...
       </div>

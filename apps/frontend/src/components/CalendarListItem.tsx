@@ -1,6 +1,7 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { CalendarMapping } from '../lib/connectionService'
 
 interface CalendarListItemProps {
@@ -67,8 +68,8 @@ export function CalendarListItem({
       {/* Calendar Name */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: '14px',
-          fontWeight: mapping.is_primary ? '500' : '400',
+          fontSize: fontSize.base,
+          fontWeight: mapping.is_primary ? fontWeight.medium : fontWeight.normal,
           color: colors.textPrimary,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -78,9 +79,9 @@ export function CalendarListItem({
           {mapping.is_primary && (
             <span style={{
               marginLeft: '8px',
-              fontSize: '11px',
+              fontSize: fontSize.xs,
               color: colors.textTertiary,
-              fontWeight: '400'
+              fontWeight: fontWeight.normal
             }}>
               Primary
             </span>
@@ -95,7 +96,7 @@ export function CalendarListItem({
         disabled={isUpdating || !mapping.is_synced}
         style={{
           padding: '6px 10px',
-          fontSize: '13px',
+          fontSize: fontSize.sm,
           background: colors.bgTertiary,
           color: colors.textPrimary,
           border: `1px solid ${colors.border}`,

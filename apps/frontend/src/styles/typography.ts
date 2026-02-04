@@ -71,6 +71,37 @@ export const fontWeight = {
 }
 
 /**
+ * Form-specific typography tokens
+ * Used for form inputs, labels, errors, and helper text
+ */
+export const formTypography = {
+  inputText: {
+    fontFamily: fontFamily.sans,
+    fontSize: '16px', // Fixed - iOS zoom prevention requirement
+    fontWeight: fontWeight.normal,
+    lineHeight: lineHeight.normal,
+  } as CSSProperties,
+  errorText: {
+    fontFamily: fontFamily.sans,
+    fontSize: fontSize.sm, // 13px
+    fontWeight: fontWeight.medium,
+    lineHeight: lineHeight.normal,
+  } as CSSProperties,
+  helperText: {
+    fontFamily: fontFamily.sans,
+    fontSize: fontSize.xs, // 11px
+    fontWeight: fontWeight.normal,
+    lineHeight: lineHeight.normal,
+  } as CSSProperties,
+  placeholderText: {
+    fontFamily: fontFamily.sans,
+    fontSize: '16px',
+    fontWeight: fontWeight.normal,
+    lineHeight: lineHeight.normal,
+  } as CSSProperties,
+}
+
+/**
  * Pre-defined typography styles
  * Use these for consistent text styling across the app
  */
@@ -202,6 +233,11 @@ export function getTypography(isMobile: boolean) {
     labelMd: { ...typography.labelMd, fontSize: sizes.xs },
     labelSm: typography.labelSm, // Fixed size
     mono: { ...typography.mono, fontSize: sizes.sm },
+    // Form typography - fixed sizes for iOS compatibility
+    inputText: formTypography.inputText,
+    errorText: { ...formTypography.errorText, fontSize: sizes.sm },
+    helperText: { ...formTypography.helperText, fontSize: sizes.xs },
+    placeholderText: formTypography.placeholderText,
   }
 }
 

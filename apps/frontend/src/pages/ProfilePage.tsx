@@ -1,9 +1,9 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { PageHeader } from '../components/PageHeader'
 import { ProfileStats } from '../components/ProfileStats'
 import { ProfileSettings } from '../components/ProfileSettings'
 import { GoalsSection } from '../components/GoalsSection'
 import { RulesSection } from '../components/RulesSection'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
@@ -58,23 +58,23 @@ function ProfilePageDesktop() {
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
-      background: colors.bgSecondary
+      background: colors.bgPrimary
     }}>
-      {/* Header */}
-      <PageHeader />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
 
-      {/* Main Content */}
+      {/* Main Content - offset by sidebar width */}
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: '20px'
+        padding: '24px',
+        marginLeft: `${SIDEBAR_WIDTH}px`,
       }}>
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px'
+          gap: '24px'
         }}>
           {/* Stats Section */}
           <ProfileStats />

@@ -6,7 +6,9 @@ import { RuleCard } from './RuleCard'
 import { RuleForm } from './RuleForm'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
+import { NewButton, EditButton, DeleteButton } from './ui/IconButtons'
 
 export function RulesSection() {
   const { isDarkMode } = useDarkMode()
@@ -117,8 +119,8 @@ export function RulesSection() {
                 onClick={handleBackToList}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '13px',
-                  fontWeight: '400',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.normal,
                   background: 'transparent',
                   color: colors.textSecondary,
                   border: 'none',
@@ -131,8 +133,8 @@ export function RulesSection() {
                 ← Back
               </button>
               <h2 style={{
-                fontSize: '14px',
-                fontWeight: '400',
+                fontSize: fontSize.base,
+                fontWeight: fontWeight.normal,
                 color: colors.textPrimary,
                 margin: 0,
                 flex: 1,
@@ -145,28 +147,17 @@ export function RulesSection() {
           ) : (
             <>
               <h2 style={{
-                fontSize: '14px',
-                fontWeight: '400',
+                fontSize: fontSize.base,
+                fontWeight: fontWeight.normal,
                 color: colors.textPrimary,
                 margin: 0
               }}>
-                Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: '300' }}>({enabledCount}/{rules.length})</span>}
+                Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: fontWeight.light }}>({enabledCount}/{rules.length})</span>}
               </h2>
-              <button
+              <NewButton
                 onClick={handleCreateRule}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: '13px',
-                  fontWeight: '400',
-                  background: 'transparent',
-                  color: colors.textSecondary,
-                  border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                New
-              </button>
+                title="New rule"
+                              />
             </>
           )}
         </div>
@@ -197,7 +188,7 @@ export function RulesSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: '14px'
+                fontSize: fontSize.base
               }}>
                 Loading rules...
               </div>
@@ -206,7 +197,7 @@ export function RulesSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: '14px'
+                fontSize: fontSize.base
               }}>
                 Error: {error}
               </div>
@@ -258,28 +249,17 @@ export function RulesSection() {
         alignItems: 'center'
       }}>
         <h2 style={{
-          fontSize: '14px',
-          fontWeight: '400',
+          fontSize: fontSize.base,
+          fontWeight: fontWeight.normal,
           color: colors.textPrimary,
           margin: 0
         }}>
-          Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: '300' }}>({enabledCount}/{rules.length} active)</span>}
+          Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: fontWeight.light }}>({enabledCount}/{rules.length} active)</span>}
         </h2>
-        <button
+        <NewButton
           onClick={handleCreateRule}
-          style={{
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: '400',
-            background: 'transparent',
-            color: colors.textSecondary,
-            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          New
-        </button>
+          title="New rule"
+                  />
       </div>
 
       {/* Rules Content */}
@@ -310,7 +290,7 @@ export function RulesSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: '14px'
+                fontSize: fontSize.base
               }}>
                 Loading rules...
               </div>
@@ -319,7 +299,7 @@ export function RulesSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: '14px'
+                fontSize: fontSize.base
               }}>
                 Error: {error}
               </div>
@@ -397,11 +377,11 @@ function RuleDetailPanel({
     <div>
       {/* Rule Text */}
       <p style={{
-        fontSize: '15px',
-        fontWeight: '400',
+        fontSize: fontSize.base,
+        fontWeight: fontWeight.normal,
         color: colors.textPrimary,
         margin: '0 0 16px 0',
-        lineHeight: '1.5'
+        lineHeight: lineHeight.normal
       }}>
         {rule.rule_text}
       </p>
@@ -415,8 +395,8 @@ function RuleDetailPanel({
       }}>
         <span style={{
           padding: '4px 8px',
-          fontSize: '11px',
-          fontWeight: '500',
+          fontSize: fontSize.xs,
+          fontWeight: fontWeight.medium,
           background: rule.enabled ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)',
           color: rule.enabled ? '#22c55e' : colors.textSecondary,
           borderRadius: '4px'
@@ -425,8 +405,8 @@ function RuleDetailPanel({
         </span>
         <span style={{
           padding: '4px 8px',
-          fontSize: '11px',
-          fontWeight: '500',
+          fontSize: fontSize.xs,
+          fontWeight: fontWeight.medium,
           background: 'rgba(59, 130, 246, 0.1)',
           color: '#3b82f6',
           borderRadius: '4px'
@@ -435,8 +415,8 @@ function RuleDetailPanel({
         </span>
         <span style={{
           padding: '4px 8px',
-          fontSize: '11px',
-          fontWeight: '500',
+          fontSize: fontSize.xs,
+          fontWeight: fontWeight.medium,
           background: rule.source === 'agent' ? 'rgba(168, 85, 247, 0.1)' : 'rgba(156, 163, 175, 0.1)',
           color: rule.source === 'agent' ? '#a855f7' : colors.textSecondary,
           borderRadius: '4px'
@@ -448,10 +428,10 @@ function RuleDetailPanel({
       {/* Description */}
       {rule.description && (
         <p style={{
-          fontSize: '13px',
+          fontSize: fontSize.sm,
           color: colors.textSecondary,
           margin: '0 0 24px 0',
-          lineHeight: '1.5'
+          lineHeight: lineHeight.normal
         }}>
           {rule.description}
         </p>
@@ -466,7 +446,7 @@ function RuleDetailPanel({
         paddingBottom: '24px',
         borderBottom: `1px solid ${colors.border}`
       }}>
-        <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+        <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
           {rule.enabled ? 'Enabled' : 'Disabled'}
         </span>
         <button
@@ -500,34 +480,8 @@ function RuleDetailPanel({
         display: 'flex',
         gap: '8px'
       }}>
-        <button
-          onClick={onEdit}
-          style={{
-            padding: '8px 16px',
-            fontSize: '13px',
-            background: 'transparent',
-            color: colors.textSecondary,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Edit
-        </button>
-        <button
-          onClick={onDelete}
-          style={{
-            padding: '8px 16px',
-            fontSize: '13px',
-            background: 'transparent',
-            color: '#ef4444',
-            border: '1px solid #ef4444',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Delete
-        </button>
+        <EditButton onClick={onEdit} title="Edit rule" />
+        <DeleteButton onClick={onDelete} title="Delete rule" />
       </div>
     </div>
   )

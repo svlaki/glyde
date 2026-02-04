@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useKeenSlider, KeenSliderPlugin } from 'keen-slider/react'
 import 'keen-slider/keen-slider.min.css'
+import { fontSize, fontWeight } from '../../styles/typography'
 
 // Wheel control plugin for mouse/trackpad scrolling
 const WheelControls: KeenSliderPlugin = (slider) => {
@@ -197,8 +198,8 @@ function SliderColumn({
                 height: `${itemHeight}px`,
                 minHeight: `${itemHeight}px`,
                 maxHeight: `${itemHeight}px`,
-                fontSize: isSelected ? '20px' : '16px',
-                fontWeight: isSelected ? '600' : '400',
+                fontSize: isSelected ? fontSize.xl : '16px',
+                fontWeight: isSelected ? fontWeight.semibold : fontWeight.normal,
                 color: isSelected ? selectedTextColor : textColor,
                 transition: 'all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1)',
                 opacity: isSelected ? 1 : 0.4,
@@ -300,8 +301,8 @@ export function TimePickerSlider({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '20px',
-          fontWeight: '600',
+          fontSize: fontSize.xl,
+          fontWeight: fontWeight.semibold,
           color: selectedTextColor,
           width: '16px',
         }}

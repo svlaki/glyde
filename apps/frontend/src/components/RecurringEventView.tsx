@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { CalendarEvent } from '../lib/calendarService'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { useDarkMode } from '../lib/darkModeContext'
 import { formatRRuleForDisplay, getNextOccurrences, isRecurringInstance } from '../lib/recurrenceUtils'
 import { Modal } from './Modal'
+import { EditButton, DeleteButton } from './ui/IconButtons'
 
 interface RecurringEventViewProps {
   event: CalendarEvent | null
@@ -82,16 +84,16 @@ export function RecurringEventView({
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Event Title */}
           <div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: '600', color: colors.textPrimary }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: fontSize.xl, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
               {event.title}
             </h3>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ fontSize: '13px', color: colors.textSecondary }}>
+              <div style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
                 ⏰ {startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - {endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
               </div>
               {event.category && (
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: fontSize.xs,
                   padding: '3px 8px',
                   backgroundColor: `${colors.accent}20`,
                   color: colors.textPrimary,
@@ -105,24 +107,24 @@ export function RecurringEventView({
 
           {/* Recurrence Information */}
           <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase' }}>
               Recurrence
             </h4>
 
             {event.recurrence_rule && (
-              <div style={{ fontSize: '14px', color: colors.textPrimary, marginBottom: '12px' }}>
+              <div style={{ fontSize: fontSize.base, color: colors.textPrimary, marginBottom: '12px' }}>
                 <strong>Pattern:</strong> {formatRRuleForDisplay(event.recurrence_rule)}
               </div>
             )}
 
             {isInstance && event.parent_event_id && (
-              <div style={{ fontSize: '13px', color: colors.textSecondary, marginBottom: '12px' }}>
+              <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: '12px' }}>
                 💡 This is an instance of a recurring series. You can edit or delete just this event, or modify the entire series.
               </div>
             )}
 
             {!isInstance && (
-              <div style={{ fontSize: '13px', color: colors.textSecondary, marginBottom: '12px' }}>
+              <div style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: '12px' }}>
                 📅 This is the parent recurring event. Changes to the series will affect all future instances.
               </div>
             )}
@@ -131,7 +133,7 @@ export function RecurringEventView({
           {/* Next Occurrences Preview */}
           {nextOccurrences.length > 0 && (
             <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase' }}>
                 Upcoming Instances
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -139,7 +141,7 @@ export function RecurringEventView({
                   const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                   const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                   return (
-                    <div key={idx} style={{ fontSize: '13px', color: colors.textPrimary }}>
+                    <div key={idx} style={{ fontSize: fontSize.sm, color: colors.textPrimary }}>
                       {dateStr} at {timeStr}
                     </div>
                   )
@@ -151,10 +153,10 @@ export function RecurringEventView({
           {/* Description */}
           {event.description && (
             <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase' }}>
                 Description
               </h4>
-              <p style={{ margin: 0, fontSize: '14px', color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
+              <p style={{ margin: 0, fontSize: fontSize.base, color: colors.textPrimary, whiteSpace: 'pre-wrap' }}>
                 {event.description}
               </p>
             </div>
@@ -163,10 +165,10 @@ export function RecurringEventView({
           {/* Location */}
           {event.location && (
             <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: '16px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: colors.textSecondary, textTransform: 'uppercase' }}>
                 Location
               </h4>
-              <p style={{ margin: 0, fontSize: '14px', color: colors.textPrimary }}>
+              <p style={{ margin: 0, fontSize: fontSize.base, color: colors.textPrimary }}>
                 📍 {event.location}
               </p>
             </div>
@@ -178,59 +180,17 @@ export function RecurringEventView({
             paddingTop: '16px',
             display: 'flex',
             gap: '10px',
-            justifyContent: 'flex-end'
+            justifyContent: 'flex-end',
+            alignItems: 'center'
           }}>
-            <button
-              onClick={handleClose}
-              style={{
-                padding: '10px 16px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: 'transparent',
-                color: colors.textPrimary,
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Close
-            </button>
-            <button
-              onClick={handleEditClick}
-              style={{
-                padding: '10px 16px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                backgroundColor: 'transparent',
-                color: colors.textPrimary,
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              style={{
-                padding: '10px 16px',
-                border: `1px solid #ef4444`,
-                borderRadius: '6px',
-                backgroundColor: 'transparent',
-                color: '#ef4444',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Delete
-            </button>
+            <EditButton onClick={handleEditClick} title="Edit event" />
+            <DeleteButton onClick={handleDeleteClick} title="Delete event" />
           </div>
         </div>
       ) : (
         // Scope Selection Mode
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: colors.textPrimary }}>
+          <p style={{ margin: 0, fontSize: fontSize.base, color: colors.textPrimary }}>
             Would you like to {action === 'choose_delete_scope' ? 'delete' : 'edit'} this event instance or the entire recurring series?
           </p>
 
@@ -246,8 +206,8 @@ export function RecurringEventView({
                   backgroundColor: colors.bgPrimary,
                   color: colors.textPrimary,
                   cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
+                  fontSize: fontSize.base,
+                  fontWeight: fontWeight.medium,
                   textAlign: 'left',
                   transition: 'all 0.2s'
                 }}
@@ -260,10 +220,10 @@ export function RecurringEventView({
                   e.currentTarget.style.borderColor = colors.border
                 }}
               >
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                <div style={{ fontWeight: fontWeight.semibold, marginBottom: '4px' }}>
                   This Instance Only
                 </div>
-                <div style={{ fontSize: '12px', color: colors.textSecondary }}>
+                <div style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
                   Affects only this {startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} instance
                 </div>
               </button>
@@ -279,8 +239,8 @@ export function RecurringEventView({
                 backgroundColor: colors.bgPrimary,
                 color: colors.textPrimary,
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
+                fontSize: fontSize.base,
+                fontWeight: fontWeight.medium,
                 textAlign: 'left',
                 transition: 'all 0.2s'
               }}
@@ -293,10 +253,10 @@ export function RecurringEventView({
                 e.currentTarget.style.borderColor = colors.border
               }}
             >
-              <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+              <div style={{ fontWeight: fontWeight.semibold, marginBottom: '4px' }}>
                 Entire Series
               </div>
-              <div style={{ fontSize: '12px', color: colors.textSecondary }}>
+              <div style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
                 Affects all instances of this recurring event
               </div>
             </button>
@@ -313,8 +273,8 @@ export function RecurringEventView({
                 backgroundColor: 'transparent',
                 color: colors.textPrimary,
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
+                fontSize: fontSize.base,
+                fontWeight: fontWeight.medium
               }}
             >
               Cancel

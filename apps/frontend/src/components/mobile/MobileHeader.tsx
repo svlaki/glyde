@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
 import { mobileHeaderStyles } from '../../styles/mobileStyles'
 import { MobileMenu } from './MobileMenu'
 
@@ -14,6 +15,7 @@ interface MobileHeaderProps {
 export function MobileHeader({ title, onBack, actions, showMenu = false }: MobileHeaderProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
@@ -73,9 +75,9 @@ export function MobileHeader({ title, onBack, actions, showMenu = false }: Mobil
         )}
         <h1 style={{
           flex: 1,
-          fontSize: mobileHeaderStyles.titleFontSize,
-          fontWeight: mobileHeaderStyles.titleFontWeight,
-          letterSpacing: mobileHeaderStyles.titleLetterSpacing,
+          ...typography.headingLg,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
           margin: 0,
           color: colors.textPrimary
         }}>

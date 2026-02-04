@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useAuth } from '../lib/authContext'
-import { PageHeader } from '../components/PageHeader'
 import { PlanTimeline } from '../components/PlanTimeline'
 import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 import { fetchUserPlan, createUserPlan, updateUserPlan, LifePlan } from '../lib/planService'
 import { fetchUserGoals, Goal } from '../lib/goalService'
 import { supabase } from '../lib/supabase'
@@ -26,6 +27,7 @@ function PlanPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const { user, session } = useAuth()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
 
   const [plan, setPlan] = useState<LifePlan | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
@@ -252,16 +254,16 @@ function PlanPageDesktop() {
       <div style={{
         height: '100vh',
         display: 'flex',
-        flexDirection: 'column',
-        background: colors.bgSecondary
+        background: colors.bgPrimary
       }}>
-        <PageHeader />
+        <VerticalSidebar />
         <div style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: colors.textSecondary
+          color: colors.textSecondary,
+          marginLeft: `${SIDEBAR_WIDTH}px`,
         }}>
           Loading...
         </div>
@@ -276,13 +278,13 @@ function PlanPageDesktop() {
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
-      background: colors.bgSecondary
+      background: colors.bgPrimary
     }}>
-      <PageHeader />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
 
-      {/* Main content area - Two columns */}
+      {/* Main content area - Two columns, offset by sidebar */}
       <div
         ref={containerRef}
         style={{
@@ -291,6 +293,7 @@ function PlanPageDesktop() {
           overflow: 'hidden',
           padding: '16px',
           gap: '16px',
+          marginLeft: `${SIDEBAR_WIDTH}px`,
           userSelect: (isResizingLeft || isResizingChat) ? 'none' : 'auto'
         }}
       >
@@ -363,15 +366,15 @@ function PlanPageDesktop() {
                   flexShrink: 0
                 }}>
                   <h2 style={{
+                    ...typography.headingLg,
                     margin: 0,
-                    fontSize: '18px',
-                    fontWeight: '600',
+                    fontWeight: 600,
                     color: colors.textPrimary
                   }}>
                     {plan.title}
                   </h2>
                   <span style={{
-                    fontSize: '12px',
+                    ...typography.labelSm,
                     color: colors.textTertiary
                   }}>
                     {isEditing ? 'Editing...' : 'Click to edit'}
@@ -473,9 +476,9 @@ function PlanPageDesktop() {
             minHeight: '150px'
           }}>
             <h3 style={{
+              ...typography.headingMd,
               margin: '0 0 12px 0',
-              fontSize: '14px',
-              fontWeight: '600',
+              fontWeight: 600,
               color: colors.textPrimary
             }}>
               Goal Timelines
@@ -483,8 +486,8 @@ function PlanPageDesktop() {
 
             {goalsWithMilestones.length === 0 ? (
               <div style={{
+                ...typography.bodySm,
                 color: colors.textSecondary,
-                fontSize: '13px',
                 padding: '20px',
                 textAlign: 'center'
               }}>
@@ -499,8 +502,8 @@ function PlanPageDesktop() {
                     padding: '12px'
                   }}>
                     <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
+                      ...typography.labelMd,
+                      fontWeight: 500,
                       color: colors.textPrimary,
                       marginBottom: '8px'
                     }}>

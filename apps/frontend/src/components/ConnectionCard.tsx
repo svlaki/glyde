@@ -1,5 +1,6 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Connection } from '../lib/connectionService'
 
 interface ConnectionCardProps {
@@ -92,8 +93,8 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
 
           <div>
             <h3 style={{
-              fontSize: '16px',
-              fontWeight: '500',
+              fontSize: fontSize.lg,
+              fontWeight: fontWeight.medium,
               color: colors.textPrimary,
               margin: 0
             }}>
@@ -101,7 +102,7 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
             </h3>
             {connection.calendar_name && (
               <p style={{
-                fontSize: '13px',
+                fontSize: fontSize.sm,
                 color: colors.textSecondary,
                 margin: '2px 0 0 0'
               }}>
@@ -115,8 +116,8 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
         <span style={{
           padding: '4px 10px',
           borderRadius: '12px',
-          fontSize: '12px',
-          fontWeight: '500',
+          fontSize: fontSize.xs,
+          fontWeight: fontWeight.medium,
           background: `${statusColors[actualSyncStatus]}15`,
           color: statusColors[actualSyncStatus]
         }}>
@@ -127,7 +128,7 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
       {/* Error Message */}
       {connection.sync_error && connection.sync_status === 'error' && (
         <p style={{
-          fontSize: '12px',
+          fontSize: fontSize.xs,
           color: '#ef4444',
           margin: '12px 0 0 0',
           padding: '8px 12px',
@@ -151,7 +152,7 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
             disabled={actualSyncStatus === 'syncing'}
             style={{
               padding: '6px 12px',
-              fontSize: '12px',
+              fontSize: fontSize.xs,
               background: 'transparent',
               color: actualSyncStatus === 'syncing' ? colors.textTertiary : colors.textSecondary,
               border: `1px solid ${colors.border}`,
@@ -166,7 +167,7 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
             onClick={onDisconnect}
             style={{
               padding: '6px 12px',
-              fontSize: '12px',
+              fontSize: fontSize.xs,
               background: 'transparent',
               color: '#c66',
               border: '1px solid #c66',
@@ -180,7 +181,7 @@ export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: 
 
         {/* Last Synced */}
         <span style={{
-          fontSize: '11px',
+          fontSize: fontSize.xs,
           color: colors.textTertiary
         }}>
           Last synced: {formatDate(connection.last_synced_at)}

@@ -1,6 +1,8 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import { Category } from '../lib/categoryService'
 import { getColors } from '../styles/colors'
+import { getTypography, fontWeight, lineHeight } from '../styles/typography'
+import { usePlatform } from '../hooks/usePlatform'
 
 interface AspectCardProps {
   aspect: Category
@@ -12,7 +14,9 @@ interface AspectCardProps {
 
 export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: AspectCardProps) {
   const { isDarkMode } = useDarkMode()
+  const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(isMobile)
 
   return (
     <div
@@ -40,8 +44,8 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: '14px',
-            fontWeight: '600',
+            ...typography.labelLg,
+            fontWeight: fontWeight.semibold,
             color: colors.textPrimary,
             marginBottom: '2px'
           }}>
@@ -49,9 +53,9 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
           </div>
           {aspect.description && (
             <div style={{
-              fontSize: '12px',
+              ...typography.bodySm,
               color: colors.textSecondary,
-              lineHeight: '1.4'
+              lineHeight: lineHeight.tight
             }}>
               {aspect.description}
             </div>

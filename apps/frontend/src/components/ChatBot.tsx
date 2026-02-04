@@ -5,7 +5,9 @@ import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { mobileSpacing } from '../styles/mobileStyles'
+import { ClearButton } from './ui/IconButtons'
 
 interface Message {
   id: string
@@ -100,6 +102,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const { refreshCategories } = useCategories()
   const location = useLocation()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false) // Desktop-scaled mobile fonts
 
   // Derive current page from pathname
   const getCurrentPage = (): string => {
@@ -398,7 +401,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       sender: 'user',
       timestamp: new Date(),
       hasImage: !!imageToSend,
-      imageData: imageToSend?.base64  // Store for context window
+      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {})  // Store for context window
     }
     setMessages(prev => [...prev, userMessage])
     setInput('')
@@ -498,9 +501,9 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
         // Parse status updates from the stream
         // Format: [STATUS:message] - extract and show in toolStatus
         const statusMatch = chunk.match(/\[STATUS:([^\]]+)\]/g)
-        if (statusMatch) {
+        if (statusMatch && statusMatch.length > 0) {
           // Extract the last status message
-          const lastStatus = statusMatch[statusMatch.length - 1]
+          const lastStatus = statusMatch[statusMatch.length - 1]!
           const statusContent = lastStatus.replace(/\[STATUS:|\]/g, '')
           setToolStatus(statusContent)
 
@@ -604,7 +607,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: colors.bgPrimary,
+      background: colors.bgSecondary,
     }}>
       {/* Header */}
       {!hideHeader && (
@@ -626,10 +629,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
               flex: 1,
             }}>
               <span style={{
-                fontSize: '16px',
-                fontWeight: '600',
+                fontSize: fontSize.lg,
+                fontWeight: fontWeight.semibold,
                 color: colors.textPrimary,
-                fontFamily: '"EB Garamond", Georgia, serif',
+                fontFamily: fontFamily.serif,
               }}>
                 Assistant
               </span>
@@ -646,9 +649,9 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   transform: 'translateY(1px)',  // Visually align dot with text baseline
                 }} />
                 <span style={{
-                  fontSize: '12px',
+                  fontSize: fontSize.xs,
                   color: colors.textTertiary,
-                  fontWeight: '500',
+                  fontWeight: fontWeight.medium,
                 }}>
                   {isLoading ? 'Typing...' : 'Online'}
                 </span>
@@ -682,92 +685,46 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             </button>
           </div>
         ) : (
-          /* Desktop layout with icon */
+          /* Desktop layout - Mobile-style header */
           <div style={{
-            padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px)',
-            borderBottom: `1px solid ${colors.borderLight}`,
-            background: colors.bgPrimary,
+            padding: '12px 16px',
+            borderBottom: `1px solid ${colors.border}`,
+            background: colors.bgSecondary,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{
+                ...typography.headingLg,
+                fontWeight: fontWeight.bold,
+                margin: 0,
+                color: colors.textPrimary,
+              }}>
+                Chat
+              </h3>
               <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
-                background: `linear-gradient(135deg, ${hexToRgba(colors.textSecondary, 0.1)}, ${hexToRgba(colors.textSecondary, 0.05)})`,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                border: `1px solid ${colors.borderLight}`,
+                gap: '5px',
               }}>
-
-              </div>
-              <div>
-                <h3 style={{
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  margin: 0,
-                  color: colors.textPrimary,
-                  fontFamily: '"EB Garamond", Georgia, serif',
-                  letterSpacing: '0.01em',
-                }}>
-                  Assistant
-                </h3>
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  marginTop: '1px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: isLoading ? '#fbbf24' : '#4ade80',
+                }} />
+                <span style={{
+                  ...typography.labelMd,
+                  color: colors.textTertiary,
                 }}>
-                  <div style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: isLoading ? '#fbbf24' : '#4ade80',
-                    boxShadow: isLoading
-                      ? '0 0 6px rgba(251, 191, 36, 0.4)'
-                      : '0 0 6px rgba(74, 222, 128, 0.4)',
-                  }} />
-                  <span style={{
-                    fontSize: '11px',
-                    color: colors.textTertiary,
-                    fontWeight: '500',
-                  }}>
-                    {isLoading ? 'Typing...' : 'Online'}
-                  </span>
-                </div>
+                  {isLoading ? 'Typing...' : 'Online'}
+                </span>
               </div>
             </div>
 
-            <button
-              onClick={handleClearChat}
-              title="Clear conversation"
-              style={{
-                padding: '8px',
-                background: 'transparent',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                color: colors.textTertiary,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = colors.bgTertiary
-                e.currentTarget.style.color = colors.textSecondary
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = colors.textTertiary
-              }}
-            >
-              <ClearIcon size={16} />
-            </button>
+            <ClearButton onClick={handleClearChat} title="Clear conversation" />
           </div>
         )
       )}
@@ -803,9 +760,9 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   padding: '12px 0',
                 }}>
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: fontSize.xs,
                     color: colors.textTertiary,
-                    background: colors.bgPrimary,
+                    background: colors.bgSecondary,
                     padding: '4px 12px',
                     borderRadius: '12px',
                     border: `1px solid ${colors.borderLight}`,
@@ -831,12 +788,12 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   <div style={{ position: 'relative', maxWidth: mobileEmbedded ? '100%' : '85%' }}>
                     <div style={{
                       padding: '10px 14px',
-                      borderRadius: `14px 14px ${isLast ? '4px' : '14px'} 14px`,
+                      borderRadius: `14px 14px 14px 14px`,
                       background: accent.userBubble,
                       color: accent.userText,
-                      fontSize: '16px',
-                      lineHeight: '1.5',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      fontSize: fontSize.lg,
+                      lineHeight: lineHeight.normal,
+                      fontFamily: fontFamily.sans,
                       wordBreak: 'break-word',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
@@ -863,7 +820,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                       position: 'absolute',
                       bottom: '-18px',
                       right: '4px',
-                      fontSize: '10px',
+                      fontSize: fontSize.xs,
                       color: colors.textTertiary,
                       opacity: isHovered ? 1 : 0,
                       transition: 'opacity 0.15s ease',
@@ -884,10 +841,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   onMouseLeave={() => setHoveredMessageId(null)}
                 >
                   <div className="chat-markdown" style={{
-                    fontSize: '16px',
-                    lineHeight: '1.55',
+                    fontSize: fontSize.lg,
+                    lineHeight: lineHeight.normal,
                     color: colors.textPrimary,
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontFamily: fontFamily.serif
                   }}>
                     <ReactMarkdown
                       components={{
@@ -896,7 +853,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                         ),
                         strong: ({ children }) => (
                           <strong style={{
-                            fontWeight: 600,
+                            fontWeight: fontWeight.semibold,
                             color: colors.textPrimary,
                           }}>{children}</strong>
                         ),
@@ -935,8 +892,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                             background: colors.bgTertiary,
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            fontSize: '14px',
-                            fontFamily: 'monospace',
+                            fontSize: fontSize.base,
+                            fontFamily: fontFamily.mono,
                           }}>{children}</code>
                         ),
                       }}
@@ -957,7 +914,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   </div>
                   {/* Timestamp on hover */}
                   <div style={{
-                    fontSize: '10px',
+                    fontSize: fontSize.xs,
                     color: colors.textTertiary,
                     opacity: isHovered ? 1 : 0,
                     transition: 'opacity 0.15s ease',
@@ -978,10 +935,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             animation: 'messageSlideIn 0.25s ease-out',
           }}>
             <div className="chat-markdown" style={{
-              fontSize: '16px',
+              fontSize: fontSize.lg,
               color: colors.textPrimary,
-              lineHeight: '1.55',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              lineHeight: lineHeight.normal,
+              fontFamily: fontFamily.sans,
             }}>
               <ReactMarkdown
                 components={{
@@ -1017,7 +974,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             gap: '8px',
           }}>
             <span style={{
-              fontSize: '15px',
+              fontSize: fontSize.base,
               color: colors.textSecondary,
               fontStyle: 'italic',
             }}>
@@ -1066,7 +1023,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 animation: 'pulse 1s infinite',
               }} />
               <span style={{
-                fontSize: '12px',
+                fontSize: fontSize.xs,
                 color: colors.textSecondary,
               }}>
                 {toolStatus}
@@ -1097,7 +1054,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 background: colors.bgSecondary,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '20px',
-                fontSize: '13px',
+                fontSize: fontSize.sm,
                 color: colors.textSecondary,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1130,7 +1087,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
           ? '0'
           : 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
         paddingBottom: mobileEmbedded ? '0' : 'clamp(12px, 2vh, 16px)',
-        borderTop: mobileEmbedded ? 'none' : `1px solid ${colors.borderLight}`,
         background: mobileEmbedded ? 'transparent' : colors.bgSecondary,
         flexShrink: 0,
       }}>
@@ -1148,7 +1104,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
           <div style={{
             marginBottom: '8px',
             padding: '8px',
-            background: colors.bgPrimary,
+            background: colors.bgSecondary,
             border: `1px solid ${colors.border}`,
             borderRadius: '12px',
             display: 'flex',
@@ -1167,7 +1123,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             />
             <span style={{
               flex: 1,
-              fontSize: '13px',
+              fontSize: fontSize.sm,
               color: colors.textSecondary,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -1211,7 +1167,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             display: 'flex',
             gap: mobileEmbedded ? '6px' : '10px',
             alignItems: 'flex-end',
-            background: colors.bgPrimary,
+            background: colors.bgSecondary,
             border: `1px solid ${colors.border}`,
             borderRadius: mobileEmbedded ? '10px' : '14px',
             padding: mobileEmbedded ? '2px 2px 2px 10px' : '4px 4px 4px 14px',
@@ -1235,7 +1191,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 padding: 0,
                 paddingTop: mobileEmbedded ? '5px' : '7px',
                 border: 'none',
-                fontSize: '15px',
+                fontSize: fontSize.base,
                 background: 'transparent',
                 color: colors.textPrimary,
                 resize: 'none',
@@ -1243,7 +1199,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 maxHeight: mobileEmbedded ? '80px' : '100px',
                 overflowY: 'auto',
                 fontFamily: 'inherit',
-                lineHeight: '1.4',
+                lineHeight: lineHeight.tight,
                 outline: 'none',
               }}
               onInput={(e) => {
@@ -1359,12 +1315,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             marginTop: '8px',
             textAlign: 'center',
           }}>
-            <span style={{
-              fontSize: '11px',
-              color: colors.textTertiary,
-            }}>
-              Press Enter to send · Shift + Enter for new line
-            </span>
           </div>
         )}
       </div>

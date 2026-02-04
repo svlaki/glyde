@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useCategories } from '../lib/categoryContext'
 import { Category } from '../lib/categoryService'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
 import { useDarkMode } from '../lib/darkModeContext'
+import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 
 interface AspectFormProps {
   aspect?: Category | undefined
@@ -68,10 +70,10 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
     try {
       const contextValue = typeof context === 'string' && context.trim() ? { text: context.trim() } : undefined
       await onSave({
-        id: aspect?.id,
+        ...(aspect?.id ? { id: aspect.id } : {}),
         name: name.trim(),
-        description: description.trim() || undefined,
-        color,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(color ? { color } : {}),
         ...(contextValue ? { context: contextValue } : {})
       })
       onClose()
@@ -92,8 +94,8 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
       style={{
         width: '100%',
         padding: '0',
-        fontSize: '20px',
-        fontWeight: '600',
+        fontSize: fontSize.xl,
+        fontWeight: fontWeight.semibold,
         background: 'transparent',
         color: colors.textPrimary,
         border: 'none',
@@ -117,8 +119,8 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '13px',
-                fontWeight: '500',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.medium,
                 color: colors.textSecondary,
                 marginBottom: '6px'
               }}>
@@ -131,7 +133,7 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  fontSize: '14px',
+                  fontSize: fontSize.base,
                   background: colors.bgPrimary,
                   color: colors.textPrimary,
                   border: `1px solid ${colors.border}`,
@@ -145,8 +147,8 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '13px',
-                fontWeight: '500',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.medium,
                 color: colors.textSecondary,
                 marginBottom: '6px'
               }}>
@@ -160,7 +162,7 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                     onClick={() => setColor(presetColor)}
                     style={{
                       width: '16px',
-                      height: '16pxpx',
+                      height: '16px',
                       borderRadius: '4px',
                       background: presetColor,
                       border: color === presetColor ? `3px solid ${colors.textPrimary}` : 'none',
@@ -182,8 +184,8 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
             <div>
               <label style={{
                 display: 'block',
-                fontSize: '13px',
-                fontWeight: '500',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.medium,
                 color: colors.textSecondary,
                 marginBottom: '6px'
               }}>
@@ -197,7 +199,7 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  fontSize: '14px',
+                  fontSize: fontSize.base,
                   background: colors.bgPrimary,
                   color: colors.textPrimary,
                   border: `1px solid ${colors.border}`,
@@ -215,36 +217,16 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
             marginTop: '24px',
             justifyContent: 'flex-end'
           }}>
-            <button
-              type="button"
+            <CancelTextButton
               onClick={onClose}
               disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="btn btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                cursor: (loading || !name.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !name.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : aspect ? 'Update' : 'Create'}
-            </button>
+            />
+            <SaveTextButton
+              onClick={(e) => handleSubmit(e)}
+              disabled={!name.trim()}
+              loading={loading}
+              isCreate={!aspect}
+            />
           </div>
         </form>
     </Modal>

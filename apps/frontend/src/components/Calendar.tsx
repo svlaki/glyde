@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useCategories } from '../lib/categoryContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { fetchUserEvents, fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent } from '../lib/calendarService'
+import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typography'
 import { EventForm } from './EventForm'
 import { RecurringEventView } from './RecurringEventView'
 import { EditRecurringEventModal } from './EditRecurringEventModal'
@@ -29,9 +30,10 @@ type ViewType = 'day' | 'week' | 'month'
 
 export function Calendar() {
   const { user, session } = useAuth()
-  const { getCategoryColor, categories, refreshCategories } = useCategories()
+  const { getCategoryColor } = useCategories()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false) // Desktop-scaled mobile fonts
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [view, setView] = useState<ViewType>('week')
@@ -112,12 +114,12 @@ export function Calendar() {
 
 
   // Parse time string flexibly (supports "2:30pm", "14:30", "2pm", etc.)
-  const parseTime = (timeStr: string): { hours: number; minutes: number } | null => {
+  const _parseTime = (timeStr: string): { hours: number; minutes: number } | null => {
     const cleaned = timeStr.trim().toLowerCase()
 
     // Try 24-hour format (14:30, 9:15)
     const time24Match = cleaned.match(/^(\d{1,2}):(\d{2})$/)
-    if (time24Match) {
+    if (time24Match && time24Match[1] && time24Match[2]) {
       const hours = parseInt(time24Match[1])
       const minutes = parseInt(time24Match[2])
       if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
@@ -127,7 +129,7 @@ export function Calendar() {
 
     // Try 12-hour format with am/pm (2:30pm, 2:30 pm, 9am)
     const time12Match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/)
-    if (time12Match) {
+    if (time12Match && time12Match[1]) {
       let hours = parseInt(time12Match[1])
       const minutes = time12Match[2] ? parseInt(time12Match[2]) : 0
       const meridiem = time12Match[3]
@@ -147,7 +149,7 @@ export function Calendar() {
 
     // Try just hour number (assume next upcoming time in 24h format)
     const hourMatch = cleaned.match(/^(\d{1,2})$/)
-    if (hourMatch) {
+    if (hourMatch && hourMatch[1]) {
       const hours = parseInt(hourMatch[1])
       if (hours >= 0 && hours <= 23) {
         return { hours, minutes: 0 }
@@ -298,11 +300,11 @@ export function Calendar() {
     return `${displayHour}${ampm}`
   }
 
-  const formatDate = (date: Date) => {
+  const _formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const getDayName = (date: Date) => {
+  const _getDayName = (date: Date) => {
     return date.toLocaleDateString('en-US', { weekday: 'short' })
   }
 
@@ -426,8 +428,8 @@ export function Calendar() {
             title: eventData.title!,
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
-            description: eventData.description,
-            category: eventData.category
+            ...(eventData.description ? { description: eventData.description } : {}),
+            ...(eventData.category ? { category: eventData.category } : {})
           },
           session?.access_token
         )
@@ -454,8 +456,8 @@ export function Calendar() {
             title: eventData.title!,
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
-            description: eventData.description,
-            category: eventData.category
+            ...(eventData.description ? { description: eventData.description } : {}),
+            ...(eventData.category ? { category: eventData.category } : {})
           },
           session?.access_token
         )
@@ -723,40 +725,56 @@ export function Calendar() {
   return (
     <div style={{
       height: '100%',
+      width: '100%',
+      flex: 1,
       background: colors.bgSecondary,
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
       position: 'relative'
     }}>
-      {/* Calendar Header */}
+      {/* Calendar Header - Mobile-style design */}
       <div style={{
-        padding: '0 20px 20px 20px',
+        padding: '12px 16px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        borderBottom: `1px solid ${colors.border}`,
+        background: colors.bgSecondary,
       }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '600', color: colors.textPrimary, letterSpacing: '0.02em' }}>
+        <h2 style={{
+          ...typography.headingLg,
+          fontWeight: fontWeight.bold,
+          color: colors.textPrimary,
+          margin: 0
+        }}>
           {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h2>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {/* View Toggle */}
-          <div style={{ display: 'flex', gap: '3px', marginRight: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* View Toggle - Mobile pill style */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            background: colors.bgTertiary,
+            padding: '4px',
+            borderRadius: '10px'
+          }}>
             {(['day', 'week', 'month'] as ViewType[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 style={{
-                  padding: '6px 12px',
-                  fontSize: '12px',
-                  background: view === v ? (isDarkMode ? '#d0d0d0' : '#000') : colors.bgTertiary,
-                  color: view === v ? (isDarkMode ? '#2a2a2a' : '#fff') : colors.textSecondary,
-                  border: view === v ? 'none' : `1px solid ${colors.border}`,
+                  padding: '6px 14px',
+                  ...typography.labelLg,
+                  fontWeight: view === v ? fontWeight.semibold : fontWeight.medium,
+                  background: view === v ? colors.bgSecondary : 'transparent',
+                  color: view === v ? colors.textPrimary : colors.textSecondary,
+                  border: 'none',
                   cursor: 'pointer',
                   textTransform: 'capitalize',
-                  borderRadius: '4px',
-                  fontWeight: '500',
-                  transition: 'all 0.2s'
+                  borderRadius: '8px',
+                  transition: 'all 0.15s',
+                  boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
                 }}
               >
                 {v}
@@ -764,82 +782,142 @@ export function Calendar() {
             ))}
           </div>
 
-          {/* Navigation */}
-          <button
-            onClick={handlePrev}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '12px' }}
-          >
-            ←
-          </button>
-          <button
-            onClick={() => setCurrentDate(new Date())}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '12px' }}
-          >
-            Today
-          </button>
-          <button
-            onClick={handleNext}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '12px' }}
-          >
-            →
-          </button>
+          {/* Navigation - Mobile style buttons */}
+          <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+            <button
+              onClick={handlePrev}
+              style={{
+                padding: '8px',
+                background: colors.bgTertiary,
+                color: colors.textSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = colors.bgHover
+                e.currentTarget.style.color = colors.textPrimary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textSecondary
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCurrentDate(new Date())}
+              style={{
+                padding: '8px 14px',
+                ...typography.labelLg,
+                fontWeight: 500,
+                background: colors.bgTertiary,
+                color: colors.textSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = colors.bgHover
+                e.currentTarget.style.color = colors.textPrimary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textSecondary
+              }}
+            >
+              Today
+            </button>
+            <button
+              onClick={handleNext}
+              style={{
+                padding: '8px',
+                background: colors.bgTertiary,
+                color: colors.textSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = colors.bgHover
+                e.currentTarget.style.color = colors.textPrimary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textSecondary
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Calendar Grid */}
       <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {view === 'month' ? (
-          // Month View
-          <div style={{ padding: '8px', height: '100%', overflow: 'hidden' }}>
+          // Month View - Mobile-style grid
+          <div style={{ padding: '0', height: '100%', overflow: 'hidden' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
               gridTemplateRows: 'auto repeat(6, 1fr)',
-              gap: '1px',
-              background: colors.border,
               height: '100%'
             }}>
-              {/* Week day headers */}
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} style={{
-                  padding: '6px',
+              {/* Week day headers - Match day/week view style */}
+              {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day, index) => (
+                <div key={index} style={{
+                  padding: '8px 4px',
                   textAlign: 'center',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  letterSpacing: '0.05em',
-                  color: colors.textSecondary,
+                  fontSize: fontSize.sm,
+                  fontFamily: fontFamily.sans,
+                  fontWeight: fontWeight.medium,
+                  color: colors.textTertiary,
                   background: colors.bgSecondary,
-                  minWidth: 0,
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em',
                 }}>
                   {day}
                 </div>
               ))}
-              {/* Month dates */}
+              {/* Month dates - Mobile-style cells */}
               {displayDates.map((date, idx) => {
                 const isToday = date.toDateString() === new Date().toDateString()
                 const isCurrentMonth = date.getMonth() === currentDate.getMonth()
                 const dayEvents = getEventsForDate(date)
+                const col = idx % 7
 
                 return (
                   <div
                     key={idx}
                     onClick={() => handleDayClick(date)}
                     style={{
-                      padding: '4px',
+                      padding: '8px',
                       background: colors.bgSecondary,
                       color: isCurrentMonth ? colors.textPrimary : colors.textTertiary,
                       cursor: 'pointer',
                       position: 'relative',
-                      transition: 'background 0.2s',
                       display: 'flex',
                       flexDirection: 'column',
                       minWidth: 0,
-                      minHeight: 0,
-                      overflow: 'hidden'
+                      minHeight: '80px',
+                      overflow: 'hidden',
+                      borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                      borderRight: col < 6 ? `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` : 'none',
+                      transition: 'background 0.15s'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = colors.bgHover
@@ -848,41 +926,40 @@ export function Calendar() {
                       e.currentTarget.style.background = colors.bgSecondary
                     }}
                   >
-                    {/* Date number */}
+                    {/* Date number - Mobile style circle for today */}
                     <div style={{
-                      fontSize: '14px',
-                      fontWeight: isToday ? '600' : '500',
+                      ...typography.bodySm,
+                      fontWeight: isToday ? 600 : 400,
                       color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : 'inherit',
                       background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : 'transparent',
-                      width: '25px',
-                      height: '25px',
+                      width: '26px',
+                      height: '26px',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginBottom: '2px',
+                      marginBottom: '6px',
                       flexShrink: 0
                     }}>
                       {date.getDate()}
                     </div>
 
-                    {/* Events */}
+                    {/* Events - Mobile style with 2 visible + "+X more" */}
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '2px',
+                      gap: '3px',
                       overflow: 'hidden',
                       flex: 1,
                       minHeight: 0
                     }}>
-                      {dayEvents.map((event) => {
+                      {dayEvents.slice(0, 2).map((event) => {
                         const eventColor = getEventColor(event)
                         return (
                           <div
                             key={event.id}
                             onClick={(e) => {
                               e.stopPropagation()
-                              // Check if this is a recurring event
                               if (event.is_recurring || event.parent_event_id) {
                                 setRecurringEventToView(event)
                                 setIsRecurringViewOpen(true)
@@ -892,33 +969,45 @@ export function Calendar() {
                               }
                             }}
                             style={{
-                              background: hexToRgba(eventColor, 0.15),
-                              borderLeft: `3px solid ${eventColor}`,
+                              background: hexToRgba(eventColor, 0.12),
+                              borderLeft: `2px solid ${eventColor}`,
                               color: colors.textPrimary,
-                              fontSize: '11px',
-                              padding: '2px 4px',
-                              borderRadius: '3px',
+                              fontSize: fontSize.xs,
+                              fontFamily: fontFamily.sans,
+                              fontWeight: fontWeight.medium,
+                              padding: '3px 6px',
+                              borderRadius: '4px',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               cursor: 'pointer',
                               transition: 'background 0.15s ease',
-                              flexShrink: 0,
-                              fontWeight: '500'
+                              flexShrink: 0
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, 0.25)
+                              e.currentTarget.style.background = hexToRgba(eventColor, 0.2)
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
+                              e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
                             }}
                             title={`${event.title}${getRecurrenceBadge(event) ? ' ♻️' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                           >
                             {event.title}
-                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px' }}>♻️</span>}
+                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '3px', fontSize: fontSize.xs }}>♻️</span>}
                           </div>
                         )
                       })}
+                      {dayEvents.length > 2 && (
+                        <div style={{
+                          fontSize: fontSize.xs,
+                          fontFamily: fontFamily.sans,
+                          fontWeight: fontWeight.medium,
+                          color: colors.textSecondary,
+                          padding: '2px 6px'
+                        }}>
+                          +{dayEvents.length - 2} more
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -926,35 +1015,59 @@ export function Calendar() {
             </div>
           </div>
         ) : (
-          // Day/Week View
+          // Day/Week View - Mobile-style design
           <div style={{ display: 'flex', minHeight: '100%', position: 'relative' }}>
-            {/* Time Column */}
+            {/* Time Column - Mobile-style sticky gutter with timezone */}
             <div style={{
-              width: '50px',
-              borderRight: `1px solid ${colors.border}`,
+              width: '52px',
               flexShrink: 0,
+              position: 'sticky',
+              left: 0,
+              zIndex: 20,
               background: colors.bgSecondary
             }}>
+              {/* Timezone header - sticky top */}
               <div style={{
-                height: '40px',
-                borderBottom: `1px solid ${colors.border}`,
                 position: 'sticky',
                 top: 0,
-                zIndex: 20
-              }} />
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: fontSize.xs,
+                fontFamily: fontFamily.sans,
+                fontWeight: fontWeight.normal,
+                color: colors.textTertiary,
+                background: colors.bgSecondary,
+                zIndex: 30,
+              }}>
+                {new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()}
+              </div>
+              {/* Spacer for gap between header and first hour */}
+              <div style={{ height: '12px' }} />
               {hours.map(hour => (
                 <div
                   key={hour}
                   style={{
                     height: '60px',
-                    borderBottom: `1px solid ${colors.border}`,
-                    padding: '4px',
-                    fontSize: '12px',
-                    color: colors.textSecondary,
-                    textAlign: 'center'
+                    position: 'relative'
                   }}
                 >
-                  {formatTime(hour)}
+                  <span style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: 'translateY(-50%)',
+                    fontSize: fontSize.xs,
+                    fontFamily: fontFamily.sans,
+                    color: colors.textTertiary,
+                    background: colors.bgSecondary,
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {formatTime(hour)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -968,33 +1081,40 @@ export function Calendar() {
                   key={dayIndex}
                   style={{
                     flex: 1,
-                    minWidth: view === 'day' ? '300px' : '100px'
+                    minWidth: view === 'day' ? '300px' : '100px',
+                    position: 'relative'
                   }}
                 >
-                  {/* Day Header */}
+                  {/* Day Header - Mobile style */}
                   <div style={{
-                    height: '40px',
-                    borderBottom: `1px solid ${colors.border}`,
-                    padding: '6px',
-                    textAlign: 'center',
-                    background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : colors.bgSecondary,
-                    color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : colors.textPrimary,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
                     position: 'sticky',
                     top: 0,
-                    zIndex: 15
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: fontSize.sm,
+                    fontFamily: fontFamily.sans,
+                    fontWeight: fontWeight.medium,
+                    color: isToday ? colors.error : colors.textTertiary,
+                    background: colors.bgSecondary,
+                    zIndex: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
                   }}>
-                    <div style={{ fontSize: '10px', fontWeight: '500' }}>
-                      {getDayName(date)}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '600' }}>
+                    <span>
+                      {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][date.getDay()]}
+                    </span>
+                    <span style={{ fontWeight: isToday ? fontWeight.semibold : fontWeight.medium }}>
                       {date.getDate()}
-                    </div>
+                    </span>
                   </div>
 
-                  {/* Time Slots - 15 minute intervals */}
+                  {/* Spacer for gap between header and first hour */}
+                  <div style={{ height: '12px' }} />
+
+                  {/* Time Slots - Mobile-style hour grid */}
                   {hours.map(hour => {
                     const slotEvents = getEventsForSlot(date, hour)
                     const isPreviewSlot = dragPreview &&
@@ -1010,18 +1130,10 @@ export function Calendar() {
                       >
                         {/* Four 15-minute blocks per hour for drag/drop precision */}
                         {[0, 1, 2, 3].map(quarter => {
-                          // Only show borders at hour (:00) and half-hour (:30) marks
-                          let borderStyle
-                          if (quarter === 3) {
-                            // Hour boundary - solid line
-                            borderStyle = `1px solid ${colors.border}`
-                          } else if (quarter === 1) {
-                            // 30-minute mark - solid line
-                            borderStyle = `1px solid ${colors.border}`
-                          } else {
-                            // No border at :15 and :45
-                            borderStyle = 'none'
-                          }
+                          // Mobile-style: subtle borders at hour marks only
+                          const borderStyle = quarter === 3
+                            ? `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                            : 'none'
 
                           return (
                             <div
@@ -1033,13 +1145,10 @@ export function Calendar() {
                                 cursor: 'pointer',
                                 transition: 'background 0.1s',
                                 position: 'relative'
-                                // Allow pointer events even when dragging so drop zones work
                               }}
                               onClick={(e) => {
-                                // Only handle clicks when not dragging
                                 if (!draggingEvent) {
                                   e.stopPropagation()
-                                  // Convert quarter to halfHour for compatibility with existing click handler
                                   const halfHour = Math.floor(quarter / 2)
                                   handleCalendarClick(date, hour, halfHour)
                                 }
@@ -1073,7 +1182,7 @@ export function Calendar() {
                           />
                         )}
 
-                        {/* Render events */}
+                        {/* Render events - Mobile-style cards with left border */}
                         {slotEvents.map(event => {
                           const { top, height } = getEventStyle(event)
                           const layout = getEventLayout(event, slotEvents)
@@ -1092,7 +1201,6 @@ export function Calendar() {
                               onDragEnd={handleDragEnd}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                // Check if this is a recurring event
                                 if (event.is_recurring || event.parent_event_id) {
                                   setRecurringEventToView(event)
                                   setIsRecurringViewOpen(true)
@@ -1104,51 +1212,51 @@ export function Calendar() {
                               style={{
                                 position: 'absolute',
                                 top: `${top}px`,
-                                left: layout.left,
-                                right: layout.right,
+                                left: layout.left === '2px' ? '4px' : layout.left,
+                                right: layout.right === '2px' ? '4px' : layout.right,
                                 width: layout.width,
                                 height: `${height}px`,
-                                background: hexToRgba(eventColor, 0.15),
-                                borderTop: `4px solid ${eventColor}`,
-                                color: colors.textPrimary,
-                                borderRadius: '0 0 3px 3px',
-                                padding: '2px 6px 3px 6px',
-                                fontSize: '11px',
-                                fontWeight: '500',
+                                background: hexToRgba(eventColor, 0.12),
+                                borderLeft: `3px solid ${eventColor}`,
+                                color: eventColor,
+                                borderRadius: '4px',
+                                padding: '3px 8px',
                                 overflow: 'hidden',
                                 zIndex: layout.zIndex,
                                 cursor: draggingEvent?.id === event.id ? 'grabbing' : 'grab',
                                 transition: 'background 0.15s ease',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '1px'
+                                gap: '2px'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, 0.25)
+                                e.currentTarget.style.background = hexToRgba(eventColor, 0.2)
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, 0.15)
+                                e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
                               }}
                               title={`${event.title}${getRecurrenceBadge(event) ? ' ♻️' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                             >
                               <div style={{
-                                fontSize: '11px',
-                                fontWeight: '600',
-                                color: colors.textPrimary,
+                                ...typography.labelMd,
+                                fontWeight: fontWeight.semibold,
+                                color: eventColor,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '3px'
+                                gap: '4px'
                               }}>
                                 <span>{event.title}</span>
-                                {getRecurrenceBadge(event) && <span style={{ fontSize: '10px', flexShrink: 0 }}>♻️</span>}
+                                {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, flexShrink: 0 }}>♻️</span>}
                               </div>
-                              {height > 25 && (
+                              {height > 30 && (
                                 <div style={{
-                                  fontSize: '10px',
-                                  color: colors.textSecondary,
+                                  fontSize: fontSize.xs,
+                                  fontFamily: fontFamily.sans,
+                                  color: eventColor,
+                                  opacity: 0.8,
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
@@ -1166,13 +1274,13 @@ export function Calendar() {
               )
             })}
 
-            {/* Current Time Indicator */}
+            {/* Current Time Indicator - Mobile style (time in gutter + continuous red line) */}
             {(() => {
               const now = currentTime
               const currentHour = now.getHours()
               const currentMinutes = now.getMinutes()
-              // Position: (hour * 60px) + (minutes as fraction of hour * 60px) + 40px header
-              const topPosition = (currentHour * 60) + (currentMinutes / 60 * 60) + 40
+              // Position: (hour * 60px) + (minutes as fraction of hour * 60px) + 36px header
+              const topPosition = (currentHour * 60) + (currentMinutes / 60 * 60) + 36
 
               // Only show if today is in the current view
               const todayInView = displayDates.some(date =>
@@ -1181,40 +1289,36 @@ export function Calendar() {
 
               if (!todayInView) return null
 
-              // Format time display
-              const displayHour = currentHour === 0 ? 12 : currentHour > 12 ? currentHour - 12 : currentHour
-              const ampm = currentHour >= 12 ? 'PM' : 'AM'
-              const timeString = `${displayHour}:${currentMinutes.toString().padStart(2, '0')} ${ampm}`
-
               return (
                 <>
-                  {/* Time text with bubble background */}
+                  {/* Time label in gutter - uses error color */}
                   <div style={{
                     position: 'absolute',
-                    left: '2px',
+                    left: '0',
                     top: `${topPosition}px`,
-                    fontSize: '10px',
-                    fontWeight: '600',
-                    color: '#fff',
-                    background: '#ef4444',
-                    padding: '3px 6px',
-                    borderRadius: '10px',
-                    zIndex: 10,
+                    width: '52px',
                     transform: 'translateY(-50%)',
+                    fontSize: fontSize.xs,
+                    fontFamily: fontFamily.sans,
+                    fontWeight: fontWeight.semibold,
+                    color: colors.error,
+                    background: colors.bgSecondary,
+                    textAlign: 'center',
+                    zIndex: 25,
                     whiteSpace: 'nowrap'
                   }}>
-                    {timeString}
+                    {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </div>
 
-                  {/* Red line across entire calendar */}
+                  {/* Continuous red line across all columns */}
                   <div style={{
                     position: 'absolute',
-                    left: '50px',
+                    left: '52px',
                     top: `${topPosition}px`,
-                    width: 'calc(100% - 50px)',
+                    width: 'calc(100% - 52px)',
                     height: '2px',
-                    background: '#ef4444',
-                    zIndex: 5,
+                    background: colors.error,
+                    zIndex: 15,
                     pointerEvents: 'none'
                   }} />
                 </>
@@ -1249,17 +1353,19 @@ export function Calendar() {
       />
 
       {/* Edit Recurring Event Modal */}
-      <EditRecurringEventModal
-        isOpen={isRecurringEditOpen}
-        onClose={() => {
-          setIsRecurringEditOpen(false)
-          setRecurringEventToEdit(null)
-        }}
-        onSuccess={handleRecurringEditSuccess}
-        event={recurringEventToEdit}
-        user={user}
-        accessToken={session?.access_token}
-      />
+      {session?.access_token && (
+        <EditRecurringEventModal
+          isOpen={isRecurringEditOpen}
+          onClose={() => {
+            setIsRecurringEditOpen(false)
+            setRecurringEventToEdit(null)
+          }}
+          onSuccess={handleRecurringEditSuccess}
+          event={recurringEventToEdit}
+          user={user}
+          accessToken={session.access_token}
+        />
+      )}
     </div>
   )
 }

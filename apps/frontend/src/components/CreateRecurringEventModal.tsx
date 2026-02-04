@@ -5,6 +5,8 @@ import { createRecurringEvent } from '../lib/calendarService'
 import { buildRRuleFromForm, getNextOccurrences } from '../lib/recurrenceUtils'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
+import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 
 interface CreateRecurringEventModalProps {
   isOpen: boolean
@@ -159,8 +161,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -174,7 +176,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -187,8 +189,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -201,7 +203,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -214,8 +216,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -227,7 +229,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgSecondary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -245,8 +247,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -261,7 +263,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
               style={{
                 width: '60px',
                 padding: '8px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgSecondary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -269,7 +271,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
                 textAlign: 'center'
               }}
             />
-            <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+            <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
               {pattern === 'daily' ? 'day(s)' : pattern === 'weekly' ? 'week(s)' : pattern === 'monthly' ? 'month(s)' : 'year(s)'}
             </span>
           </div>
@@ -280,7 +282,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
+              fontSize: fontSize.sm,
               fontWeight: '500',
               color: colors.textSecondary,
               marginBottom: '6px'
@@ -317,8 +319,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
                     border: `1px solid ${daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
                     background: daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
                     color: daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
-                    fontSize: '11px',
-                    fontWeight: '600',
+                    fontSize: fontSize.xs,
+                    fontWeight: fontWeight.semibold,
                     cursor: 'pointer'
                   }}
                 >
@@ -334,7 +336,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
+              fontSize: fontSize.sm,
               fontWeight: '500',
               color: colors.textSecondary,
               marginBottom: '6px'
@@ -350,7 +352,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
               style={{
                 width: '60px',
                 padding: '8px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgSecondary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -365,8 +367,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -398,7 +400,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
                 style={{
                   width: '60px',
                   padding: '8px',
-                  fontSize: '14px',
+                  fontSize: fontSize.base,
                   background: colors.bgSecondary,
                   color: colors.textPrimary,
                   border: `1px solid ${colors.border}`,
@@ -406,7 +408,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
                   textAlign: 'center'
                 }}
               />
-              <span style={{ fontSize: '13px', color: colors.textSecondary }}>occurrences</span>
+              <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>occurrences</span>
             </div>
           )}
 
@@ -417,7 +419,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
               onChange={(e) => setUntilDate(e.target.value)}
               style={{
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -431,8 +433,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -446,7 +448,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -459,8 +461,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -474,7 +476,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -489,8 +491,8 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
         <div>
           <label style={{
             display: 'block',
-            fontSize: '13px',
-            fontWeight: '500',
+            fontSize: fontSize.sm,
+            fontWeight: fontWeight.medium,
             color: colors.textSecondary,
             marginBottom: '6px'
           }}>
@@ -504,7 +506,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             style={{
               width: '100%',
               padding: '10px 12px',
-              fontSize: '14px',
+              fontSize: fontSize.base,
               background: colors.bgPrimary,
               color: colors.textPrimary,
               border: `1px solid ${colors.border}`,
@@ -519,7 +521,7 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
             padding: '10px',
             background: colors.bgSecondary,
             borderRadius: '6px',
-            fontSize: '12px'
+            fontSize: fontSize.xs
           }}>
             <p style={{ color: colors.textSecondary, margin: '0 0 6px 0' }}>Next occurrences:</p>
             {preview.map((date, idx) => (
@@ -552,36 +554,16 @@ export function CreateRecurringEventModal({ isOpen, onClose, onSuccess, user }: 
           paddingTop: '8px',
           borderTop: `1px solid ${colors.border}`
         }}>
-          <button
-            type="button"
+          <CancelTextButton
             onClick={handleClose}
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              background: colors.bgPrimary,
-              color: colors.textSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading || !title.trim()}
-            className="btn btn-primary"
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-              opacity: (loading || !title.trim()) ? 0.5 : 1
-            }}
-          >
-            {loading ? 'Creating...' : 'Create Event'}
-          </button>
+          />
+          <SaveTextButton
+            onClick={(e) => handleSubmit(e)}
+            disabled={!title.trim()}
+            loading={loading}
+            isCreate
+          />
         </div>
       </form>
     </Modal>
