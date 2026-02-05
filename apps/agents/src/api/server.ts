@@ -32,7 +32,7 @@ initializeSupabase();
 import express from 'express';
 import cors from 'cors';
 import { createUserSchema } from './user.js';
-import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent, createRecurringEvent, getExpandedEvents, updateRecurringEvent, deleteRecurringEvent } from './events.js';
+import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent, createRecurringEvent, getExpandedEvents, updateRecurringEvent, deleteRecurringEvent, getFriendsEvents, toggleFriendEventVisibility } from './events.js';
 import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask } from './tasks.js';
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserPlan, createUserPlan, updateUserPlan, deleteUserPlan } from './plans.js';
@@ -55,6 +55,8 @@ import {
 import { getChatHistory, saveChatMessage, saveChatMessagesBatch, clearChatHistory } from './chat.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
+import friendshipRouter from './friendships.js';
+import sharedAspectsRouter from './shared-aspects.js';
 import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { authenticateRequest } from './middleware/auth.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
@@ -281,6 +283,7 @@ app.post('/api/user/create-schema', createUserSchema);
 // Events endpoints
 app.post('/api/events', getUserEvents);
 app.post('/api/events/expanded', getExpandedEvents);
+app.post('/api/events/friends', getFriendsEvents);
 app.post('/api/events/create', createUserEvent);
 app.post('/api/events/create-recurring', createRecurringEvent);
 app.post('/api/events/update', updateUserEvent);
@@ -347,6 +350,13 @@ app.post('/api/rules/create', createUserRule);
 app.post('/api/rules/update', updateUserRule);
 app.post('/api/rules/delete', deleteUserRule);
 app.post('/api/rules/toggle', toggleUserRule);
+
+// Friends endpoints
+app.use('/api/friends', friendshipRouter);
+app.post('/api/friends/:friendId/visibility', toggleFriendEventVisibility);
+
+// Shared aspects endpoints
+app.use('/api/shared-aspects', sharedAspectsRouter);
 
 // Connections endpoints (for calendar sync)
 app.post('/api/connections', getConnections);

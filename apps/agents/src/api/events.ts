@@ -426,3 +426,78 @@ export async function deleteRecurringEvent(req: Request, res: Response): Promise
     sendErrorResponse(res, 500, 'Failed to delete recurring event', { error });
   }
 }
+
+/**
+ * Get friends' visible events
+ * POST /api/events/friends
+ * Body: { user_id, start_date?, end_date? }
+ */
+export async function getFriendsEvents(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, start_date, end_date } = req.body;
+
+    if (!user_id) {
+      sendErrorResponse(res, 400, 'user_id is required');
+      return;
+    }
+
+    if (!validateUserId(user_id)) {
+      sendErrorResponse(res, 400, 'Invalid user_id format');
+      return;
+    }
+
+    logger.info('Fetching friends events', { user_id, start_date, end_date });
+
+    const events = await getSupabaseService().getFriendsEvents(user_id, start_date, end_date);
+
+    logger.info('Successfully fetched friends events', { count: events.length, user_id });
+
+    res.json({
+      success: true,
+      events: events
+    });
+  } catch (error) {
+    logger.error('Error fetching friends events', { error: error instanceof Error ? error.message : error });
+    sendErrorResponse(res, 500, 'Failed to fetch friends events', { error });
+  }
+}
+
+/**
+ * Toggle friend event visibility
+ * POST /api/friends/:friendId/visibility
+ * Body: { user_id, showEvents: boolean }
+ */
+export async function toggleFriendEventVisibility(req: Request, res: Response): Promise<void> {
+  try {
+    const { user_id, showEvents } = req.body;
+    const { friendId } = req.params;
+
+    if (!user_id || !friendId) {
+      sendErrorResponse(res, 400, 'user_id and friendId are required');
+      return;
+    }
+
+    if (typeof showEvents !== 'boolean') {
+      sendErrorResponse(res, 400, 'showEvents must be a boolean');
+      return;
+    }
+
+    logger.info('Toggling friend event visibility', { user_id, friendId, showEvents });
+
+    const result = await getSupabaseService().toggleFriendEventVisibility(user_id, friendId, showEvents);
+
+    if (!result.success) {
+      sendErrorResponse(res, 500, 'Failed to toggle visibility');
+      return;
+    }
+
+    logger.info('Successfully toggled friend event visibility', { user_id, friendId, showEvents });
+
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    logger.error('Error toggling visibility', { error: error instanceof Error ? error.message : error });
+    sendErrorResponse(res, 500, 'Failed to toggle visibility', { error });
+  }
+}

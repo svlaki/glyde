@@ -23,6 +23,7 @@ export interface DatabaseEvent {
   is_recurring?: boolean;  // Quick flag for recurring events
   is_instance?: boolean;  // Flag for event instances of a recurring series
   instance_date?: string;  // YYYY-MM-DD date for this specific instance
+  visibility?: 'private' | 'friends' | 'public';  // Event visibility setting
 }
 
 export interface DatabaseCategory {

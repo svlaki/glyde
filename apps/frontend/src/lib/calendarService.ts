@@ -799,3 +799,96 @@ export async function getAnalysisStatus(
   }
 }
 
+/**
+ * Fetch friends' visible events
+ */
+export async function fetchFriendsEvents(
+  user: User,
+  accessToken?: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<{ events: CalendarEvent[], error: string | null }> {
+  try {
+    if (!user) {
+      console.error('[calendarService] No user provided');
+      return { events: [], error: 'User not authenticated' }
+    }
+
+    const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events/friends`;
+    const body = {
+      user_id: user.id,
+      start_date: startDate ? startDate.toISOString() : null,
+      end_date: endDate ? endDate.toISOString() : null
+    };
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      console.error('[calendarService] Failed to fetch friends events:', response.status);
+      return { events: [], error: 'Failed to fetch friends events' }
+    }
+
+    const data = await response.json();
+    return { events: data.events || [], error: null };
+  } catch (error) {
+    console.error('[calendarService] Error fetching friends events:', error);
+    return { events: [], error: 'Network error' }
+  }
+}
+
+/**
+ * Toggle friend event visibility
+ */
+export async function toggleFriendEventVisibility(
+  userId: string,
+  friendId: string,
+  showEvents: boolean,
+  accessToken?: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/friends/${friendId}/visibility`;
+    const body = {
+      user_id: userId,
+      showEvents
+    };
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      console.error('[calendarService] Failed to toggle visibility:', response.status);
+      return { success: false, error: 'Failed to toggle visibility' }
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('[calendarService] Error toggling visibility:', error);
+    return { success: false, error: 'Network error' }
+  }
+}
+

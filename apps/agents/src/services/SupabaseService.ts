@@ -485,7 +485,8 @@ export class SupabaseService {
           location: location,
           description: description,
           category: event.category || 'Personal', // Keep for backward compatibility
-          category_id: categoryId
+          category_id: categoryId,
+          visibility: event.visibility || 'private' // Default to private for privacy
         })
         .select()
         .single();
@@ -634,6 +635,64 @@ export class SupabaseService {
     }
 
     return result;
+  }
+
+  /**
+   * Get friends' visible events for a user
+   */
+  async getFriendsEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    try {
+      let query = this.client
+        .from('events')
+        .select('*')
+        .in('visibility', ['friends', 'public'])
+        .neq('user_id', userId);
+
+      if (startDate) {
+        query = query.gte('start_time', startDate);
+      }
+      if (endDate) {
+        query = query.lte('end_time', endDate);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching friends events:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getFriendsEvents:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Toggle friend event visibility setting
+   */
+  async toggleFriendEventVisibility(userId: string, friendId: string, showEvents: boolean): Promise<{ success: boolean }> {
+    try {
+      const { error } = await this.client
+        .from('user_friend_visibility_settings')
+        .upsert({
+          user_id: userId,
+          friend_id: friendId,
+          show_events: showEvents,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error updating visibility settings:', error);
+        return { success: false };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in toggleFriendEventVisibility:', error);
+      return { success: false };
+    }
   }
 
   // ============================================================================
