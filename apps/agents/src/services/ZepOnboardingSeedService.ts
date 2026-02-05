@@ -56,7 +56,7 @@ export class ZepOnboardingSeedService {
       errors: []
     };
 
-    console.log(`🌱 [ZepOnboardingSeed] Starting Zep seeding for user ${userId}...`);
+    console.log(` [ZepOnboardingSeed] Starting Zep seeding for user ${userId}...`);
 
     // Seed thread-based facts (for natural language context retrieval)
     try {
@@ -79,9 +79,9 @@ export class ZepOnboardingSeedService {
     result.success = result.threadSeeded || result.graphSeeded;
 
     if (result.success) {
-      console.log(`✅ [ZepOnboardingSeed] Completed for user ${userId} (thread: ${result.threadSeeded}, graph: ${result.graphSeeded})`);
+      console.log(`[ZepOnboardingSeed] Completed for user ${userId} (thread: ${result.threadSeeded}, graph: ${result.graphSeeded})`);
     } else {
-      console.warn(`⚠️ [ZepOnboardingSeed] Both seeding methods failed for user ${userId}`);
+      console.warn(`[ZepOnboardingSeed] Both seeding methods failed for user ${userId}`);
     }
 
     return result;
@@ -120,7 +120,7 @@ export class ZepOnboardingSeedService {
       seeded_at: new Date().toISOString()
     });
 
-    console.log(`✅ [ZepOnboardingSeed] Thread facts seeded for user ${userId}`);
+    console.log(`[ZepOnboardingSeed] Thread facts seeded for user ${userId}`);
   }
 
   /**
@@ -223,7 +223,7 @@ export class ZepOnboardingSeedService {
       await this.seedHabitPatterns(userId, data.habits);
     }
 
-    console.log(`✅ [ZepOnboardingSeed] Graph entities seeded for user ${userId}`);
+    console.log(`[ZepOnboardingSeed] Graph entities seeded for user ${userId}`);
   }
 
   /**

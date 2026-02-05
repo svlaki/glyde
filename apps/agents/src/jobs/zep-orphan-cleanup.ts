@@ -123,7 +123,7 @@ async function runOrphanCleanup(): Promise<void> {
     console.log('═══════════════════════════════════════════\n');
 
   } catch (error) {
-    console.error('[ZEP-CLEANUP] ❌ Job failed:', error);
+    console.error('[ZEP-CLEANUP] Job failed:', error);
     process.exit(1);
   }
 }
@@ -300,7 +300,7 @@ async function cleanupUserOrphans(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     result.errors.push(`User ${userId}: ${errorMsg}`);
-    console.error(`[ZEP-CLEANUP] ❌ Error processing user ${userId}:`, error);
+    console.error(`[ZEP-CLEANUP] Error processing user ${userId}:`, error);
   }
 
   return result;
@@ -309,10 +309,10 @@ async function cleanupUserOrphans(
 // Run the job
 runOrphanCleanup()
   .then(() => {
-    console.log('[ZEP-CLEANUP] ✅ Job completed successfully');
+    console.log('[ZEP-CLEANUP] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[ZEP-CLEANUP] ❌ Job failed:', error);
+    console.error('[ZEP-CLEANUP] Job failed:', error);
     process.exit(1);
   });

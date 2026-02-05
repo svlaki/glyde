@@ -15,7 +15,7 @@ const supabase = createClient(
 );
 
 async function main() {
-  console.log('📋 Checking Categories Detail\n');
+  console.log('Checking Categories Detail\n');
 
   // Get all categories with ALL fields
   const { data: categories } = await supabase
@@ -43,7 +43,7 @@ async function main() {
     .map(([name, count]) => ({ name, count }));
 
   if (duplicates.length > 0) {
-    console.log('\n⚠️  Duplicate Categories:');
+    console.log('\n Duplicate Categories:');
     console.table(duplicates);
   }
 
@@ -55,7 +55,7 @@ async function main() {
   });
 
   if (withEmojis && withEmojis.length > 0) {
-    console.log('\n😀 Categories with Emojis in Name:');
+    console.log('\nCategories with Emojis in Name:');
     console.table(withEmojis.map(c => ({ name: c.name, icon: c.icon })));
   }
 

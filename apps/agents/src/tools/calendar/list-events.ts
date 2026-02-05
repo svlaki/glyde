@@ -16,7 +16,7 @@ export const listEventsTool = tool(
       throw new Error("Timezone is required for listing events");
     }
 
-    console.log('📋 [LIST-EVENTS TOOL] Listing events:', { startDate, endDate, limit: effectiveLimit, includePast });
+    console.log('[LIST-EVENTS TOOL] Listing events:', { startDate, endDate, limit: effectiveLimit, includePast });
 
     // Initialize service
     const supabaseService = new SupabaseService();
@@ -32,7 +32,7 @@ export const listEventsTool = tool(
       if (!includePast) {
         const now = new Date();
         events = events.filter((event: any) => new Date(event.end_time) >= now);
-        console.log(`📋 [LIST-EVENTS TOOL] Filtered to ${events.length} future/ongoing events`);
+        console.log(`[LIST-EVENTS TOOL] Filtered to ${events.length} future/ongoing events`);
       }
     }
 
@@ -52,7 +52,7 @@ export const listEventsTool = tool(
       const eventTime = formatEventTime(event.start_time, timezone);
       const categoryLabel = event.category ? `\n   🏷️ ${event.category}` : '';
 
-      return `📅 ${event.title}\n   ⏰ ${eventTime}${event.location ? `\n   📍 ${event.location}` : ''}${categoryLabel}\n   ID: ${event.id}`;
+      return `${event.title}\n   ${eventTime}${event.location ? `\n   ${event.location}` : ''}${categoryLabel}\n   ID: ${event.id}`;
     });
 
     const totalText = events.length > effectiveLimit ? ` (showing first ${effectiveLimit} of ${events.length})` : '';

@@ -46,7 +46,7 @@ async function testTemporal() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Now test temporal queries
-    console.log('\n📝 Testing temporal queries...\n');
+    console.log('\nTesting temporal queries...\n');
     
     // Test 1: Ask about tomorrow morning
     console.log('1️⃣ Testing "tomorrow morning"...');
@@ -103,10 +103,10 @@ async function testTemporal() {
     const specificQuery = await specificQueryResponse.json();
     console.log('Response:', specificQuery.content || 'No response');
     
-    console.log('\n✨ Temporal testing completed!');
+    console.log('\nTemporal testing completed!');
     
   } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
+    console.error('\nTest failed:', error.message);
   }
 }
 

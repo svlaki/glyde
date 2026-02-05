@@ -17,7 +17,7 @@ async function testCategories() {
   ];
   
   for (const message of testEvents) {
-    console.log(`\n📝 Testing: "${message}"`);
+    console.log(`\nTesting: "${message}"`);
     
     try {
       const response = await fetch(`${API_URL}/api/agent/process`, {
@@ -33,16 +33,16 @@ async function testCategories() {
       });
       
       const result = await response.json();
-      console.log('✅ Response:', result.content || 'Created');
+      console.log('Response:', result.content || 'Created');
       
       // Small delay between requests
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error('❌ Error:', error.message);
+      console.error('Error:', error.message);
     }
   }
   
-  console.log('\n🎉 Category testing completed!');
+  console.log('\nCategory testing completed!');
 }
 
 // Run the test

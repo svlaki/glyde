@@ -10,7 +10,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
   }
 
   async initialize(): Promise<void> {
-    console.log('🧹 [MARGARET] MaintenanceAgentMargaret initialized');
+    console.log('[MARGARET] MaintenanceAgentMargaret initialized');
   }
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
@@ -21,7 +21,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
       const userProfile = await supabaseService.getProfile(context.userId);
       const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      console.log(`🧹 [MARGARET] Processing for user ${context.userId} in timezone ${userTimezone}`);
+      console.log(`[MARGARET] Processing for user ${context.userId} in timezone ${userTimezone}`);
 
       try {
         await this.zepService.addUserMessage(context.userId, message);
@@ -77,7 +77,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
         type: 'text'
       };
     } catch (error) {
-      console.error('🧹 [MARGARET] Error processing message:', error);
+      console.error('[MARGARET] Error processing message:', error);
       return {
         content: "Sorry, I encountered an error while running maintenance. Please try again.",
         type: 'text'

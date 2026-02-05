@@ -96,7 +96,7 @@ export class OnboardingService {
   static async completeOnboardingV2(userId: string, data: OnboardingDataV2): Promise<void> {
     const supabase = getSupabaseService().getClient();
 
-    console.log(`🔄 Starting V2 onboarding for user ${userId} - clearing previous data...`);
+    console.log(`Starting V2 onboarding for user ${userId} - clearing previous data...`);
 
     // Step 1: Clear previous onboarding data
     await this.clearPreviousOnboardingData(userId);
@@ -145,7 +145,7 @@ export class OnboardingService {
     // Step 6: Create goals in the user's schema
     await this.createGoalsForUser(userId, data.goals);
 
-    console.log(`✅ Completed V2 onboarding for user ${userId}`);
+    console.log(`Completed V2 onboarding for user ${userId}`);
 
     // Step 7: Seed Zep memory with onboarding data (non-blocking)
     try {
@@ -153,11 +153,11 @@ export class OnboardingService {
       const seedResult = await zepSeedService.seedOnboardingData(userId, data, goals_summary);
 
       if (!seedResult.success) {
-        console.warn(`⚠️ Zep seeding failed for user ${userId}:`, seedResult.errors);
+        console.warn(`Zep seeding failed for user ${userId}:`, seedResult.errors);
       }
     } catch (error: any) {
       // Log but don't fail onboarding - Zep seeding is non-critical
-      console.error(`⚠️ Zep seeding error for user ${userId}:`, error.message);
+      console.error(`Zep seeding error for user ${userId}:`, error.message);
     }
   }
 
@@ -171,7 +171,7 @@ export class OnboardingService {
     // NOTE: We intentionally DO NOT delete categories or goals here
     // Users may have existing data they want to preserve across re-onboarding
     // Categories and goals are created additively during onboarding
-    console.log(`✅ Preserving existing categories and goals for user`);
+    console.log(`Preserving existing categories and goals for user`);
 
     // Reset profile onboarding-related fields
     const { error: profileError } = await supabase
@@ -193,9 +193,9 @@ export class OnboardingService {
       .eq('id', userId);
 
     if (profileError) {
-      console.warn(`⚠️ Failed to reset profile: ${profileError.message}`);
+      console.warn(`Failed to reset profile: ${profileError.message}`);
     } else {
-      console.log(`✅ Reset profile fields for user`);
+      console.log(`Reset profile fields for user`);
     }
   }
 
@@ -228,10 +228,10 @@ export class OnboardingService {
           progress: 0,
           priorityScore: 5
         });
-        console.log(`✅ Created goal: ${goalTitle}`);
+        console.log(`Created goal: ${goalTitle}`);
       } catch (error: any) {
         // Don't fail the whole onboarding if one goal fails
-        console.error(`⚠️  Failed to create goal "${goalTitle}":`, error.message);
+        console.error(` Failed to create goal "${goalTitle}":`, error.message);
       }
     }
   }
@@ -246,7 +246,7 @@ export class OnboardingService {
     // Check if user already has categories - if so, preserve them completely
     const existingCategories = await categoryService.getCategories(userId);
     if (existingCategories && existingCategories.length > 0) {
-      console.log(`✅ User already has ${existingCategories.length} categories, preserving existing setup`);
+      console.log(`User already has ${existingCategories.length} categories, preserving existing setup`);
       return;
     }
 
@@ -279,10 +279,10 @@ export class OnboardingService {
           color: color,
           description: `${aspect} activities and events`
         });
-        console.log(`✅ Created/updated category for aspect: ${aspect}`);
+        console.log(`Created/updated category for aspect: ${aspect}`);
       } catch (error: any) {
         // Don't fail the whole onboarding if one category fails
-        console.error(`⚠️  Failed to create category for aspect ${aspect}:`, error.message);
+        console.error(` Failed to create category for aspect ${aspect}:`, error.message);
       }
     }
   }

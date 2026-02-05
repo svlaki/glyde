@@ -459,7 +459,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     gap: '8px'
                   }}
                 >
-                  <span>📅</span>
+                  <span>Due</span>
                   {isMobile ? (
                     formatDate(dueDate)
                   ) : (

@@ -53,8 +53,8 @@ export const updateMemoryAdvancedTool = tool(
 
         console.log(`💾 [MEMORY ADVANCED] Immediately persisted ${insights.length} insights for user ${userId}`);
 
-        return `✅ **Memory Updated** (${importance} importance)
-📝 Saved ${insights.length} insight${insights.length > 1 ? 's' : ''} to your ${category} memory:
+        return `**Memory Updated** (${importance} importance)
+Saved ${insights.length} insight${insights.length > 1 ? 's' : ''} to your ${category} memory:
 ${insights.map((insight, i) => `  ${i + 1}. ${insight}`).join('\n')}
 
 These insights will help me better understand your preferences and provide more personalized assistance.`;
@@ -68,14 +68,14 @@ These insights will help me better understand your preferences and provide more 
       }
       sessionMetadata.queuedInsights.push(memoryEntry);
 
-      console.log(`📋 [MEMORY ADVANCED] Queued ${insights.length} insights for batch persistence (user ${userId})`);
+      console.log(`[MEMORY ADVANCED] Queued ${insights.length} insights for batch persistence (user ${userId})`);
 
-      return `✅ **Noted** (${importance} importance)
+      return `**Noted** (${importance} importance)
 I've recorded ${insights.length} insight${insights.length > 1 ? 's' : ''} about your ${category} preferences. These will be saved to help personalize future interactions.`;
 
     } catch (error) {
       console.error('Failed to update memory:', error);
-      return `⚠️ Memory update temporarily unavailable. Your insights were noted for this conversation but may not persist long-term. Please try again later.`;
+      return `Memory update temporarily unavailable. Your insights were noted for this conversation but may not persist long-term. Please try again later.`;
     }
   },
   {

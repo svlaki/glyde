@@ -360,7 +360,7 @@ IMPORTANT INSTRUCTIONS:
 
         // Handle tool execution end
         else if (event.event === 'on_tool_end') {
-          console.log(`✅ [STREAM] Tool completed: ${event.name}`);
+          console.log(`[STREAM] Tool completed: ${event.name}`);
           yield { type: 'tool-end', toolName: event.name, toolResult: event.data?.output };
         }
       }
@@ -454,7 +454,7 @@ IMPORTANT INSTRUCTIONS:
         ? `\n\nUSER'S TASKS (${userTasks.length} total):\n${userTasks.map((t, idx) => {
             const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
             const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
-            const statusStr = t.status === 'completed' ? ' ✓' : t.status === 'in_progress' ? ' 🔄' : '';
+            const statusStr = t.status === 'completed' ? ' [done]' : t.status === 'in_progress' ? ' [in progress]' : '';
             const categoryStr = t.category ? ` {${t.category}}` : '';
             return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}${categoryStr} (ID: ${t.id})`;
           }).join('\n')}`
@@ -478,7 +478,7 @@ IMPORTANT INSTRUCTIONS:
         : `\n\nUSER'S GOALS: No goals set`;
 
       // Log the actual goal context being sent to the LLM
-      console.log(`📊 [GOAL CONTEXT] ${goalContext}`);
+      console.log(`[GOAL CONTEXT] ${goalContext}`);
 
       // Load Zep thread context using built-in API
       // This returns Zep's pre-formatted context block with user summary + relevant facts

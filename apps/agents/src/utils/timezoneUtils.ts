@@ -22,7 +22,7 @@ export function convertToUTC(localTimeString: string, timezone: string): string 
   // Otherwise, treat as local time in the specified timezone and convert to UTC
   const utcDate = fromZonedTime(localTimeString, timezone);
 
-  console.log(`🌍 [TIMEZONE UTILS] Converting Local "${localTimeString}" → UTC "${utcDate.toISOString()}" (${timezone})`);
+  console.log(`[TIMEZONE UTILS] Converting Local "${localTimeString}" → UTC "${utcDate.toISOString()}" (${timezone})`);
   return utcDate.toISOString();
 }
 

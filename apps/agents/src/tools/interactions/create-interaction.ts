@@ -11,19 +11,19 @@ export const createInteractionTool = tool(
     const userId = config?.configurable?.userId;
     if (!userId) {
       console.error('🔧 [CREATE-INTERACTION] No userId in config!');
-      return "❌ User ID required";
+      return "User ID required";
     }
     console.log('🔧 [CREATE-INTERACTION] userId:', userId);
 
     // Log warnings for missing metadata (but still create the interaction)
     if (type === "yes_no" && (!metadata || !metadata.followUp)) {
-      console.warn('⚠️ [create-interaction] YES_NO interaction created WITHOUT followUp - clicking "yes" will do nothing!');
-      console.warn('⚠️ [create-interaction] Metadata received:', JSON.stringify(metadata, null, 2));
+      console.warn('[create-interaction] YES_NO interaction created WITHOUT followUp - clicking "yes" will do nothing!');
+      console.warn('[create-interaction] Metadata received:', JSON.stringify(metadata, null, 2));
     }
 
     // Log warning if directAction is missing in followUp
     if (metadata?.followUp && (!metadata.followUp.metadata?.directAction)) {
-      console.warn('⚠️ [create-interaction] followUp is missing directAction - picking a time will do nothing!');
+      console.warn('[create-interaction] followUp is missing directAction - picking a time will do nothing!');
     }
 
     try {
@@ -39,7 +39,7 @@ export const createInteractionTool = tool(
       });
 
       if (!interaction) {
-        return "❌ Failed to create interaction";
+        return "Failed to create interaction";
       }
 
       // NOTE: Interactions use thread history only, NOT Zep graph nodes
@@ -48,12 +48,12 @@ export const createInteractionTool = tool(
       // "interaction_summary" node per session instead of per-interaction nodes
 
       // Log interaction creation for debugging
-      console.log(`✅ [create-interaction] Interaction created: ${question} (ID: ${interaction.id})`);
+      console.log(`[create-interaction] Interaction created: ${question} (ID: ${interaction.id})`);
 
-      return `✅ Interaction created: "${question}" (ID: ${interaction.id})`;
+      return `Interaction created: "${question}" (ID: ${interaction.id})`;
     } catch (error) {
-      console.error('❌ [create-interaction] Error:', error);
-      return `❌ Error creating interaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[create-interaction] Error:', error);
+      return `Error creating interaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

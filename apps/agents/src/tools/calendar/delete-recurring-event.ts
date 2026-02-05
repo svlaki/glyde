@@ -40,7 +40,7 @@ export const deleteRecurringEventTool = tool(
         throw new Error('Failed to delete recurring series');
       }
 
-      return `✅ Deleted recurring event series and all its instances: "${event.title}"`;
+      return `Deleted recurring event series and all its instances: "${event.title}"`;
     } else if (scope === 'this_instance') {
       // Delete single instance
       console.log('[DELETE-RECURRING-EVENT TOOL] Deleting single instance:', eventId);
@@ -55,7 +55,7 @@ export const deleteRecurringEventTool = tool(
         throw new Error('Failed to delete instance');
       }
 
-      return `✅ Deleted this instance of "${event.title}"`;
+      return `Deleted this instance of "${event.title}"`;
     } else if (scope === 'all_future') {
       // Delete this and all future instances
       console.log('[DELETE-RECURRING-EVENT TOOL] Deleting from this instance onwards');

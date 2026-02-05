@@ -41,19 +41,19 @@ export const bulkUpdateEventsTool = tool(
           `Create the category first using create_category, then call bulk_update_events.`
         );
       }
-      console.log(`✅ [BULK-UPDATE-EVENTS TOOL] Category "${category}" validated`);
+      console.log(`[BULK-UPDATE-EVENTS TOOL] Category "${category}" validated`);
     }
 
     let eventsToUpdate: any[] = [];
 
-    console.log('🔄 [BULK-UPDATE-EVENTS TOOL] Processing bulk update:', { searchQuery, eventIds, category, title });
+    console.log('[BULK-UPDATE-EVENTS TOOL] Processing bulk update:', { searchQuery, eventIds, category, title });
 
     // Find events to update
     if (eventIds && eventIds.length > 0) {
       // Update specific events by ID
       const allEvents = await supabaseService.getEvents(userId);
       eventsToUpdate = allEvents.filter((event: any) => eventIds.includes(event.id));
-      console.log(`📋 [BULK-UPDATE-EVENTS TOOL] Found ${eventsToUpdate.length} events by ID`);
+      console.log(`[BULK-UPDATE-EVENTS TOOL] Found ${eventsToUpdate.length} events by ID`);
     } else if (searchQuery) {
       // Search for events to update
       try {
@@ -81,7 +81,7 @@ export const bulkUpdateEventsTool = tool(
         eventsToUpdate = deduplicatedEvents;
         console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Found ${matchingEvents.length} event instances matching: "${searchQuery}" (${deduplicatedEvents.length} unique parent events)`);
       } catch (error) {
-        console.error('❌ [BULK-UPDATE-EVENTS TOOL] Search error:', error);
+        console.error('[BULK-UPDATE-EVENTS TOOL] Search error:', error);
         throw new Error(`Failed to search for events: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } else {
@@ -136,7 +136,7 @@ export const bulkUpdateEventsTool = tool(
                 attendee_count: 0
               });
             } catch (error) {
-              console.error(`⚠️ [BULK-UPDATE-EVENTS TOOL] Failed to update event "${event.title}" in knowledge graph (non-critical):`, error);
+              console.error(`[BULK-UPDATE-EVENTS TOOL] Failed to update event "${event.title}" in knowledge graph (non-critical):`, error);
             }
           };
 
@@ -146,7 +146,7 @@ export const bulkUpdateEventsTool = tool(
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`Failed to update "${event.title}": ${errorMsg}`);
-        console.error(`❌ [BULK-UPDATE-EVENTS TOOL] Error updating event "${event.title}":`, error);
+        console.error(`[BULK-UPDATE-EVENTS TOOL] Error updating event "${event.title}":`, error);
       }
     }
 
@@ -157,14 +157,14 @@ export const bulkUpdateEventsTool = tool(
     if (location) updateFields.push(`location to "${location}"`);
     if (description) updateFields.push(`description`);
 
-    let result = `✅ Successfully updated ${updatedCount} event(s)`;
+    let result = `Successfully updated ${updatedCount} event(s)`;
 
     if (updateFields.length > 0) {
       result += ` (set ${updateFields.join(', ')})`;
     }
 
     // Add a clear completion message to prevent agent from looping
-    result += `\n\n✅ BULK UPDATE COMPLETE - No further action needed.`;
+    result += `\n\nBULK UPDATE COMPLETE - No further action needed.`;
 
     // Add unique event titles (deduplicated)
     if (updatedEventTitles.length > 0) {
@@ -179,7 +179,7 @@ export const bulkUpdateEventsTool = tool(
     }
 
     if (errors.length > 0) {
-      result += `\n\n⚠️ ${errors.length} error(s) occurred:\n${errors.slice(0, 3).join('\n')}`;
+      result += `\n\n${errors.length} error(s) occurred:\n${errors.slice(0, 3).join('\n')}`;
       if (errors.length > 3) {
         result += `\n... and ${errors.length - 3} more errors`;
       }

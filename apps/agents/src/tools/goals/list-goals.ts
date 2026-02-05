@@ -5,7 +5,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 export const listGoalsTool = tool(
   async ({ status, category, goalType }, config) => {
     const userId = config?.configurable?.userId;
-    console.log('🎯 [LIST-GOALS TOOL] Called with:', {
+    console.log('[LIST-GOALS TOOL] Called with:', {
       userId,
       status,
       category,
@@ -15,8 +15,8 @@ export const listGoalsTool = tool(
     });
 
     if (!userId) {
-      console.error('❌ [LIST-GOALS TOOL] Missing userId in config');
-      return "❌ User ID required";
+      console.error('[LIST-GOALS TOOL] Missing userId in config');
+      return "User ID required";
     }
 
     try {
@@ -29,13 +29,13 @@ export const listGoalsTool = tool(
 
       console.log('🔍 [LIST-GOALS TOOL] Fetching goals with filters:', filters);
       const goals = await supabaseService.getGoals(userId, filters);
-      console.log('📊 [LIST-GOALS TOOL] Retrieved goals:', {
+      console.log('[LIST-GOALS TOOL] Retrieved goals:', {
         count: goals?.length || 0,
         hasGoals: !!goals && goals.length > 0
       });
 
       if (!goals || goals.length === 0) {
-        console.log('⚠️ [LIST-GOALS TOOL] No goals found');
+        console.log('[LIST-GOALS TOOL] No goals found');
         return "No goals found matching the criteria.";
       }
 
@@ -48,8 +48,8 @@ export const listGoalsTool = tool(
 
       return `Found ${goals.length} goal(s):\n${goalList}`;
     } catch (error) {
-      console.error('❌ [list-goals] Error:', error);
-      return `❌ Error listing goals: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[list-goals] Error:', error);
+      return `Error listing goals: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

@@ -21,11 +21,11 @@ export const searchTasksTool = tool(
   async ({ query, status, category, priority, dueBefore, dueAfter }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     if (!query || query.trim().length === 0) {
-      return "❌ Search query is required. Use list_tasks to list all tasks with filters.";
+      return "Search query is required. Use list_tasks to list all tasks with filters.";
     }
 
     try {
@@ -89,8 +89,8 @@ export const searchTasksTool = tool(
 
       return `🔍 Found ${matchedTasks.length} task(s) matching "${query}":\n${taskList}`;
     } catch (error) {
-      console.error('❌ [search-tasks] Error:', error);
-      return `❌ Error searching tasks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[search-tasks] Error:', error);
+      return `Error searching tasks: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

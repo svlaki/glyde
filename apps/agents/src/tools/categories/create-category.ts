@@ -6,14 +6,14 @@ export const createCategoryTool = tool(
   async ({ name, color, description, context }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
       // Check if category already exists
       const existing = await CategoryService.getCategoryByName(userId, name);
       if (existing) {
-        return `✅ Category "${name}" already exists with color ${existing.color}`;
+        return `Category "${name}" already exists with color ${existing.color}`;
       }
 
       const category = await CategoryService.createCategory(userId, {
@@ -24,13 +24,13 @@ export const createCategoryTool = tool(
       });
 
       if (!category) {
-        return "❌ Failed to create category";
+        return "Failed to create category";
       }
 
-      return `✅ Created category: "${name}" (${color || '#3b82f6'})`;
+      return `Created category: "${name}" (${color || '#3b82f6'})`;
     } catch (error) {
-      console.error('❌ [create-category] Error:', error);
-      return `❌ Error creating category: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[create-category] Error:', error);
+      return `Error creating category: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

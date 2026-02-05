@@ -144,7 +144,7 @@ export function parseNaturalLanguageRecurrence(
       nextOccurrence
     };
   } catch (error) {
-    console.error('❌ [RRule] Error parsing natural language recurrence:', error);
+    console.error('[RRule] Error parsing natural language recurrence:', error);
     return null;
   }
 }
@@ -157,7 +157,7 @@ export function validateRRule(rrule: string): boolean {
     rrulestr(rrule, { dtstart: new Date() });
     return true;
   } catch (error) {
-    console.error('❌ [RRule] Invalid RRULE format:', rrule, error);
+    console.error('[RRule] Invalid RRULE format:', rrule, error);
     return false;
   }
 }
@@ -241,7 +241,7 @@ export function expandRecurrence(
 ): Date[] {
   try {
     if (!validateRRule(rrule)) {
-      console.warn('⚠️  [RRule] Invalid RRULE, returning empty list:', rrule);
+      console.warn(' [RRule] Invalid RRULE, returning empty list:', rrule);
       return [];
     }
 
@@ -281,7 +281,7 @@ export function expandRecurrence(
     // Apply limit
     return realOccurrences.slice(0, limit);
   } catch (error) {
-    console.error('❌ [RRule] Error expanding recurrence:', error);
+    console.error('[RRule] Error expanding recurrence:', error);
     return [];
   }
 }
@@ -310,7 +310,7 @@ export function expandRecurrenceWithEndTime(
       end: new Date(start.getTime() + duration)
     }));
   } catch (error) {
-    console.error('❌ [RRule] Error expanding recurrence with end times:', error);
+    console.error('[RRule] Error expanding recurrence with end times:', error);
     return [];
   }
 }
@@ -324,7 +324,7 @@ export function getNextOccurrence(rrule: string, after: Date): Date | null {
     const nextDate = rule.after(after, true);
     return nextDate;
   } catch (error) {
-    console.error('❌ [RRule] Error getting next occurrence:', error);
+    console.error('[RRule] Error getting next occurrence:', error);
     return null;
   }
 }
@@ -391,7 +391,7 @@ export function formatRRuleForDisplay(rrule: string): string {
 
     return result;
   } catch (error) {
-    console.error('❌ [RRule] Error formatting RRULE:', error);
+    console.error('[RRule] Error formatting RRULE:', error);
     return rrule;
   }
 }
@@ -453,7 +453,7 @@ export function parseRRule(rrule: string): RecurrenceConfig | null {
 
     return config;
   } catch (error) {
-    console.error('❌ [RRule] Error parsing RRULE:', error);
+    console.error('[RRule] Error parsing RRULE:', error);
     return null;
   }
 }

@@ -460,7 +460,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     gap: '8px'
                   }}
                 >
-                  <span>📅</span>
+                  <span>Due</span>
                   {isMobile ? (
                     formatDate(dueDate)
                   ) : (

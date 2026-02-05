@@ -18,12 +18,12 @@ const CATEGORY_MAPPINGS: Record<string, string> = {
   'Fitness': 'Exercise',
   'Health & Hygiene': 'Health',
   'School': 'Learning',
-  '📚 Learning': 'Learning',
-  '🎶 Mendicants': 'Mendicants',
+  'Learning': 'Learning',
+  'Mendicants': 'Mendicants',
 };
 
 async function main() {
-  console.log('🔄 Fixing Category Mappings\n');
+  console.log('Fixing Category Mappings\n');
 
   let totalFixed = 0;
 
@@ -65,12 +65,12 @@ async function main() {
       }
     }
 
-    console.log(`   ✅ Updated ${updated}/${events.length} events`);
+    console.log(`   Updated ${updated}/${events.length} events`);
     totalFixed += updated;
   }
 
-  console.log(`\n✨ Total events fixed: ${totalFixed}`);
-  console.log('🔄 Refresh your calendar to see the correct colors!\n');
+  console.log(`\nTotal events fixed: ${totalFixed}`);
+  console.log('Refresh your calendar to see the correct colors!\n');
 
   // Show summary
   const { data: summary } = await supabase
@@ -89,7 +89,7 @@ async function main() {
     .limit(10);
 
   if (summary) {
-    console.log('📋 Sample of events with updated categories:');
+    console.log('Sample of events with updated categories:');
     console.table(
       summary.map((e: any) => ({
         title: e.title.substring(0, 30),

@@ -6,14 +6,14 @@ export const updateCategoryTool = tool(
   async ({ name, newName, color, description, context }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
       // Find category by name
       const existing = await CategoryService.getCategoryByName(userId, name);
       if (!existing) {
-        return `❌ Category "${name}" not found. Use list_categories to see available categories.`;
+        return `Category "${name}" not found. Use list_categories to see available categories.`;
       }
 
       // Prepare updates
@@ -26,13 +26,13 @@ export const updateCategoryTool = tool(
       const updated = await CategoryService.updateCategory(userId, existing.id, updates);
 
       if (!updated) {
-        return "❌ Failed to update category";
+        return "Failed to update category";
       }
 
-      return `✅ Updated category "${name}"${newName ? ` → "${newName}"` : ''}`;
+      return `Updated category "${name}"${newName ? ` → "${newName}"` : ''}`;
     } catch (error) {
-      console.error('❌ [update-category] Error:', error);
-      return `❌ Error updating category: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[update-category] Error:', error);
+      return `Error updating category: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

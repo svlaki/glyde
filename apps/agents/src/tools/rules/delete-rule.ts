@@ -4,12 +4,12 @@ import ruleService from "../../services/RuleService.js";
 
 export const deleteRuleTool = tool(
   async ({ rule_id, search_query }, config) => {
-    console.log('📋 [DELETE-RULE] Tool invoked!');
-    console.log('📋 [DELETE-RULE] Args:', JSON.stringify({ rule_id, search_query }, null, 2));
+    console.log('[DELETE-RULE] Tool invoked!');
+    console.log('[DELETE-RULE] Args:', JSON.stringify({ rule_id, search_query }, null, 2));
 
     const userId = config?.configurable?.userId;
     if (!userId) {
-      console.error('📋 [DELETE-RULE] No userId in config!');
+      console.error('[DELETE-RULE] No userId in config!');
       return "User ID required to delete a rule";
     }
 
@@ -20,7 +20,7 @@ export const deleteRuleTool = tool(
         if (!result.success) {
           return `Failed to delete rule: ${result.error || 'Rule not found'}`;
         }
-        console.log(`✅ [DELETE-RULE] Rule deleted: ${rule_id}`);
+        console.log(`[DELETE-RULE] Rule deleted: ${rule_id}`);
         return `Rule deleted successfully.`;
       }
 
@@ -39,7 +39,7 @@ export const deleteRuleTool = tool(
           if (!result.success) {
             return `Failed to delete rule: ${result.error}`;
           }
-          console.log(`✅ [DELETE-RULE] Rule deleted: ${rule.id}`);
+          console.log(`[DELETE-RULE] Rule deleted: ${rule.id}`);
           return `Rule deleted successfully: "${rule.rule_text}"`;
         }
 
@@ -53,7 +53,7 @@ export const deleteRuleTool = tool(
 
       return "Please provide either a rule_id or a search_query to find the rule to delete.";
     } catch (error) {
-      console.error('❌ [DELETE-RULE] Error:', error);
+      console.error('[DELETE-RULE] Error:', error);
       return `Error deleting rule: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },

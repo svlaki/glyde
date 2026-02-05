@@ -50,13 +50,13 @@ export class CategoryService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [CategoryService] Error fetching categories:', error);
+        console.error('[CategoryService] Error fetching categories:', error);
         return [];
       }
 
       return data as Category[];
     } catch (error) {
-      console.error('❌ [CategoryService] Exception fetching categories:', error);
+      console.error('[CategoryService] Exception fetching categories:', error);
       return [];
     }
   }
@@ -74,13 +74,13 @@ export class CategoryService {
         .single();
 
       if (error) {
-        console.error(`❌ [CategoryService] Error fetching category ${name}:`, error);
+        console.error(`[CategoryService] Error fetching category ${name}:`, error);
         return null;
       }
 
       return data as Category;
     } catch (error) {
-      console.error(`❌ [CategoryService] Exception fetching category ${name}:`, error);
+      console.error(`[CategoryService] Exception fetching category ${name}:`, error);
       return null;
     }
   }
@@ -98,13 +98,13 @@ export class CategoryService {
         .single();
 
       if (error) {
-        console.error(`❌ [CategoryService] Error fetching category by id ${categoryId}:`, error);
+        console.error(`[CategoryService] Error fetching category by id ${categoryId}:`, error);
         return null;
       }
 
       return data as Category;
     } catch (error) {
-      console.error(`❌ [CategoryService] Exception fetching category by id ${categoryId}:`, error);
+      console.error(`[CategoryService] Exception fetching category by id ${categoryId}:`, error);
       return null;
     }
   }
@@ -140,7 +140,7 @@ export class CategoryService {
         .single();
 
       if (error) {
-        console.error('❌ [CategoryService] Error creating category:', error);
+        console.error('[CategoryService] Error creating category:', error);
         throw new Error(`Database error: ${error.message}`);
       }
 
@@ -148,10 +148,10 @@ export class CategoryService {
         throw new Error('No data returned from database');
       }
 
-      console.log(`✅ [CategoryService] Created category: ${input.name}`);
+      console.log(`[CategoryService] Created category: ${input.name}`);
       return data as Category;
     } catch (error) {
-      console.error('❌ [CategoryService] Exception creating category:', error);
+      console.error('[CategoryService] Exception creating category:', error);
       throw error; // Re-throw to let API handle it
     }
   }
@@ -190,7 +190,7 @@ export class CategoryService {
         .single();
 
       if (error) {
-        console.error('❌ [CategoryService] Error upserting category:', error);
+        console.error('[CategoryService] Error upserting category:', error);
         throw new Error(`Database error: ${error.message}`);
       }
 
@@ -198,10 +198,10 @@ export class CategoryService {
         throw new Error('No data returned from database');
       }
 
-      console.log(`✅ [CategoryService] Upserted category: ${input.name}`);
+      console.log(`[CategoryService] Upserted category: ${input.name}`);
       return data as Category;
     } catch (error) {
-      console.error('❌ [CategoryService] Exception upserting category:', error);
+      console.error('[CategoryService] Exception upserting category:', error);
       throw error;
     }
   }
@@ -249,7 +249,7 @@ export class CategoryService {
         .single();
 
       if (error) {
-        console.error('❌ [CategoryService] Error updating category:', error);
+        console.error('[CategoryService] Error updating category:', error);
         if (error.code === 'PGRST116') {
           throw new Error('Category not found');
         }
@@ -260,10 +260,10 @@ export class CategoryService {
         throw new Error('Category not found or no data returned');
       }
 
-      console.log(`✅ [CategoryService] Updated category: ${categoryId}`);
+      console.log(`[CategoryService] Updated category: ${categoryId}`);
       return data as Category;
     } catch (error) {
-      console.error('❌ [CategoryService] Exception updating category:', error);
+      console.error('[CategoryService] Exception updating category:', error);
       throw error; // Re-throw to let API handle it
     }
   }
@@ -294,9 +294,9 @@ export class CategoryService {
         throw error;
       }
 
-      console.log(`✅ [CategoryService] Updated context for category: ${categoryId}`);
+      console.log(`[CategoryService] Updated context for category: ${categoryId}`);
     } catch (error) {
-      console.error('❌ [CategoryService] Exception updating category context:', error);
+      console.error('[CategoryService] Exception updating category context:', error);
       throw error;
     }
   }
@@ -322,16 +322,16 @@ export class CategoryService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('❌ [CategoryService] Error deleting category:', error);
+        console.error('[CategoryService] Error deleting category:', error);
         if (error.code === 'PGRST116') {
           throw new Error('Category not found');
         }
         throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log(`✅ [CategoryService] Deleted category: ${categoryId}`);
+      console.log(`[CategoryService] Deleted category: ${categoryId}`);
     } catch (error) {
-      console.error('❌ [CategoryService] Exception deleting category:', error);
+      console.error('[CategoryService] Exception deleting category:', error);
       throw error;
     }
   }

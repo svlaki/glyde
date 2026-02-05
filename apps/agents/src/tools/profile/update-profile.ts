@@ -6,7 +6,7 @@ export const updateProfileTool = tool(
   async ({ field, value }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -22,10 +22,10 @@ export const updateProfileTool = tool(
         // Nested field update
         await profileService.updateField(userId, column, fieldName, value);
       }
-      return `✅ Profile updated: ${field} = ${typeof value === 'object' ? JSON.stringify(value) : value}`;
+      return `Profile updated: ${field} = ${typeof value === 'object' ? JSON.stringify(value) : value}`;
     } catch (error) {
-      console.error('❌ [update-profile] Error:', error);
-      return `❌ Error updating profile: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[update-profile] Error:', error);
+      return `Error updating profile: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

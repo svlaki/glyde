@@ -7,7 +7,7 @@ export const createGoalTool = tool(
   async ({ title, description, targetDate, category, goalType, priorityScore, energyRequirement, reviewFrequency, milestones, milestoneType }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -33,7 +33,7 @@ export const createGoalTool = tool(
       }, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
-        return "❌ Failed to create goal";
+        return "Failed to create goal";
       }
 
       // Note: Graph sync disabled to prevent Zep graph bloat
@@ -50,10 +50,10 @@ export const createGoalTool = tool(
               : `- ${m.title}${m.due_date ? ` (due: ${new Date(m.due_date).toLocaleDateString()})` : ''}`
           ).join('\n')}`
         : '';
-      return `✅ Goal created: "${title}"${targetStr}${milestonesStr}`;
+      return `Goal created: "${title}"${targetStr}${milestonesStr}`;
     } catch (error) {
-      console.error('❌ [create-goal] Error:', error);
-      return `❌ Error creating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[create-goal] Error:', error);
+      return `Error creating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

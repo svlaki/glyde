@@ -1041,7 +1041,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           }}
                         >
                           {event.title}
-                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px' }}></span>}
+                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px', opacity: 0.7 }}>R</span>}
                         </div>
                       )
                     })}
@@ -1395,7 +1395,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           whiteSpace: 'nowrap'
                         }}>
                           {event.title}
-                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px' }}></span>}
+                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', opacity: 0.7 }}>R</span>}
                         </div>
                         {duration >= 30 && (
                           <div style={{
@@ -1629,7 +1629,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     whiteSpace: 'nowrap'
                   }}>
                     {event.title}
-                    {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}></span>}
+                    {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px', opacity: 0.7 }}>R</span>}
                   </div>
                   <div style={{
                     ...typography.labelMd,

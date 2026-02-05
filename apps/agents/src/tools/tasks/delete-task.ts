@@ -7,7 +7,7 @@ export const deleteTaskTool = tool(
   async ({ taskId, searchQuery }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     let targetTaskId = taskId;
@@ -15,7 +15,7 @@ export const deleteTaskTool = tool(
     // If no taskId provided, search for the task
     if (!targetTaskId) {
       if (!searchQuery) {
-        return "❌ Either taskId or searchQuery must be provided";
+        return "Either taskId or searchQuery must be provided";
       }
 
       console.log('🔍 [DELETE-TASK TOOL] Searching for task to delete:', searchQuery);
@@ -58,14 +58,14 @@ export const deleteTaskTool = tool(
           targetTaskId = matchingTasks[0].id;
           // Store task details for the response
           const taskToDelete = matchingTasks[0];
-          console.log('✅ [DELETE-TASK TOOL] Found task to delete:', taskToDelete.title);
+          console.log('[DELETE-TASK TOOL] Found task to delete:', taskToDelete.title);
 
           // Delete the task
           const supabaseService = getSupabaseService();
           const result = await supabaseService.deleteTask(userId, taskToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
-            return `❌ Failed to delete task: ${result.error}`;
+            return `Failed to delete task: ${result.error}`;
           }
 
           // Remove from Zep knowledge graph (fire-and-forget for speed)
@@ -89,18 +89,18 @@ export const deleteTaskTool = tool(
             dueInfo = ` (was due ${dateStr} at ${timeStr})`;
           }
 
-          return `✅ TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
+          return `TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
         } else {
-          return `❌ No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
+          return `No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
         }
       } catch (error) {
-        console.error('❌ [DELETE-TASK TOOL] Search error:', error);
-        return `❌ Failed to find task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error('[DELETE-TASK TOOL] Search error:', error);
+        return `Failed to find task: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     }
 
     if (!targetTaskId) {
-      return "❌ Failed to identify task to delete - this should not happen";
+      return "Failed to identify task to delete - this should not happen";
     }
 
     // Direct taskId provided - fetch task details first, then delete
@@ -114,7 +114,7 @@ export const deleteTaskTool = tool(
       const result = await supabaseService.deleteTask(userId, targetTaskId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
-        return `❌ Failed to delete task: ${result.error}`;
+        return `Failed to delete task: ${result.error}`;
       }
 
       // Remove from Zep knowledge graph (fire-and-forget for speed)
@@ -140,13 +140,13 @@ export const deleteTaskTool = tool(
           const timeStr = dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
           dueInfo = ` (was due ${dateStr} at ${timeStr})`;
         }
-        return `✅ TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
+        return `TASK: "${taskToDelete.title}" has been deleted${dueInfo}`;
       }
 
-      return `✅ Task deleted successfully`;
+      return `Task deleted successfully`;
     } catch (error) {
-      console.error('❌ [delete-task] Error:', error);
-      return `❌ Error deleting task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[delete-task] Error:', error);
+      return `Error deleting task: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

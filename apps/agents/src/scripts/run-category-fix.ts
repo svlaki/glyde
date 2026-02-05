@@ -22,7 +22,7 @@ async function main() {
   const migrationPath = resolve(__dirname, '../../../../supabase/migrations/20250113000000_consolidate_categories_fix.sql');
   const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
-  console.log('📋 Executing migration...\n');
+  console.log('Executing migration...\n');
 
   try {
     // Execute the migration
@@ -31,14 +31,14 @@ async function main() {
     });
 
     if (error) {
-      console.error('❌ Migration failed:', error);
+      console.error('Migration failed:', error);
       process.exit(1);
     }
 
-    console.log('✅ Migration completed successfully!\n');
+    console.log('Migration completed successfully!\n');
 
     // Check results
-    console.log('📊 Checking results...\n');
+    console.log('Checking results...\n');
 
     const { data: categories } = await supabase
       .from('categories')
@@ -54,7 +54,7 @@ async function main() {
     })));
 
   } catch (err) {
-    console.error('❌ Error:', err);
+    console.error('Error:', err);
     process.exit(1);
   }
 }

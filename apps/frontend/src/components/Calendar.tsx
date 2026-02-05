@@ -901,10 +901,10 @@ export function Calendar() {
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
                             }}
-                            title={`${event.title}${getRecurrenceBadge(event) ? ' ' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                            title={`${event.title}${getRecurrenceBadge(event) ? ' (recurring)' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                           >
                             {event.title}
-                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '3px', fontSize: fontSize.xs }}></span>}
+                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '3px', fontSize: fontSize.xs, opacity: 0.7 }}>R</span>}
                           </div>
                         )
                       })}
@@ -1141,7 +1141,7 @@ export function Calendar() {
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
                               }}
-                              title={`${event.title}${getRecurrenceBadge(event) ? ' ' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                              title={`${event.title}${getRecurrenceBadge(event) ? ' (recurring)' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                             >
                               <div style={{
                                 ...typography.labelMd,
@@ -1155,7 +1155,7 @@ export function Calendar() {
                                 gap: '4px'
                               }}>
                                 <span>{event.title}</span>
-                                {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, flexShrink: 0 }}></span>}
+                                {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, flexShrink: 0, opacity: 0.7 }}>R</span>}
                               </div>
                               {height > 30 && (
                                 <div style={{

@@ -41,7 +41,7 @@ async function runForceReauthAll(): Promise<void> {
     }
 
     const count = data?.length || 0;
-    console.log(`✅ Updated ${count} users with force_reauth=true`);
+    console.log(`Updated ${count} users with force_reauth=true`);
     console.log('\nUsers will be redirected to onboarding on next login.');
     console.log('Their existing categories, goals, and events are preserved.');
 
@@ -54,10 +54,10 @@ async function runForceReauthAll(): Promise<void> {
 // Run the job
 runForceReauthAll()
   .then(() => {
-    console.log('\n[FORCE-REAUTH] ✅ Job completed successfully');
+    console.log('\n[FORCE-REAUTH] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[FORCE-REAUTH] ❌ Job failed:', error);
+    console.error('[FORCE-REAUTH] Job failed:', error);
     process.exit(1);
   });

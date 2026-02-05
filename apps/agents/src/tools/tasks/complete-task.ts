@@ -6,7 +6,7 @@ export const completeTaskTool = tool(
   async ({ taskId, notes, actualDuration }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -21,7 +21,7 @@ export const completeTaskTool = tool(
       );
 
       if (!task) {
-        return "❌ Failed to complete task";
+        return "Failed to complete task";
       }
 
       // NOTE: We don't sync completed tasks to Zep because:
@@ -31,10 +31,10 @@ export const completeTaskTool = tool(
       // 4. Completion metadata (duration, notes, rating) is accessed from task status in Supabase
       // Only task DELETION should trigger graph cleanup (via deleteTask tool)
 
-      return `✅ Task completed: "${task.title}"`;
+      return `Task completed: "${task.title}"`;
     } catch (error) {
-      console.error('❌ [complete-task] Error:', error);
-      return `❌ Error completing task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[complete-task] Error:', error);
+      return `Error completing task: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

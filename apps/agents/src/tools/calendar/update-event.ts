@@ -11,10 +11,10 @@ export const updateEventTool = tool(
     const timezone = config?.configurable?.timezone;
 
     if (!userId) {
-      return "❌ User ID is required for updating events. Please try again.";
+      return "User ID is required for updating events. Please try again.";
     }
     if (!timezone) {
-      return "❌ Timezone is required for updating events. Please try again.";
+      return "Timezone is required for updating events. Please try again.";
     }
 
     let targetEventId = eventId;
@@ -74,12 +74,12 @@ export const updateEventTool = tool(
 
           if (timeFilteredEvents.length > 0) {
             matchingEvents = timeFilteredEvents;
-            console.log(`✅ [UPDATE-EVENT TOOL] Filtered to ${matchingEvents.length} event(s) by currentStartTime: ${currentStartTime}`);
+            console.log(`[UPDATE-EVENT TOOL] Filtered to ${matchingEvents.length} event(s) by currentStartTime: ${currentStartTime}`);
           }
         }
 
         if (matchingEvents.length === 0) {
-          return `❌ No event found matching: "${searchQuery}". Please check the event name and try again.`;
+          return `No event found matching: "${searchQuery}". Please check the event name and try again.`;
         }
 
         if (matchingEvents.length > 1) {
@@ -96,13 +96,13 @@ export const updateEventTool = tool(
         targetEventId = matchingEvents[0].id;
         console.log('[UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
       } catch (error) {
-        console.error('❌ [UPDATE-EVENT TOOL] Search error:', error);
-        return `❌ Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error('[UPDATE-EVENT TOOL] Search error:', error);
+        return `Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     }
 
     if (!targetEventId) {
-      return "❌ No event ID provided and no search query given. Please specify which event to update.";
+      return "No event ID provided and no search query given. Please specify which event to update.";
     }
 
     // Get original event to compare changes
@@ -118,7 +118,7 @@ export const updateEventTool = tool(
         const instanceDate = new Date(originalEvent.start_time).toLocaleDateString('en-US', {
           weekday: 'long', month: 'long', day: 'numeric'
         });
-        return `⚠️ "${originalEvent.title}" on ${instanceDate} is part of a recurring series. To change the time:\n` +
+        return `"${originalEvent.title}" on ${instanceDate} is part of a recurring series. To change the time:\n` +
           `- To reschedule just THIS instance: Use update_recurring_event with scope 'this_instance'\n` +
           `- To reschedule ALL instances: Use update_recurring_event with scope 'entire_series'\n\n` +
           `I can update the title, description, location, or category for the entire series if you'd like.`;
@@ -153,7 +153,7 @@ export const updateEventTool = tool(
 
     if (!updatedEvent) {
       // Return error message instead of throwing to prevent LLM retry loops
-      return "❌ Failed to update event. The event may have been deleted or you may not have permission to modify it.";
+      return "Failed to update event. The event may have been deleted or you may not have permission to modify it.";
     }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat
@@ -185,7 +185,7 @@ export const updateEventTool = tool(
 
     const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
-    return `✅ EVENT: "${eventTitle}" has been updated${changeDescription}`;
+    return `EVENT: "${eventTitle}" has been updated${changeDescription}`;
   },
   {
     name: "update_event",

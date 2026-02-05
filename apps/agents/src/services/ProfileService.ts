@@ -36,7 +36,7 @@ export class ProfileService {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ [ProfileService] Error fetching profile:', error);
+        console.error('[ProfileService] Error fetching profile:', error);
         return null;
       }
 
@@ -56,7 +56,7 @@ export class ProfileService {
           .single();
 
         if (createError) {
-          console.error('❌ [ProfileService] Error creating profile:', createError);
+          console.error('[ProfileService] Error creating profile:', createError);
           return null;
         }
 
@@ -65,7 +65,7 @@ export class ProfileService {
 
       return data as UserProfile;
     } catch (error) {
-      console.error('❌ [ProfileService] Exception fetching profile:', error);
+      console.error('[ProfileService] Exception fetching profile:', error);
       return null;
     }
   }
@@ -81,13 +81,13 @@ export class ProfileService {
         .eq('id', userId);
 
       if (error) {
-        console.error('❌ [ProfileService] Error updating profile:', error);
+        console.error('[ProfileService] Error updating profile:', error);
         throw error;
       }
 
-      console.log('✅ [ProfileService] Profile updated successfully');
+      console.log('[ProfileService] Profile updated successfully');
     } catch (error) {
-      console.error('❌ [ProfileService] Exception updating profile:', error);
+      console.error('[ProfileService] Exception updating profile:', error);
       throw error;
     }
   }
@@ -104,7 +104,7 @@ export class ProfileService {
       const updates = { [section]: data };
       await this.updateProfile(userId, updates);
     } catch (error) {
-      console.error(`❌ [ProfileService] Error updating section ${section}:`, error);
+      console.error(`[ProfileService] Error updating section ${section}:`, error);
       throw error;
     }
   }
@@ -124,13 +124,13 @@ export class ProfileService {
         .single();
 
       if (error) {
-        console.error(`❌ [ProfileService] Error getting section ${section}:`, error);
+        console.error(`[ProfileService] Error getting section ${section}:`, error);
         return null;
       }
 
       return (data as any)?.[section] || null;
     } catch (error) {
-      console.error(`❌ [ProfileService] Error getting section ${section}:`, error);
+      console.error(`[ProfileService] Error getting section ${section}:`, error);
       return null;
     }
   }
@@ -156,7 +156,7 @@ export class ProfileService {
 
       await this.updateProfile(userId, { [column]: columnData });
     } catch (error) {
-      console.error(`❌ [ProfileService] Error updating field ${column}.${field}:`, error);
+      console.error(`[ProfileService] Error updating field ${column}.${field}:`, error);
       throw error;
     }
   }
@@ -185,7 +185,7 @@ export class ProfileService {
 
       await this.updateProfile(userId, changes);
     } catch (error) {
-      console.error('❌ [ProfileService] Error batch updating fields:', error);
+      console.error('[ProfileService] Error batch updating fields:', error);
       throw error;
     }
   }
@@ -223,7 +223,7 @@ export class ProfileService {
 
       return totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
     } catch (error) {
-      console.error('❌ [ProfileService] Error calculating completeness:', error);
+      console.error('[ProfileService] Error calculating completeness:', error);
       return 0;
     }
   }
@@ -278,7 +278,7 @@ export class ProfileService {
 
       return summary;
     } catch (error) {
-      console.error('❌ [ProfileService] Error generating summary:', error);
+      console.error('[ProfileService] Error generating summary:', error);
       return {
         totalFields: 0,
         filledFields: 0,

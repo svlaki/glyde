@@ -590,6 +590,7 @@ When creating recurring events, mention the pattern:
 
 CALENDAR VIEW WITH RECURRING EVENTS:
 - When listing schedule, recurring events are automatically expanded into instances
+- Recurring events are marked with an indicator in the calendar view
 - When user clicks on an event instance, they can edit "this instance" or "entire series"
 
 CRITICAL TIMEZONE:
@@ -747,7 +748,7 @@ You have THREE memory tools for capturing and retrieving user insights:
    - Requires frequency and confidence score
    - Example: "User exhibits peak productivity 9-11am daily (confidence: 0.9)"
 
-3. **update_memory_advanced** - Proactively save important insights NEW
+3. **update_memory_advanced** - Proactively save important insights [NEW]
    USE THIS WHEN:
    - User reveals important preferences: "I hate morning meetings" → update_memory_advanced
    - Major life context changes: "Starting new job next month" → update_memory_advanced

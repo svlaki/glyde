@@ -12,7 +12,7 @@ export async function getUserRules(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    console.log('📋 [RULES API] Fetching rules for user:', userId);
+    console.log('[RULES API] Fetching rules for user:', userId);
 
     const rules = await ruleService.getRules(userId);
 
@@ -21,7 +21,7 @@ export async function getUserRules(req: Request, res: Response): Promise<void> {
       rules: rules
     });
   } catch (error) {
-    console.error('❌ [RULES API] Error fetching rules:', error);
+    console.error('[RULES API] Error fetching rules:', error);
     res.status(500).json({ error: 'Failed to fetch rules' });
   }
 }
@@ -67,7 +67,7 @@ export async function createUserRule(req: Request, res: Response): Promise<void>
       message: 'Rule created successfully'
     });
   } catch (error) {
-    console.error('❌ [RULES API] Error creating rule:', error);
+    console.error('[RULES API] Error creating rule:', error);
     res.status(500).json({ error: 'Failed to create rule' });
   }
 }
@@ -113,7 +113,7 @@ export async function updateUserRule(req: Request, res: Response): Promise<void>
       message: 'Rule updated successfully'
     });
   } catch (error) {
-    console.error('❌ [RULES API] Error updating rule:', error);
+    console.error('[RULES API] Error updating rule:', error);
     res.status(500).json({ error: 'Failed to update rule' });
   }
 }
@@ -136,7 +136,7 @@ export async function deleteUserRule(req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.log('🗑️ [RULES API] Deleting rule:', rule_id, 'for user:', userId);
+    console.log('[RULES API] Deleting rule:', rule_id, 'for user:', userId);
 
     const result = await ruleService.deleteRule(userId, rule_id);
 
@@ -153,7 +153,7 @@ export async function deleteUserRule(req: Request, res: Response): Promise<void>
       message: 'Rule deleted successfully'
     });
   } catch (error) {
-    console.error('❌ [RULES API] Error deleting rule:', error);
+    console.error('[RULES API] Error deleting rule:', error);
     res.status(500).json({ error: 'Failed to delete rule' });
   }
 }
@@ -181,7 +181,7 @@ export async function toggleUserRule(req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.log('🔄 [RULES API] Toggling rule:', rule_id, 'to:', enabled, 'for user:', userId);
+    console.log('[RULES API] Toggling rule:', rule_id, 'to:', enabled, 'for user:', userId);
 
     const rule = await ruleService.toggleRule(userId, rule_id, enabled);
 
@@ -199,7 +199,7 @@ export async function toggleUserRule(req: Request, res: Response): Promise<void>
       message: `Rule ${enabled ? 'enabled' : 'disabled'} successfully`
     });
   } catch (error) {
-    console.error('❌ [RULES API] Error toggling rule:', error);
+    console.error('[RULES API] Error toggling rule:', error);
     res.status(500).json({ error: 'Failed to toggle rule' });
   }
 }

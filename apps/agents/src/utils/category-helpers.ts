@@ -75,13 +75,13 @@ export async function getCategoryByName(
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error(`❌ [CategoryHelpers] Error fetching category ${name}:`, error);
+      console.error(`[CategoryHelpers] Error fetching category ${name}:`, error);
       throw error;
     }
 
     return data as Category;
   } catch (error) {
-    console.error(`❌ [CategoryHelpers] Exception fetching category ${name}:`, error);
+    console.error(`[CategoryHelpers] Exception fetching category ${name}:`, error);
     throw error;
   }
 }
@@ -104,13 +104,13 @@ export async function getCategoryById(
       if (error.code === 'PGRST116') {
         return null;
       }
-      console.error(`❌ [CategoryHelpers] Error fetching category by id ${categoryId}:`, error);
+      console.error(`[CategoryHelpers] Error fetching category by id ${categoryId}:`, error);
       throw error;
     }
 
     return data as Category;
   } catch (error) {
-    console.error(`❌ [CategoryHelpers] Exception fetching category by id ${categoryId}:`, error);
+    console.error(`[CategoryHelpers] Exception fetching category by id ${categoryId}:`, error);
     throw error;
   }
 }
@@ -155,7 +155,7 @@ export async function getCategoryColor(
 
     return category?.color || '#6b7280'; // Default gray
   } catch (error) {
-    console.error('❌ [CategoryHelpers] Error getting category color:', error);
+    console.error('[CategoryHelpers] Error getting category color:', error);
     return '#6b7280'; // Default gray
   }
 }
@@ -186,13 +186,13 @@ export async function createDefaultCategories(
     });
 
     if (error) {
-      console.error('❌ [CategoryHelpers] Error creating default categories:', error);
+      console.error('[CategoryHelpers] Error creating default categories:', error);
       throw error;
     }
 
-    console.log(`✅ [CategoryHelpers] Created default categories for user: ${userId}`);
+    console.log(`[CategoryHelpers] Created default categories for user: ${userId}`);
   } catch (error) {
-    console.error('❌ [CategoryHelpers] Exception creating default categories:', error);
+    console.error('[CategoryHelpers] Exception creating default categories:', error);
     throw error;
   }
 }

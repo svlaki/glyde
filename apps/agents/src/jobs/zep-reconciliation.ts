@@ -123,7 +123,7 @@ async function runReconciliation(): Promise<void> {
     console.log('═══════════════════════════════════════════\n');
 
   } catch (error) {
-    console.error('[ZEP-RECONCILIATION] ❌ Job failed:', error);
+    console.error('[ZEP-RECONCILIATION] Job failed:', error);
     process.exit(1);
   }
 }
@@ -301,7 +301,7 @@ async function reconcileUser(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     result.errors.push(`User ${userId}: ${errorMsg}`);
-    console.error(`[ZEP-RECONCILIATION] ❌ Error processing user ${userId}:`, error);
+    console.error(`[ZEP-RECONCILIATION] Error processing user ${userId}:`, error);
   }
 
   return result;
@@ -310,10 +310,10 @@ async function reconcileUser(
 // Run the job
 runReconciliation()
   .then(() => {
-    console.log('[ZEP-RECONCILIATION] ✅ Job completed successfully');
+    console.log('[ZEP-RECONCILIATION] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[ZEP-RECONCILIATION] ❌ Job failed:', error);
+    console.error('[ZEP-RECONCILIATION] Job failed:', error);
     process.exit(1);
   });

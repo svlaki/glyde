@@ -50,7 +50,7 @@ export async function getGoalsWithCategories(
     });
 
     if (error) {
-      console.error('❌ [GoalHelpers] Error getting goals:', error);
+      console.error('[GoalHelpers] Error getting goals:', error);
       return [];
     }
 
@@ -92,10 +92,10 @@ export async function getGoalsWithCategories(
       filteredGoals = filteredGoals.filter((g: any) => g.target_date && g.target_date >= filters.targetAfter!);
     }
 
-    console.log(`✅ [GoalHelpers] Found ${filteredGoals.length} goals with categories`);
+    console.log(`[GoalHelpers] Found ${filteredGoals.length} goals with categories`);
     return filteredGoals as GoalWithCategory[];
   } catch (error) {
-    console.error('❌ [GoalHelpers] Exception getting goals:', error);
+    console.error('[GoalHelpers] Exception getting goals:', error);
     return [];
   }
 }
@@ -113,7 +113,7 @@ export async function getGoalById(
     const goal = goals.find(g => g.id === goalId);
     return goal || null;
   } catch (error) {
-    console.error('❌ [GoalHelpers] Exception fetching goal by ID:', error);
+    console.error('[GoalHelpers] Exception fetching goal by ID:', error);
     return null;
   }
 }

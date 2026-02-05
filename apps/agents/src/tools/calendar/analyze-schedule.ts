@@ -26,7 +26,7 @@ export const analyzeScheduleTool = tool(
     const timezone = config?.configurable?.timezone || 'UTC';
 
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -132,7 +132,7 @@ export const analyzeScheduleTool = tool(
       }
 
       // Build report
-      const report = `📊 **Schedule Analysis** (${format(rangeStart, 'MMM d')} - ${format(rangeEnd, 'MMM d')})
+      const report = `**Schedule Analysis** (${format(rangeStart, 'MMM d')} - ${format(rangeEnd, 'MMM d')})
 
 **Overview:**
 • Total events: ${events.length}
@@ -152,8 +152,8 @@ ${loadAssessment}`;
       return report;
 
     } catch (error) {
-      console.error('❌ [analyze-schedule] Error:', error);
-      return `❌ Error analyzing schedule: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[analyze-schedule] Error:', error);
+      return `Error analyzing schedule: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

@@ -378,7 +378,7 @@ export async function generateStartupInteractions(req: Request, res: Response): 
       initiated: true
     });
   } catch (error) {
-    console.error('❌ [STARTUP] Error generating startup interactions:', error);
+    console.error('[STARTUP] Error generating startup interactions:', error);
     return res.status(500).json({ error: 'Failed to generate startup interactions' });
   }
 }

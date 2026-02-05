@@ -28,7 +28,7 @@ async function main() {
       throw new Error(`Failed to fetch categories: ${error.message}`);
     }
 
-    console.log(`📋 Total categories: ${categories?.length}\n`);
+    console.log(`Total categories: ${categories?.length}\n`);
 
     // Find duplicates - keep oldest, delete newer ones
     const seen = new Map<string, any>(); // key: user_id + name
@@ -45,16 +45,16 @@ async function main() {
           name: cat.name,
           created: new Date(cat.created_at).toLocaleString()
         });
-        console.log(`  🗑️  Duplicate: "${cat.name}" (created: ${new Date(cat.created_at).toLocaleString()})`);
+        console.log(`   Duplicate: "${cat.name}" (created: ${new Date(cat.created_at).toLocaleString()})`);
       } else {
         seen.set(key, cat);
       }
     }
 
-    console.log(`\n📊 Found ${toDelete.length} duplicates to remove\n`);
+    console.log(`\nFound ${toDelete.length} duplicates to remove\n`);
 
     if (toDelete.length === 0) {
-      console.log('✅ No duplicates found!');
+      console.log('No duplicates found!');
       return;
     }
 
@@ -71,13 +71,13 @@ async function main() {
         console.log(`  - ${name}: ${count} duplicate${count > 1 ? 's' : ''}`);
       });
 
-    console.log('\n⚠️  About to delete these categories...');
+    console.log('\n About to delete these categories...');
     console.log('Press Ctrl+C to cancel, or wait 3 seconds to proceed...\n');
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Delete duplicates in batches
-    console.log('🗑️  Deleting duplicates...');
+    console.log(' Deleting duplicates...');
     const deleteIds = toDelete.map(d => d.id);
 
     const { error: deleteError } = await supabase
@@ -89,7 +89,7 @@ async function main() {
       throw new Error(`Failed to delete duplicates: ${deleteError.message}`);
     }
 
-    console.log(`✅ Successfully deleted ${deleteIds.length} duplicate categories\n`);
+    console.log(`Successfully deleted ${deleteIds.length} duplicate categories\n`);
 
     // Verify final count
     const { data: finalCategories } = await supabase
@@ -97,10 +97,10 @@ async function main() {
       .select('id')
       .order('user_id');
 
-    console.log(`📊 Final category count: ${finalCategories?.length}`);
+    console.log(`Final category count: ${finalCategories?.length}`);
 
   } catch (err) {
-    console.error('❌ Error:', err);
+    console.error('Error:', err);
     process.exit(1);
   }
 }

@@ -29,10 +29,10 @@ async function ensureAgentsInitialized(): Promise<void> {
   if (!initializationPromise) {
     initializationPromise = initializeAgents()
       .then(() => {
-        console.log('✅ Agents initialized successfully');
+        console.log('Agents initialized successfully');
       })
       .catch(error => {
-        console.error('❌ Failed to initialize agents:', error);
+        console.error('Failed to initialize agents:', error);
         throw error;
       })
       .finally(() => {
@@ -45,7 +45,7 @@ async function ensureAgentsInitialized(): Promise<void> {
 
 // Kick off initialization eagerly but don't block module evaluation
 ensureAgentsInitialized().catch(error => {
-  console.error('❌ Agent initialization failed during startup:', error);
+  console.error('Agent initialization failed during startup:', error);
 });
 
 export async function processAgentMessage(req: Request, res: Response): Promise<void> {
@@ -56,7 +56,7 @@ export async function processAgentMessage(req: Request, res: Response): Promise<
     const { context, message, targetAgent, isInternal } = req.body;
 
     if (!context || typeof context !== 'object' || !message) {
-      console.error('❌ [AGENT] Missing context or message:', { context: !!context, message: !!message });
+      console.error('[AGENT] Missing context or message:', { context: !!context, message: !!message });
       res.status(400).json({ error: 'Missing context or message in request body' });
       return;
     }
@@ -71,7 +71,7 @@ export async function processAgentMessage(req: Request, res: Response): Promise<
       return;
     }
 
-    console.log(`🤖 Processing ${isInternal ? 'internal ' : ''}message for user ${context.userId}, target agent: ${targetAgent || 'auto-route'}`);
+    console.log(`Processing ${isInternal ? 'internal ' : ''}message for user ${context.userId}, target agent: ${targetAgent || 'auto-route'}`);
 
     // Convert context to AgentContext format
     const agentContext = {
@@ -86,7 +86,7 @@ export async function processAgentMessage(req: Request, res: Response): Promise<
     // Route message through agent registry
     const response = await agentRegistry.routeMessage(agentContext, message, targetAgent);
     
-    console.log(`✅ Agent response: ${response.content.substring(0, 100)}...`);
+    console.log(`Agent response: ${response.content.substring(0, 100)}...`);
     
     res.json({
       success: true,

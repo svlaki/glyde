@@ -98,9 +98,9 @@ export class ZepGraphService {
     try {
       await this.initializeOntology();
       await this.initializeCentralGraph();
-      console.log('✅ [ZepGraphService] Infrastructure initialized successfully');
+      console.log('[ZepGraphService] Infrastructure initialized successfully');
     } catch (error) {
-      console.error('❌ [ZepGraphService] Infrastructure initialization failed:', error);
+      console.error('[ZepGraphService] Infrastructure initialization failed:', error);
     }
   }
 
@@ -150,9 +150,9 @@ export class ZepGraphService {
       );
 
       this.ontologyInitialized = true;
-      console.log('✅ [ZepGraphService] Custom ontology registered successfully');
+      console.log('[ZepGraphService] Custom ontology registered successfully');
     } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to register ontology:', error);
+      console.error('[ZepGraphService] Failed to register ontology:', error);
       throw error;
     }
   }
@@ -167,7 +167,7 @@ export class ZepGraphService {
       // Check if central graph exists
       try {
         await this.client.graph.get(CENTRAL_GRAPH_ID);
-        console.log('✅ [ZepGraphService] Central graph already exists');
+        console.log('[ZepGraphService] Central graph already exists');
       } catch (error: any) {
         if (error?.statusCode === 404 || error?.status === 404) {
           // Create central graph
@@ -176,7 +176,7 @@ export class ZepGraphService {
             name: CENTRAL_GRAPH_NAME,
             description: "Centralized knowledge graph for cross-user patterns, insights, and collective intelligence"
           });
-          console.log('✅ [ZepGraphService] Central graph created successfully');
+          console.log('[ZepGraphService] Central graph created successfully');
         } else {
           throw error;
         }
@@ -184,7 +184,7 @@ export class ZepGraphService {
 
       this.centralGraphInitialized = true;
     } catch (error) {
-      console.error('❌ [ZepGraphService] Failed to initialize central graph:', error);
+      console.error('[ZepGraphService] Failed to initialize central graph:', error);
       throw error;
     }
   }
@@ -214,7 +214,7 @@ export class ZepGraphService {
           }
         }
       });
-      console.log(`✅ [ZepGraphService] User initialized with fact ratings: ${userId}`);
+      console.log(`[ZepGraphService] User initialized with fact ratings: ${userId}`);
     } catch (error: any) {
       // User already exists - check for both 409 and 400 with "already exists" message
       const isAlreadyExists = 
@@ -224,11 +224,11 @@ export class ZepGraphService {
         (error?.status === 400 && error?.body?.message?.includes('already exists'));
       
       if (!isAlreadyExists) {
-        console.error(`❌ [ZepGraphService] Failed to initialize user ${userId}:`, error);
+        console.error(`[ZepGraphService] Failed to initialize user ${userId}:`, error);
         throw error;
       }
       // User already exists, continue silently
-      console.log(`✅ [ZepGraphService] User already exists: ${userId}`);
+      console.log(`[ZepGraphService] User already exists: ${userId}`);
     }
   }
 
@@ -254,7 +254,7 @@ export class ZepGraphService {
       });
 
       this.userThreads.set(userId, threadId);
-      console.log(`✅ [ZepGraphService] Created thread: ${threadId}`);
+      console.log(`[ZepGraphService] Created thread: ${threadId}`);
       return threadId;
     } catch (error: any) {
       // Thread already exists - check for both 409 and 400 with "already exists" message
@@ -266,7 +266,7 @@ export class ZepGraphService {
       
       if (isAlreadyExists) {
         this.userThreads.set(userId, threadId);
-        console.log(`✅ [ZepGraphService] Thread already exists: ${threadId}`);
+        console.log(`[ZepGraphService] Thread already exists: ${threadId}`);
         return threadId;
       }
       
@@ -297,10 +297,10 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added calendar event to user graph: ${event.title}`);
+      console.log(`[ZepGraphService] Added calendar event to user graph: ${event.title}`);
       return event.eventId || '';
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add calendar event:`, error);
+      console.error(`[ZepGraphService] Failed to add calendar event:`, error);
       throw error;
     }
   }
@@ -324,9 +324,9 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Updated calendar event: ${updatedEvent.title}`);
+      console.log(`[ZepGraphService] Updated calendar event: ${updatedEvent.title}`);
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to update calendar event:`, error);
+      console.error(`[ZepGraphService] Failed to update calendar event:`, error);
       throw error;
     }
   }
@@ -344,9 +344,9 @@ export class ZepGraphService {
         data: `The calendar event "${eventTitle || eventId}" (ID: ${eventId}) has been deleted and is no longer scheduled. This event should be considered cancelled and removed from the user's schedule.`,
         type: 'text',
       });
-      console.log(`✅ [ZepGraphService] Calendar event invalidated in graph: ${eventId}`);
+      console.log(`[ZepGraphService] Calendar event invalidated in graph: ${eventId}`);
     } catch (error) {
-      console.error(`⚠️ [ZepGraphService] Failed to invalidate calendar event ${eventId}:`, error);
+      console.error(`[ZepGraphService] Failed to invalidate calendar event ${eventId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary
     }
   }
@@ -374,10 +374,10 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added task to user graph: ${task.title}`);
+      console.log(`[ZepGraphService] Added task to user graph: ${task.title}`);
       return task.taskId || '';
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add task:`, error);
+      console.error(`[ZepGraphService] Failed to add task:`, error);
       throw error;
     }
   }
@@ -395,9 +395,9 @@ export class ZepGraphService {
         data: `The task "${taskTitle || taskId}" (ID: ${taskId}) has been deleted and is no longer active. This task should be considered removed from the user's task list.`,
         type: 'text',
       });
-      console.log(`✅ [ZepGraphService] Task invalidated in graph: ${taskId}`);
+      console.log(`[ZepGraphService] Task invalidated in graph: ${taskId}`);
     } catch (error) {
-      console.error(`⚠️ [ZepGraphService] Failed to invalidate task ${taskId}:`, error);
+      console.error(`[ZepGraphService] Failed to invalidate task ${taskId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary
     }
   }
@@ -424,10 +424,10 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added goal to user graph: ${goal.title}`);
+      console.log(`[ZepGraphService] Added goal to user graph: ${goal.title}`);
       return goal.goalId || '';
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add goal:`, error);
+      console.error(`[ZepGraphService] Failed to add goal:`, error);
       throw error;
     }
   }
@@ -445,9 +445,9 @@ export class ZepGraphService {
         data: `The goal "${goalTitle || goalId}" (ID: ${goalId}) has been deleted and is no longer being pursued. This goal should be considered removed from the user's goals.`,
         type: 'text',
       });
-      console.log(`✅ [ZepGraphService] Goal invalidated in graph: ${goalId}`);
+      console.log(`[ZepGraphService] Goal invalidated in graph: ${goalId}`);
     } catch (error) {
-      console.error(`⚠️ [ZepGraphService] Failed to invalidate goal ${goalId}:`, error);
+      console.error(`[ZepGraphService] Failed to invalidate goal ${goalId}:`, error);
       // Non-critical - deletion from DB is what matters, graph invalidation is secondary
     }
   }
@@ -474,9 +474,9 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added pattern to user graph: ${pattern.pattern_type}`);
+      console.log(`[ZepGraphService] Added pattern to user graph: ${pattern.pattern_type}`);
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add pattern:`, error);
+      console.error(`[ZepGraphService] Failed to add pattern:`, error);
       throw error;
     }
   }
@@ -502,9 +502,9 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added user preference: ${preference.key}`);
+      console.log(`[ZepGraphService] Added user preference: ${preference.key}`);
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add user preference:`, error);
+      console.error(`[ZepGraphService] Failed to add user preference:`, error);
       throw error;
     }
   }
@@ -536,9 +536,9 @@ export class ZepGraphService {
         })
       });
 
-      console.log(`✅ [ZepGraphService] Added community pattern: ${pattern.pattern_type} (${pattern.user_count} users)`);
+      console.log(`[ZepGraphService] Added community pattern: ${pattern.pattern_type} (${pattern.user_count} users)`);
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to add community pattern:`, error);
+      console.error(`[ZepGraphService] Failed to add community pattern:`, error);
       throw error;
     }
   }
@@ -574,14 +574,14 @@ export class ZepGraphService {
         }
       });
 
-      console.log(`✅ [ZepGraphService] User graph search completed: ${query}`);
+      console.log(`[ZepGraphService] User graph search completed: ${query}`);
       return {
         edges: result.edges || [],
         nodes: result.nodes || [],
         episodes: result.episodes || []
       };
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Search failed:`, error);
+      console.error(`[ZepGraphService] Search failed:`, error);
       return { edges: [], nodes: [], episodes: [] };
     }
   }
@@ -618,7 +618,7 @@ export class ZepGraphService {
           `${e.fact?.description} (${e.fact?.user_count} users, ${(e.fact?.confidence_score || 0).toFixed(2)} confidence)`
         );
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Community search failed:`, error);
+      console.error(`[ZepGraphService] Community search failed:`, error);
       return [];
     }
   }
@@ -663,7 +663,7 @@ ${communityInsights.length > 0 ? communityInsights.join('\n') : 'Building commun
         entities: []
       };
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Failed to get enhanced context:`, error);
+      console.error(`[ZepGraphService] Failed to get enhanced context:`, error);
       return {
         facts: [],
         memory_context: '',
@@ -694,9 +694,9 @@ ${communityInsights.length > 0 ? communityInsights.join('\n') : 'Building commun
     try {
       await this.client.user.delete(userId);
       this.userThreads.delete(userId);
-      console.log(`✅ [ZepGraphService] Cleaned up user graph: ${userId}`);
+      console.log(`[ZepGraphService] Cleaned up user graph: ${userId}`);
     } catch (error) {
-      console.error(`❌ [ZepGraphService] Cleanup failed:`, error);
+      console.error(`[ZepGraphService] Cleanup failed:`, error);
     }
   }
 }

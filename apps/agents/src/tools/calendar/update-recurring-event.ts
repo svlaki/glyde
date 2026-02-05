@@ -56,7 +56,7 @@ export const updateRecurringEventTool = tool(
         throw new Error('Failed to update recurring series');
       }
 
-      return `✅ Updated recurring event series: "${updated.title}"`;
+      return `Updated recurring event series: "${updated.title}"`;
     } else if (scope === 'this_instance') {
       // Update single instance - would need to know which instance
       // For now, require more specific handling

@@ -11,19 +11,19 @@ const requiredEnvVars = [
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
-  console.error('❌ Missing required environment variables:', missingVars.join(', '));
+  console.error('Missing required environment variables:', missingVars.join(', '));
   console.error('Please set these variables before starting the server.');
   process.exit(1);
 }
 
 // Validate environment variables format
 if (process.env.SUPABASE_URL && !process.env.SUPABASE_URL.startsWith('https://')) {
-  console.error('❌ SUPABASE_URL must be a valid HTTPS URL');
+  console.error('SUPABASE_URL must be a valid HTTPS URL');
   process.exit(1);
 }
 
 if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY.length < 20) {
-  console.error('❌ SUPABASE_SERVICE_ROLE_KEY appears to be invalid (too short)');
+  console.error('SUPABASE_SERVICE_ROLE_KEY appears to be invalid (too short)');
   process.exit(1);
 }
 
@@ -150,7 +150,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 // Request logging middleware
 if (isDevelopment) {
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.log(`📝 [SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    console.log(`[SERVER] ${req.method} ${req.url} - ${new Date().toISOString()}`);
     next();
   });
 }
@@ -375,7 +375,7 @@ app.post('/api/agent/stream', addStartTime, streamAgentMessage);
 // Centralized error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Log error with context
-  console.error('❌ [SERVER] Unhandled error:', {
+  console.error('[SERVER] Unhandled error:', {
     message: err.message,
     stack: err.stack,
     url: req.url,

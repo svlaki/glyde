@@ -119,7 +119,7 @@ export async function completeOnboarding(
       return { success: false, error: result.error || 'Failed to complete onboarding' }
     }
 
-    console.log('✅ Onboarding completed successfully')
+    console.log('Onboarding completed successfully')
     return { success: true }
   } catch (error) {
     console.error('🔴 Error completing onboarding:', error)

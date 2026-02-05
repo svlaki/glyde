@@ -30,10 +30,10 @@ async function testCRUD() {
     const createResult = await createResponse.json();
     if (createResult.success && createResult.event) {
       testEventId = createResult.event.id;
-      console.log('✅ CREATE: Event created successfully');
+      console.log('CREATE: Event created successfully');
       console.log(`   Event ID: ${testEventId}`);
     } else {
-      console.log('❌ CREATE: Failed to create event');
+      console.log('CREATE: Failed to create event');
       return;
     }
     
@@ -51,13 +51,13 @@ async function testCRUD() {
     if (listResult.success && listResult.events) {
       const foundEvent = listResult.events.find(e => e.id === testEventId);
       if (foundEvent) {
-        console.log('✅ READ: Event found in list');
+        console.log('READ: Event found in list');
         console.log(`   Total events: ${listResult.events.length}`);
       } else {
-        console.log('❌ READ: Created event not found in list');
+        console.log('READ: Created event not found in list');
       }
     } else {
-      console.log('❌ READ: Failed to list events');
+      console.log('READ: Failed to list events');
     }
     
     // 3. UPDATE - Test event update
@@ -77,9 +77,9 @@ async function testCRUD() {
     
     const updateResult = await updateResponse.json();
     if (updateResult.success) {
-      console.log('✅ UPDATE: Event updated successfully');
+      console.log('UPDATE: Event updated successfully');
     } else {
-      console.log('❌ UPDATE: Failed to update event');
+      console.log('UPDATE: Failed to update event');
     }
     
     // 4. DELETE - Test event deletion
@@ -95,9 +95,9 @@ async function testCRUD() {
     
     const deleteResult = await deleteResponse.json();
     if (deleteResult.success) {
-      console.log('✅ DELETE: Event deleted successfully');
+      console.log('DELETE: Event deleted successfully');
     } else {
-      console.log('❌ DELETE: Failed to delete event');
+      console.log('DELETE: Failed to delete event');
     }
     
     // 5. VERIFY - Check event is gone
@@ -114,20 +114,20 @@ async function testCRUD() {
     if (verifyResult.success && verifyResult.events) {
       const stillExists = verifyResult.events.find(e => e.id === testEventId);
       if (!stillExists) {
-        console.log('✅ VERIFY: Event successfully removed from database');
+        console.log('VERIFY: Event successfully removed from database');
       } else {
-        console.log('❌ VERIFY: Event still exists after deletion');
+        console.log('VERIFY: Event still exists after deletion');
       }
     }
     
-    console.log('\n✨ All CRUD operations tested successfully!');
+    console.log('\nAll CRUD operations tested successfully!');
     
   } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
+    console.error('\nTest failed:', error.message);
     
     // Cleanup if test failed
     if (testEventId) {
-      console.log('\n🧹 Cleaning up test event...');
+      console.log('\nCleaning up test event...');
       try {
         await fetch(`${API_URL}/api/events/delete`, {
           method: 'POST',
@@ -137,9 +137,9 @@ async function testCRUD() {
             event_id: testEventId
           })
         });
-        console.log('✅ Cleanup complete');
+        console.log('Cleanup complete');
       } catch (cleanupError) {
-        console.log('⚠️ Cleanup failed:', cleanupError.message);
+        console.log('Cleanup failed:', cleanupError.message);
       }
     }
   }

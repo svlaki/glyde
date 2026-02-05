@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refresh_token = params.get('refresh_token')
 
           if (access_token) {
-            console.log('✅ OAuth tokens received via deep link')
+            console.log('OAuth tokens received via deep link')
             await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || ''
@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Interactions are now created directly by the agent via create_interaction tool
     // They can be generated on-demand via the refresh button in the UI
-    console.log('✅ Ready to generate interactions on-demand');
+    console.log('Ready to generate interactions on-demand');
   }
 
   async function signIn(email: string, password: string) {

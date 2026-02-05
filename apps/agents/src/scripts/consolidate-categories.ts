@@ -49,7 +49,7 @@ async function consolidateCategories() {
         .order('created_at', { ascending: true }) as { data: Category[]; error: any };
 
       if (catError) {
-        console.error(`❌ Error fetching categories for user ${userId}:`, catError);
+        console.error(`Error fetching categories for user ${userId}:`, catError);
         continue;
       }
 
@@ -73,7 +73,7 @@ async function consolidateCategories() {
               .eq('id', cat.id);
 
             if (delError) {
-              console.error(`❌ Failed to delete duplicate "${name}" (${cat.id}):`, delError);
+              console.error(`Failed to delete duplicate "${name}" (${cat.id}):`, delError);
             } else {
               console.log(`✓ Removed duplicate: "${name}"`);
               totalDuplicatesRemoved++;
@@ -96,7 +96,7 @@ async function consolidateCategories() {
             .eq('id', cat.id);
 
           if (updateError) {
-            console.error(`❌ Failed to update icon for "${cat.name}":`, updateError);
+            console.error(`Failed to update icon for "${cat.name}":`, updateError);
           } else {
             console.log(`✓ Fixed icon for "${cat.name}": ${newIcon}`);
             totalIconsFixed++;
@@ -105,12 +105,12 @@ async function consolidateCategories() {
       }
     }
 
-    console.log('\n✅ Consolidation complete!');
+    console.log('\nConsolidation complete!');
     console.log(`   - Duplicates removed: ${totalDuplicatesRemoved}`);
     console.log(`   - Icons fixed: ${totalIconsFixed}`);
 
   } catch (error) {
-    console.error('❌ Consolidation failed:', error);
+    console.error('Consolidation failed:', error);
     process.exit(1);
   }
 }

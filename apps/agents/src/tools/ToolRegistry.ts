@@ -149,7 +149,7 @@ export class ToolRegistry {
       }
     });
 
-    console.log(`🤖 [GERALD TOOLS] Loaded ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
+    console.log(`[GERALD TOOLS] Loaded ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
     return tools;
   }
 

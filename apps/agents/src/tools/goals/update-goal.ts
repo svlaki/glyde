@@ -7,7 +7,7 @@ export const updateGoalTool = tool(
   async ({ goalId, title, description, targetDate, status, progress, category, priorityScore, milestones }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -33,7 +33,7 @@ export const updateGoalTool = tool(
       const goal = await supabaseService.updateGoal(userId, goalId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
-        return "❌ Failed to update goal";
+        return "Failed to update goal";
       }
 
       // Update in Zep knowledge graph asynchronously
@@ -48,9 +48,9 @@ export const updateGoalTool = tool(
             deadline: goal.target_date,
             time_invested_minutes: 0, // Could be enhanced to track actual time
           });
-          console.log(`✅ [update-goal] Goal update added to knowledge graph: ${goal.title}`);
+          console.log(`[update-goal] Goal update added to knowledge graph: ${goal.title}`);
         } catch (error) {
-          console.error('⚠️ [update-goal] Failed to update knowledge graph (non-critical):', error);
+          console.error('[update-goal] Failed to update knowledge graph (non-critical):', error);
         }
       };
       updateGraph(); // Fire and forget
@@ -90,10 +90,10 @@ export const updateGoalTool = tool(
 
       const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
-      return `✅ GOAL: "${goalTitle}" has been updated${changeDescription}`;
+      return `GOAL: "${goalTitle}" has been updated${changeDescription}`;
     } catch (error) {
-      console.error('❌ [update-goal] Error:', error);
-      return `❌ Error updating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[update-goal] Error:', error);
+      return `Error updating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

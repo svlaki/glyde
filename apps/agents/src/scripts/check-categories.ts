@@ -15,7 +15,7 @@ const supabase = createClient(
 );
 
 async function main() {
-  console.log('📋 Checking Categories & Events\n');
+  console.log('Checking Categories & Events\n');
 
   // Get all categories
   const { data: categories } = await supabase
@@ -33,7 +33,7 @@ async function main() {
 
   const uniqueCategories = [...new Set(events?.map(e => e.category).filter(Boolean))];
 
-  console.log('\n📅 Event Categories (old field):');
+  console.log('\nEvent Categories (old field):');
   console.table(uniqueCategories.map(c => ({ category: c })));
 
   // Check for mismatches
@@ -41,7 +41,7 @@ async function main() {
   const mismatches = uniqueCategories.filter(c => !categoryNames.has(c));
 
   if (mismatches.length > 0) {
-    console.log('\n⚠️  Categories in events but NOT in categories table:');
+    console.log('\n Categories in events but NOT in categories table:');
     console.table(mismatches.map(c => ({ missing: c })));
   }
 }

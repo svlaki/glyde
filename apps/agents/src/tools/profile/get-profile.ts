@@ -6,7 +6,7 @@ export const getProfileTool = tool(
   async ({ section }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -28,8 +28,8 @@ export const getProfileTool = tool(
         return `Profile Summary (${completeness}% complete):\n${summary}`;
       }
     } catch (error) {
-      console.error('❌ [get-profile] Error:', error);
-      return `❌ Error getting profile: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[get-profile] Error:', error);
+      return `Error getting profile: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {
