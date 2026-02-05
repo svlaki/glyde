@@ -7,7 +7,7 @@ import { GoalDetailPanel } from './GoalDetailPanel'
 import { GoalForm } from './GoalForm'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
-import { getTypography, fontSize, fontWeight } from '../styles/typography'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { supabase } from '../lib/supabase'
 import { NewButton } from './ui/IconButtons'
@@ -196,8 +196,7 @@ export function GoalsSection() {
                 onClick={handleBackToList}
                 style={{
                   padding: '6px 12px',
-                  fontSize: fontSize.sm,
-                  fontWeight: fontWeight.normal,
+                  ...typography.bodySm,
                   background: 'transparent',
                   color: colors.textSecondary,
                   border: 'none',
@@ -210,8 +209,7 @@ export function GoalsSection() {
                 ← Back
               </button>
               <h2 style={{
-                fontSize: fontSize.base,
-                fontWeight: fontWeight.normal,
+                ...typography.headingMd,
                 color: colors.textPrimary,
                 margin: 0,
                 flex: 1,
@@ -225,7 +223,6 @@ export function GoalsSection() {
             <>
               <h2 style={{
                 ...typography.headingMd,
-                fontWeight: 600,
                 color: colors.textPrimary,
                 margin: 0
               }}>
@@ -267,7 +264,7 @@ export function GoalsSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Loading goals...
               </div>
@@ -276,7 +273,7 @@ export function GoalsSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>
@@ -328,7 +325,6 @@ export function GoalsSection() {
       }}>
         <h2 style={{
           ...typography.headingMd,
-          fontWeight: 600,
           color: colors.textPrimary,
           margin: 0
         }}>
@@ -368,7 +364,7 @@ export function GoalsSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Loading goals...
               </div>
@@ -377,7 +373,7 @@ export function GoalsSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>

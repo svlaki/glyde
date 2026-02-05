@@ -6,7 +6,7 @@ import { RuleCard } from './RuleCard'
 import { RuleForm } from './RuleForm'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
-import { fontSize, fontWeight, lineHeight } from '../styles/typography'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { NewButton, EditButton, DeleteButton } from './ui/IconButtons'
 
@@ -14,6 +14,7 @@ export function RulesSection() {
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(isMobile)
   const { rules, isLoading, error, createRule, updateRule, deleteRule, toggleRule } = useRules()
 
   const [selectedRule, setSelectedRule] = useState<Rule | null>(null)
@@ -119,8 +120,7 @@ export function RulesSection() {
                 onClick={handleBackToList}
                 style={{
                   padding: '6px 12px',
-                  fontSize: fontSize.sm,
-                  fontWeight: fontWeight.normal,
+                  ...typography.bodySm,
                   background: 'transparent',
                   color: colors.textSecondary,
                   border: 'none',
@@ -133,8 +133,7 @@ export function RulesSection() {
                 ← Back
               </button>
               <h2 style={{
-                fontSize: fontSize.base,
-                fontWeight: fontWeight.normal,
+                ...typography.headingMd,
                 color: colors.textPrimary,
                 margin: 0,
                 flex: 1,
@@ -147,12 +146,11 @@ export function RulesSection() {
           ) : (
             <>
               <h2 style={{
-                fontSize: fontSize.base,
-                fontWeight: fontWeight.normal,
+                ...typography.headingMd,
                 color: colors.textPrimary,
                 margin: 0
               }}>
-                Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: fontWeight.light }}>({enabledCount}/{rules.length})</span>}
+                Rules {rules.length > 0 && <span style={{ ...typography.bodySm, color: colors.textSecondary }}>({enabledCount}/{rules.length})</span>}
               </h2>
               <NewButton
                 onClick={handleCreateRule}
@@ -188,7 +186,7 @@ export function RulesSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Loading rules...
               </div>
@@ -197,7 +195,7 @@ export function RulesSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>
@@ -249,12 +247,11 @@ export function RulesSection() {
         alignItems: 'center'
       }}>
         <h2 style={{
-          fontSize: fontSize.base,
-          fontWeight: fontWeight.normal,
+          ...typography.headingMd,
           color: colors.textPrimary,
           margin: 0
         }}>
-          Rules {rules.length > 0 && <span style={{ color: colors.textSecondary, fontWeight: fontWeight.light }}>({enabledCount}/{rules.length} active)</span>}
+          Rules {rules.length > 0 && <span style={{ ...typography.bodySm, color: colors.textSecondary }}>({enabledCount}/{rules.length} active)</span>}
         </h2>
         <NewButton
           onClick={handleCreateRule}
@@ -290,7 +287,7 @@ export function RulesSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Loading rules...
               </div>
@@ -299,7 +296,7 @@ export function RulesSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: fontSize.base
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>
@@ -364,6 +361,9 @@ function RuleDetailPanel({
   onDelete: () => void
   onToggle: (enabled: boolean) => void
 }) {
+  const { isMobile } = usePlatform()
+  const typography = getTypography(isMobile)
+
   if (!rule) {
     return (
       <EmptyState
@@ -377,11 +377,9 @@ function RuleDetailPanel({
     <div>
       {/* Rule Text */}
       <p style={{
-        fontSize: fontSize.base,
-        fontWeight: fontWeight.normal,
+        ...typography.bodyMd,
         color: colors.textPrimary,
         margin: '0 0 16px 0',
-        lineHeight: lineHeight.normal
       }}>
         {rule.rule_text}
       </p>
@@ -395,8 +393,7 @@ function RuleDetailPanel({
       }}>
         <span style={{
           padding: '4px 8px',
-          fontSize: fontSize.xs,
-          fontWeight: fontWeight.medium,
+          ...typography.labelMd,
           background: rule.enabled ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)',
           color: rule.enabled ? '#22c55e' : colors.textSecondary,
           borderRadius: '4px'
@@ -405,8 +402,7 @@ function RuleDetailPanel({
         </span>
         <span style={{
           padding: '4px 8px',
-          fontSize: fontSize.xs,
-          fontWeight: fontWeight.medium,
+          ...typography.labelMd,
           background: 'rgba(59, 130, 246, 0.1)',
           color: '#3b82f6',
           borderRadius: '4px'
@@ -415,8 +411,7 @@ function RuleDetailPanel({
         </span>
         <span style={{
           padding: '4px 8px',
-          fontSize: fontSize.xs,
-          fontWeight: fontWeight.medium,
+          ...typography.labelMd,
           background: rule.source === 'agent' ? 'rgba(168, 85, 247, 0.1)' : 'rgba(156, 163, 175, 0.1)',
           color: rule.source === 'agent' ? '#a855f7' : colors.textSecondary,
           borderRadius: '4px'
@@ -428,10 +423,9 @@ function RuleDetailPanel({
       {/* Description */}
       {rule.description && (
         <p style={{
-          fontSize: fontSize.sm,
+          ...typography.bodySm,
           color: colors.textSecondary,
           margin: '0 0 24px 0',
-          lineHeight: lineHeight.normal
         }}>
           {rule.description}
         </p>
@@ -446,7 +440,7 @@ function RuleDetailPanel({
         paddingBottom: '24px',
         borderBottom: `1px solid ${colors.border}`
       }}>
-        <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
+        <span style={{ ...typography.bodySm, color: colors.textSecondary }}>
           {rule.enabled ? 'Enabled' : 'Disabled'}
         </span>
         <button

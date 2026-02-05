@@ -67,7 +67,7 @@ export const analyzeScheduleTool = tool(
       });
 
       if (events.length === 0) {
-        return `📅 No events scheduled for ${period || 'the selected period'}. Your calendar is completely free!`;
+        return `No events scheduled for ${period || 'the selected period'}. Your calendar is completely free!`;
       }
 
       // Calculate metrics

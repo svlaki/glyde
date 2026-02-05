@@ -2,17 +2,12 @@ import { User } from '@supabase/supabase-js'
 
 export interface UserProfile {
   user_id: string
-  life?: Record<string, any>
-  work?: Record<string, any>
-  productivity?: Record<string, any>
-  health?: Record<string, any>
-  relationships?: Record<string, any>
-  routines?: Record<string, any>
-  decision_making?: Record<string, any>
-  communication?: Record<string, any>
-  learning?: Record<string, any>
-  agent_preferences?: Record<string, any>
-  rules?: Record<string, any>
+  values?: Record<string, any>
+  preferences?: Record<string, any>
+  work_patterns?: Record<string, any>
+  personality_traits?: Record<string, any>
+  context_data?: Record<string, any>
+  goals_summary?: string
   created_at?: string
   updated_at?: string
 }

@@ -10,6 +10,7 @@ import { ConnectionProvider } from './src/lib/connectionContext'
 import { Auth } from './src/components/Auth'
 import { CalendarPage } from './src/pages/CalendarPage'
 import { ProfilePage } from './src/pages/ProfilePage'
+import { ProfileEditPage } from './src/pages/ProfileEditPage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { ConnectionsPage } from './src/pages/ConnectionsPage'
 import { PlanPage } from './src/pages/PlanPage'
@@ -42,6 +43,16 @@ function App() {
                     <ProtectedRoute>
                       <OnboardingCheck>
                         <CalendarPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile/edit"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <ProfileEditPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }

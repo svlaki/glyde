@@ -247,11 +247,11 @@ export async function searchAll(
 export function getTypeIcon(type: SearchResultType): string {
   switch (type) {
     case 'event':
-      return '📅'
+      return ''
     case 'task':
-      return '✓'
+      return ''
     case 'goal':
-      return '🎯'
+      return ''
     default:
       return '•'
   }

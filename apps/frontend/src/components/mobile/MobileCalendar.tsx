@@ -2,16 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useCategories } from '../../lib/categoryContext'
 import { useDarkMode } from '../../lib/darkModeContext'
-import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent } from '../../lib/calendarService'
+import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
 import { supabase } from '../../lib/supabase'
 import { getColors, hexToRgba } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
-import { EventForm } from '../EventForm'
-import { EventFormMobile } from './EventFormMobile'
-import { RecurringEventView } from '../RecurringEventView'
-import { EditRecurringEventModal } from '../EditRecurringEventModal'
+import { EventFormUnified } from '../event'
 import { getRecurrenceBadge } from '../../lib/recurrenceUtils'
-import { usePlatform } from '../../hooks/usePlatform'
 
 interface CalendarEvent {
   id: string
@@ -42,7 +38,6 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   const { user, session } = useAuth()
   const { getCategoryColor } = useCategories()
   const { isDarkMode } = useDarkMode()
-  const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(true) // Mobile context
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -52,13 +47,6 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [columnWidth, setColumnWidth] = useState(() => (window.innerWidth - 40) / 3)
 
-  // Recurring event view state
-  const [recurringEventToView, setRecurringEventToView] = useState<CalendarEvent | null>(null)
-  const [isRecurringViewOpen, setIsRecurringViewOpen] = useState(false)
-
-  // Recurring event edit state
-  const [recurringEventToEdit, setRecurringEventToEdit] = useState<CalendarEvent | null>(null)
-  const [isRecurringEditOpen, setIsRecurringEditOpen] = useState(false)
 
   // Drag state for events
   const [isDragging, setIsDragging] = useState(false)
@@ -87,6 +75,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
   const hasMovedRef = useRef(false)
   const touchStartTimeRef = useRef(0)
+  const handleEventTouchEndRef = useRef<() => void>(() => {})
 
   // Refs for cross-day drag (3-day view)
   const dragStartXRef = useRef(0)
@@ -447,6 +436,25 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
       container.removeEventListener('wheel', handleWheel)
     }
   }, [view])
+
+  // Safety net: document-level touchend to catch cases where the event element's
+  // onTouchEnd doesn't fire (e.g., element unmounted during cross-day drag)
+  // Uses handleEventTouchEndRef to always call the latest version (avoids stale closure)
+  useEffect(() => {
+    const handleGlobalTouchEnd = () => {
+      if (touchedEventRef.current || isDraggingRef.current || isInEditModeRef.current) {
+        handleEventTouchEndRef.current()
+      }
+    }
+
+    document.addEventListener('touchend', handleGlobalTouchEnd, { passive: true })
+    document.addEventListener('touchcancel', handleGlobalTouchEnd, { passive: true })
+
+    return () => {
+      document.removeEventListener('touchend', handleGlobalTouchEnd)
+      document.removeEventListener('touchcancel', handleGlobalTouchEnd)
+    }
+  }, [])
 
   // Load events for the visible date range
   useEffect(() => {
@@ -811,59 +819,17 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
       setEventTouchTimer(null)
     }
 
-    // Capture drag data before resetting state
-    let pendingUpdate: { eventId: string; startTime: string; endTime: string } | null = null
+    // Step 1: Clear refs FIRST so container touch handlers stop blocking scroll
+    // This must happen before any state updates to prevent the race condition
+    // where a new scroll gesture sees stale touchedEventRef and calls preventDefault
+    const wasDragging = isDraggingRef.current
+    const draggedEvent = draggingEventRef.current
+    const finalDeltaY = dragCurrentYRef.current - dragStartYRef.current
+    const finalTargetDay = targetDayIndexRef.current
+    const finalSourceDay = sourceDayIndexRef.current
+    const hasMoved = hasMovedRef.current
+    const tappedEvent = touchedEventRef.current
 
-    // If dragging, prepare the update
-    if (isDraggingRef.current && draggingEventRef.current) {
-      const deltaY = dragCurrentYRef.current - dragStartYRef.current
-      const rawDeltaMinutes = deltaY
-
-      // Check if the event was dragged to a different day
-      const didChangeDays = view === '3day' &&
-        targetDayIndexRef.current !== null &&
-        sourceDayIndexRef.current !== null &&
-        targetDayIndexRef.current !== sourceDayIndexRef.current
-
-      if (Math.abs(rawDeltaMinutes) >= 10 || didChangeDays) {
-        const originalStart = new Date(draggingEventRef.current.start_time)
-        const originalEnd = new Date(draggingEventRef.current.end_time)
-        const duration = originalEnd.getTime() - originalStart.getTime()
-
-        const newStartRaw = new Date(originalStart.getTime() + rawDeltaMinutes * 60 * 1000)
-        const snappedMinutes = Math.round(newStartRaw.getMinutes() / 15) * 15
-        const newStart = new Date(newStartRaw)
-        newStart.setMinutes(snappedMinutes, 0, 0)
-
-        // If cross-day drag, update the date using the target column index
-        if (didChangeDays && targetDayIndexRef.current !== null) {
-          const targetDate = getDateForColumnIndex(targetDayIndexRef.current)
-          newStart.setFullYear(targetDate.getFullYear())
-          newStart.setMonth(targetDate.getMonth())
-          newStart.setDate(targetDate.getDate())
-        }
-
-        const newEnd = new Date(newStart.getTime() + duration)
-
-        pendingUpdate = {
-          eventId: draggingEventRef.current.id,
-          startTime: newStart.toISOString(),
-          endTime: newEnd.toISOString()
-        }
-      }
-    } else if (!hasMovedRef.current && touchDuration < 200 && touchedEventRef.current) {
-      // Quick tap - open event form
-      const event = touchedEventRef.current
-      if (event.is_recurring || event.parent_event_id) {
-        setRecurringEventToView(event)
-        setIsRecurringViewOpen(true)
-      } else {
-        setSelectedEvent(event)
-        setIsFormOpen(true)
-      }
-    }
-
-    // Reset all state IMMEDIATELY (before async update)
     touchedEventRef.current = null
     isInEditModeRef.current = false
     isDraggingRef.current = false
@@ -872,8 +838,6 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     dragCurrentYRef.current = 0
     touchStartPosRef.current = null
     hasMovedRef.current = false
-
-    // Reset cross-day state
     dragStartXRef.current = 0
     dragCurrentXRef.current = 0
     targetDayIndexRef.current = null
@@ -893,6 +857,71 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     scrollGestureRef.current.velocityX = 0
     scrollGestureRef.current.velocityY = 0
 
+    // Step 2: Calculate the update BEFORE resetting visual state
+    // so we can apply the optimistic update in the same batch
+    if (wasDragging && draggedEvent) {
+      const rawDeltaMinutes = finalDeltaY
+
+      const didChangeDays = view === '3day' &&
+        finalTargetDay !== null &&
+        finalSourceDay !== null &&
+        finalTargetDay !== finalSourceDay
+
+      if (Math.abs(rawDeltaMinutes) >= 10 || didChangeDays) {
+        const originalStart = new Date(draggedEvent.start_time)
+        const originalEnd = new Date(draggedEvent.end_time)
+        const duration = originalEnd.getTime() - originalStart.getTime()
+
+        const newStartRaw = new Date(originalStart.getTime() + rawDeltaMinutes * 60 * 1000)
+        const snappedMinutes = Math.round(newStartRaw.getMinutes() / 15) * 15
+        const newStart = new Date(newStartRaw)
+        newStart.setMinutes(snappedMinutes, 0, 0)
+
+        if (didChangeDays && finalTargetDay !== null) {
+          const targetDate = getDateForColumnIndex(finalTargetDay)
+          newStart.setFullYear(targetDate.getFullYear())
+          newStart.setMonth(targetDate.getMonth())
+          newStart.setDate(targetDate.getDate())
+        }
+
+        const newEnd = new Date(newStart.getTime() + duration)
+
+        // Apply optimistic update to events array BEFORE clearing drag visual state
+        // This prevents the flash where the event snaps back to its old position
+        setEvents(prevEvents =>
+          prevEvents.map(e => e.id === draggedEvent.id
+            ? { ...e, start_time: newStart.toISOString(), end_time: newEnd.toISOString() }
+            : e
+          )
+        )
+
+        // Now clear drag visual state — event is already at its new position in the array
+        setTouchedEvent(null)
+        setIsInEditMode(false)
+        setIsDragging(false)
+        setDraggingEvent(null)
+        setDragStartY(0)
+        setDragCurrentY(0)
+        setDragStartX(0)
+        setDragCurrentX(0)
+        setTargetDayIndex(null)
+        setSourceDayIndex(null)
+
+        // Send to server (non-optimistic since we already updated locally)
+        handleUpdateEvent(draggedEvent.id, {
+          start_time: newStart.toISOString(),
+          end_time: newEnd.toISOString()
+        }, false)
+
+        return
+      }
+    } else if (!hasMoved && touchDuration < 200 && tappedEvent) {
+      // Quick tap - open event form (unified handles recurring vs non-recurring)
+      setSelectedEvent(tappedEvent)
+      setIsFormOpen(true)
+    }
+
+    // Reset visual state (no drag update case)
     setTouchedEvent(null)
     setIsInEditMode(false)
     setIsDragging(false)
@@ -903,15 +932,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     setDragCurrentX(0)
     setTargetDayIndex(null)
     setSourceDayIndex(null)
-
-    // Perform the update AFTER state reset with optimistic update to prevent snap-back
-    if (pendingUpdate) {
-      handleUpdateEvent(pendingUpdate.eventId, {
-        start_time: pendingUpdate.startTime,
-        end_time: pendingUpdate.endTime
-      }, true)  // optimistic = true
-    }
   }
+
+  // Keep ref in sync so the global touchend listener always calls the latest version
+  handleEventTouchEndRef.current = handleEventTouchEnd
 
   return (
     <div className="mobile-calendar" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -998,13 +1022,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           key={event.id}
                           onClick={(e) => {
                             e.stopPropagation()
-                            if (event.is_recurring || event.parent_event_id) {
-                              setRecurringEventToView(event)
-                              setIsRecurringViewOpen(true)
-                            } else {
-                              setSelectedEvent(event)
-                              setIsFormOpen(true)
-                            }
+                            setSelectedEvent(event)
+                            setIsFormOpen(true)
                           }}
                           style={{
                             background: hexToRgba(eventColor, 0.12),
@@ -1022,7 +1041,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           }}
                         >
                           {event.title}
-                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px' }}>♻️</span>}
+                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px' }}></span>}
                         </div>
                       )
                     })}
@@ -1301,8 +1320,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                       }
                     }
 
-                    // Ghost preview no longer needed - event follows finger directly
-                    if (!showInThisColumn) return null
+                    // If event is being dragged to another column, keep it mounted but invisible
+                    // so onTouchEnd still fires. Unmounting would lose the touch handler.
+                    if (!showInThisColumn && !isBeingDragged) return null
 
                     return (
                       <div
@@ -1331,13 +1351,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         onClick={(e) => {
                           e.stopPropagation()
                           if (!isDragging) {
-                            if (event.is_recurring || event.parent_event_id) {
-                              setRecurringEventToView(event)
-                              setIsRecurringViewOpen(true)
-                            } else {
-                              setSelectedEvent(event)
-                              setIsFormOpen(true)
-                            }
+                            setSelectedEvent(event)
+                            setIsFormOpen(true)
                           }
                         }}
                         style={{
@@ -1346,16 +1361,17 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           right: '4px',
                           top: `${startMinutes + dragOffset}px`,
                           height: `${Math.max(duration, 15)}px`,
-                          background: hexToRgba(eventColor, isBeingDragged ? 0.35 : 0.25),
-                          borderLeft: `3px solid ${eventColor}`,
+                          background: !showInThisColumn ? 'transparent' : hexToRgba(eventColor, isBeingDragged ? 0.35 : 0.25),
+                          borderLeft: !showInThisColumn ? 'none' : `3px solid ${eventColor}`,
                           borderRadius: '4px',
                           padding: '2px 4px',
                           cursor: isDragging ? 'grabbing' : 'pointer',
                           overflow: 'hidden',
                           zIndex: isBeingDragged ? 100 : 5,
-                          opacity: isBeingDragged ? 0.8 : 1,
+                          opacity: !showInThisColumn ? 0 : (isBeingDragged ? 0.8 : 1),
                           transition: isBeingDragged ? 'none' : 'all 0.2s',
                           touchAction: 'none',
+                          // Keep pointer events active even when invisible — touchEnd must fire
                           // Apply horizontal transform when dragging across days
                           transform: isBeingDragged && horizontalOffset !== 0
                             ? `translateX(${horizontalOffset}px)`
@@ -1379,7 +1395,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           whiteSpace: 'nowrap'
                         }}>
                           {event.title}
-                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px' }}>♻️</span>}
+                          {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px' }}></span>}
                         </div>
                         {duration >= 30 && (
                           <div style={{
@@ -1573,13 +1589,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   onClick={(e) => {
                     e.stopPropagation()
                     if (!isDragging) {
-                      if (event.is_recurring || event.parent_event_id) {
-                        setRecurringEventToView(event)
-                        setIsRecurringViewOpen(true)
-                      } else {
-                        setSelectedEvent(event)
-                        setIsFormOpen(true)
-                      }
+                      setSelectedEvent(event)
+                      setIsFormOpen(true)
                     }
                   }}
                   className="calendar-event"
@@ -1618,7 +1629,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     whiteSpace: 'nowrap'
                   }}>
                     {event.title}
-                    {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}>♻️</span>}
+                    {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px' }}></span>}
                   </div>
                   <div style={{
                     ...typography.labelMd,
@@ -1635,102 +1646,51 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
         </div>
       )}
 
-      {/* Event Form Modal */}
-      {isFormOpen && (
-        isMobile ? (
-          <EventFormMobile
-            event={selectedEvent}
-            isOpen={isFormOpen}
-            onClose={() => {
-              setIsFormOpen(false)
-              setSelectedEvent(null)
-            }}
-            onSave={async (eventData) => {
-              if (selectedEvent?.id) {
-                await handleUpdateEvent(selectedEvent.id, eventData)
-              } else {
-                await handleCreateEvent(eventData)
-              }
-              setIsFormOpen(false)
-              setSelectedEvent(null)
-            }}
-            onDelete={async () => {
-              if (selectedEvent?.id) {
-                await handleDeleteEvent(selectedEvent.id)
-                setIsFormOpen(false)
-                setSelectedEvent(null)
-              }
-            }}
-          />
-        ) : (
-          <EventForm
-            event={selectedEvent}
-            isOpen={isFormOpen}
-            onClose={() => {
-              setIsFormOpen(false)
-              setSelectedEvent(null)
-            }}
-            onSave={async (eventData) => {
-              if (selectedEvent?.id) {
-                await handleUpdateEvent(selectedEvent.id, eventData)
-              } else {
-                await handleCreateEvent(eventData)
-              }
-              setIsFormOpen(false)
-              setSelectedEvent(null)
-            }}
-            onDelete={async () => {
-              if (selectedEvent?.id) {
-                await handleDeleteEvent(selectedEvent.id)
-                setIsFormOpen(false)
-                setSelectedEvent(null)
-              }
-            }}
-          />
-        )
-      )}
-
-      {/* Recurring Event View Modal */}
-      {isRecurringViewOpen && recurringEventToView && (
-        <RecurringEventView
-          event={recurringEventToView}
-          isOpen={isRecurringViewOpen}
-          onClose={() => {
-            setIsRecurringViewOpen(false)
-            setRecurringEventToView(null)
-          }}
-          onEdit={(event, _scope) => {
-            setRecurringEventToEdit(event)
-            setIsRecurringEditOpen(true)
-            setIsRecurringViewOpen(false)
-          }}
-          onDelete={async (event, scope) => {
-            await handleDeleteRecurringEvent(event, scope)
-            setIsRecurringViewOpen(false)
-            setRecurringEventToView(null)
-          }}
-        />
-      )}
-
-      {/* Recurring Event Edit Modal */}
-      {isRecurringEditOpen && recurringEventToEdit && user && session && (
-        <EditRecurringEventModal
-          event={recurringEventToEdit}
-          isOpen={isRecurringEditOpen}
-          user={user}
-          accessToken={session.access_token}
-          onClose={() => {
-            setIsRecurringEditOpen(false)
-            setRecurringEventToEdit(null)
-          }}
-          onSuccess={async () => {
-            const { events: userEvents } = await fetchExpandedEvents(user, session.access_token)
-            setEvents(userEvents || [])
-            setIsRecurringEditOpen(false)
-            setRecurringEventToEdit(null)
-          }}
-        />
-      )}
+      {/* Unified Event Form */}
+      <EventFormUnified
+        event={selectedEvent}
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false)
+          setSelectedEvent(null)
+        }}
+        onSave={async (eventData) => {
+          if (selectedEvent?.id) {
+            await handleUpdateEvent(selectedEvent.id, eventData)
+          } else {
+            await handleCreateEvent(eventData)
+          }
+          setIsFormOpen(false)
+          setSelectedEvent(null)
+        }}
+        onSaveRecurring={async (eventData, scope, recurrenceRule) => {
+          if (!user || !session) return
+          if (eventData.id) {
+            const updates: Record<string, string> = {}
+            if (eventData.title) updates.title = eventData.title
+            if (eventData.start_time) updates.start_time = eventData.start_time
+            if (eventData.end_time) updates.end_time = eventData.end_time
+            if (eventData.description) updates.description = eventData.description
+            if (eventData.category) updates.category = eventData.category
+            if (recurrenceRule) updates.recurrence_rule = recurrenceRule
+            await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
+          }
+          const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+          setEvents(refreshed || [])
+          setIsFormOpen(false)
+          setSelectedEvent(null)
+        }}
+        onDelete={async (scope) => {
+          if (!selectedEvent?.id || !user) return
+          if (scope) {
+            await handleDeleteRecurringEvent(selectedEvent, scope)
+          } else {
+            await handleDeleteEvent(selectedEvent.id)
+          }
+          setIsFormOpen(false)
+          setSelectedEvent(null)
+        }}
+      />
     </div>
   )
 }

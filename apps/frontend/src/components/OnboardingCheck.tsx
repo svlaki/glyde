@@ -8,77 +8,121 @@ interface OnboardingCheckProps {
   children: ReactNode
 }
 
+/** Get the user-scoped localStorage key for onboarding data */
+export function getOnboardingKey(userId: string): string {
+  return `onboardingData_${userId}`
+}
+
 export function OnboardingCheck({ children }: OnboardingCheckProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, session } = useAuth()
-  const hasCheckedForceReauth = useRef(false)
+  const hasCheckedServer = useRef(false)
 
   useEffect(() => {
-    // Only check if not already on onboarding page
     if (location.pathname === '/onboarding') {
       return
     }
 
-    const hasCompletedOnboarding = localStorage.getItem('onboardingData')
-    if (!hasCompletedOnboarding) {
-      navigate('/onboarding', { replace: true })
+    // Need user to check user-scoped onboarding status
+    if (!user || !session?.access_token) {
       return
     }
 
-    // Check for force_reauth flag from server (only once per session)
-    async function checkForceReauth() {
-      if (!user || !session?.access_token || hasCheckedForceReauth.current) {
-        return
-      }
+    const userKey = getOnboardingKey(user.id)
+    let hasCompletedOnboarding = localStorage.getItem(userKey)
 
-      hasCheckedForceReauth.current = true
-
-      try {
-        const response = await fetch(`${API_URL}/api/profile`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ user_id: user.id })
-        })
-
-        if (!response.ok) return
-
-        const data = await response.json()
-
-        if (data.profile?.force_reauth === true) {
-          console.log('[OnboardingCheck] Force reauth detected, clearing localStorage')
-
-          // Clear localStorage onboarding data
-          localStorage.removeItem('onboardingData')
-
-          // Clear the force_reauth flag in the profile
-          await fetch(`${API_URL}/api/profile/field`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({
-              field: 'force_reauth',
-              value: false
-            })
-          })
-
-          // Redirect to onboarding
-          navigate('/onboarding', { replace: true })
-        }
-      } catch (error) {
-        console.error('[OnboardingCheck] Error checking force_reauth:', error)
+    // Migrate legacy non-scoped key to user-scoped key for the current user
+    if (!hasCompletedOnboarding) {
+      const legacyData = localStorage.getItem('onboardingData')
+      if (legacyData) {
+        // Current authenticated user likely owns this data — migrate it
+        localStorage.setItem(userKey, legacyData)
+        localStorage.removeItem('onboardingData')
+        hasCompletedOnboarding = legacyData
       }
     }
 
-    checkForceReauth()
+    if (hasCompletedOnboarding) {
+      // User has local proof of onboarding — still check for force_reauth
+      checkServer(user.id, session.access_token, userKey, navigate)
+      return
+    }
+
+    // No local onboarding data for this user — check the server before redirecting
+    // (handles app reinstalls, new devices, etc.)
+    checkServer(user.id, session.access_token, userKey, navigate)
+
   }, [navigate, location.pathname, user, session])
 
-  // Allow direct access to /onboarding page even if already completed
-  // This lets users re-do onboarding for testing
+  async function checkServer(userId: string, accessToken: string, userKey: string, nav: ReturnType<typeof useNavigate>) {
+    if (hasCheckedServer.current) {
+      return
+    }
+    hasCheckedServer.current = true
+
+    try {
+      const response = await fetch(`${API_URL}/api/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ user_id: userId })
+      })
+
+      if (!response.ok) {
+        // Server error — if no local data, redirect to onboarding to be safe
+        if (!localStorage.getItem(userKey)) {
+          nav('/onboarding', { replace: true })
+        }
+        return
+      }
+
+      const data = await response.json()
+
+      // Handle force_reauth
+      if (data.profile?.force_reauth === true) {
+        localStorage.removeItem(userKey)
+
+        await fetch(`${API_URL}/api/profile/field`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            field: 'force_reauth',
+            value: false
+          })
+        })
+
+        nav('/onboarding', { replace: true })
+        return
+      }
+
+      // Check if server says onboarding was completed
+      // completed_at is set by both V1 and V2; display_name is a fallback indicator
+      const serverOnboarded = data.profile?.context_data?.onboarding?.completed_at
+        || data.profile?.display_name
+      if (serverOnboarded && !localStorage.getItem(userKey)) {
+        // Server knows this user onboarded — cache locally so we don't re-check
+        localStorage.setItem(userKey, JSON.stringify({ restoredFromServer: true }))
+        return
+      }
+
+      // No onboarding on server either — redirect to onboarding
+      if (!serverOnboarded && !localStorage.getItem(userKey)) {
+        nav('/onboarding', { replace: true })
+      }
+    } catch (error) {
+      console.error('[OnboardingCheck] Error checking server:', error)
+      // On error, if no local data, redirect to onboarding
+      if (!localStorage.getItem(userKey)) {
+        nav('/onboarding', { replace: true })
+      }
+    }
+  }
+
   return <>{children}</>
 }

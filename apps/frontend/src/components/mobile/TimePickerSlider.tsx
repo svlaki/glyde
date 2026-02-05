@@ -198,7 +198,7 @@ function SliderColumn({
                 height: `${itemHeight}px`,
                 minHeight: `${itemHeight}px`,
                 maxHeight: `${itemHeight}px`,
-                fontSize: isSelected ? fontSize.xl : '16px',
+                fontSize: isSelected ? fontSize.xl : fontSize.base,
                 fontWeight: isSelected ? fontWeight.semibold : fontWeight.normal,
                 color: isSelected ? selectedTextColor : textColor,
                 transition: 'all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1)',

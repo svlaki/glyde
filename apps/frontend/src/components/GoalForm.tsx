@@ -11,7 +11,7 @@ import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
 import { usePlatform } from '../hooks/usePlatform'
-import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
+import { SaveTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -81,8 +81,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       if (goal.milestones && goal.milestones.length > 0) {
         setMilestones(goal.milestones.map(m => ({
           title: m.title,
-          due_date: m.due_date,
-          completed: m.completed
+          ...(m.due_date !== undefined && { due_date: m.due_date }),
+          ...(m.completed !== undefined && { completed: m.completed })
         })))
         setShowMilestones(true)
       } else {
@@ -143,6 +143,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
+    return undefined
   }, [editingField])
 
   const handleCreateAspect = async (aspectData: Partial<Category>) => {
@@ -468,7 +469,10 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       value={dueDate.toISOString().split('T')[0]}
                       onChange={(e) => {
                         const newDate = new Date(dueDate)
-                        const [year, month, day] = e.target.value.split('-').map(Number)
+                        const parts = e.target.value.split('-').map(Number)
+                        const year = parts[0] ?? 0
+                        const month = parts[1] ?? 1
+                        const day = parts[2] ?? 1
                         newDate.setFullYear(year, month - 1, day)
                         setDueDate(newDate)
                       }}
@@ -505,7 +509,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       type="time"
                       value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
                       onChange={(e) => {
-                        const [hours, minutes] = e.target.value.split(':').map(Number)
+                        const timeParts = e.target.value.split(':').map(Number)
+                        const hours = timeParts[0] ?? 0
+                        const minutes = timeParts[1] ?? 0
                         const newDate = new Date(dueDate)
                         newDate.setHours(hours, minutes)
                         setDueDate(newDate)
@@ -794,10 +800,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            {/* <CancelTextButton
-              onClick={onClose}
-              disabled={loading}
-            /> */}
+            
             <SaveTextButton
               onClick={(e) => handleSubmit(e)}
               disabled={!title.trim()}

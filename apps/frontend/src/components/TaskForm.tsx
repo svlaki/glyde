@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
@@ -59,6 +59,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
   const [loading, setLoading] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
+  const categoryDropdownRef = useRef<HTMLDivElement>(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
@@ -103,6 +104,20 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     setShowTimePicker(false)
   }, [task, isOpen])
 
+  // Click-outside to close category dropdown
+  useEffect(() => {
+    if (!showCategoryDropdown) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [showCategoryDropdown])
+
   // Sync time picker value with dueDate
   useEffect(() => {
     if (dueDate) {
@@ -130,15 +145,16 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
 
     setLoading(true)
     try {
-      await onSave({
-        id: task?.id,
+      const taskData: Partial<Task> = {
         title: title.trim(),
-        description: description.trim() || undefined,
-        category: category || undefined,
-        due_date: hasDueDate && dueDate ? dueDate.toISOString() : undefined,
         priority,
         status: 'pending'
-      })
+      }
+      if (task?.id) taskData.id = task.id
+      if (description.trim()) taskData.description = description.trim()
+      if (category) taskData.category = category
+      if (hasDueDate && dueDate) taskData.due_date = dueDate.toISOString()
+      await onSave(taskData)
       onClose()
       setShowCategoryDropdown(false)
     } catch (error) {
@@ -208,7 +224,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
       }}>
 
           {/* Aspect */}
-          <div style={{ position: 'relative' }}>
+          <div ref={categoryDropdownRef} style={{ position: 'relative' }}>
             <label style={{
               display: 'block',
               fontSize: fontSize.sm,
@@ -452,7 +468,10 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       value={dueDate.toISOString().split('T')[0]}
                       onChange={(e) => {
                         const newDate = new Date(dueDate)
-                        const [year, month, day] = e.target.value.split('-').map(Number)
+                        const parts = e.target.value.split('-').map(Number)
+                        const year = parts[0] ?? 0
+                        const month = parts[1] ?? 1
+                        const day = parts[2] ?? 1
                         newDate.setFullYear(year, month - 1, day)
                         setDueDate(newDate)
                       }}
@@ -489,7 +508,9 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       type="time"
                       value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
                       onChange={(e) => {
-                        const [hours, minutes] = e.target.value.split(':').map(Number)
+                        const timeParts = e.target.value.split(':').map(Number)
+                        const hours = timeParts[0] ?? 0
+                        const minutes = timeParts[1] ?? 0
                         const newDate = new Date(dueDate)
                         newDate.setHours(hours, minutes)
                         setDueDate(newDate)
