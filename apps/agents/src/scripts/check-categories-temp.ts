@@ -13,7 +13,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function main() {
-  console.log('📊 Checking categories and events...\n');
+  console.log('Checking categories and events...\n');
 
   const { data: categories } = await supabase
     .from('categories')

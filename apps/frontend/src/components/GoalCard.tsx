@@ -2,6 +2,8 @@ import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
 import { Goal } from '../lib/goalService'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontWeight, lineHeight } from '../styles/typography'
+import { usePlatform } from '../hooks/usePlatform'
 
 interface GoalCardProps {
   goal: Goal
@@ -11,7 +13,9 @@ interface GoalCardProps {
 
 export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
   const { isDarkMode } = useDarkMode()
+  const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(isMobile)
   const { getCategoryColor } = useCategories()
 
   const aspectColor = goal.category ? getCategoryColor(goal.category) : undefined
@@ -34,10 +38,10 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
     >
       {/* Goal Title */}
       <div style={{
-        fontSize: '14px',
-        fontWeight: '400',
+        ...typography.bodyMd,
+        fontWeight: fontWeight.normal,
         color: colors.textPrimary,
-        lineHeight: '1.4'
+        lineHeight: lineHeight.tight
       }}>
         {goal.title}
       </div>
@@ -45,9 +49,9 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
       {/* Goal Description Preview - Only show if selected */}
       {isSelected && goal.description && (
         <div style={{
-          fontSize: '13px',
+          ...typography.bodySm,
           color: colors.textSecondary,
-          lineHeight: '1.5',
+          lineHeight: lineHeight.normal,
           marginTop: '8px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',

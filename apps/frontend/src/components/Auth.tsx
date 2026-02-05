@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
+import { fontSize, fontWeight } from '../styles/typography'
 
 export function Auth() {
   const navigate = useNavigate()
@@ -46,7 +47,7 @@ export function Auth() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 10px'
           }} />
-          <p style={{ color: '#666', fontSize: '14px' }}>Checking session...</p>
+          <p style={{ color: '#666', fontSize: fontSize.base }}>Checking session...</p>
         </div>
       </div>
     )
@@ -99,13 +100,13 @@ export function Auth() {
         borderRadius: '12px',
         boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
       }}>
-        <h1 style={{ marginBottom: '30px', fontSize: '24px', fontWeight: '600' }}>
+        <h1 style={{ marginBottom: '30px', fontSize: fontSize['2xl'], fontWeight: fontWeight.semibold }}>
           {isSignUp ? 'Welcome to Glyde' : 'Welcome Back'}
         </h1>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: fontSize.base, fontWeight: '500' }}>
               Email
             </label>
             <input
@@ -118,7 +119,7 @@ export function Auth() {
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: fontSize.base, fontWeight: '500' }}>
               Password
             </label>
             <input
@@ -137,7 +138,7 @@ export function Auth() {
               background: '#fee',
               color: '#c00',
               borderRadius: '6px',
-              fontSize: '14px'
+              fontSize: fontSize.base
             }}>
               {error}
             </div>
@@ -159,7 +160,7 @@ export function Auth() {
             gap: '10px'
           }}>
             <div style={{ flex: 1, height: '1px', background: '#e5e5e5' }} />
-            <span style={{ color: '#999', fontSize: '12px' }}>OR</span>
+            <span style={{ color: '#999', fontSize: fontSize.xs }}>OR</span>
             <div style={{ flex: 1, height: '1px', background: '#e5e5e5' }} />
           </div>
 
@@ -173,8 +174,8 @@ export function Auth() {
               border: '1px solid #e5e5e5',
               borderRadius: '6px',
               background: '#fff',
-              fontSize: '14px',
-              fontWeight: '500',
+              fontSize: fontSize.base,
+              fontWeight: fontWeight.medium,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',

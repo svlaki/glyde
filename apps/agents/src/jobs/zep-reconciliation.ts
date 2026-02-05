@@ -123,7 +123,7 @@ async function runReconciliation(): Promise<void> {
     console.log('═══════════════════════════════════════════\n');
 
   } catch (error) {
-    console.error('[ZEP-RECONCILIATION] ❌ Job failed:', error);
+    console.error('[ZEP-RECONCILIATION] Job failed:', error);
     process.exit(1);
   }
 }
@@ -166,11 +166,17 @@ async function reconcileUser(
             { entityTypes: ['Task'], scope: 'nodes' }
           );
 
-          // If no matching node found, add it
-          const hasMatch = searchResult.nodes.some((n: any) =>
-            n.name?.toLowerCase().includes(task.title.toLowerCase()) ||
-            n.data?.title?.toLowerCase() === task.title.toLowerCase()
-          );
+          // Check for match using supabase_id (precise) or fallback to title (legacy)
+          const hasMatch = searchResult.nodes.some((n: any) => {
+            // Try to parse node data to check for supabase_id
+            try {
+              const nodeData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+              if (nodeData?.supabase_id === task.id) return true;
+            } catch {}
+            // Fallback to title matching for legacy nodes
+            return n.name?.toLowerCase().includes(task.title.toLowerCase()) ||
+                   n.data?.title?.toLowerCase() === task.title.toLowerCase();
+          });
 
           if (!hasMatch) {
             await zepGraphService.addTask(userId, {
@@ -205,11 +211,17 @@ async function reconcileUser(
             { entityTypes: ['Goal'], scope: 'nodes' }
           );
 
-          // If no matching node found, add it
-          const hasMatch = searchResult.nodes.some((n: any) =>
-            n.name?.toLowerCase().includes(goal.title.toLowerCase()) ||
-            n.data?.title?.toLowerCase() === goal.title.toLowerCase()
-          );
+          // Check for match using supabase_id (precise) or fallback to title (legacy)
+          const hasMatch = searchResult.nodes.some((n: any) => {
+            // Try to parse node data to check for supabase_id
+            try {
+              const nodeData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+              if (nodeData?.supabase_id === goal.id) return true;
+            } catch {}
+            // Fallback to title matching for legacy nodes
+            return n.name?.toLowerCase().includes(goal.title.toLowerCase()) ||
+                   n.data?.title?.toLowerCase() === goal.title.toLowerCase();
+          });
 
           if (!hasMatch) {
             await zepGraphService.addGoal(userId, {
@@ -249,11 +261,17 @@ async function reconcileUser(
             { entityTypes: ['CalendarEvent'], scope: 'nodes' }
           );
 
-          // If no matching node found, add it
-          const hasMatch = searchResult.nodes.some((n: any) =>
-            n.name?.toLowerCase().includes(event.title.toLowerCase()) ||
-            n.data?.title?.toLowerCase() === event.title.toLowerCase()
-          );
+          // Check for match using supabase_id (precise) or fallback to title (legacy)
+          const hasMatch = searchResult.nodes.some((n: any) => {
+            // Try to parse node data to check for supabase_id
+            try {
+              const nodeData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+              if (nodeData?.supabase_id === event.id) return true;
+            } catch {}
+            // Fallback to title matching for legacy nodes
+            return n.name?.toLowerCase().includes(event.title.toLowerCase()) ||
+                   n.data?.title?.toLowerCase() === event.title.toLowerCase();
+          });
 
           if (!hasMatch) {
             const durationMinutes = event.end_time && event.start_time
@@ -283,7 +301,7 @@ async function reconcileUser(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     result.errors.push(`User ${userId}: ${errorMsg}`);
-    console.error(`[ZEP-RECONCILIATION] ❌ Error processing user ${userId}:`, error);
+    console.error(`[ZEP-RECONCILIATION] Error processing user ${userId}:`, error);
   }
 
   return result;
@@ -292,10 +310,10 @@ async function reconcileUser(
 // Run the job
 runReconciliation()
   .then(() => {
-    console.log('[ZEP-RECONCILIATION] ✅ Job completed successfully');
+    console.log('[ZEP-RECONCILIATION] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[ZEP-RECONCILIATION] ❌ Job failed:', error);
+    console.error('[ZEP-RECONCILIATION] Job failed:', error);
     process.exit(1);
   });

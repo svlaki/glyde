@@ -6,7 +6,7 @@ export const listCategoriesTool = tool(
   async ({}, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -17,13 +17,13 @@ export const listCategoriesTool = tool(
       }
 
       const categoriesList = categories.map(cat =>
-        `• "${cat.name}" ${cat.icon ? `[icon: ${cat.icon}]` : ''} (${cat.color}) - ${cat.description || 'No description'}`
+        `• "${cat.name}" (${cat.color}) - ${cat.description || 'No description'}`
       ).join('\n');
 
       return `Available categories (${categories.length}). Use the exact name in quotes when assigning:\n${categoriesList}`;
     } catch (error) {
-      console.error('❌ [list-categories] Error:', error);
-      return `❌ Error listing categories: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[list-categories] Error:', error);
+      return `Error listing categories: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

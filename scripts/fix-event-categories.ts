@@ -24,7 +24,7 @@ const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Missing required environment variables:');
+  console.error('Missing required environment variables:');
   console.error('   - SUPABASE_URL');
   console.error('   - SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
@@ -39,11 +39,11 @@ async function main() {
   console.log('================================\n');
 
   if (isDryRun) {
-    console.log('🏃 Running in DRY RUN mode - no changes will be made\n');
+    console.log('Running in DRY RUN mode - no changes will be made\n');
   }
 
   // Step 1: Check current state
-  console.log('📊 Step 1: Checking current state of events...');
+  console.log('Step 1: Checking current state of events...');
   const { data: allEvents } = await supabase
     .from('events')
     .select('id, category_id, category, user_id');
@@ -57,12 +57,12 @@ async function main() {
   console.log(`   Events missing category_id: ${missing}\n`);
 
   if (missing === 0) {
-    console.log('✅ All events already have category_id set!');
+    console.log('All events already have category_id set!');
     return;
   }
 
   // Step 2: Show sample of problematic events
-  console.log('📋 Step 2: Sample of events missing category_id...');
+  console.log('Step 2: Sample of events missing category_id...');
   const { data: sampleEvents, error: sampleError } = await supabase
     .from('events')
     .select('id, title, category, category_id, start_time')
@@ -70,13 +70,13 @@ async function main() {
     .limit(5);
 
   if (sampleError) {
-    console.error('❌ Error fetching sample events:', sampleError);
+    console.error('Error fetching sample events:', sampleError);
   } else {
     console.table(sampleEvents);
   }
 
   if (isDryRun) {
-    console.log('\n🏃 Dry run mode - stopping here. Run without --dry-run to apply fixes.');
+    console.log('\nDry run mode - stopping here. Run without --dry-run to apply fixes.');
     return;
   }
 
@@ -115,7 +115,7 @@ async function main() {
       }
     }
 
-    console.log(`   ✅ Updated ${updated} events based on category name`);
+    console.log(`   Updated ${updated} events based on category name`);
   } else {
     console.log('   ℹ️ No events to update');
   }
@@ -152,13 +152,13 @@ async function main() {
       }
     }
 
-    console.log(`   ✅ Set Personal category for ${defaulted} remaining events`);
+    console.log(`   Set Personal category for ${defaulted} remaining events`);
   } else {
     console.log('   ℹ️ No remaining events without category');
   }
 
   // Step 5: Verify the fix
-  console.log('\n✅ Step 5: Verifying the fix...');
+  console.log('\nStep 5: Verifying the fix...');
   const { data: verifyEvents } = await supabase
     .from('events')
     .select('id, category_id');
@@ -172,7 +172,7 @@ async function main() {
   console.log(`   Events still missing category_id: ${missingAfter}\n`);
 
   // Step 6: Show sample of fixed events
-  console.log('📋 Step 6: Sample of events with categories...');
+  console.log('Step 6: Sample of events with categories...');
   const { data: fixedSample } = await supabase
     .from('events')
     .select(`
@@ -201,8 +201,8 @@ async function main() {
     );
   }
 
-  console.log('\n✅ Event category fix complete!');
-  console.log('🔄 Refresh your calendar to see the updated colors.');
+  console.log('\nEvent category fix complete!');
+  console.log('Refresh your calendar to see the updated colors.');
 }
 
 main().catch(console.error);

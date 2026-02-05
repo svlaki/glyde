@@ -6,7 +6,7 @@ export const listTasksTool = tool(
   async ({ status, category, priority, dueBefore, dueAfter }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -35,8 +35,8 @@ export const listTasksTool = tool(
 
       return `Found ${tasks.length} task(s):\n${taskList}`;
     } catch (error) {
-      console.error('❌ [list-tasks] Error:', error);
-      return `❌ Error listing tasks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[list-tasks] Error:', error);
+      return `Error listing tasks: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

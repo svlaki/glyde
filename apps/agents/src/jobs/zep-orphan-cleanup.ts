@@ -123,7 +123,7 @@ async function runOrphanCleanup(): Promise<void> {
     console.log('═══════════════════════════════════════════\n');
 
   } catch (error) {
-    console.error('[ZEP-CLEANUP] ❌ Job failed:', error);
+    console.error('[ZEP-CLEANUP] Job failed:', error);
     process.exit(1);
   }
 }
@@ -153,7 +153,11 @@ async function cleanupUserOrphans(
       supabaseService.getEvents(userId).catch(() => []),
     ]);
 
-    // Create sets of titles for quick lookup (case-insensitive)
+    // Create maps for ID-based lookup (precise) and title sets (fallback)
+    const taskIds = new Set(tasks.map((t: any) => t.id));
+    const goalIds = new Set(goals.map((g: any) => g.id));
+    const eventIds = new Set(events.map((e: any) => e.id));
+    // Keep title sets as fallback for legacy nodes without supabase_id
     const taskTitles = new Set(tasks.map((t: any) => t.title?.toLowerCase()));
     const goalTitles = new Set(goals.map((g: any) => g.title?.toLowerCase()));
     const eventTitles = new Set(events.map((e: any) => e.title?.toLowerCase()));
@@ -167,8 +171,24 @@ async function cleanupUserOrphans(
       );
 
       for (const node of zepTasks.nodes || []) {
-        const nodeTitle = node.name?.toLowerCase() || node.data?.title?.toLowerCase();
-        if (nodeTitle && !taskTitles.has(nodeTitle)) {
+        // Check for match using supabase_id (precise) or fallback to title (legacy)
+        let isOrphan = true;
+        let nodeTitle = node.name?.toLowerCase() || '';
+
+        try {
+          const nodeData = typeof node.data === 'string' ? JSON.parse(node.data) : node.data;
+          if (nodeData?.supabase_id && taskIds.has(nodeData.supabase_id)) {
+            isOrphan = false; // Found by ID - not orphaned
+          }
+          nodeTitle = nodeData?.title?.toLowerCase() || nodeTitle;
+        } catch {}
+
+        // Fallback to title matching for legacy nodes
+        if (isOrphan && nodeTitle && taskTitles.has(nodeTitle)) {
+          isOrphan = false;
+        }
+
+        if (isOrphan && nodeTitle) {
           // This task exists in Zep but not in Supabase - it's orphaned
           result.orphanedTasks++;
 
@@ -195,8 +215,24 @@ async function cleanupUserOrphans(
       );
 
       for (const node of zepGoals.nodes || []) {
-        const nodeTitle = node.name?.toLowerCase() || node.data?.title?.toLowerCase();
-        if (nodeTitle && !goalTitles.has(nodeTitle)) {
+        // Check for match using supabase_id (precise) or fallback to title (legacy)
+        let isOrphan = true;
+        let nodeTitle = node.name?.toLowerCase() || '';
+
+        try {
+          const nodeData = typeof node.data === 'string' ? JSON.parse(node.data) : node.data;
+          if (nodeData?.supabase_id && goalIds.has(nodeData.supabase_id)) {
+            isOrphan = false; // Found by ID - not orphaned
+          }
+          nodeTitle = nodeData?.title?.toLowerCase() || nodeTitle;
+        } catch {}
+
+        // Fallback to title matching for legacy nodes
+        if (isOrphan && nodeTitle && goalTitles.has(nodeTitle)) {
+          isOrphan = false;
+        }
+
+        if (isOrphan && nodeTitle) {
           // This goal exists in Zep but not in Supabase - it's orphaned
           result.orphanedGoals++;
 
@@ -223,8 +259,24 @@ async function cleanupUserOrphans(
       );
 
       for (const node of zepEvents.nodes || []) {
-        const nodeTitle = node.name?.toLowerCase() || node.data?.title?.toLowerCase();
-        if (nodeTitle && !eventTitles.has(nodeTitle)) {
+        // Check for match using supabase_id (precise) or fallback to title (legacy)
+        let isOrphan = true;
+        let nodeTitle = node.name?.toLowerCase() || '';
+
+        try {
+          const nodeData = typeof node.data === 'string' ? JSON.parse(node.data) : node.data;
+          if (nodeData?.supabase_id && eventIds.has(nodeData.supabase_id)) {
+            isOrphan = false; // Found by ID - not orphaned
+          }
+          nodeTitle = nodeData?.title?.toLowerCase() || nodeTitle;
+        } catch {}
+
+        // Fallback to title matching for legacy nodes
+        if (isOrphan && nodeTitle && eventTitles.has(nodeTitle)) {
+          isOrphan = false;
+        }
+
+        if (isOrphan && nodeTitle) {
           // This event exists in Zep but not in Supabase - it's orphaned
           result.orphanedEvents++;
 
@@ -248,7 +300,7 @@ async function cleanupUserOrphans(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     result.errors.push(`User ${userId}: ${errorMsg}`);
-    console.error(`[ZEP-CLEANUP] ❌ Error processing user ${userId}:`, error);
+    console.error(`[ZEP-CLEANUP] Error processing user ${userId}:`, error);
   }
 
   return result;
@@ -257,10 +309,10 @@ async function cleanupUserOrphans(
 // Run the job
 runOrphanCleanup()
   .then(() => {
-    console.log('[ZEP-CLEANUP] ✅ Job completed successfully');
+    console.log('[ZEP-CLEANUP] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[ZEP-CLEANUP] ❌ Job failed:', error);
+    console.error('[ZEP-CLEANUP] Job failed:', error);
     process.exit(1);
   });

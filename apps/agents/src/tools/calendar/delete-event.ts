@@ -108,9 +108,9 @@ export const deleteEventTool = tool(
         }
 
         targetEventId = matchingEvents[0].id;
-        console.log('✅ [DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].title);
+        console.log('[DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].title);
       } catch (error) {
-        console.error('❌ [DELETE-EVENT TOOL] Search error:', error);
+        console.error('[DELETE-EVENT TOOL] Search error:', error);
         throw new Error(`Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
@@ -128,7 +128,7 @@ export const deleteEventTool = tool(
     // Check if this is a recurring event instance
     if (eventToDelete?.is_instance && eventToDelete?.parent_event_id) {
       // Delete just this instance of the recurring event
-      console.log(`🔄 [DELETE-EVENT TOOL] Deleting recurring instance for date: ${eventToDelete.instance_date}`);
+      console.log(`[DELETE-EVENT TOOL] Deleting recurring instance for date: ${eventToDelete.instance_date}`);
 
       const instanceDeleted = await supabaseService.deleteRecurringEventInstance(
         userId,
@@ -140,7 +140,7 @@ export const deleteEventTool = tool(
         throw new Error(`Failed to delete recurring event instance`);
       }
 
-      console.log(`✅ [DELETE-EVENT TOOL] Recurring instance "${eventTitle}" deleted successfully`);
+      console.log(`[DELETE-EVENT TOOL] Recurring instance "${eventTitle}" deleted successfully`);
 
       // Format event time for response
       let timeInfo = '';
@@ -151,7 +151,7 @@ export const deleteEventTool = tool(
         timeInfo = ` on ${dateStr} at ${timeStr}`;
       }
 
-      return `✅ EVENT: Deleted this instance of recurring event "${eventTitle}"${timeInfo}. Other occurrences remain unchanged. To delete the entire series, use delete_recurring_event with scope 'entire_series'.`;
+      return `EVENT: Deleted this instance of recurring event "${eventTitle}"${timeInfo}. Other occurrences remain unchanged. To delete the entire series, use delete_recurring_event with scope 'entire_series'.`;
     }
 
     // Regular event deletion
@@ -161,18 +161,18 @@ export const deleteEventTool = tool(
       throw new Error(`Failed to delete event: ${deleteResult.error}`);
     }
 
-    console.log(`✅ [DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully from database`);
+    console.log(`[DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully from database`);
 
     // Remove from knowledge graph asynchronously (fire-and-forget for speed)
     const removeFromGraph = async () => {
       try {
-        console.log('🧠 [DELETE-EVENT TOOL] Removing from knowledge graph (async)...');
+        console.log('[DELETE-EVENT TOOL] Removing from knowledge graph (async)...');
 
         await zepGraphService.deleteCalendarEvent(userId, targetEventId, eventTitle);
 
-        console.log(`✅ [DELETE-EVENT TOOL] Event removed from knowledge graph`);
+        console.log(`[DELETE-EVENT TOOL] Event removed from knowledge graph`);
       } catch (error) {
-        console.error('⚠️ [DELETE-EVENT TOOL] Failed to remove event from knowledge graph (non-critical):', error);
+        console.error('[DELETE-EVENT TOOL] Failed to remove event from knowledge graph (non-critical):', error);
       }
     };
 
@@ -188,7 +188,7 @@ export const deleteEventTool = tool(
       timeInfo = ` from ${dateStr} at ${timeStr}`;
     }
 
-    return `✅ EVENT: "${eventTitle}" has been deleted${timeInfo}`;
+    return `EVENT: "${eventTitle}" has been deleted${timeInfo}`;
   },
   {
     name: "delete_event",

@@ -45,6 +45,7 @@ OUTPUT FORMAT (STRICT):
 EVIDENCE RULES:
 - Every suggestion must cite an item title and brief rationale.
 - Prefer concrete, low-risk suggestions.
+- Do NOT use emojis in any output or suggestions. Keep all text plain without emoji characters.
 
 USER CONTEXT:
 Timezone: ${timezone}

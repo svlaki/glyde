@@ -7,7 +7,9 @@ import { useCategories } from '../lib/categoryContext'
 import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, Task } from '../lib/taskService'
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontSize, fontWeight } from '../styles/typography'
 import { supabase } from '../lib/supabase'
+import { NewButton } from './ui/IconButtons'
 
 // Export Task type for drag-drop handling
 export type { Task } from '../lib/taskService'
@@ -20,6 +22,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false) // Desktop-scaled mobile fonts
   const { categories } = useCategories()
   const [tasks, setTasks] = useState<Task[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -127,46 +130,41 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   return (
     <div style={{
       height: '100%',
-      background: colors.bgPrimary,
+      background: colors.bgSecondary,
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Header */}
+      {/* Header - Mobile-style */}
       {!hideHeader && (
         <div style={{
-          padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px) clamp(4px, 0.5vh, 5px)'
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+          borderBottom: `1px solid ${colors.border}`,
+          background: colors.bgSecondary,
         }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '4px'
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h3 style={{
-              fontSize: '20px',
-              fontWeight: '600',
+              ...typography.headingLg,
+              fontWeight: fontWeight.bold,
               margin: 0,
               color: colors.textPrimary
             }}>
               Tasks
             </h3>
-            <button
-              onClick={() => {
-                console.log('[TodoList] Opening task form')
-                setIsFormOpen(true)
-              }}
-              className="btn btn-primary"
-              style={{ padding: '5px 10px', fontSize: '16px' }}
-            >
-              +
-            </button>
+            <span style={{
+              ...typography.labelMd,
+              color: colors.textTertiary
+            }}>
+              {tasks.length} pending
+            </span>
           </div>
-          <div style={{
-            fontSize: '13px',
-            color: colors.textSecondary
-          }}>
-            {tasks.length} pending
-          </div>
+          <NewButton
+            onClick={() => setIsFormOpen(true)}
+            title="New task"
+          />
         </div>
       )}
 
@@ -178,27 +176,13 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span style={{ fontSize: '13px', color: colors.textSecondary }}>
+          <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
             {tasks.length} pending
           </span>
-          <button
-            onClick={() => {
-              setIsFormOpen(true)
-            }}
-            className="btn btn-primary"
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: '400',
-              background: 'transparent',
-              color: colors.textSecondary,
-              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            New
-        </button>
+          <NewButton
+            onClick={() => setIsFormOpen(true)}
+            title="New task"
+                      />
         </div>
       )}
 
@@ -214,7 +198,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
             textAlign: 'center',
             padding: '40px 20px',
             color: colors.textSecondary,
-            fontSize: '12px'
+            fontSize: fontSize.xs
           }}>
             Loading tasks...
           </div>
@@ -223,7 +207,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
             textAlign: 'center',
             padding: '40px 20px',
             color: colors.textTertiary,
-            fontSize: '12px'
+            fontSize: fontSize.xs
           }}>
             No pending tasks
           </div>
@@ -286,8 +270,8 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: '13px',
-                      fontWeight: '500',
+                      fontSize: fontSize.sm,
+                      fontWeight: fontWeight.medium,
                       color: colors.textPrimary,
                       marginBottom: task.due_date || task.priority ? '4px' : 0
                     }}>
@@ -295,18 +279,18 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {task.due_date && (
-                        <div style={{ fontSize: '11px', color: colors.textSecondary }}>
+                        <div style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
                           {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                       )}
                       {task.priority && task.priority !== 'low' && (
                         <span style={{
-                          fontSize: '10px',
+                          fontSize: fontSize.xs,
                           padding: '2px 6px',
                           borderRadius: '3px',
                           background: task.priority === 'urgent' ? '#fee' : task.priority === 'high' ? '#fef0e6' : '#fff9e6',
                           color: task.priority === 'urgent' ? '#c00' : task.priority === 'high' ? '#c60' : '#880',
-                          fontWeight: '500'
+                          fontWeight: fontWeight.medium
                         }}>
                           {task.priority}
                         </span>

@@ -1,9 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
+import { useCategories } from '../lib/categoryContext'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
+import { mobileSpacing } from '../styles/mobileStyles'
+import { ClearButton } from './ui/IconButtons'
 
 interface Message {
   id: string
@@ -14,24 +18,27 @@ interface Message {
   imageData?: string  // base64 image data, kept for context
 }
 
+// Expose ChatBot ref handle for external control
+export interface ChatBotHandle {
+  isLoading: boolean;
+  clearChat: () => void;
+}
+
 interface ChatBotProps {
   onSetResponseCallback?: (callback: (message: string) => void) => void;
   hideHeader?: boolean;
   compact?: boolean;
+  mobileEmbedded?: boolean;  // When true: no sparkle icon, reduced header gap, mobile-optimized layout
 }
+
+// Export ClearIcon for use in external headers
+export { ClearIcon }
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
 // Session ID for chat persistence (consistent per user)
 const getSessionId = (userId: string): string => `chat_${userId}`
 
-// Sparkle icon for AI assistant
-const SparkleIcon = ({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 3v18M5.5 8.5l13 7M5.5 15.5l13-7" />
-    <circle cx="12" cy="12" r="1" fill={color} />
-  </svg>
-)
 
 // Send arrow icon
 const SendIcon = ({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) => (
@@ -85,16 +92,17 @@ const isSameTimeGroup = (date1: Date, date2: Date): boolean => {
 
 // Suggestion chips data
 const SUGGESTIONS = [
-  { label: "What's on today?", icon: "" },
   { label: "Schedule a meeting", icon: "" },
   { label: "Find free time", icon: "" },
 ]
 
-export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
+export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false }, ref) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
+  const { refreshCategories } = useCategories()
   const location = useLocation()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false) // Desktop-scaled mobile fonts
 
   // Derive current page from pathname
   const getCurrentPage = (): string => {
@@ -138,6 +146,12 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
   const [isInitializing, setIsInitializing] = useState(true)
   const [streamingMessage, setStreamingMessage] = useState<string>('')
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Expose handle for external control (e.g., header integration)
+  useImperativeHandle(ref, () => ({
+    get isLoading() { return isLoading },
+    clearChat: () => handleClearChat()
+  }), [isLoading])
 
   // Create welcome message
   const createWelcomeMessage = useCallback((): Message => ({
@@ -387,7 +401,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
       sender: 'user',
       timestamp: new Date(),
       hasImage: !!imageToSend,
-      imageData: imageToSend?.base64  // Store for context window
+      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {})  // Store for context window
     }
     setMessages(prev => [...prev, userMessage])
     setInput('')
@@ -487,9 +501,9 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
         // Parse status updates from the stream
         // Format: [STATUS:message] - extract and show in toolStatus
         const statusMatch = chunk.match(/\[STATUS:([^\]]+)\]/g)
-        if (statusMatch) {
+        if (statusMatch && statusMatch.length > 0) {
           // Extract the last status message
-          const lastStatus = statusMatch[statusMatch.length - 1]
+          const lastStatus = statusMatch[statusMatch.length - 1]!
           const statusContent = lastStatus.replace(/\[STATUS:|\]/g, '')
           setToolStatus(statusContent)
 
@@ -523,6 +537,9 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
 
       // Save bot message to API (fire and forget)
       saveMessageToAPI(botMessage)
+
+      // Refresh categories in case agent created/modified any
+      refreshCategories()
 
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
@@ -585,106 +602,142 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
 
   return (
     <div style={{
+      flex: 1,
+      minHeight: 0,
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: colors.bgPrimary,
+      background: colors.bgSecondary,
     }}>
       {/* Header */}
       {!hideHeader && (
-        <div style={{
-          padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px)',
-          borderBottom: `1px solid ${colors.borderLight}`,
-          background: colors.bgPrimary,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        mobileEmbedded ? (
+          /* Flattened single-div layout for mobile */
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px',
+            background: colors.bgSecondary,
+            borderBottom: `1px solid ${colors.border}`,
+            flexShrink: 0,
+          }}>
             <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              background: `linear-gradient(135deg, ${hexToRgba(colors.textSecondary, 0.1)}, ${hexToRgba(colors.textSecondary, 0.05)})`,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: `1px solid ${colors.borderLight}`,
+              alignItems: 'baseline',
+              gap: '8px',
+              flex: 1,
             }}>
-              <SparkleIcon size={16} color={colors.textSecondary} />
-            </div>
-            <div>
-              <h3 style={{
-                fontSize: '15px',
-                fontWeight: '600',
-                margin: 0,
+              <span style={{
+                fontSize: fontSize.lg,
+                fontWeight: fontWeight.semibold,
                 color: colors.textPrimary,
-                fontFamily: '"EB Garamond", Georgia, serif',
-                letterSpacing: '0.01em',
+                fontFamily: fontFamily.serif,
               }}>
                 Assistant
+              </span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}>
+                <div style={{
+                  width: '5px',
+                  height: '5px',
+                  borderRadius: '50%',
+                  background: isLoading ? '#fbbf24' : '#4ade80',
+                  transform: 'translateY(1px)',  // Visually align dot with text baseline
+                }} />
+                <span style={{
+                  fontSize: fontSize.xs,
+                  color: colors.textTertiary,
+                  fontWeight: fontWeight.medium,
+                }}>
+                  {isLoading ? 'Typing...' : 'Online'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={handleClearChat}
+              title="Clear conversation"
+              style={{
+                padding: '4px',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                color: colors.textTertiary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textSecondary
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = colors.textTertiary
+              }}
+            >
+              <ClearIcon size={14} />
+            </button>
+          </div>
+        ) : (
+          /* Desktop layout - Mobile-style header */
+          <div style={{
+            padding: '12px 16px',
+            borderBottom: `1px solid ${colors.border}`,
+            background: colors.bgSecondary,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{
+                ...typography.headingLg,
+                fontWeight: fontWeight.bold,
+                margin: 0,
+                color: colors.textPrimary,
+              }}>
+                Chat
               </h3>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                marginTop: '1px',
               }}>
                 <div style={{
                   width: '6px',
                   height: '6px',
                   borderRadius: '50%',
                   background: isLoading ? '#fbbf24' : '#4ade80',
-                  boxShadow: isLoading
-                    ? '0 0 6px rgba(251, 191, 36, 0.4)'
-                    : '0 0 6px rgba(74, 222, 128, 0.4)',
                 }} />
                 <span style={{
-                  fontSize: '11px',
+                  ...typography.labelMd,
                   color: colors.textTertiary,
-                  fontWeight: '500',
                 }}>
                   {isLoading ? 'Typing...' : 'Online'}
                 </span>
               </div>
             </div>
-          </div>
 
-          <button
-            onClick={handleClearChat}
-            title="Clear conversation"
-            style={{
-              padding: '8px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              color: colors.textTertiary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = colors.bgTertiary
-              e.currentTarget.style.color = colors.textSecondary
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.color = colors.textTertiary
-            }}
-          >
-            <ClearIcon size={16} />
-          </button>
-        </div>
+            <ClearButton onClick={handleClearChat} title="Clear conversation" />
+          </div>
+        )
       )}
 
       {/* Messages */}
       <div style={{
         flex: 1,
+        minHeight: 0,  // Critical for flex scrolling
         overflowY: 'auto',
-        padding: 'clamp(12px, 2.5vh, 20px) clamp(8px, 2vw, 16px)',
+        WebkitOverflowScrolling: 'touch',  // Momentum scrolling on iOS
+        padding: mobileEmbedded
+          ? `12px ${mobileSpacing.paddingX}`  // Use shared mobile padding
+          : 'clamp(12px, 2.5vh, 20px) clamp(8px, 2vw, 16px)',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
@@ -707,9 +760,9 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                   padding: '12px 0',
                 }}>
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: fontSize.xs,
                     color: colors.textTertiary,
-                    background: colors.bgPrimary,
+                    background: colors.bgSecondary,
                     padding: '4px 12px',
                     borderRadius: '12px',
                     border: `1px solid ${colors.borderLight}`,
@@ -719,60 +772,30 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                 </div>
               )}
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: isUser ? 'flex-end' : 'flex-start',
-                  alignItems: 'flex-end',
-                  gap: '8px',
-                  marginTop: isFirst ? '8px' : '2px',
-                  paddingLeft: isUser ? '48px' : '0',
-                  paddingRight: isUser ? '0' : '48px',
-                  animation: index === messages.length - 1 && !isStreaming ? 'messageSlideIn 0.25s ease-out' : 'none',
-                }}
-                onMouseEnter={() => setHoveredMessageId(message.id)}
-                onMouseLeave={() => setHoveredMessageId(null)}
-              >
-                {/* Bot avatar - only show for first message in group */}
-                {!isUser && (
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    background: isFirst ? colors.bgTertiary : 'transparent',
+              {isUser ? (
+                /* User message - bubble aligned right */
+                <div
+                  style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    opacity: isFirst ? 1 : 0,
-                    border: isFirst ? `1px solid ${colors.borderLight}` : 'none',
-                  }}>
-                    <SparkleIcon size={14} color={colors.textSecondary} />
-                  </div>
-                )}
-
-                {/* Message bubble */}
-                <div style={{
-                  position: 'relative',
-                  maxWidth: '85%',
-                }}>
-                  <div style={{
-                    padding: '10px 14px',
-                    borderRadius: isUser
-                      ? `14px 14px ${isLast ? '4px' : '14px'} 14px`
-                      : `14px 14px 14px ${isLast ? '4px' : '14px'}`,
-                    background: isUser ? accent.userBubble : colors.bgSecondary,
-                    color: isUser ? accent.userText : colors.textPrimary,
-                    fontSize: '14px',
-                    lineHeight: '1.55',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    boxShadow: isUser
-                      ? 'none'
-                      : `0 1px 2px ${hexToRgba(colors.textPrimary, 0.04)}`,
-                    border: isUser ? 'none' : `1px solid ${colors.borderLight}`,
-                    wordBreak: 'break-word',
-                  }}>
-                    {isUser ? (
+                    justifyContent: 'flex-end',
+                    marginTop: isFirst ? '12px' : '2px',
+                    paddingLeft: mobileEmbedded ? '24px' : '48px',
+                    animation: index === messages.length - 1 && !isStreaming ? 'messageSlideIn 0.25s ease-out' : 'none',
+                  }}
+                  onMouseEnter={() => setHoveredMessageId(message.id)}
+                  onMouseLeave={() => setHoveredMessageId(null)}
+                >
+                  <div style={{ position: 'relative', maxWidth: mobileEmbedded ? '100%' : '85%' }}>
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: `14px 14px 14px 14px`,
+                      background: accent.userBubble,
+                      color: accent.userText,
+                      fontSize: fontSize.lg,
+                      lineHeight: lineHeight.normal,
+                      fontFamily: fontFamily.sans,
+                      wordBreak: 'break-word',
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                         {message.hasImage && (
                           <div style={{
@@ -791,159 +814,152 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                         )}
                         <span>{message.text || 'Sent an image'}</span>
                       </div>
-                    ) : (
-                      <div className="chat-markdown">
-                        <ReactMarkdown
-                          components={{
-                            // Paragraphs
-                            p: ({ children }) => (
-                              <p style={{ margin: '0 0 8px 0' }}>{children}</p>
-                            ),
-                            // Bold text
-                            strong: ({ children }) => (
-                              <strong style={{
-                                fontWeight: 600,
-                                color: colors.textPrimary,
-                              }}>{children}</strong>
-                            ),
-                            // Unordered lists
-                            ul: ({ children }) => (
-                              <ul style={{
-                                margin: '8px 0',
-                                paddingLeft: '20px',
-                                listStyleType: 'disc',
-                              }}>{children}</ul>
-                            ),
-                            // Ordered lists
-                            ol: ({ children }) => (
-                              <ol style={{
-                                margin: '8px 0',
-                                paddingLeft: '20px',
-                                listStyleType: 'decimal',
-                              }}>{children}</ol>
-                            ),
-                            // List items
-                            li: ({ children }) => (
-                              <li style={{
-                                margin: '4px 0',
-                                lineHeight: '1.5',
-                                paddingLeft: '4px',
-                              }}>
-                                {children}
-                              </li>
-                            ),
-                            // Horizontal rules (for --- separators)
-                            hr: () => (
-                              <hr style={{
-                                border: 'none',
-                                borderTop: `1px solid ${colors.borderLight}`,
-                                margin: '12px 0',
-                              }} />
-                            ),
-                            // Code blocks (inline)
-                            code: ({ children }) => (
-                              <code style={{
-                                background: colors.bgTertiary,
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                fontFamily: 'monospace',
-                              }}>{children}</code>
-                            ),
-                          }}
-                        >
-                          {message.text}
-                        </ReactMarkdown>
-                        {/* Blinking cursor during streaming */}
-                        {showCursor && (
-                          <span className="streaming-cursor" style={{
-                            display: 'inline-block',
-                            width: '2px',
-                            height: '1em',
-                            background: colors.textSecondary,
-                            marginLeft: '2px',
-                            verticalAlign: 'text-bottom',
-                            animation: 'blink 1s infinite',
+                    </div>
+                    {/* Timestamp on hover */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-18px',
+                      right: '4px',
+                      fontSize: fontSize.xs,
+                      color: colors.textTertiary,
+                      opacity: isHovered ? 1 : 0,
+                      transition: 'opacity 0.15s ease',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Bot message - full width, no bubble */
+                <div
+                  style={{
+                    marginTop: isFirst ? '12px' : '3px',
+                    animation: index === messages.length - 1 && !isStreaming ? 'messageSlideIn 0.25s ease-out' : 'none',
+                  }}
+                  onMouseEnter={() => setHoveredMessageId(message.id)}
+                  onMouseLeave={() => setHoveredMessageId(null)}
+                >
+                  <div className="chat-markdown" style={{
+                    fontSize: fontSize.lg,
+                    lineHeight: lineHeight.normal,
+                    color: colors.textPrimary,
+                    fontFamily: fontFamily.serif
+                  }}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => (
+                          <p style={{ margin: '0 0 10px 0' }}>{children}</p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong style={{
+                            fontWeight: fontWeight.semibold,
+                            color: colors.textPrimary,
+                          }}>{children}</strong>
+                        ),
+                        ul: ({ children }) => (
+                          <ul style={{
+                            margin: '6px 0',
+                            paddingLeft: '20px',
+                            listStyleType: 'disc',
+                          }}>{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol style={{
+                            margin: '6px 0',
+                            paddingLeft: '20px',
+                            listStyleType: 'decimal',
+                          }}>{children}</ol>
+                        ),
+                        li: ({ children }) => (
+                          <li style={{
+                            margin: '3px 0',
+                            lineHeight: '1.55',
+                            paddingLeft: '4px',
+                          }}>
+                            {children}
+                          </li>
+                        ),
+                        hr: () => (
+                          <hr style={{
+                            border: 'none',
+                            borderTop: `1px solid ${colors.borderLight}`,
+                            margin: '12px 0',
                           }} />
-                        )}
-                      </div>
+                        ),
+                        code: ({ children }) => (
+                          <code style={{
+                            background: colors.bgTertiary,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: fontSize.base,
+                            fontFamily: fontFamily.mono,
+                          }}>{children}</code>
+                        ),
+                      }}
+                    >
+                      {message.text}
+                    </ReactMarkdown>
+                    {showCursor && (
+                      <span className="streaming-cursor" style={{
+                        display: 'inline-block',
+                        width: '2px',
+                        height: '1em',
+                        background: colors.textSecondary,
+                        marginLeft: '2px',
+                        verticalAlign: 'text-bottom',
+                        animation: 'blink 1s infinite',
+                      }} />
                     )}
                   </div>
-
                   {/* Timestamp on hover */}
                   <div style={{
-                    position: 'absolute',
-                    bottom: '-18px',
-                    [isUser ? 'right' : 'left']: '4px',
-                    fontSize: '10px',
+                    fontSize: fontSize.xs,
                     color: colors.textTertiary,
                     opacity: isHovered ? 1 : 0,
                     transition: 'opacity 0.15s ease',
-                    whiteSpace: 'nowrap',
+                    marginTop: '4px',
                   }}>
                     {formatTime(message.timestamp)}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )
         })}
 
-        {/* Streaming message - show text as it streams in */}
+        {/* Streaming message - full width, no bubble */}
         {isStreaming && (
           <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '8px',
-            marginTop: '8px',
+            marginTop: '12px',
             animation: 'messageSlideIn 0.25s ease-out',
           }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: colors.bgTertiary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: `1px solid ${colors.borderLight}`,
-              flexShrink: 0,
+            <div className="chat-markdown" style={{
+              fontSize: fontSize.lg,
+              color: colors.textPrimary,
+              lineHeight: lineHeight.normal,
+              fontFamily: fontFamily.sans,
             }}>
-              <SparkleIcon size={14} color={colors.textSecondary} />
-            </div>
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '14px 14px 14px 4px',
-              background: colors.bgSecondary,
-              border: `1px solid ${colors.borderLight}`,
-              maxWidth: '85%',
-            }}>
-              <div className="chat-markdown" style={{
-                fontSize: '14px',
-                color: colors.textPrimary,
-                lineHeight: '1.5',
-              }}>
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{children}</p>,
-                    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                    ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: '20px', listStyleType: 'disc' }}>{children}</ul>,
-                    ol: ({ children }) => <ol style={{ margin: '8px 0', paddingLeft: '20px', listStyleType: 'decimal' }}>{children}</ol>,
-                    li: ({ children }) => <li style={{ margin: '4px 0', lineHeight: '1.5', paddingLeft: '4px' }}>{children}</li>,
-                  }}
-                >
-                  {streamingMessage}
-                </ReactMarkdown>
-                <span style={{
-                  display: 'inline-block',
-                  width: '6px',
-                  height: '14px',
-                  background: colors.textSecondary,
-                  marginLeft: '2px',
-                  animation: 'blink 1s infinite',
-                  verticalAlign: 'middle',
-                }} />
-              </div>
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p style={{ margin: '0 0 10px 0' }}>{children}</p>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                  ul: ({ children }) => <ul style={{ margin: '6px 0', paddingLeft: '20px', listStyleType: 'disc' }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: '6px 0', paddingLeft: '20px', listStyleType: 'decimal' }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ margin: '3px 0', lineHeight: '1.55', paddingLeft: '4px' }}>{children}</li>,
+                }}
+              >
+                {streamingMessage}
+              </ReactMarkdown>
+              <span style={{
+                display: 'inline-block',
+                width: '2px',
+                height: '1em',
+                background: colors.textSecondary,
+                marginLeft: '2px',
+                animation: 'blink 1s infinite',
+                verticalAlign: 'text-bottom',
+              }} />
             </div>
           </div>
         )}
@@ -951,55 +967,33 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
         {/* Loading indicator - only show when waiting for first token */}
         {isLoading && !isStreaming && (
           <div style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '8px',
-            marginTop: '8px',
+            marginTop: '12px',
             animation: 'messageSlideIn 0.25s ease-out',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: colors.bgTertiary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: `1px solid ${colors.borderLight}`,
+            <span style={{
+              fontSize: fontSize.base,
+              color: colors.textSecondary,
+              fontStyle: 'italic',
             }}>
-              <SparkleIcon size={14} color={colors.textSecondary} />
-            </div>
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '14px 14px 14px 4px',
-              background: colors.bgSecondary,
-              border: `1px solid ${colors.borderLight}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{
-                fontSize: '13px',
-                color: colors.textSecondary,
-                fontStyle: 'italic',
-              }}>
-                {toolStatus || 'Thinking'}
-              </span>
-              <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: '4px',
-                      height: '4px',
-                      borderRadius: '50%',
-                      background: colors.textTertiary,
-                      animation: 'pulse 1.4s infinite ease-in-out both',
-                      animationDelay: `${i * 0.16}s`,
-                    }}
-                  />
-                ))}
-              </div>
+              {toolStatus || 'Thinking'}
+            </span>
+            <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '4px',
+                    height: '4px',
+                    borderRadius: '50%',
+                    background: colors.textTertiary,
+                    animation: 'pulse 1.4s infinite ease-in-out both',
+                    animationDelay: `${i * 0.16}s`,
+                  }}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -1010,8 +1004,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            marginTop: '4px',
-            marginLeft: '36px',
+            marginTop: '8px',
             animation: 'fadeIn 0.2s ease-out',
           }}>
             <div style={{
@@ -1030,7 +1023,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                 animation: 'pulse 1s infinite',
               }} />
               <span style={{
-                fontSize: '12px',
+                fontSize: fontSize.xs,
                 color: colors.textSecondary,
               }}>
                 {toolStatus}
@@ -1061,7 +1054,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                 background: colors.bgSecondary,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '20px',
-                fontSize: '13px',
+                fontSize: fontSize.sm,
                 color: colors.textSecondary,
                 cursor: 'pointer',
                 display: 'flex',
@@ -1090,10 +1083,11 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
 
       {/* Input area */}
       <div style={{
-        padding: 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
-        paddingBottom: 'clamp(12px, 2vh, 16px)',
-        borderTop: `1px solid ${colors.borderLight}`,
-        background: colors.bgSecondary,
+        padding: mobileEmbedded
+          ? '0'
+          : 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
+        paddingBottom: mobileEmbedded ? '0' : 'clamp(12px, 2vh, 16px)',
+        background: mobileEmbedded ? 'transparent' : colors.bgSecondary,
         flexShrink: 0,
       }}>
         {/* Hidden file input for image upload */}
@@ -1110,7 +1104,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
           <div style={{
             marginBottom: '8px',
             padding: '8px',
-            background: colors.bgPrimary,
+            background: colors.bgSecondary,
             border: `1px solid ${colors.border}`,
             borderRadius: '12px',
             display: 'flex',
@@ -1129,7 +1123,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
             />
             <span style={{
               flex: 1,
-              fontSize: '13px',
+              fontSize: fontSize.sm,
               color: colors.textSecondary,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -1168,15 +1162,15 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
           </div>
         )}
 
-        <form onSubmit={handleSend}>
+        <form onSubmit={handleSend} style={{ margin: mobileEmbedded ? `0 ${mobileSpacing.paddingX}` : '0' }}>
           <div style={{
             display: 'flex',
-            gap: '10px',
+            gap: mobileEmbedded ? '6px' : '10px',
             alignItems: 'flex-end',
-            background: colors.bgPrimary,
+            background: colors.bgSecondary,
             border: `1px solid ${colors.border}`,
-            borderRadius: '14px',
-            padding: '4px 4px 4px 14px',
+            borderRadius: mobileEmbedded ? '10px' : '14px',
+            padding: mobileEmbedded ? '2px 2px 2px 10px' : '4px 4px 4px 14px',
             transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
           }}>
             <textarea
@@ -1194,23 +1188,26 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
               rows={1}
               style={{
                 flex: 1,
-                padding: '8px 0',
+                padding: 0,
+                paddingTop: mobileEmbedded ? '5px' : '7px',
                 border: 'none',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: 'transparent',
                 color: colors.textPrimary,
                 resize: 'none',
-                height: '36px',
-                maxHeight: '100px',
+                height: mobileEmbedded ? '32px' : '36px',
+                maxHeight: mobileEmbedded ? '80px' : '100px',
                 overflowY: 'auto',
                 fontFamily: 'inherit',
-                lineHeight: '1.5',
+                lineHeight: lineHeight.tight,
                 outline: 'none',
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement
-                target.style.height = '36px'
-                target.style.height = Math.min(target.scrollHeight, 100) + 'px'
+                const baseHeight = mobileEmbedded ? 32 : 36
+                const maxHeight = mobileEmbedded ? 80 : 100
+                target.style.height = `${baseHeight}px`
+                target.style.height = Math.min(target.scrollHeight, maxHeight) + 'px'
               }}
             />
             {/* Image upload button */}
@@ -1220,13 +1217,13 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                 onClick={handleImageClick}
                 title="Upload image"
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: mobileEmbedded ? '30px' : '36px',
+                  height: mobileEmbedded ? '30px' : '36px',
                   padding: 0,
                   background: selectedImage ? hexToRgba(colors.textSecondary, 0.15) : 'transparent',
                   color: selectedImage ? colors.textPrimary : colors.textTertiary,
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: mobileEmbedded ? '8px' : '10px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1243,7 +1240,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                   e.currentTarget.style.color = selectedImage ? colors.textPrimary : colors.textTertiary
                 }}
               >
-                <ImageIcon size={18} />
+                <ImageIcon size={mobileEmbedded ? 16 : 18} />
               </button>
             )}
             {isLoading ? (
@@ -1252,13 +1249,13 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                 onClick={handleStop}
                 title="Stop generating"
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: mobileEmbedded ? '30px' : '36px',
+                  height: mobileEmbedded ? '30px' : '36px',
                   padding: 0,
                   background: '#ef4444',
                   color: '#fff',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: mobileEmbedded ? '8px' : '10px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1273,15 +1270,15 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                   e.currentTarget.style.transform = 'scale(1)'
                 }}
               >
-                <StopIcon size={14} />
+                <StopIcon size={mobileEmbedded ? 12 : 14} />
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={!(input ?? '').trim() && !selectedImage}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: mobileEmbedded ? '30px' : '36px',
+                  height: mobileEmbedded ? '30px' : '36px',
                   padding: 0,
                   background: (!(input ?? '').trim() && !selectedImage)
                     ? colors.bgTertiary
@@ -1290,7 +1287,7 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                     ? colors.textTertiary
                     : accent.userText,
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: mobileEmbedded ? '8px' : '10px',
                   cursor: (!(input ?? '').trim() && !selectedImage) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1307,22 +1304,19 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
                   e.currentTarget.style.transform = 'scale(1)'
                 }}
               >
-                <SendIcon size={16} />
+                <SendIcon size={mobileEmbedded ? 14 : 16} />
               </button>
             )}
           </div>
         </form>
-        <div style={{
-          marginTop: '8px',
-          textAlign: 'center',
-        }}>
-          <span style={{
-            fontSize: '11px',
-            color: colors.textTertiary,
+        {/* Hide helper text on mobile to save space */}
+        {!mobileEmbedded && (
+          <div style={{
+            marginTop: '8px',
+            textAlign: 'center',
           }}>
-            Press Enter to send · Shift + Enter for new line
-          </span>
-        </div>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -1379,4 +1373,4 @@ export function ChatBot({ hideHeader = false, compact = false }: ChatBotProps) {
       `}</style>
     </div>
   )
-}
+})

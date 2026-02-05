@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
+import { RefreshButton } from './ui/IconButtons'
 
 interface Interaction {
   id: string
@@ -31,6 +33,7 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false) // Desktop-scaled mobile fonts
 
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -211,8 +214,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: 'none',
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -236,8 +239,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -268,7 +271,7 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
         if (isShowingCustomTime) {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '12px', color: colors.textSecondary }}>
+              <div style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
                 Enter your preferred time (e.g., "tomorrow at 3pm", "Friday 10am"):
               </div>
               <input
@@ -287,10 +290,10 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 }}
                 style={{
                   padding: '10px 12px',
-                  fontSize: '13px',
+                  fontSize: fontSize.sm,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
-                  background: colors.bgPrimary,
+                  background: colors.bgSecondary,
                   color: colors.textPrimary,
                   outline: 'none'
                 }}
@@ -302,8 +305,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                   style={{
                     flex: 1,
                     padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '500',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.medium,
                     border: 'none',
                     borderRadius: '6px',
                     cursor: (isResponding || !customTimeValue.trim()) ? 'not-allowed' : 'pointer',
@@ -323,8 +326,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                   disabled={isResponding}
                   style={{
                     padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '500',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.medium,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -352,8 +355,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                   disabled={isResponding}
                   style={{
                     padding: '8px 12px',
-                    fontSize: '13px',
-                    fontWeight: '400',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.normal,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -386,8 +389,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               disabled={isResponding}
               style={{
                 padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.normal,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -424,15 +427,15 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               disabled={isResponding}
               style={{
                 padding: '10px 12px',
-                fontSize: '13px',
+                fontSize: fontSize.sm,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
-                background: colors.bgPrimary,
+                background: colors.bgSecondary,
                 color: colors.textPrimary,
                 resize: 'none',
                 minHeight: '60px',
                 fontFamily: 'inherit',
-                lineHeight: '1.4'
+                lineHeight: lineHeight.tight
               }}
             />
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -442,8 +445,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: 'none',
                   borderRadius: '6px',
                   cursor: (isResponding || !textValue.trim()) ? 'not-allowed' : 'pointer',
@@ -465,8 +468,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -504,8 +507,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                   style={{
                     width: '36px',
                     height: '36px',
-                    fontSize: '14px',
-                    fontWeight: '500',
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.medium,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '8px',
                     cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -539,8 +542,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               disabled={isResponding}
               style={{
                 padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.normal,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -575,8 +578,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: 'none',
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -594,8 +597,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 style={{
                   flex: 1,
                   padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  fontSize: fontSize.sm,
+                  fontWeight: fontWeight.medium,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -614,8 +617,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               disabled={isResponding}
               style={{
                 padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '400',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.normal,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -649,8 +652,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               style={{
                 flex: 1,
                 padding: '8px 12px',
-                fontSize: '13px',
-                fontWeight: '500',
+                fontSize: fontSize.sm,
+                fontWeight: fontWeight.medium,
                 border: 'none',
                 borderRadius: '6px',
                 cursor: isResponding ? 'not-allowed' : 'pointer',
@@ -694,82 +697,43 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: colors.bgPrimary,
+      background: colors.bgSecondary,
       overflow: 'hidden'
     }}>
-      {/* Header */}
+      {/* Header - Mobile-style */}
       {!hideHeader && (
         <div style={{
-          padding: 'clamp(12px, 2vh, 16px) clamp(12px, 3vw, 20px) clamp(8px, 1.5vh, 12px)',
+          padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexShrink: 0
+          flexShrink: 0,
+          borderBottom: `1px solid ${colors.border}`,
+          background: colors.bgSecondary
         }}>
-          <h3 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            margin: 0,
-            color: colors.textPrimary,
-            letterSpacing: '0.02em'
-          }}>
-            Interactions
-          </h3>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h3 style={{
+              ...typography.headingLg,
+              fontWeight: fontWeight.bold,
+              margin: 0,
+              color: colors.textPrimary
+            }}>
+              Interactions
+            </h3>
             {interactions.length > 0 && (
               <span style={{
-                fontSize: '12px',
-                color: colors.textTertiary,
-                background: colors.bgTertiary,
-                padding: '2px 8px',
-                borderRadius: '10px'
+                ...typography.labelMd,
+                color: colors.textTertiary
               }}>
-                {interactions.length}
+                {interactions.length} pending
               </span>
             )}
-            <button
-              onClick={handleGenerateInteractions}
-              disabled={isRefreshing}
-              title="Generate new interactions"
-              style={{
-                padding: '6px',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: isRefreshing ? 'not-allowed' : 'pointer',
-                background: 'transparent',
-                color: colors.textSecondary,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isRefreshing) e.currentTarget.style.background = colors.bgTertiary
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
-                }}
-              >
-                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-                <path d="M16 16h5v5" />
-              </svg>
-            </button>
           </div>
+          <RefreshButton
+            onClick={handleGenerateInteractions}
+            disabled={isRefreshing}
+            title="Generate new interactions"
+          />
         </div>
       )}
 
@@ -783,47 +747,16 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
           flexShrink: 0
         }}>
           <span style={{
-            fontSize: '13px',
+            fontSize: fontSize.sm,
             color: colors.textSecondary
           }}>
             {interactions.length} pending
           </span>
-          <button
+          <RefreshButton
             onClick={handleGenerateInteractions}
             disabled={isRefreshing}
             title="Generate new interactions"
-            style={{
-              padding: '6px',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: isRefreshing ? 'not-allowed' : 'pointer',
-              background: 'transparent',
-              color: colors.textSecondary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.15s'
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                animation: isRefreshing ? 'spin 1s linear infinite' : 'none'
-              }}
-            >
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 16h5v5" />
-            </svg>
-          </button>
+          />
         </div>
       )}
 
@@ -835,7 +768,7 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
           background: hexToRgba(isDarkMode ? '#ef4444' : '#dc2626', 0.1),
           border: `1px solid ${hexToRgba(isDarkMode ? '#ef4444' : '#dc2626', 0.3)}`,
           borderRadius: '8px',
-          fontSize: '13px',
+          fontSize: fontSize.sm,
           color: isDarkMode ? '#fca5a5' : '#dc2626'
         }}>
           {error}
@@ -846,8 +779,7 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '0 clamp(8px, 2vw, 16px) clamp(12px, 2vh, 16px)',
-        paddingBottom: 'clamp(12px, 2vh, 16px)',
+        padding: '12px clamp(8px, 2vw, 16px) clamp(12px, 2vh, 16px)',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px'
@@ -909,10 +841,10 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z" />
               <path d="M12 6v6l4 2" />
             </svg>
-            <p style={{ fontSize: '14px', margin: '0 0 4px 0' }}>
+            <p style={{ fontSize: fontSize.base, margin: '0 0 4px 0' }}>
               No interactions right now
             </p>
-            <p style={{ fontSize: '12px', margin: 0 }}>
+            <p style={{ fontSize: fontSize.xs, margin: 0 }}>
               Click refresh to generate insights
             </p>
           </div>
@@ -941,8 +873,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {interaction.category && (
                     <span style={{
-                      fontSize: '11px',
-                      fontWeight: '500',
+                      fontSize: fontSize.xs,
+                      fontWeight: fontWeight.medium,
                       color: interaction.category.color,
                       background: hexToRgba(interaction.category.color, 0.15),
                       padding: '2px 8px',
@@ -952,7 +884,7 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                     </span>
                   )}
                   <span style={{
-                    fontSize: '11px',
+                    fontSize: fontSize.xs,
                     color: colors.textTertiary
                   }}>
                     {formatTimeAgo(interaction.created_at)}
@@ -962,11 +894,11 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
 
               {/* Question */}
               <p style={{
-                fontSize: '14px',
-                lineHeight: '1.5',
+                fontSize: fontSize.base,
+                lineHeight: lineHeight.normal,
                 margin: '0 0 12px 0',
                 color: colors.textPrimary,
-                fontFamily: 'Georgia, "Times New Roman", serif'
+                fontFamily: fontFamily.serif
               }}>
                 {interaction.question}
               </p>

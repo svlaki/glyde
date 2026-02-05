@@ -1,5 +1,6 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { Rule } from '../lib/ruleService'
 
 interface RuleCardProps {
@@ -42,10 +43,10 @@ export function RuleCard({ rule, isSelected, onClick, onToggle }: RuleCardProps)
         {/* Rule Text */}
         <div style={{
           flex: 1,
-          fontSize: '14px',
-          fontWeight: '400',
+          fontSize: fontSize.base,
+          fontWeight: fontWeight.normal,
           color: colors.textPrimary,
-          lineHeight: '1.4'
+          lineHeight: lineHeight.tight
         }}>
           {rule.rule_text}
         </div>
@@ -86,7 +87,7 @@ export function RuleCard({ rule, isSelected, onClick, onToggle }: RuleCardProps)
           marginTop: '12px',
           display: 'flex',
           gap: '16px',
-          fontSize: '12px',
+          fontSize: fontSize.xs,
           color: colors.textSecondary
         }}>
           <span style={{
@@ -112,9 +113,9 @@ export function RuleCard({ rule, isSelected, onClick, onToggle }: RuleCardProps)
       {/* Description - only show if selected and exists */}
       {isSelected && rule.description && (
         <div style={{
-          fontSize: '13px',
+          fontSize: fontSize.sm,
           color: colors.textSecondary,
-          lineHeight: '1.5',
+          lineHeight: lineHeight.normal,
           marginTop: '8px',
           opacity: 0.8
         }}>

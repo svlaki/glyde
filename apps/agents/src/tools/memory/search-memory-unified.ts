@@ -83,10 +83,10 @@ export const searchMemoryUnifiedTool = tool(
             .map((pattern, i) => `${i + 1}. ${pattern}`)
             .join('\n');
 
-          return `🌐 **Community Insights** for "${query}":\n\n💡 **Patterns Discovered Across Users:**\n${topPatterns}\n\n*Validated across ${minUsers}+ users with high confidence.*`;
+          return `**Community Insights** for "${query}":\n\n**Patterns Discovered Across Users:**\n${topPatterns}\n\n*Validated across ${minUsers}+ users with high confidence.*`;
         }
 
-        return `🌐 No community patterns found for "${query}". This might be a unique use case.`;
+        return `No community patterns found for "${query}". This might be a unique use case.`;
       }
 
       // Mode: 'all' (default) - Search both personal and community

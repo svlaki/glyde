@@ -6,7 +6,7 @@ export const createTaskTool = tool(
   async ({ title, description, dueDate, priority, category, energyRequired, estimatedDuration }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -23,14 +23,14 @@ export const createTaskTool = tool(
       }, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
-        return "❌ Failed to create task";
+        return "Failed to create task";
       }
 
       const dueDateStr = dueDate ? ` (Due: ${new Date(dueDate).toLocaleDateString()})` : '';
-      return `✅ Task created: "${title}"${dueDateStr}`;
+      return `Task created: "${title}"${dueDateStr}`;
     } catch (error) {
-      console.error('❌ [create-task] Error:', error);
-      return `❌ Error creating task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[create-task] Error:', error);
+      return `Error creating task: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

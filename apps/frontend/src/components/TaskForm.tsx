@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useCategories } from '../lib/categoryContext'
@@ -7,9 +7,11 @@ import { useAuth } from '../lib/authContext'
 import { Task } from '../lib/taskService'
 import { AspectForm } from './AspectForm'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
 import { usePlatform } from '../hooks/usePlatform'
+import { SaveTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -57,6 +59,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
   const [loading, setLoading] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
+  const categoryDropdownRef = useRef<HTMLDivElement>(null)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
@@ -101,6 +104,20 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     setShowTimePicker(false)
   }, [task, isOpen])
 
+  // Click-outside to close category dropdown
+  useEffect(() => {
+    if (!showCategoryDropdown) return
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [showCategoryDropdown])
+
   // Sync time picker value with dueDate
   useEffect(() => {
     if (dueDate) {
@@ -128,15 +145,16 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
 
     setLoading(true)
     try {
-      await onSave({
-        id: task?.id,
+      const taskData: Partial<Task> = {
         title: title.trim(),
-        description: description.trim() || undefined,
-        category: category || undefined,
-        due_date: hasDueDate && dueDate ? dueDate.toISOString() : undefined,
         priority,
         status: 'pending'
-      })
+      }
+      if (task?.id) taskData.id = task.id
+      if (description.trim()) taskData.description = description.trim()
+      if (category) taskData.category = category
+      if (hasDueDate && dueDate) taskData.due_date = dueDate.toISOString()
+      await onSave(taskData)
       onClose()
       setShowCategoryDropdown(false)
     } catch (error) {
@@ -170,12 +188,33 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     return cat?.color || '#999'
   }
 
+  const titleInput = (
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      required
+      placeholder="Task title"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: fontSize.xl,
+        fontWeight: fontWeight.semibold,
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={task ? 'Edit Task' : 'Create New Task'}
+      headerContent={titleInput}
       maxWidth="500px"
+      preventAutoFocus={!!task}
     >
       <form onSubmit={handleSubmit} style={{
         padding: '20px',
@@ -183,41 +222,13 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
         flexDirection: 'column',
         gap: '16px'
       }}>
-          {/* Title */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Task Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="e.g., Call dentist, Buy groceries, Submit report"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-          </div>
 
           {/* Aspect */}
-          <div style={{ position: 'relative' }}>
+          <div ref={categoryDropdownRef} style={{ position: 'relative' }}>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -228,7 +239,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -249,11 +260,6 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     background: getCategoryColor(category),
                     flexShrink: 0
                   }} />
-                  {categories.find(c => c.name === category)?.icon && (
-                    <span style={{ fontSize: '16px', flexShrink: 0 }}>
-                      {categories.find(c => c.name === category)?.icon}
-                    </span>
-                  )}
                   <span>{category}</span>
                 </>
               ) : (
@@ -289,7 +295,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     padding: '10px 14px',
                     cursor: 'pointer',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: colors.textSecondary,
                     transition: 'background 0.15s ease'
                   }}
@@ -315,7 +321,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       color: colors.textPrimary,
                       transition: 'background 0.15s ease',
                       borderTop: `1px solid ${colors.borderLight}`
@@ -334,9 +340,6 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       background: cat.color || '#999',
                       flexShrink: 0
                     }} />
-                    {cat.icon && (
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                    )}
                     <span>{cat.name}</span>
                   </div>
                 ))}
@@ -352,9 +355,9 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: isDarkMode ? '#f0f0f0' : '#000',
-                    fontWeight: '500',
+                    fontWeight: fontWeight.medium,
                     transition: 'background 0.15s ease',
                     borderTop: `2px solid ${colors.border}`
                   }}
@@ -376,8 +379,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -389,7 +392,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -432,7 +435,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   }}
                   style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
                 />
-                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Set due date</span>
+                <span style={{ fontSize: fontSize.base, color: colors.textPrimary }}>Set due date</span>
               </label>
             </div>
 
@@ -444,7 +447,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -456,7 +459,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     gap: '8px'
                   }}
                 >
-                  <span>📅</span>
+                  <span>Due</span>
                   {isMobile ? (
                     formatDate(dueDate)
                   ) : (
@@ -465,7 +468,10 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       value={dueDate.toISOString().split('T')[0]}
                       onChange={(e) => {
                         const newDate = new Date(dueDate)
-                        const [year, month, day] = e.target.value.split('-').map(Number)
+                        const parts = e.target.value.split('-').map(Number)
+                        const year = parts[0] ?? 0
+                        const month = parts[1] ?? 1
+                        const day = parts[2] ?? 1
                         newDate.setFullYear(year, month - 1, day)
                         setDueDate(newDate)
                       }}
@@ -473,7 +479,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -484,7 +490,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: showTimePicker ? colors.bgHover : colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -502,7 +508,9 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                       type="time"
                       value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
                       onChange={(e) => {
-                        const [hours, minutes] = e.target.value.split(':').map(Number)
+                        const timeParts = e.target.value.split(':').map(Number)
+                        const hours = timeParts[0] ?? 0
+                        const minutes = timeParts[1] ?? 0
                         const newDate = new Date(dueDate)
                         newDate.setHours(hours, minutes)
                         setDueDate(newDate)
@@ -511,7 +519,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -594,8 +602,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -609,7 +617,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -628,36 +636,11 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !title.trim()}
-              className="btn btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
-            </button>
+            <SaveTextButton
+              onClick={(e) => handleSubmit(e)}
+              disabled={!title.trim()}
+              loading={loading}
+            />
           </div>
         </form>
 

@@ -6,7 +6,7 @@ export const checkInGoalTool = tool(
   async ({ goalId, progressUpdate, moodRating, confidenceLevel, obstaclesEncountered, winsAndProgress, nextSteps, reflectionNotes }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     try {
@@ -22,13 +22,13 @@ export const checkInGoalTool = tool(
       });
 
       if (!checkIn) {
-        return "❌ Failed to record goal check-in";
+        return "Failed to record goal check-in";
       }
 
-      return `✅ Goal check-in recorded successfully`;
+      return `Goal check-in recorded successfully`;
     } catch (error) {
-      console.error('❌ [check-in-goal] Error:', error);
-      return `❌ Error recording goal check-in: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[check-in-goal] Error:', error);
+      return `Error recording goal check-in: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

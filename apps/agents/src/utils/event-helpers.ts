@@ -46,11 +46,11 @@ export async function getEventsWithCategories(
     });
 
     if (error) {
-      console.error('❌ [EventHelpers] Error fetching events:', error);
+      console.error('[EventHelpers] Error fetching events:', error);
       return [];
     }
 
-    console.log('✅ [EventHelpers] Retrieved', data?.length || 0, 'events (UTC) with categories');
+    console.log('[EventHelpers] Retrieved', data?.length || 0, 'events (UTC) with categories');
 
     // Transform to match DatabaseEvent interface - convert timestamps to ISO 8601
     const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
@@ -73,7 +73,7 @@ export async function getEventsWithCategories(
 
     return transformedEvents;
   } catch (error) {
-    console.error('❌ [EventHelpers] Exception fetching events:', error);
+    console.error('[EventHelpers] Exception fetching events:', error);
     return [];
   }
 }
@@ -92,7 +92,7 @@ export async function getEventById(
     const event = events.find(e => e.id === eventId);
     return event || null;
   } catch (error) {
-    console.error('❌ [EventHelpers] Exception fetching event by ID:', error);
+    console.error('[EventHelpers] Exception fetching event by ID:', error);
     return null;
   }
 }

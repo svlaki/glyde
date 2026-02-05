@@ -133,7 +133,7 @@ export const createRecurringEventTool = tool(
     const categoryContext = validatedCategory ? ` in category "${validatedCategory}"` : '';
     const recurrenceDescription = formatRRuleForDisplay(finalRRule);
 
-    return `✅ Recurring event created successfully!\n\n**${title}**${categoryContext}\n**Pattern:** ${recurrenceDescription}\n**Starting:** ${formatEventTime(startTimeUTC, timezone)}${
+    return `Recurring event created successfully!\n\n**${title}**${categoryContext}\n**Pattern:** ${recurrenceDescription}\n**Starting:** ${formatEventTime(startTimeUTC, timezone)}${
       endDate ? `\n**Until:** ${endDate}` : ''
     }\n\nI'll automatically create instances for each occurrence on your calendar.`;
   },

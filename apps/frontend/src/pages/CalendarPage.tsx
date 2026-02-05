@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
-import { PageHeader } from '../components/PageHeader'
 import { Calendar } from '../components/Calendar'
-import { ChatBot } from '../components/ChatBot'
+import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
 import { TodoList } from '../components/TodoList'
-import { GlobalSearch } from '../components/GlobalSearch'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
-import { mobileStyles } from '../styles/mobileStyles'
+import { mobileStyles, mobileSpacing, mobileHeaderStyles } from '../styles/mobileStyles'
 import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
 import { MobileMenu } from '../components/mobile/MobileMenu'
 
@@ -27,6 +26,19 @@ function CalendarPageMobile() {
   const colors = getColors(isDarkMode)
   const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const chatBotRef = useRef<ChatBotHandle>(null)
+  const [chatIsLoading, setChatIsLoading] = useState(false)
+
+  // Poll ChatBot loading state for header display
+  useEffect(() => {
+    if (activeTab !== 'chat') return
+    const interval = setInterval(() => {
+      if (chatBotRef.current) {
+        setChatIsLoading(chatBotRef.current.isLoading)
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }, [activeTab])
 
   const tabs = [
     { id: 'calendar' as const, label: 'Calendar' },
@@ -45,13 +57,13 @@ function CalendarPageMobile() {
     }
   }
 
-  // Reusable header for non-calendar tabs
+  // Reusable header for non-calendar tabs - uses global mobileHeaderStyles
   const renderHeader = () => (
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      marginBottom: '16px',
+      gap: mobileHeaderStyles.gap,
+      marginBottom: mobileHeaderStyles.marginBottom,
       flexShrink: 0
     }}>
       <button
@@ -60,11 +72,11 @@ function CalendarPageMobile() {
           background: 'transparent',
           border: 'none',
           color: colors.textPrimary,
-          fontSize: '22px',
-          padding: '4px',
+          fontSize: mobileHeaderStyles.buttonFontSize,
+          padding: mobileHeaderStyles.buttonPadding,
           cursor: 'pointer',
-          minWidth: '32px',
-          minHeight: '32px',
+          minWidth: mobileHeaderStyles.buttonMinSize,
+          minHeight: mobileHeaderStyles.buttonMinSize,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -73,15 +85,62 @@ function CalendarPageMobile() {
         ☰
       </button>
       <h2 style={{
-        fontSize: '22px',
-        fontWeight: '700',
+        fontSize: mobileHeaderStyles.titleFontSize,
+        fontWeight: mobileHeaderStyles.titleFontWeight,
         color: colors.textPrimary,
         margin: 0,
-        letterSpacing: '-0.02em',
-        flex: 1
+        letterSpacing: mobileHeaderStyles.titleLetterSpacing,
+        flex: activeTab === 'chat' ? 0 : 1
       }}>
         {getHeaderTitle()}
       </h2>
+      {/* Chat tab: show status indicator and trash button */}
+      {activeTab === 'chat' && (
+        <>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            flex: 1,
+            marginLeft: '8px',
+          }}>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: chatIsLoading ? '#fbbf24' : '#4ade80',
+              flexShrink: 0,
+            }} />
+            <span style={{
+              fontSize: '12px',
+              color: colors.textTertiary,
+              fontWeight: '500',
+              lineHeight: 1,
+            }}>
+              {chatIsLoading ? 'Typing...' : 'Online'}
+            </span>
+          </div>
+          <button
+            onClick={() => chatBotRef.current?.clearChat()}
+            title="Clear conversation"
+            style={{
+              padding: '4px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              color: colors.textTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: mobileHeaderStyles.buttonMinSize,
+              minHeight: mobileHeaderStyles.buttonMinSize,
+            }}
+          >
+            <ClearIcon size={14} />
+          </button>
+        </>
+      )}
     </div>
   )
 
@@ -90,39 +149,46 @@ function CalendarPageMobile() {
       {/* Content area - changes based on active tab */}
       <div style={{
         ...mobileStyles.scrollContainer,
-        // Calendar tab: disable outer scroll, let inner calendar scroll
-        // Other tabs: enable outer scroll
-        overflow: activeTab === 'calendar' ? 'hidden' : 'auto',
-        // Calendar tab needs flex container for proper height chain
+        // All tabs: disable outer scroll, let inner components handle scroll
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        background: colors.bgPrimary,
-        paddingLeft: 'clamp(12px, 2.5vw, 16px)',
-        paddingRight: 'clamp(12px, 2.5vw, 16px)',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-        paddingBottom: 'calc(70px + env(safe-area-inset-bottom, 0px))'
+        background: colors.bgSecondary,
+        paddingLeft: mobileSpacing.paddingX,
+        paddingRight: mobileSpacing.paddingX,
+        paddingTop: mobileSpacing.paddingTopSafe,
+        paddingBottom: mobileSpacing.paddingBottomWithTabs
       }}>
         {activeTab === 'calendar' && <CalendarMobileWrapper />}
         {activeTab === 'chat' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            overflow: 'hidden',
+            // Extend chat to the edge of the tab bar
+            marginBottom: `calc(-1 * ${mobileSpacing.paddingBottomWithTabs})`,
+            paddingBottom: mobileSpacing.paddingBottomWithTabs
+          }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
-              <ChatBot />
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
+              <ChatBot ref={chatBotRef} mobileEmbedded hideHeader />
             </div>
           </div>
         )}
         {activeTab === 'todos' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
               <TodoList hideHeader />
             </div>
           </div>
         )}
         {activeTab === 'agents' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
-            <div style={{ flex: 1, minHeight: 0, marginLeft: 'calc(-1 * clamp(12px, 2.5vw, 16px))', marginRight: 'calc(-1 * clamp(12px, 2.5vw, 16px))' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
               <AgentInteractions hideHeader />
             </div>
           </div>
@@ -180,6 +246,17 @@ function CalendarPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
 
+  // Collapse state with localStorage persistence
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState(() => {
+    const saved = localStorage.getItem('calendar-left-collapsed')
+    return saved === 'true'
+  })
+
+  const [isRightCollapsed, setIsRightCollapsed] = useState(() => {
+    const saved = localStorage.getItem('calendar-right-collapsed')
+    return saved === 'true'
+  })
+
   // Load saved widths from localStorage or use defaults
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('calendar-left-width')
@@ -203,6 +280,15 @@ function CalendarPageDesktop() {
   useEffect(() => {
     localStorage.setItem('calendar-right-width', rightWidth.toString())
   }, [rightWidth])
+
+  // Save collapse state to localStorage
+  useEffect(() => {
+    localStorage.setItem('calendar-left-collapsed', isLeftCollapsed.toString())
+  }, [isLeftCollapsed])
+
+  useEffect(() => {
+    localStorage.setItem('calendar-right-collapsed', isRightCollapsed.toString())
+  }, [isRightCollapsed])
 
   // Handle mouse move for resizing
   useEffect(() => {
@@ -245,31 +331,23 @@ function CalendarPageDesktop() {
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
       background: colors.bgSecondary
     }}>
-      {/* Header */}
-      <PageHeader
-        searchComponent={
-          <GlobalSearch
-            onSelectEvent={(eventId) => {
-              // TODO: Navigate to event or open event modal
-              console.log('Selected event:', eventId)
-            }}
-            onSelectTask={(taskId) => {
-              // TODO: Navigate to task or open task modal
-              console.log('Selected task:', taskId)
-            }}
-            onSelectGoal={(goalId) => {
-              // TODO: Navigate to goal or open goal modal
-              console.log('Selected goal:', goalId)
-            }}
-          />
-        }
+      {/* Vertical Sidebar */}
+      <VerticalSidebar
+        onSelectEvent={(eventId) => {
+          // TODO: Navigate to event or open event modal
+        }}
+        onSelectTask={(taskId) => {
+          // TODO: Navigate to task or open task modal
+        }}
+        onSelectGoal={(goalId) => {
+          // TODO: Navigate to goal or open goal modal
+        }}
       />
 
-      {/* Main Layout */}
+      {/* Main Layout - offset by sidebar width */}
       <div
         ref={containerRef}
         style={{
@@ -277,111 +355,250 @@ function CalendarPageDesktop() {
           display: 'flex',
           overflow: 'hidden',
           minHeight: 0,
+          marginLeft: `${SIDEBAR_WIDTH}px`,
           userSelect: (isResizingLeft || isResizingRight) ? 'none' : 'auto'
         }}
       >
         {/* Left Sidebar - Agent Interactions + Todo List */}
         <div style={{
-          width: `${leftWidth}px`,
+          width: isLeftCollapsed ? '40px' : `${leftWidth}px`,
           borderRight: `1px solid ${colors.border}`,
           background: colors.bgSecondary,
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          position: 'relative'
+          position: 'relative',
+          transition: 'width 0.2s ease'
         }}>
-          {/* Agent Interactions */}
-          <div style={{
-            flex: 1,
-            borderBottom: `1px solid ${colors.border}`,
-            overflow: 'hidden',
-            minHeight: 0
-          }}>
-            <AgentInteractions />
-          </div>
+          {isLeftCollapsed ? (
+            // Collapsed state - thin bar with expand button
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+            }}>
+              <button
+                onClick={() => setIsLeftCollapsed(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                title="Expand sidebar"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Agent Interactions */}
+              <div style={{
+                flex: 1,
+                overflow: 'hidden',
+                minHeight: 0
+              }}>
+                <AgentInteractions />
+              </div>
 
-          {/* Todo List */}
-          <div style={{
-            flex: 1,
-            overflow: 'hidden',
-            minHeight: 0
-          }}>
-            <TodoList />
-          </div>
+              {/* Todo List */}
+              <div style={{
+                flex: 1,
+                overflow: 'hidden',
+                minHeight: 0
+              }}>
+                <TodoList />
+              </div>
 
-          {/* Resize handle for left sidebar */}
-          <div
-            onMouseDown={() => setIsResizingLeft(true)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: -4,
-              bottom: 0,
-              width: '8px',
-              cursor: 'col-resize',
-              zIndex: 10,
-              background: isResizingLeft ? colors.border : 'transparent',
-              transition: 'background 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              if (!isResizingLeft) {
-                e.currentTarget.style.background = colors.border
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizingLeft) {
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          />
+              {/* Resize handle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: -4,
+                  bottom: 0,
+                  width: '8px',
+                  cursor: 'col-resize',
+                  zIndex: 10,
+                  background: isResizingLeft ? colors.border : 'transparent',
+                  transition: 'background 0.15s',
+                }}
+                onMouseDown={() => setIsResizingLeft(true)}
+                onMouseEnter={(e) => {
+                  if (!isResizingLeft) {
+                    e.currentTarget.style.background = colors.border
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isResizingLeft) {
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              />
+
+              {/* Collapse button - positioned outside resize handle for proper z-index */}
+              <button
+                onClick={() => setIsLeftCollapsed(true)}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '-12px',
+                  transform: 'translateY(-50%)',
+                  background: colors.bgSecondary,
+                  border: `1px solid ${colors.border}`,
+                  color: colors.textTertiary,
+                  cursor: 'pointer',
+                  padding: '6px 2px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 20,
+                  transition: 'background 0.15s, color 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                  e.currentTarget.style.color = colors.textPrimary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = colors.bgSecondary
+                  e.currentTarget.style.color = colors.textTertiary
+                }}
+                title="Collapse sidebar"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
 
         {/* Center - Calendar */}
-        <div style={{
-          flex: 1,
-          padding: '20px',
-          overflow: 'auto',
-          minWidth: 0
-        }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
           <Calendar />
         </div>
 
         {/* Right Sidebar - ChatBot */}
         <div style={{
-          width: `${rightWidth}px`,
+          width: isRightCollapsed ? '40px' : `${rightWidth}px`,
           borderLeft: `1px solid ${colors.border}`,
           background: colors.bgSecondary,
           flexShrink: 0,
           overflow: 'hidden',
-          position: 'relative'
+          position: 'relative',
+          transition: 'width 0.2s ease'
         }}>
-          <ChatBot />
+          {isRightCollapsed ? (
+            // Collapsed state - thin bar with expand button
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+            }}>
+              <button
+                onClick={() => setIsRightCollapsed(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: colors.textSecondary,
+                  cursor: 'pointer',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                title="Expand chat"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <ChatBot />
 
-          {/* Resize handle for right sidebar */}
-          <div
-            onMouseDown={() => setIsResizingRight(true)}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: -4,
-              bottom: 0,
-              width: '8px',
-              cursor: 'col-resize',
-              zIndex: 10,
-              background: isResizingRight ? colors.border : 'transparent',
-              transition: 'background 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              if (!isResizingRight) {
-                e.currentTarget.style.background = colors.border
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizingRight) {
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          />
+              {/* Resize handle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: -4,
+                  bottom: 0,
+                  width: '8px',
+                  cursor: 'col-resize',
+                  zIndex: 10,
+                  background: isResizingRight ? colors.border : 'transparent',
+                  transition: 'background 0.15s',
+                }}
+                onMouseDown={() => setIsResizingRight(true)}
+                onMouseEnter={(e) => {
+                  if (!isResizingRight) {
+                    e.currentTarget.style.background = colors.border
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isResizingRight) {
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              />
+
+              {/* Collapse button - positioned outside resize handle for proper z-index */}
+              <button
+                onClick={() => setIsRightCollapsed(true)}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '-12px',
+                  transform: 'translateY(-50%)',
+                  background: colors.bgSecondary,
+                  border: `1px solid ${colors.border}`,
+                  color: colors.textTertiary,
+                  cursor: 'pointer',
+                  padding: '6px 2px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 20,
+                  transition: 'background 0.15s, color 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                  e.currentTarget.style.color = colors.textPrimary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = colors.bgSecondary
+                  e.currentTarget.style.color = colors.textTertiary
+                }}
+                title="Collapse chat"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

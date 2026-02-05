@@ -4,6 +4,8 @@ import { useAuth } from '../lib/authContext'
 import { Goal, updateUserGoal } from '../lib/goalService'
 import { EmptyState } from './EmptyState'
 import { getColors, hexToRgba } from '../styles/colors'
+import { fontSize, fontWeight, lineHeight } from '../styles/typography'
+import { EditButton, DeleteButton } from './ui/IconButtons'
 
 interface GoalDetailPanelProps {
   goal: Goal | null
@@ -57,11 +59,11 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
         borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
       }}>
         <h2 style={{
-          fontSize: '18px',
-          fontWeight: '400',
+          fontSize: fontSize.lg,
+          fontWeight: fontWeight.normal,
           color: colors.textPrimary,
           margin: '0 0 16px 0',
-          lineHeight: '1.3'
+          lineHeight: lineHeight.tight
         }}>
           {goal.title}
         </h2>
@@ -71,46 +73,17 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
           alignItems: 'center',
           gap: '8px'
         }}>
-          <button
-            onClick={onEdit}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: '400',
-              background: 'transparent',
-              color: colors.textSecondary,
-              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Edit
-          </button>
-          <button
-            onClick={onDelete}
-            style={{
-              padding: '6px 12px',
-              fontSize: '13px',
-              fontWeight: '400',
-              background: 'transparent',
-              color: colors.textSecondary,
-              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-              borderRadius: '4px',
-              cursor: 'pointer',
-              opacity: 0.5
-            }}
-          >
-            Delete
-          </button>
+          <EditButton onClick={onEdit} title="Edit goal" />
+          <DeleteButton onClick={onDelete} title="Delete goal" />
         </div>
       </div>
 
       {/* Description */}
       {goal.description && (
         <div style={{
-          fontSize: '14px',
+          fontSize: fontSize.base,
           color: colors.textSecondary,
-          lineHeight: '1.6',
+          lineHeight: lineHeight.relaxed,
           whiteSpace: 'pre-wrap'
         }}>
           {goal.description}
@@ -124,8 +97,8 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
           borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
         }}>
           <h3 style={{
-            fontSize: '14px',
-            fontWeight: '500',
+            fontSize: fontSize.base,
+            fontWeight: fontWeight.medium,
             color: colors.textPrimary,
             margin: '0 0 12px 0'
           }}>
@@ -167,8 +140,8 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                     flexShrink: 0,
                     marginTop: '1px',
                     transition: 'all 0.15s ease',
-                    fontSize: '11px',
-                    fontWeight: '600',
+                    fontSize: fontSize.xs,
+                    fontWeight: fontWeight.semibold,
                     color: milestone.completed ? '#fff' : colors.textSecondary
                   }}>
                     {milestone.completed ? (
@@ -203,8 +176,8 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    fontSize: '13px',
-                    fontWeight: '400',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.normal,
                     color: milestone.completed ? colors.textSecondary : colors.textPrimary,
                     textDecoration: milestone.completed ? 'line-through' : 'none'
                   }}>
@@ -212,7 +185,7 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                   </div>
                   {goal.milestone_type !== 'ordered' && milestone.due_date && (
                     <div style={{
-                      fontSize: '12px',
+                      fontSize: fontSize.xs,
                       color: colors.textTertiary,
                       marginTop: '2px'
                     }}>

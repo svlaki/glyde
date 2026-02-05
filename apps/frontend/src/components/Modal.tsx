@@ -2,18 +2,22 @@ import { ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  title: string
+  title?: string
+  headerContent?: ReactNode
   children: ReactNode
   maxWidth?: string
+  preventAutoFocus?: boolean
 }
 
-export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, headerContent, children, maxWidth = '500px', preventAutoFocus = false }: ModalProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -22,11 +26,13 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 1000
+            background: 'rgba(0, 0, 0, 0.4)',
+            zIndex: 1000,
+            backdropFilter: 'blur(2px)'
           }}
         />
         <Dialog.Content
+          onOpenAutoFocus={preventAutoFocus ? (e) => e.preventDefault() : undefined}
           style={{
             position: 'fixed',
             top: '50%',
@@ -35,52 +41,74 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = '600px' }: 
             width: 'min(90vw, 100%)',
             maxWidth,
             maxHeight: '85vh',
-            background: colors.bgSecondary,
-            borderRadius: 'clamp(8px, 2vw, 12px)',
+            background: colors.bgPrimary,
+            borderRadius: '16px',
             border: `1px solid ${colors.border}`,
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
-            zIndex: 1001
+            zIndex: 1001,
+            boxShadow: isDarkMode
+              ? '0 24px 48px rgba(0, 0, 0, 0.4)'
+              : '0 24px 48px rgba(0, 0, 0, 0.15)'
           }}
         >
-          {/* Header */}
-          <div style={{
-            padding: 'clamp(12px, 2.5vh, 20px) clamp(12px, 3vw, 20px)',
-            borderBottom: `1px solid ${colors.border}`,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0
-          }}>
-            <Dialog.Title style={{
-              fontSize: '18px',
-              fontWeight: '600',
-              color: colors.textPrimary,
-              margin: 0
+          {/* Header - Mobile-style */}
+          {(title || headerContent) && (
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: title ? `1px solid ${colors.border}` : 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0,
+              background: colors.bgPrimary
             }}>
-              {title}
-            </Dialog.Title>
-            <Dialog.Close asChild>
+              {headerContent ? (
+                <Dialog.Title asChild>
+                  <div style={{ width: '100%' }}>{headerContent}</div>
+                </Dialog.Title>
+              ) : (
+                <Dialog.Title style={{
+                  ...typography.headingLg,
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  margin: 0
+                }}>
+                  {title}
+                </Dialog.Title>
+              )}
+              {/* Close button */}
               <button
+                onClick={onClose}
                 style={{
+                  padding: '8px',
                   background: 'transparent',
                   border: 'none',
-                  fontSize: '24px',
-                  color: colors.textSecondary,
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  padding: '0',
-                  width: '32px',
-                  height: '32px',
+                  color: colors.textTertiary,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgHover
+                  e.currentTarget.style.color = colors.textSecondary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = colors.textTertiary
                 }}
               >
-                ×
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
-            </Dialog.Close>
-          </div>
+            </div>
+          )}
 
           {/* Children (form content) */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>

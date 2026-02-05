@@ -22,11 +22,11 @@ export const findFreeTimeTool = tool(
     const timezone = config?.configurable?.timezone || 'UTC';
 
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     if (durationMinutes <= 0) {
-      return "❌ Duration must be greater than 0 minutes";
+      return "Duration must be greater than 0 minutes";
     }
 
     try {
@@ -68,7 +68,7 @@ export const findFreeTimeTool = tool(
       }
 
       if (availableSlots.length === 0) {
-        return `❌ No free time slots found for ${durationMinutes} minutes in the next ${searchDays} days (searching ${earliestHour ?? 9} AM - ${latestHour ?? 7} PM). Consider:\n- Extending your search range\n- Reducing the duration\n- Adjusting your time preferences`;
+        return `No free time slots found for ${durationMinutes} minutes in the next ${searchDays} days (searching ${earliestHour ?? 9} AM - ${latestHour ?? 7} PM). Consider:\n- Extending your search range\n- Reducing the duration\n- Adjusting your time preferences`;
       }
 
       const slotList = availableSlots
@@ -78,8 +78,8 @@ export const findFreeTimeTool = tool(
       return `🗓️ Found ${availableSlots.length} available time slot(s) for ${durationMinutes} minutes:\n\n${slotList}\n\nWould you like me to schedule something during any of these times?`;
 
     } catch (error) {
-      console.error('❌ [find-free-time] Error:', error);
-      return `❌ Error finding free time: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[find-free-time] Error:', error);
+      return `Error finding free time: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

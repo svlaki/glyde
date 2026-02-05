@@ -35,7 +35,7 @@ export const managePatternsTool = tool(
           frequency: frequency!
         });
 
-        return `✅ Pattern recorded: "${description}" (${patternType}, ${frequency}, confidence: ${confidence})`;
+        return `Pattern recorded: "${description}" (${patternType}, ${frequency}, confidence: ${confidence})`;
       }
 
       // Action: Add community pattern
@@ -52,14 +52,14 @@ export const managePatternsTool = tool(
           pattern_category: category!
         });
 
-        return `✅ Added community pattern: "${patternType}" (observed in ${userCount} users, ${Math.round(avgConfidence! * 100)}% confidence)`;
+        return `Added community pattern: "${patternType}" (observed in ${userCount} users, ${Math.round(avgConfidence! * 100)}% confidence)`;
       }
 
-      return `❌ Invalid action: ${action}`;
+      return `Invalid action: ${action}`;
 
     } catch (error) {
       console.error('Failed to manage pattern:', error);
-      return `❌ Failed to ${action === 'add-user' ? 'record user' : 'add community'} pattern: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      return `Failed to ${action === 'add-user' ? 'record user' : 'add community'} pattern: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

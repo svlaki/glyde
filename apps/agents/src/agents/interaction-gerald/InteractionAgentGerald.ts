@@ -62,7 +62,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   async initialize(): Promise<void> {
     // Initialize any required resources
-    console.log('🤖 [GERALD] InteractionAgentGerald initialized');
+    console.log('[GERALD] InteractionAgentGerald initialized');
   }
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
@@ -76,7 +76,7 @@ export class InteractionAgentGerald extends BaseAgent {
       const userProfile = await supabaseService.getProfile(context.userId);
       const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      console.log(`🤖 [GERALD] Processing for user ${context.userId} in timezone ${userTimezone}`);
+      console.log(`[GERALD] Processing for user ${context.userId} in timezone ${userTimezone}`);
 
       // Add current message to Zep
       try {
@@ -97,7 +97,7 @@ export class InteractionAgentGerald extends BaseAgent {
       // Filter to future/ongoing events
       const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
 
-      console.log(`🤖 [GERALD] Context loaded:
+      console.log(`[GERALD] Context loaded:
         - Events: ${userEvents.length} (filtered from ${allEvents.length})
         - Tasks: ${userTasks?.length || 0}
         - Goals: ${userGoals?.length || 0}
@@ -134,14 +134,14 @@ export class InteractionAgentGerald extends BaseAgent {
         recursionLimit: 15 // Allow more steps for complex interactions with retries
       });
 
-      console.log('🤖 [GERALD] Graph completed, processing result');
+      console.log('[GERALD] Graph completed, processing result');
 
       // Get the last AI message
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
 
       let response = lastAiMessage?.content || "Gerald processed your request.";
-      console.log('🤖 [GERALD] Final response:', response?.substring?.(0, 100) || response);
+      console.log('[GERALD] Final response:', response?.substring?.(0, 100) || response);
 
       // Add assistant response to Zep
       try {
@@ -155,9 +155,9 @@ export class InteractionAgentGerald extends BaseAgent {
         type: 'text'
       };
     } catch (error) {
-      console.error('🤖 [GERALD] Error processing message:', error);
-      console.error('🤖 [GERALD] Error stack:', error instanceof Error ? error.stack : 'No stack');
-      console.error('🤖 [GERALD] Error name:', error instanceof Error ? error.name : 'Unknown');
+      console.error('[GERALD] Error processing message:', error);
+      console.error('[GERALD] Error stack:', error instanceof Error ? error.stack : 'No stack');
+      console.error('[GERALD] Error name:', error instanceof Error ? error.name : 'Unknown');
       return {
         content: "Sorry, I encountered an error. Please try again.",
         type: 'text'
@@ -193,7 +193,7 @@ export class InteractionAgentGerald extends BaseAgent {
     // Register tools with the base agent
     this.registerTools(tools);
 
-    console.log(`🤖 [GERALD] Loaded ${tools.length} tools from ToolRegistry`);
+    console.log(`[GERALD] Loaded ${tools.length} tools from ToolRegistry`);
 
     // Define the workflow nodes
     const callModel = async (state: GeraldStateType) => {
@@ -225,10 +225,10 @@ export class InteractionAgentGerald extends BaseAgent {
         const userRules = await ruleService.getEnabledRules(state.userId);
         if (userRules.length > 0) {
           rulesContext = ruleService.formatRulesForPrompt(userRules);
-          console.log(`🤖 [GERALD] Loaded ${userRules.length} rules for user context`);
+          console.log(`[GERALD] Loaded ${userRules.length} rules for user context`);
         }
       } catch (error) {
-        console.error('🤖 [GERALD] Error loading user rules:', error);
+        console.error('[GERALD] Error loading user rules:', error);
       }
 
       // Build system prompt with full context
@@ -250,9 +250,9 @@ export class InteractionAgentGerald extends BaseAgent {
       const systemMessage = buildGeraldSystemPrompt(promptContext);
       const messages = [systemMessage, ...state.messages];
 
-      console.log(`🤖 [GERALD] Invoking model with ${messages.length} messages`);
+      console.log(`[GERALD] Invoking model with ${messages.length} messages`);
       const response = await modelWithTools.invoke(messages);
-      console.log(`🤖 [GERALD] Response has ${(response as any).tool_calls?.length || 0} tool calls`);
+      console.log(`[GERALD] Response has ${(response as any).tool_calls?.length || 0} tool calls`);
 
       return {
         messages: [response],
@@ -263,12 +263,12 @@ export class InteractionAgentGerald extends BaseAgent {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls?.length > 0) {
         const toolCalls = (lastMessage as any).tool_calls;
-        console.log(`🤖 [GERALD] Executing ${toolCalls.length} tool calls`);
+        console.log(`[GERALD] Executing ${toolCalls.length} tool calls`);
 
         // Log each tool call for debugging
         toolCalls.forEach((tc: any, idx: number) => {
-          console.log(`🤖 [GERALD] Tool call ${idx + 1}: ${tc.name}`);
-          console.log(`🤖 [GERALD] Tool args: ${JSON.stringify(tc.args, null, 2)}`);
+          console.log(`[GERALD] Tool call ${idx + 1}: ${tc.name}`);
+          console.log(`[GERALD] Tool args: ${JSON.stringify(tc.args, null, 2)}`);
         });
 
         try {
@@ -279,12 +279,12 @@ export class InteractionAgentGerald extends BaseAgent {
             }
           });
 
-          console.log(`🤖 [GERALD] Tool results received:`, toolResults?.messages?.length || 0, 'messages');
+          console.log(`[GERALD] Tool results received:`, toolResults?.messages?.length || 0, 'messages');
 
           // Log each tool result
           if (toolResults?.messages) {
             toolResults.messages.forEach((msg: any, idx: number) => {
-              console.log(`🤖 [GERALD] Tool result ${idx + 1}:`, typeof msg.content === 'string' ? msg.content.substring(0, 200) : msg.content);
+              console.log(`[GERALD] Tool result ${idx + 1}:`, typeof msg.content === 'string' ? msg.content.substring(0, 200) : msg.content);
             });
           }
 
@@ -292,8 +292,8 @@ export class InteractionAgentGerald extends BaseAgent {
             messages: toolResults.messages,
           };
         } catch (toolError) {
-          console.error(`🤖 [GERALD] Tool execution error:`, toolError);
-          console.error(`🤖 [GERALD] Tool error stack:`, toolError instanceof Error ? toolError.stack : 'No stack');
+          console.error(`[GERALD] Tool execution error:`, toolError);
+          console.error(`[GERALD] Tool error stack:`, toolError instanceof Error ? toolError.stack : 'No stack');
           throw toolError;
         }
       }

@@ -52,7 +52,7 @@ export async function getTasksWithCategories(
     });
 
     if (error) {
-      console.error('❌ [TaskHelpers] Error getting tasks:', error);
+      console.error('[TaskHelpers] Error getting tasks:', error);
       return [];
     }
 
@@ -95,10 +95,10 @@ export async function getTasksWithCategories(
       filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date >= filters.dueAfter!);
     }
 
-    console.log(`✅ [TaskHelpers] Found ${filteredTasks.length} tasks with categories`);
+    console.log(`[TaskHelpers] Found ${filteredTasks.length} tasks with categories`);
     return filteredTasks as TaskWithCategory[];
   } catch (error) {
-    console.error('❌ [TaskHelpers] Exception getting tasks:', error);
+    console.error('[TaskHelpers] Exception getting tasks:', error);
     return [];
   }
 }
@@ -116,7 +116,7 @@ export async function getTaskById(
     const task = tasks.find(t => t.id === taskId);
     return task || null;
   } catch (error) {
-    console.error('❌ [TaskHelpers] Exception fetching task by ID:', error);
+    console.error('[TaskHelpers] Exception fetching task by ID:', error);
     return null;
   }
 }

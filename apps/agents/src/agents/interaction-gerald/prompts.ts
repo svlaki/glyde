@@ -348,6 +348,8 @@ CRITICAL RULES:
 
 8. **Duration is in MINUTES** (30, 45, 60, 90, 120)
 
+9. **Do NOT use emojis** in any output, interaction questions, or generated content. Keep all text plain without emoji characters.
+
 CORRECT STRUCTURE FOR YES_NO:
 create_interaction(
   question: "Want to schedule time for [SPECIFIC THING]?",

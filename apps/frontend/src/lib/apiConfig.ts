@@ -20,7 +20,7 @@ export function getApiUrl(): string {
   if (Capacitor.isNativePlatform()) {
     // On native platforms (iOS/Android), we can't use localhost
     // This should be set via environment variable
-    console.warn('⚠️ VITE_AGENT_SERVICE_URL not set. Native apps require explicit backend URL.')
+    console.warn('VITE_AGENT_SERVICE_URL not set. Native apps require explicit backend URL.')
     return 'http://localhost:8000' // This won't work, but prevents crashes
   }
 

@@ -1,116 +1,52 @@
 import { useState, useRef, useEffect } from 'react'
-import { useKeenSlider } from 'keen-slider/react'
-import 'keen-slider/keen-slider.min.css'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
+import { mobileHeaderStyles } from '../../styles/mobileStyles'
 import { MobileCalendar } from './MobileCalendar'
 import { MobileMenu } from './MobileMenu'
 
 export function CalendarMobileWrapper() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<'day' | 'month'>('day')
+  const [displayDate, setDisplayDate] = useState(new Date())  // For header display during scroll
+  const [view, setView] = useState<'day' | '3day' | 'month'>('3day')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [scrollToDate, setScrollToDate] = useState<Date | null>(null)  // For scrolling within buffer
 
-  // Track if we're currently sliding to prevent multiple navigations
-  const isSliding = useRef(false)
+  // Refs for scroll containers
+  const dayScrollRef = useRef<HTMLDivElement>(null)
+  const monthScrollRef = useRef<HTMLDivElement>(null)
+  const lastScrollUpdateRef = useRef(0)
+  const isSnappingRef = useRef(false)
 
-  // Refs to avoid stale closure in keen-slider callbacks
-  const currentDateRef = useRef(currentDate)
-  const viewRef = useRef(view)
-
-  // Keep refs in sync with state
+  // Restore saved state on mount
   useEffect(() => {
-    currentDateRef.current = currentDate
+    const savedView = localStorage.getItem('calendar-view')
+    const savedDate = localStorage.getItem('calendar-date')
+    if (savedView === '3day' || savedView === 'month') {
+      setView(savedView)
+    }
+    if (savedDate) {
+      const date = new Date(savedDate)
+      if (!isNaN(date.getTime())) {
+        setCurrentDate(date)
+      }
+    }
+  }, [])
+
+  // Save state when it changes
+  useEffect(() => {
+    localStorage.setItem('calendar-view', view)
+    localStorage.setItem('calendar-date', currentDate.toISOString())
+  }, [view, currentDate])
+
+  // Sync displayDate when currentDate changes (e.g., re-centering or Today button)
+  useEffect(() => {
+    setDisplayDate(currentDate)
   }, [currentDate])
-
-  useEffect(() => {
-    viewRef.current = view
-  }, [view])
-
-  // Helper function to navigate by offset
-  const navigateByOffset = (offset: number) => {
-    const newDate = new Date(currentDateRef.current)
-    if (viewRef.current === 'day') {
-      newDate.setDate(newDate.getDate() + (offset * 7)) // ±1 week
-    } else {
-      newDate.setMonth(newDate.getMonth() + offset) // ±1 month
-    }
-    setCurrentDate(newDate)
-  }
-
-  // Week header slider (for day view swipe navigation)
-  const [weekSliderRef] = useKeenSlider<HTMLDivElement>({
-    initial: 1,
-    slides: { perView: 1 },
-    rubberband: false,
-    slideChanged(slider) {
-      if (isSliding.current) return
-      isSliding.current = true
-
-      const slideIndex = slider.track.details.rel
-      if (slideIndex === 0) {
-        navigateByOffset(-1)
-      } else if (slideIndex === 2) {
-        navigateByOffset(1)
-      }
-
-      setTimeout(() => {
-        slider.moveToIdx(1, true, { duration: 0 })
-        isSliding.current = false
-      }, 50)
-    },
-  })
-
-  // Month view slider (swipe on entire month grid)
-  const [monthSliderRef] = useKeenSlider<HTMLDivElement>({
-    initial: 1,
-    slides: { perView: 1 },
-    rubberband: false,
-    slideChanged(slider) {
-      if (isSliding.current) return
-      isSliding.current = true
-
-      const slideIndex = slider.track.details.rel
-      if (slideIndex === 0) {
-        navigateByOffset(-1)
-      } else if (slideIndex === 2) {
-        navigateByOffset(1)
-      }
-
-      setTimeout(() => {
-        slider.moveToIdx(1, true, { duration: 0 })
-        isSliding.current = false
-      }, 50)
-    },
-  })
-
-  // Get the days of the week for a given date
-  const getWeekDays = (date: Date) => {
-    const week = []
-    const startOfWeek = new Date(date)
-    startOfWeek.setDate(date.getDate() - date.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek)
-      day.setDate(startOfWeek.getDate() + i)
-      week.push(day)
-    }
-    return week
-  }
-
-  // Get offset date for slider slides
-  const getOffsetDate = (offset: number) => {
-    const newDate = new Date(currentDate)
-    if (view === 'day') {
-      newDate.setDate(newDate.getDate() + (offset * 7))
-    } else {
-      newDate.setMonth(newDate.getMonth() + offset)
-    }
-    return newDate
-  }
 
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -128,11 +64,28 @@ export function CalendarMobileWrapper() {
   }
 
   const handleToday = () => {
-    setCurrentDate(new Date())
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Check if today is within the current buffer (±30 days of currentDate)
+    const bufferCenter = new Date(currentDate)
+    bufferCenter.setHours(0, 0, 0, 0)
+    const daysDiff = Math.round((today.getTime() - bufferCenter.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (view === '3day' && Math.abs(daysDiff) <= 30) {
+      // Today is within buffer - scroll to it without re-rendering
+      setScrollToDate(new Date())  // Create new Date object to trigger useEffect
+      setDisplayDate(today)
+    } else {
+      // Today is outside buffer or not in 3day view - recenter buffer
+      setCurrentDate(new Date())
+    }
   }
 
   const getDateHeader = () => {
-    return currentDate.toLocaleDateString('en-US', {
+    // Use displayDate for 3-day view (updates during scroll), currentDate for other views
+    const dateToShow = view === '3day' ? displayDate : currentDate
+    return dateToShow.toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric'
     })
@@ -142,75 +95,130 @@ export function CalendarMobileWrapper() {
     padding: '4px 10px',
     border: 'none',
     borderRadius: '4px',
-    fontSize: '11px',
-    fontWeight: '500' as const,
+    ...typography.labelMd,
     cursor: 'pointer',
     transition: 'all 0.15s',
     minHeight: '28px'
   }
 
-  // Render a single week row with day letters AND date numbers
-  const renderWeekRow = (weekDate: Date) => {
-    const weekDays = getWeekDays(weekDate)
-    return (
-      <div style={{ display: 'flex', width: '100%' }}>
-        {weekDays.map((day, index) => {
-          const selected = isSameDay(day, currentDate)
-          const today = isToday(day)
+  // Get visible days for day view (77 days = 11 weeks, centered on current week)
+  const getVisibleDaysForDayView = (centerDate: Date): Date[] => {
+    const dates: Date[] = []
+    // Start from beginning of the week, 5 weeks before
+    const startOfCurrentWeek = new Date(centerDate)
+    startOfCurrentWeek.setDate(centerDate.getDate() - centerDate.getDay())
+    startOfCurrentWeek.setHours(0, 0, 0, 0)
 
-          return (
-            <button
-              key={index}
-              onClick={() => setCurrentDate(day)}
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px',
-                padding: '4px 0',
-                border: 'none',
-                background: 'transparent',
-                color: colors.textSecondary,
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              {/* Day letter */}
-              <span style={{
-                fontSize: '10px',
-                fontWeight: '500',
-                color: colors.textTertiary,
-                textTransform: 'uppercase'
-              }}>
-                {dayNames[index]}
-              </span>
-              {/* Date number with circle for selected/today */}
-              <span style={{
-                fontSize: '17px',
-                fontWeight: selected || today ? '600' : '400',
-                color: selected
-                  ? '#fff'
-                  : today
-                    ? '#ef4444'
-                    : colors.textSecondary,
-                background: selected
-                  ? '#ef4444'
-                  : 'transparent',
-                width: '30px',
-                height: '30px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {day.getDate()}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    )
+    // Go back 5 weeks to start
+    const startDate = new Date(startOfCurrentWeek)
+    startDate.setDate(startOfCurrentWeek.getDate() - 35)
+
+    // Generate 77 days (11 weeks)
+    for (let i = 0; i < 77; i++) {
+      const d = new Date(startDate)
+      d.setDate(startDate.getDate() + i)
+      dates.push(d)
+    }
+    return dates
+  }
+
+  // Get visible months for month view (3 months: prev, current, next)
+  const getVisibleMonths = (centerDate: Date): Date[] => {
+    const months: Date[] = []
+    for (let i = -1; i <= 1; i++) {
+      const d = new Date(centerDate)
+      d.setDate(1)
+      d.setMonth(centerDate.getMonth() + i)
+      d.setHours(0, 0, 0, 0)
+      months.push(d)
+    }
+    return months
+  }
+
+  // Scroll to center position for day view
+  useEffect(() => {
+    if (view === 'day' && dayScrollRef.current) {
+      setTimeout(() => {
+        if (dayScrollRef.current) {
+          // Each day = 1/7 of viewport width, center week starts at day 35 (index 35-41)
+          const dayWidth = dayScrollRef.current.clientWidth / 7
+          dayScrollRef.current.scrollLeft = 35 * dayWidth
+        }
+      }, 50)
+    }
+  }, [view, currentDate])
+
+  // Scroll to center position for month view (horizontal with snap)
+  useEffect(() => {
+    if (view === 'month' && monthScrollRef.current) {
+      // Instantly scroll to center month (no animation on reset)
+      // Use scrollTo with instant behavior to avoid smooth animation on reset
+      const monthWidth = monthScrollRef.current.clientWidth
+      monthScrollRef.current.scrollTo({
+        left: monthWidth,
+        behavior: 'instant'
+      })
+      isSnappingRef.current = false
+    }
+  }, [view, currentDate])
+
+  // Handle scroll for day view - seamless infinite scroll
+  const handleDayScroll = () => {
+    if (!dayScrollRef.current) return
+
+    const now = Date.now()
+    if (now - lastScrollUpdateRef.current < 300) return
+
+    const dayWidth = dayScrollRef.current.clientWidth / 7
+    const scrollLeft = dayScrollRef.current.scrollLeft
+    // Center week starts at day 35 (5 weeks from start)
+    const centerScrollLeft = 35 * dayWidth
+    const scrolledDays = Math.round((scrollLeft - centerScrollLeft) / dayWidth)
+
+    // Update when scrolled 4+ weeks from center
+    if (Math.abs(scrolledDays) >= 28) {
+      lastScrollUpdateRef.current = now
+
+      // Calculate offset within current position
+      const offsetWithinDay = scrollLeft - (Math.round(scrollLeft / dayWidth) * dayWidth)
+
+      const newDate = new Date(currentDate)
+      newDate.setDate(newDate.getDate() + scrolledDays)
+      setCurrentDate(newDate)
+
+      // Reset scroll position after state update, preserving offset
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (dayScrollRef.current) {
+            dayScrollRef.current.scrollLeft = centerScrollLeft + offsetWithinDay
+          }
+        })
+      })
+    }
+  }
+
+  const handleDayScrollEnd = () => {
+    handleDayScroll()
+  }
+
+  // Handle month scroll snap - detect when user has swiped to a different month
+  const handleMonthScrollEnd = () => {
+    if (!monthScrollRef.current || isSnappingRef.current) return
+
+    const monthWidth = monthScrollRef.current.clientWidth
+    const scrollLeft = monthScrollRef.current.scrollLeft
+    const snappedIndex = Math.round(scrollLeft / monthWidth)
+
+    // If snapped to a different month (not center)
+    if (snappedIndex !== 1) {
+      isSnappingRef.current = true
+      const offset = snappedIndex - 1 // -1 for prev, +1 for next
+
+      // Update the date (this will trigger re-render and reset scroll)
+      const newDate = new Date(currentDate)
+      newDate.setMonth(newDate.getMonth() + offset)
+      setCurrentDate(newDate)
+    }
   }
 
   return (
@@ -219,8 +227,8 @@ export function CalendarMobileWrapper() {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        marginBottom: '8px'
+        gap: mobileHeaderStyles.gap,
+        marginBottom: mobileHeaderStyles.marginBottom
       }}>
         <button
           onClick={() => setIsMenuOpen(true)}
@@ -228,11 +236,11 @@ export function CalendarMobileWrapper() {
             background: 'transparent',
             border: 'none',
             color: colors.textPrimary,
-            fontSize: '20px',
-            padding: '2px',
+            fontSize: mobileHeaderStyles.buttonFontSize,
+            padding: mobileHeaderStyles.buttonPadding,
             cursor: 'pointer',
-            minWidth: '28px',
-            minHeight: '28px',
+            minWidth: mobileHeaderStyles.buttonMinSize,
+            minHeight: mobileHeaderStyles.buttonMinSize,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -242,8 +250,8 @@ export function CalendarMobileWrapper() {
         </button>
 
         <h2 style={{
-          fontSize: '18px',
-          fontWeight: '700',
+          ...typography.headingLg,
+          fontWeight: 700,
           color: colors.textPrimary,
           margin: 0,
           letterSpacing: '-0.02em',
@@ -259,6 +267,7 @@ export function CalendarMobileWrapper() {
           background: colors.bgSecondary,
           borderRadius: '6px'
         }}>
+          {/* Day view button - commented out
           <button
             onClick={() => setView('day')}
             style={{
@@ -270,13 +279,25 @@ export function CalendarMobileWrapper() {
           >
             Day
           </button>
+          */}
+          <button
+            onClick={() => setView('3day')}
+            style={{
+              ...compactButtonStyle,
+              background: view === '3day' ? colors.bgHover : 'transparent',
+              color: colors.textPrimary,
+              fontWeight: view === '3day' ? 600 : 400
+            }}
+          >
+            Day
+          </button>
           <button
             onClick={() => setView('month')}
             style={{
               ...compactButtonStyle,
               background: view === 'month' ? colors.bgHover : 'transparent',
               color: colors.textPrimary,
-              fontWeight: view === 'month' ? '600' : '400'
+              fontWeight: view === 'month' ? 600 : 400
             }}
           >
             Month
@@ -297,26 +318,83 @@ export function CalendarMobileWrapper() {
         </button>
       </div>
 
+      {/* Day view - commented out
       {view === 'day' ? (
         <>
-          {/* Week header with swipe - ONLY this part is swipeable */}
           <div
-            ref={weekSliderRef}
-            className="keen-slider"
-            style={{ marginBottom: '8px', overflow: 'hidden', minHeight: '60px' }}
+            ref={dayScrollRef}
+            className="mobile-day-scroll"
+            onScroll={handleDayScroll}
+            onScrollEnd={() => handleDayScrollEnd()}
+            onTouchEnd={() => setTimeout(handleDayScrollEnd, 150)}
+            style={{
+              marginBottom: '8px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              minHeight: '60px',
+              display: 'flex'
+            }}
           >
-            <div className="keen-slider__slide">
-              {renderWeekRow(getOffsetDate(-1))}
-            </div>
-            <div className="keen-slider__slide">
-              {renderWeekRow(currentDate)}
-            </div>
-            <div className="keen-slider__slide">
-              {renderWeekRow(getOffsetDate(1))}
-            </div>
+            {getVisibleDaysForDayView(currentDate).map((day, index) => {
+              const selected = isSameDay(day, currentDate)
+              const today = isToday(day)
+              const dayWidth = `calc(100vw / 7)`
+
+              return (
+                <button
+                  key={day.toISOString()}
+                  onClick={() => setCurrentDate(day)}
+                  style={{
+                    width: dayWidth,
+                    minWidth: dayWidth,
+                    flexShrink: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px',
+                    padding: '4px 0',
+                    border: 'none',
+                    background: 'transparent',
+                    color: colors.textSecondary,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: '500',
+                    color: colors.textTertiary,
+                    textTransform: 'uppercase'
+                  }}>
+                    {dayNames[day.getDay()]}
+                  </span>
+                  <span style={{
+                    fontSize: '17px',
+                    fontWeight: selected || today ? '600' : '400',
+                    color: selected
+                      ? '#fff'
+                      : today
+                        ? '#ef4444'
+                        : colors.textSecondary,
+                    background: selected
+                      ? '#ef4444'
+                      : 'transparent',
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {day.getDate()}
+                  </span>
+                </button>
+              )
+            })}
           </div>
 
-          {/* Calendar body - NOT swipeable, single instance */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <MobileCalendar
               view="day"
@@ -325,43 +403,60 @@ export function CalendarMobileWrapper() {
             />
           </div>
         </>
+      ) : */}
+      {view === '3day' ? (
+        /* 3-day view - MobileCalendar handles horizontal scrolling internally */
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <MobileCalendar
+            view="3day"
+            currentDate={currentDate}
+            onDateChange={(date) => setCurrentDate(date)}
+            onDisplayDateChange={(date) => setDisplayDate(date)}
+            scrollToDate={scrollToDate}
+          />
+        </div>
       ) : (
-        /* Month view - entire grid is swipeable */
+        /* Month view - horizontal scroll with smooth snap */
         <div
-          ref={monthSliderRef}
-          className="keen-slider"
-          style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
+          ref={monthScrollRef}
+          className="mobile-month-scroll"
+          onScrollEnd={() => handleMonthScrollEnd()}
+          onTouchEnd={() => setTimeout(handleMonthScrollEnd, 100)}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            display: 'flex',
+            scrollSnapType: 'x mandatory'
+          }}
         >
-          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <MobileCalendar
-              view="month"
-              currentDate={getOffsetDate(-1)}
-              onDateChange={(date) => {
-                setCurrentDate(date)
-                setView('day')
+          {getVisibleMonths(currentDate).map((monthDate) => (
+            <div
+              key={monthDate.toISOString()}
+              style={{
+                width: '100%',
+                minWidth: '100%',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                scrollSnapAlign: 'center',
+                scrollSnapStop: 'always'
               }}
-            />
-          </div>
-          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <MobileCalendar
-              view="month"
-              currentDate={currentDate}
-              onDateChange={(date) => {
-                setCurrentDate(date)
-                setView('day')
-              }}
-            />
-          </div>
-          <div className="keen-slider__slide" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <MobileCalendar
-              view="month"
-              currentDate={getOffsetDate(1)}
-              onDateChange={(date) => {
-                setCurrentDate(date)
-                setView('day')
-              }}
-            />
-          </div>
+            >
+              <MobileCalendar
+                view="month"
+                currentDate={monthDate}
+                onDateChange={(date) => {
+                  setCurrentDate(date)
+                  setView('3day')
+                }}
+              />
+            </div>
+          ))}
         </div>
       )}
 

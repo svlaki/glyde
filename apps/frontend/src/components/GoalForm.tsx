@@ -6,10 +6,12 @@ import { useCategories } from '../lib/categoryContext'
 import { createUserCategory, Category } from '../lib/categoryService'
 import { Goal } from '../lib/goalService'
 import { getColors } from '../styles/colors'
+import { fontSize, fontWeight } from '../styles/typography'
 import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
 import { usePlatform } from '../hooks/usePlatform'
+import { SaveTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -79,8 +81,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       if (goal.milestones && goal.milestones.length > 0) {
         setMilestones(goal.milestones.map(m => ({
           title: m.title,
-          due_date: m.due_date,
-          completed: m.completed
+          ...(m.due_date !== undefined && { due_date: m.due_date }),
+          ...(m.completed !== undefined && { completed: m.completed })
         })))
         setShowMilestones(true)
       } else {
@@ -141,6 +143,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
+    return undefined
   }, [editingField])
 
   const handleCreateAspect = async (aspectData: Partial<Category>) => {
@@ -211,11 +214,32 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     setMilestones(milestones.filter((_, i) => i !== index))
   }
 
+  const titleInput = (
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      required
+      placeholder="Goal title"
+      style={{
+        width: '100%',
+        padding: '0',
+        fontSize: fontSize.xl,
+        fontWeight: fontWeight.semibold,
+        background: 'transparent',
+        color: colors.textPrimary,
+        border: 'none',
+        outline: 'none'
+      }}
+    />
+  )
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={goal ? 'Edit Goal' : 'Create New Goal'}
+      headerContent={titleInput}
+      preventAutoFocus={!!goal}
     >
       <form onSubmit={handleSubmit} style={{
         padding: '20px',
@@ -223,41 +247,13 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         flexDirection: 'column',
         gap: '16px'
       }}>
-          {/* Title */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: colors.textSecondary,
-              marginBottom: '6px'
-            }}>
-              Goal Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="e.g., Learn to play piano, Get in shape, Start a business"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px'
-              }}
-            />
-          </div>
 
           {/* Aspect */}
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -268,7 +264,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: category ? colors.textPrimary : colors.textSecondary,
                 border: `1px solid ${colors.border}`,
@@ -292,7 +288,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                           background: getCategoryColor(category),
                           flexShrink: 0
                         }} />
-                        {cat.icon && <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>}
                         <span>{category}</span>
                       </>
                     ) : (
@@ -333,7 +328,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       color: colors.textSecondary,
                       fontStyle: 'italic',
                       borderBottom: `1px solid ${colors.border}`
@@ -362,7 +357,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      fontSize: '14px',
+                      fontSize: fontSize.base,
                       color: colors.textPrimary
                     }}
                     onMouseEnter={(e) => {
@@ -379,9 +374,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       background: getCategoryColor(cat.name),
                       flexShrink: 0
                     }} />
-                    {cat.icon && (
-                      <span style={{ fontSize: '16px', flexShrink: 0 }}>{cat.icon}</span>
-                    )}
                     <span>{cat.name}</span>
                   </div>
                 ))}
@@ -396,9 +388,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     color: colors.textPrimary,
-                    fontWeight: '500',
+                    fontWeight: fontWeight.medium,
                     borderTop: `1px solid ${colors.border}`
                   }}
                   onMouseEnter={(e) => {
@@ -444,7 +436,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   }}
                   style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
                 />
-                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Set due date</span>
+                <span style={{ fontSize: fontSize.base, color: colors.textPrimary }}>Set due date</span>
               </label>
             </div>
 
@@ -456,7 +448,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -468,7 +460,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     gap: '8px'
                   }}
                 >
-                  <span>📅</span>
+                  <span>Due</span>
                   {isMobile ? (
                     formatDate(dueDate)
                   ) : (
@@ -477,7 +469,10 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       value={dueDate.toISOString().split('T')[0]}
                       onChange={(e) => {
                         const newDate = new Date(dueDate)
-                        const [year, month, day] = e.target.value.split('-').map(Number)
+                        const parts = e.target.value.split('-').map(Number)
+                        const year = parts[0] ?? 0
+                        const month = parts[1] ?? 1
+                        const day = parts[2] ?? 1
                         newDate.setFullYear(year, month - 1, day)
                         setDueDate(newDate)
                       }}
@@ -485,7 +480,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -496,7 +491,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   style={{
                     flex: 1,
                     padding: '10px 12px',
-                    fontSize: '14px',
+                    fontSize: fontSize.base,
                     background: showTimePicker ? colors.bgHover : colors.bgPrimary,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
@@ -514,7 +509,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       type="time"
                       value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
                       onChange={(e) => {
-                        const [hours, minutes] = e.target.value.split(':').map(Number)
+                        const timeParts = e.target.value.split(':').map(Number)
+                        const hours = timeParts[0] ?? 0
+                        const minutes = timeParts[1] ?? 0
                         const newDate = new Date(dueDate)
                         newDate.setHours(hours, minutes)
                         setDueDate(newDate)
@@ -523,7 +520,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                         border: 'none',
                         background: 'transparent',
                         color: colors.textPrimary,
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         cursor: 'pointer'
                       }}
                     />
@@ -606,8 +603,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
           <div>
             <label style={{
               display: 'block',
-              fontSize: '13px',
-              fontWeight: '500',
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
               color: colors.textSecondary,
               marginBottom: '6px'
             }}>
@@ -621,7 +618,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                fontSize: '14px',
+                fontSize: fontSize.base,
                 background: colors.bgPrimary,
                 color: colors.textPrimary,
                 border: `1px solid ${colors.border}`,
@@ -656,7 +653,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   }}
                   style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
                 />
-                <span style={{ fontSize: '14px', color: colors.textPrimary }}>Add milestones</span>
+                <span style={{ fontSize: fontSize.base, color: colors.textPrimary }}>Add milestones</span>
               </label>
             </div>
 
@@ -674,7 +671,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     style={{
                       flex: 1,
                       padding: '8px 12px',
-                      fontSize: '13px',
+                      fontSize: fontSize.sm,
                       background: milestoneType === 'ordered' ? colors.accent : 'transparent',
                       color: milestoneType === 'ordered' ? '#fff' : colors.textSecondary,
                       border: `1px solid ${milestoneType === 'ordered' ? colors.accent : colors.border}`,
@@ -690,7 +687,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     style={{
                       flex: 1,
                       padding: '8px 12px',
-                      fontSize: '13px',
+                      fontSize: fontSize.sm,
                       background: milestoneType === 'dated' ? colors.accent : 'transparent',
                       color: milestoneType === 'dated' ? '#fff' : colors.textSecondary,
                       border: `1px solid ${milestoneType === 'dated' ? colors.accent : colors.border}`,
@@ -719,8 +716,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: '600',
+                        fontSize: fontSize.sm,
+                        fontWeight: fontWeight.semibold,
                         flexShrink: 0
                       }}>
                         {index + 1}
@@ -734,7 +731,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       style={{
                         flex: 1,
                         padding: '8px 10px',
-                        fontSize: '13px',
+                        fontSize: fontSize.sm,
                         background: colors.bgPrimary,
                         color: colors.textPrimary,
                         border: `1px solid ${colors.border}`,
@@ -748,7 +745,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                         onChange={(e) => updateMilestone(index, 'due_date', e.target.value)}
                         style={{
                           padding: '8px 10px',
-                          fontSize: '13px',
+                          fontSize: fontSize.sm,
                           background: colors.bgPrimary,
                           color: colors.textPrimary,
                           border: `1px solid ${colors.border}`,
@@ -762,7 +759,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       onClick={() => removeMilestone(index)}
                       style={{
                         padding: '6px 10px',
-                        fontSize: '14px',
+                        fontSize: fontSize.base,
                         background: 'transparent',
                         color: colors.textSecondary,
                         border: `1px solid ${colors.border}`,
@@ -779,7 +776,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   onClick={addMilestone}
                   style={{
                     padding: '8px 12px',
-                    fontSize: '13px',
+                    fontSize: fontSize.sm,
                     background: 'transparent',
                     color: colors.textSecondary,
                     border: `1px dashed ${colors.border}`,
@@ -803,36 +800,13 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                background: colors.bgPrimary,
-                color: colors.textSecondary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.5 : 1
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !title.trim()}
-              className="btn btn-primary"
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                cursor: (loading || !title.trim()) ? 'not-allowed' : 'pointer',
-                opacity: (loading || !title.trim()) ? 0.5 : 1
-              }}
-            >
-              {loading ? 'Saving...' : goal ? 'Update Goal' : 'Create Goal'}
-            </button>
+            
+            <SaveTextButton
+              onClick={(e) => handleSubmit(e)}
+              disabled={!title.trim()}
+              loading={loading}
+              isCreate={!goal}
+            />
           </div>
         </form>
 

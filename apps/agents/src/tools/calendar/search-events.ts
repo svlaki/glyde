@@ -46,7 +46,7 @@ export const searchEventsTool = tool(
         const description = event.description ? ` - ${event.description}` : '';
         const location = event.location ? ` at ${event.location}` : '';
 
-        return `📅 ${event.title}${description} - ${startTime}${location}${categoryLabel}\n   ID: ${event.id}`;
+        return `${event.title}${description} - ${startTime}${location}${categoryLabel}\n   ID: ${event.id}`;
       });
 
       // Return events with search context for the agent to filter semantically
@@ -54,7 +54,7 @@ export const searchEventsTool = tool(
       return `Found ${events.length} events${categoryContext}. Based on the search query "${query}", here are the matching events:\n\n${formattedEvents.join('\n')}\n\nPlease identify and show the user only the events that match their search query "${query}".`;
 
     } catch (error) {
-      console.error('❌ [SEARCH-EVENTS TOOL] Error:', error);
+      console.error('[SEARCH-EVENTS TOOL] Error:', error);
       throw new Error(`Failed to search events: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   },

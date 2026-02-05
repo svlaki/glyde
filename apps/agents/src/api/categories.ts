@@ -58,7 +58,6 @@ export async function createUserCategory(req: Request, res: Response): Promise<v
     const category = await categoryService.createCategory(userId, {
       name: categoryData.name.trim(),
       color: categoryData.color.trim(),
-      icon: categoryData.icon?.trim(),
       description: categoryData.description?.trim(),
       context: categoryData.context || {}
     });
@@ -110,7 +109,6 @@ export async function updateUserCategory(req: Request, res: Response): Promise<v
     const category = await categoryService.updateCategory(userId, category_id, {
       name: updates.name?.trim(),
       color: updates.color?.trim(),
-      icon: updates.icon?.trim(),
       description: updates.description?.trim(),
       context: updates.context
     });

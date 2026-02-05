@@ -4,11 +4,11 @@ import ruleService from "../../services/RuleService.js";
 
 export const listRulesTool = tool(
   async ({ include_disabled }, config) => {
-    console.log('📋 [LIST-RULES] Tool invoked!');
+    console.log('[LIST-RULES] Tool invoked!');
 
     const userId = config?.configurable?.userId;
     if (!userId) {
-      console.error('📋 [LIST-RULES] No userId in config!');
+      console.error('[LIST-RULES] No userId in config!');
       return "User ID required to list rules";
     }
 
@@ -28,11 +28,11 @@ export const listRulesTool = tool(
         return `${index + 1}. ${rule.rule_text}${status} ${priority}${source}${rule.description ? `\n   Description: ${rule.description}` : ''}`;
       }).join('\n\n');
 
-      console.log(`✅ [LIST-RULES] Found ${rules.length} rules`);
+      console.log(`[LIST-RULES] Found ${rules.length} rules`);
 
       return `Current Rules (${rules.length}):\n\n${formattedRules}`;
     } catch (error) {
-      console.error('❌ [LIST-RULES] Error:', error);
+      console.error('[LIST-RULES] Error:', error);
       return `Error listing rules: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },

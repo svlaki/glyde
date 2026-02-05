@@ -47,13 +47,13 @@ export class RuleService {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('❌ [RuleService] Error fetching rules:', error);
+        console.error('[RuleService] Error fetching rules:', error);
         return [];
       }
 
       return (data || []) as Rule[];
     } catch (error) {
-      console.error('❌ [RuleService] Exception fetching rules:', error);
+      console.error('[RuleService] Exception fetching rules:', error);
       return [];
     }
   }
@@ -72,13 +72,13 @@ export class RuleService {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('❌ [RuleService] Error fetching enabled rules:', error);
+        console.error('[RuleService] Error fetching enabled rules:', error);
         return [];
       }
 
       return (data || []) as Rule[];
     } catch (error) {
-      console.error('❌ [RuleService] Exception fetching enabled rules:', error);
+      console.error('[RuleService] Exception fetching enabled rules:', error);
       return [];
     }
   }
@@ -96,13 +96,13 @@ export class RuleService {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ [RuleService] Error fetching rule:', error);
+        console.error('[RuleService] Error fetching rule:', error);
         return null;
       }
 
       return data as Rule | null;
     } catch (error) {
-      console.error('❌ [RuleService] Exception fetching rule:', error);
+      console.error('[RuleService] Exception fetching rule:', error);
       return null;
     }
   }
@@ -114,7 +114,7 @@ export class RuleService {
     try {
       // Validate rule_text is not empty
       if (!input.rule_text || input.rule_text.trim().length === 0) {
-        console.error('❌ [RuleService] Rule text cannot be empty');
+        console.error('[RuleService] Rule text cannot be empty');
         return null;
       }
 
@@ -134,17 +134,17 @@ export class RuleService {
       if (error) {
         // Handle duplicate rule error
         if (error.code === '23505') {
-          console.error('❌ [RuleService] Duplicate rule - this rule already exists');
+          console.error('[RuleService] Duplicate rule - this rule already exists');
           return null;
         }
-        console.error('❌ [RuleService] Error creating rule:', error);
+        console.error('[RuleService] Error creating rule:', error);
         return null;
       }
 
-      console.log('✅ [RuleService] Rule created successfully:', data.id);
+      console.log('[RuleService] Rule created successfully:', data.id);
       return data as Rule;
     } catch (error) {
-      console.error('❌ [RuleService] Exception creating rule:', error);
+      console.error('[RuleService] Exception creating rule:', error);
       return null;
     }
   }
@@ -159,7 +159,7 @@ export class RuleService {
 
       if (updates.rule_text !== undefined) {
         if (updates.rule_text.trim().length === 0) {
-          console.error('❌ [RuleService] Rule text cannot be empty');
+          console.error('[RuleService] Rule text cannot be empty');
           return null;
         }
         updateData.rule_text = updates.rule_text.trim();
@@ -175,7 +175,7 @@ export class RuleService {
       }
 
       if (Object.keys(updateData).length === 0) {
-        console.error('❌ [RuleService] No valid updates provided');
+        console.error('[RuleService] No valid updates provided');
         return null;
       }
 
@@ -190,17 +190,17 @@ export class RuleService {
       if (error) {
         // Handle duplicate rule error
         if (error.code === '23505') {
-          console.error('❌ [RuleService] Duplicate rule - this rule already exists');
+          console.error('[RuleService] Duplicate rule - this rule already exists');
           return null;
         }
-        console.error('❌ [RuleService] Error updating rule:', error);
+        console.error('[RuleService] Error updating rule:', error);
         return null;
       }
 
-      console.log('✅ [RuleService] Rule updated successfully:', ruleId);
+      console.log('[RuleService] Rule updated successfully:', ruleId);
       return data as Rule;
     } catch (error) {
-      console.error('❌ [RuleService] Exception updating rule:', error);
+      console.error('[RuleService] Exception updating rule:', error);
       return null;
     }
   }
@@ -217,14 +217,14 @@ export class RuleService {
         .eq('id', ruleId);
 
       if (error) {
-        console.error('❌ [RuleService] Error deleting rule:', error);
+        console.error('[RuleService] Error deleting rule:', error);
         return { success: false, error: error.message };
       }
 
-      console.log('✅ [RuleService] Rule deleted successfully:', ruleId);
+      console.log('[RuleService] Rule deleted successfully:', ruleId);
       return { success: true };
     } catch (error) {
-      console.error('❌ [RuleService] Exception deleting rule:', error);
+      console.error('[RuleService] Exception deleting rule:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   }
@@ -249,13 +249,13 @@ export class RuleService {
         .order('priority', { ascending: false });
 
       if (error) {
-        console.error('❌ [RuleService] Error searching rules:', error);
+        console.error('[RuleService] Error searching rules:', error);
         return [];
       }
 
       return (data || []) as Rule[];
     } catch (error) {
-      console.error('❌ [RuleService] Exception searching rules:', error);
+      console.error('[RuleService] Exception searching rules:', error);
       return [];
     }
   }

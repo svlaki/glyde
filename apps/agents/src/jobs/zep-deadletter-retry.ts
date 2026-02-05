@@ -54,7 +54,7 @@ async function retryDeadletterQueue() {
     }
 
     if (!items || items.length === 0) {
-      console.log('[DLQ-RETRY] ✅ No items to retry\n');
+      console.log('[DLQ-RETRY] No items to retry\n');
       return;
     }
 
@@ -87,7 +87,7 @@ async function retryDeadletterQueue() {
     console.log(`Failed:           ${totalFailed}`);
     console.log('═══════════════════════════════════════════\n');
   } catch (error) {
-    console.error('[DLQ-RETRY] ❌ Job failed:', error);
+    console.error('[DLQ-RETRY] Job failed:', error);
     process.exit(1);
   }
 }
@@ -105,7 +105,7 @@ async function retryItem(
   try {
     // Skip if max retries exceeded
     if (retry_count >= max_retries) {
-      console.warn(`[DLQ-RETRY] ⚠️  Max retries exceeded for item ${id}. Moving to failed state.`);
+      console.warn(`[DLQ-RETRY]  Max retries exceeded for item ${id}. Moving to failed state.`);
 
       await supabase
         .from('zep_deadletter_queue')
@@ -235,11 +235,11 @@ async function retryItem(
           break;
 
         default:
-          console.warn(`[DLQ-RETRY] ⚠️  Unknown operation type: ${operation}`);
+          console.warn(`[DLQ-RETRY]  Unknown operation type: ${operation}`);
       }
     } catch (opError) {
       const errorMsg = opError instanceof Error ? opError.message : String(opError);
-      console.error(`[DLQ-RETRY] ❌ Operation failed: ${errorMsg}`);
+      console.error(`[DLQ-RETRY] Operation failed: ${errorMsg}`);
 
       // Schedule next retry with exponential backoff
       const backoffMs = 5 * 60 * 1000 * Math.pow(2, Math.min(retry_count, 3)); // 5min, 10min, 20min, 40min
@@ -255,7 +255,7 @@ async function retryItem(
         })
         .eq('id', id);
 
-      console.log(`[DLQ-RETRY] ⏰ Next retry scheduled for ${nextRetry.toISOString()}`);
+      console.log(`[DLQ-RETRY] Next retry scheduled for ${nextRetry.toISOString()}`);
       return { success: false, itemId: id };
     }
 
@@ -291,13 +291,13 @@ async function retryItem(
           .eq('id', item.entity_id);
       }
 
-      console.log(`[DLQ-RETRY] ✅ Successfully retried and removed from queue: ${id}\n`);
+      console.log(`[DLQ-RETRY] Successfully retried and removed from queue: ${id}\n`);
       return { success: true, itemId: id };
     }
 
     return { success: false, itemId: id };
   } catch (error) {
-    console.error(`[DLQ-RETRY] ❌ Unexpected error processing item ${id}:`, error);
+    console.error(`[DLQ-RETRY] Unexpected error processing item ${id}:`, error);
     return { success: false, itemId: id };
   }
 }
@@ -305,10 +305,10 @@ async function retryItem(
 // Run the job
 retryDeadletterQueue()
   .then(() => {
-    console.log('[DLQ-RETRY] ✅ Job completed successfully');
+    console.log('[DLQ-RETRY] Job completed successfully');
     process.exit(0);
   })
   .catch(error => {
-    console.error('[DLQ-RETRY] ❌ Job failed:', error);
+    console.error('[DLQ-RETRY] Job failed:', error);
     process.exit(1);
   });

@@ -35,7 +35,7 @@ export const webSearchTool = tool(
 
       // If Tavily provided an AI-generated answer, lead with that
       if (searchResponse.answer) {
-        response += `📍 ${searchResponse.answer}\n\n`;
+        response += `${searchResponse.answer}\n\n`;
       }
 
       // Add search results

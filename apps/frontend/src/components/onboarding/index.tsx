@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { useAuth } from '../../lib/authContext'
+import { usePlatform } from '../../hooks/usePlatform'
 import { completeOnboardingV2, OnboardingDataV2 } from '../../lib/onboardingService'
+import { getOnboardingKey } from '../OnboardingCheck'
 
 import { OnboardingProvider, useOnboarding } from './OnboardingContext'
 import { OnboardingProgress } from './OnboardingProgress'
@@ -17,6 +19,7 @@ function OnboardingContent() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const { user, session } = useAuth()
+  const { isMobile } = usePlatform()
   const {
     state,
     dispatch,
@@ -75,8 +78,8 @@ function OnboardingContent() {
       const result = await completeOnboardingV2(user, session.access_token, onboardingData)
 
       if (result.success) {
-        // Save to localStorage for OnboardingCheck
-        localStorage.setItem('onboardingData', JSON.stringify(onboardingData))
+        // Save to user-scoped localStorage for OnboardingCheck
+        localStorage.setItem(getOnboardingKey(user.id), JSON.stringify(onboardingData))
         navigate('/calendar', { replace: true })
       } else {
         dispatch({ type: 'SET_ERROR', error: result.error || 'Failed to complete onboarding' })
@@ -93,28 +96,53 @@ function OnboardingContent() {
   if (showTimezone) {
     return (
       <div style={{
-        minHeight: '100vh',
+        height: '100vh',
+        maxHeight: '100vh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.bgPrimary,
-        padding: '20px'
+        flexDirection: 'column' as const,
+        overflow: 'hidden',
+        backgroundColor: colors.bgPrimary
       }}>
-        <TimezoneConfirm onConfirm={handleComplete} />
+        <div style={{
+          flex: 1,
+          overflow: 'auto',
+          WebkitOverflowScrolling: 'touch' as const,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          paddingTop: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 20px)' : '20px',
+          paddingBottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 20px)' : '20px'
+        }}>
+          <TimezoneConfirm onConfirm={handleComplete} />
+        </div>
       </div>
     )
   }
 
   return (
     <div style={{
-      minHeight: '100vh',
-      backgroundColor: colors.bgPrimary,
-      padding: '40px 20px'
+      height: '100vh',
+      maxHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      overflow: 'hidden',
+      backgroundColor: colors.bgPrimary
     }}>
       <div style={{
-        maxWidth: '640px',
-        margin: '0 auto'
+        flex: 1,
+        overflow: 'auto',
+        WebkitOverflowScrolling: 'touch' as const,
+        minHeight: 0,
+        padding: '40px 20px',
+        paddingTop: isMobile ? 'calc(env(safe-area-inset-top, 0px) + 48px)' : '40px',
+        paddingBottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 40px)' : '40px'
       }}>
+        <div style={{
+          maxWidth: '640px',
+          margin: '0 auto'
+        }}>
         {/* Header */}
         <div style={{ marginBottom: '40px', textAlign: 'center' }}>
           <h1 style={{
@@ -209,6 +237,7 @@ function OnboardingContent() {
             {state.loading ? 'Loading...' : state.currentSection === 3 ? 'Complete' : 'Next'}
           </button>
         </div>
+      </div>
       </div>
     </div>
   )

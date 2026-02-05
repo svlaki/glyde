@@ -99,10 +99,10 @@ async function testAgentAPI() {
     const freeTimeResult = await freeTimeResponse.json();
     console.log('Response:', freeTimeResult.content || freeTimeResult.response || 'No response');
     
-    console.log('\n✨ All tests completed!');
+    console.log('\nAll tests completed!');
     
   } catch (error) {
-    console.error('\n❌ Test failed:', error.message);
+    console.error('\nTest failed:', error.message);
   }
 }
 

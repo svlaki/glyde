@@ -7,14 +7,17 @@ import { GoalDetailPanel } from './GoalDetailPanel'
 import { GoalForm } from './GoalForm'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
+import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { supabase } from '../lib/supabase'
+import { NewButton } from './ui/IconButtons'
 
 export function GoalsSection() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(isMobile)
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -193,8 +196,7 @@ export function GoalsSection() {
                 onClick={handleBackToList}
                 style={{
                   padding: '6px 12px',
-                  fontSize: '13px',
-                  fontWeight: '400',
+                  ...typography.bodySm,
                   background: 'transparent',
                   color: colors.textSecondary,
                   border: 'none',
@@ -207,8 +209,7 @@ export function GoalsSection() {
                 ← Back
               </button>
               <h2 style={{
-                fontSize: '14px',
-                fontWeight: '400',
+                ...typography.headingMd,
                 color: colors.textPrimary,
                 margin: 0,
                 flex: 1,
@@ -221,28 +222,16 @@ export function GoalsSection() {
           ) : (
             <>
               <h2 style={{
-                fontSize: '14px',
-                fontWeight: '400',
+                ...typography.headingMd,
                 color: colors.textPrimary,
                 margin: 0
               }}>
                 Goals
               </h2>
-              <button
+              <NewButton
                 onClick={handleCreateGoal}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: '13px',
-                  fontWeight: '400',
-                  background: 'transparent',
-                  color: colors.textSecondary,
-                  border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                New
-              </button>
+                title="New goal"
+                              />
             </>
           )}
         </div>
@@ -275,7 +264,7 @@ export function GoalsSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: '14px'
+                ...typography.bodyMd,
               }}>
                 Loading goals...
               </div>
@@ -284,7 +273,7 @@ export function GoalsSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: '14px'
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>
@@ -335,28 +324,16 @@ export function GoalsSection() {
         alignItems: 'center'
       }}>
         <h2 style={{
-          fontSize: '14px',
-          fontWeight: '400',
+          ...typography.headingMd,
           color: colors.textPrimary,
           margin: 0
         }}>
           Goals
         </h2>
-        <button
+        <NewButton
           onClick={handleCreateGoal}
-          style={{
-            padding: '6px 12px',
-            fontSize: '13px',
-            fontWeight: '400',
-            background: 'transparent',
-            color: colors.textSecondary,
-            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          New
-        </button>
+          title="New goal"
+                  />
       </div>
 
       {/* Goals Content */}
@@ -387,7 +364,7 @@ export function GoalsSection() {
                 padding: '40px',
                 textAlign: 'center',
                 color: colors.textSecondary,
-                fontSize: '14px'
+                ...typography.bodyMd,
               }}>
                 Loading goals...
               </div>
@@ -396,7 +373,7 @@ export function GoalsSection() {
                 padding: '20px',
                 textAlign: 'center',
                 color: '#ef4444',
-                fontSize: '14px'
+                ...typography.bodyMd,
               }}>
                 Error: {error}
               </div>

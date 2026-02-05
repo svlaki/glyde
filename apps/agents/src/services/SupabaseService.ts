@@ -90,7 +90,7 @@ export class SupabaseService {
       // Validate recordId format
       if (!this.isValidUUID(recordId)) {
         const errorMsg = `Invalid ${entityName} ID format: "${recordId}" is not a valid UUID`;
-        console.error(`❌ Invalid UUID for ${entityName}:`, recordId);
+        console.error(`Invalid UUID for ${entityName}:`, recordId);
         return { success: false, error: errorMsg };
       }
 
@@ -386,7 +386,7 @@ export class SupabaseService {
         if (event.is_recurring && event.recurrence_rule) {
           // Validate and expand recurring event
           if (!validateRRule(event.recurrence_rule)) {
-            console.warn('⚠️  [SupabaseService] Invalid RRULE for event:', event.id, event.recurrence_rule);
+            console.warn(' [SupabaseService] Invalid RRULE for event:', event.id, event.recurrence_rule);
             expandedEvents.push(event); // Add parent anyway
             continue;
           }
@@ -446,7 +446,7 @@ export class SupabaseService {
       // Sort by start time
       expandedEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
-      console.log('✅ [SUPABASE SERVICE] Retrieved', rawEvents.length, 'raw events, expanded to', expandedEvents.length, 'events for user');
+      console.log('[SUPABASE SERVICE] Retrieved', rawEvents.length, 'raw events, expanded to', expandedEvents.length, 'events for user');
 
       return expandedEvents;
     } catch (error) {
@@ -530,7 +530,7 @@ export class SupabaseService {
     try {
       // Validate eventId format
       if (!this.isValidUUID(eventId)) {
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', eventId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', eventId);
         return null;
       }
 
@@ -723,7 +723,7 @@ export class SupabaseService {
       const rrule = event.recurrence_rule;
 
       if (!rrule) {
-        console.error('❌ [SupabaseService] Missing recurrence_rule');
+        console.error('[SupabaseService] Missing recurrence_rule');
         return null;
       }
 
@@ -751,11 +751,11 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SupabaseService] Error creating recurring event:', error);
+        console.error('[SupabaseService] Error creating recurring event:', error);
         return null;
       }
 
-      console.log('✅ [SupabaseService] Created recurring event:', data.id);
+      console.log('[SupabaseService] Created recurring event:', data.id);
 
       // Get category info if we have a category_id
       let categoryName = event.category || 'Personal';
@@ -800,7 +800,7 @@ export class SupabaseService {
 
       return createdEvent;
     } catch (error) {
-      console.error('❌ [SupabaseService] Exception creating recurring event:', error);
+      console.error('[SupabaseService] Exception creating recurring event:', error);
       return null;
     }
   }
@@ -836,7 +836,7 @@ export class SupabaseService {
       const parent = parentEvent?.find(e => e.id === parentEventId && e.is_recurring);
 
       if (!parent) {
-        console.error('❌ [SupabaseService] Parent recurring event not found:', parentEventId);
+        console.error('[SupabaseService] Parent recurring event not found:', parentEventId);
         return null;
       }
 
@@ -863,11 +863,11 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SupabaseService] Error creating instance override:', error);
+        console.error('[SupabaseService] Error creating instance override:', error);
         return null;
       }
 
-      console.log('✅ [SupabaseService] Created instance override for parent:', parentEventId);
+      console.log('[SupabaseService] Created instance override for parent:', parentEventId);
 
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId, instanceStartDate.toISOString(), instanceEndDate.toISOString());
@@ -875,7 +875,7 @@ export class SupabaseService {
 
       return createdInstance || null;
     } catch (error) {
-      console.error('❌ [SupabaseService] Exception updating recurring instance:', error);
+      console.error('[SupabaseService] Exception updating recurring instance:', error);
       return null;
     }
   }
@@ -889,7 +889,7 @@ export class SupabaseService {
       // Extract just the date part (YYYY-MM-DD) from the instance date
       const exceptionDate = instanceDate.split('T')[0];
 
-      console.log('🗑️  [SupabaseService] Creating exception record to delete instance:', {
+      console.log(' [SupabaseService] Creating exception record to delete instance:', {
         parentEventId,
         instanceDate: exceptionDate
       });
@@ -907,14 +907,14 @@ export class SupabaseService {
         });
 
       if (error) {
-        console.error('❌ [SupabaseService] Error creating exception record:', error);
+        console.error('[SupabaseService] Error creating exception record:', error);
         return false;
       }
 
-      console.log('✅ [SupabaseService] Successfully marked instance as deleted:', exceptionDate);
+      console.log('[SupabaseService] Successfully marked instance as deleted:', exceptionDate);
       return true;
     } catch (error) {
-      console.error('❌ [SupabaseService] Exception deleting recurring instance:', error);
+      console.error('[SupabaseService] Exception deleting recurring instance:', error);
       return false;
     }
   }
@@ -936,7 +936,7 @@ export class SupabaseService {
       if (updates.recurrence_rule) {
         const { validateRRule } = await import('../utils/rrule.js');
         if (!validateRRule(updates.recurrence_rule)) {
-          console.error('❌ [SupabaseService] Invalid recurrence rule');
+          console.error('[SupabaseService] Invalid recurrence rule');
           return null;
         }
       }
@@ -963,11 +963,11 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SupabaseService] Error updating recurring series:', error);
+        console.error('[SupabaseService] Error updating recurring series:', error);
         return null;
       }
 
-      console.log('✅ [SupabaseService] Updated recurring series:', parentEventId);
+      console.log('[SupabaseService] Updated recurring series:', parentEventId);
 
       // Fetch with category data
       const eventsWithCategories = await this.getEvents(userId);
@@ -975,7 +975,7 @@ export class SupabaseService {
 
       return updatedEvent || null;
     } catch (error) {
-      console.error('❌ [SupabaseService] Exception updating recurring series:', error);
+      console.error('[SupabaseService] Exception updating recurring series:', error);
       return null;
     }
   }
@@ -988,11 +988,11 @@ export class SupabaseService {
     try {
       const result = await this.deleteEvent(userId, parentEventId);
       if (result.success) {
-        console.log('✅ [SupabaseService] Deleted recurring series:', parentEventId);
+        console.log('[SupabaseService] Deleted recurring series:', parentEventId);
       }
       return result.success;
     } catch (error) {
-      console.error('❌ [SupabaseService] Exception deleting recurring series:', error);
+      console.error('[SupabaseService] Exception deleting recurring series:', error);
       return false;
     }
   }
@@ -1049,7 +1049,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error creating task:', error);
+        console.error('[SUPABASE SERVICE] Error creating task:', error);
         throw error;
       }
 
@@ -1065,10 +1065,10 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      console.log('✅ [SUPABASE SERVICE] Task created:', data.id);
+      console.log('[SUPABASE SERVICE] Task created:', data.id);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception creating task:', error);
+      console.error('[SUPABASE SERVICE] Exception creating task:', error);
       throw error;
     }
   }
@@ -1094,7 +1094,7 @@ export class SupabaseService {
         });
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error getting tasks:', error);
+        console.error('[SUPABASE SERVICE] Error getting tasks:', error);
         return [];
       }
 
@@ -1125,10 +1125,10 @@ export class SupabaseService {
         filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date >= filters.dueAfter!);
       }
 
-      console.log(`✅ [SUPABASE SERVICE] Found ${filteredTasks.length} tasks with categories`);
+      console.log(`[SUPABASE SERVICE] Found ${filteredTasks.length} tasks with categories`);
       return filteredTasks;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception getting tasks:', error);
+      console.error('[SUPABASE SERVICE] Exception getting tasks:', error);
       return [];
     }
   }
@@ -1188,20 +1188,20 @@ export class SupabaseService {
             .single();
 
           if (fallbackError) {
-            console.error('❌ [SUPABASE SERVICE] Error creating interaction with fallback status:', fallbackError);
+            console.error('[SUPABASE SERVICE] Error creating interaction with fallback status:', fallbackError);
             throw fallbackError;
           }
 
           return fallbackData;
         }
 
-        console.error('❌ [SUPABASE SERVICE] Error creating interaction:', error);
+        console.error('[SUPABASE SERVICE] Error creating interaction:', error);
         throw error;
       }
 
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception creating interaction:', error);
+      console.error('[SUPABASE SERVICE] Exception creating interaction:', error);
       throw error;
     }
   }
@@ -1233,7 +1233,7 @@ export class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error fetching pending interactions:', error);
+        console.error('[SUPABASE SERVICE] Error fetching pending interactions:', error);
         return [];
       }
 
@@ -1363,7 +1363,7 @@ export class SupabaseService {
 
       return validInteractions;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception fetching pending interactions:', error);
+      console.error('[SUPABASE SERVICE] Exception fetching pending interactions:', error);
       return [];
     }
   }
@@ -1375,7 +1375,7 @@ export class SupabaseService {
     try {
       // Validate interactionId format
       if (!this.isValidUUID(interactionId)) {
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', interactionId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', interactionId);
         return null;
       }
 
@@ -1386,13 +1386,13 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error fetching interaction:', error);
+        console.error('[SUPABASE SERVICE] Error fetching interaction:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception fetching interaction:', error);
+      console.error('[SUPABASE SERVICE] Exception fetching interaction:', error);
       return null;
     }
   }
@@ -1410,7 +1410,7 @@ export class SupabaseService {
     try {
       // Validate interactionId format
       if (!this.isValidUUID(interactionId)) {
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', interactionId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', interactionId);
         return null;
       }
 
@@ -1421,7 +1421,7 @@ export class SupabaseService {
         .single();
 
       if (interactionError || !interaction) {
-        console.error('❌ [SUPABASE SERVICE] Interaction not found when saving response:', interactionError);
+        console.error('[SUPABASE SERVICE] Interaction not found when saving response:', interactionError);
         return null;
       }
 
@@ -1437,7 +1437,7 @@ export class SupabaseService {
         .single();
 
       if (responseError) {
-        console.error('❌ [SUPABASE SERVICE] Error saving interaction response:', responseError);
+        console.error('[SUPABASE SERVICE] Error saving interaction response:', responseError);
         throw responseError;
       }
 
@@ -1461,13 +1461,13 @@ export class SupabaseService {
         .single();
 
       if (updateError) {
-        console.error('❌ [SUPABASE SERVICE] Error updating interaction status:', updateError);
+        console.error('[SUPABASE SERVICE] Error updating interaction status:', updateError);
         throw updateError;
       }
 
       return { interaction: updatedInteraction, response: responseRow };
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception saving interaction response:', error);
+      console.error('[SUPABASE SERVICE] Exception saving interaction response:', error);
       throw error;
     }
   }
@@ -1511,20 +1511,20 @@ export class SupabaseService {
             .select('id');
 
           if (fallbackError) {
-            console.error('❌ [SUPABASE SERVICE] Error cancelling interactions with fallback:', fallbackError);
+            console.error('[SUPABASE SERVICE] Error cancelling interactions with fallback:', fallbackError);
             return 0;
           }
 
           return fallbackData?.length || 0;
         }
 
-        console.error('❌ [SUPABASE SERVICE] Error cancelling interactions:', error);
+        console.error('[SUPABASE SERVICE] Error cancelling interactions:', error);
         return 0;
       }
 
       return data?.length || 0;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception cancelling interactions:', error);
+      console.error('[SUPABASE SERVICE] Exception cancelling interactions:', error);
       return 0;
     }
   }
@@ -1540,13 +1540,13 @@ export class SupabaseService {
         .eq('id', interactionId);
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error updating interaction status:', error);
+        console.error('[SUPABASE SERVICE] Error updating interaction status:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception updating interaction status:', error);
+      console.error('[SUPABASE SERVICE] Exception updating interaction status:', error);
       return false;
     }
   }
@@ -1580,11 +1580,11 @@ export class SupabaseService {
       // Validate taskId format
       if (!this.isValidUUID(taskId)) {
         const error = new Error(`Invalid task ID format: "${taskId}" is not a valid UUID`);
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', taskId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', taskId);
         throw error;
       }
 
-      console.log('🔄 [SUPABASE SERVICE] Updating task:', taskId);
+      console.log('[SUPABASE SERVICE] Updating task:', taskId);
 
       // Fetch old task for change tracking
       const { data: oldTask } = await this.client
@@ -1632,7 +1632,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error updating task:', error);
+        console.error('[SUPABASE SERVICE] Error updating task:', error);
         throw error;
       }
 
@@ -1653,10 +1653,10 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      console.log('✅ [SUPABASE SERVICE] Task updated:', taskId);
+      console.log('[SUPABASE SERVICE] Task updated:', taskId);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception updating task:', error);
+      console.error('[SUPABASE SERVICE] Exception updating task:', error);
       throw error;
     }
   }
@@ -1709,7 +1709,7 @@ export class SupabaseService {
       // Validate taskId format
       if (!this.isValidUUID(taskId)) {
         const error = new Error(`Invalid task ID format: "${taskId}" is not a valid UUID`);
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', taskId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', taskId);
         throw error;
       }
 
@@ -1739,7 +1739,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error completing task:', error);
+        console.error('[SUPABASE SERVICE] Error completing task:', error);
         throw error;
       }
 
@@ -1755,10 +1755,10 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      console.log('✅ [SUPABASE SERVICE] Task completed:', taskId);
+      console.log('[SUPABASE SERVICE] Task completed:', taskId);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception completing task:', error);
+      console.error('[SUPABASE SERVICE] Exception completing task:', error);
       throw error;
     }
   }
@@ -1827,7 +1827,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error creating goal:', error);
+        console.error('[SUPABASE SERVICE] Error creating goal:', error);
         throw error;
       }
 
@@ -1843,10 +1843,10 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      console.log('✅ [SUPABASE SERVICE] Goal created:', data.id);
+      console.log('[SUPABASE SERVICE] Goal created:', data.id);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception creating goal:', error);
+      console.error('[SUPABASE SERVICE] Exception creating goal:', error);
       throw error;
     }
   }
@@ -1870,7 +1870,7 @@ export class SupabaseService {
         });
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error getting goals:', error);
+        console.error('[SUPABASE SERVICE] Error getting goals:', error);
         return [];
       }
 
@@ -1901,7 +1901,7 @@ export class SupabaseService {
         filteredGoals = filteredGoals.filter((g: any) => g.target_date && g.target_date >= filters.targetAfter!);
       }
 
-      console.log(`✅ [SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
+      console.log(`[SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
 
       // Map category_name to category for frontend compatibility
       return filteredGoals.map((g: any) => ({
@@ -1909,7 +1909,7 @@ export class SupabaseService {
         category: g.category_name || g.category  // Use category_name from RPC, fallback to category
       }));
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception getting goals:', error);
+      console.error('[SUPABASE SERVICE] Exception getting goals:', error);
       return [];
     }
   }
@@ -1946,11 +1946,11 @@ export class SupabaseService {
       // Validate goalId format
       if (!this.isValidUUID(goalId)) {
         const error = new Error(`Invalid goal ID format: "${goalId}" is not a valid UUID`);
-        console.error('❌ [SUPABASE SERVICE] Invalid UUID:', goalId);
+        console.error('[SUPABASE SERVICE] Invalid UUID:', goalId);
         throw error;
       }
 
-      console.log('🔄 [SUPABASE SERVICE] Updating goal:', goalId);
+      console.log('[SUPABASE SERVICE] Updating goal:', goalId);
 
       // Fetch old goal for change tracking
       const { data: oldGoal } = await this.client
@@ -1996,7 +1996,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error updating goal:', error);
+        console.error('[SUPABASE SERVICE] Error updating goal:', error);
         throw error;
       }
 
@@ -2017,10 +2017,10 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      console.log('✅ [SUPABASE SERVICE] Goal updated:', goalId);
+      console.log('[SUPABASE SERVICE] Goal updated:', goalId);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception updating goal:', error);
+      console.error('[SUPABASE SERVICE] Exception updating goal:', error);
       throw error;
     }
   }
@@ -2073,7 +2073,7 @@ export class SupabaseService {
     agentInsights?: Record<string, any>;
   }): Promise<any> {
     try {
-      console.log('📝 [SUPABASE SERVICE] Adding goal check-in for goal:', goalId);
+      console.log('[SUPABASE SERVICE] Adding goal check-in for goal:', goalId);
 
       const { data, error } = await this.client
         .from('goal_check_ins')
@@ -2094,14 +2094,14 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error adding goal check-in:', error);
+        console.error('[SUPABASE SERVICE] Error adding goal check-in:', error);
         throw error;
       }
 
-      console.log('✅ [SUPABASE SERVICE] Goal check-in added:', data.id);
+      console.log('[SUPABASE SERVICE] Goal check-in added:', data.id);
       return data;
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception adding goal check-in:', error);
+      console.error('[SUPABASE SERVICE] Exception adding goal check-in:', error);
       throw error;
     }
   }
@@ -2127,14 +2127,14 @@ export class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [SUPABASE SERVICE] Error getting goal check-ins:', error);
+        console.error('[SUPABASE SERVICE] Error getting goal check-ins:', error);
         return [];
       }
 
-      console.log(`✅ [SUPABASE SERVICE] Found ${data?.length || 0} check-ins`);
+      console.log(`[SUPABASE SERVICE] Found ${data?.length || 0} check-ins`);
       return data || [];
     } catch (error) {
-      console.error('❌ [SUPABASE SERVICE] Exception getting goal check-ins:', error);
+      console.error('[SUPABASE SERVICE] Exception getting goal check-ins:', error);
       return [];
     }
   }

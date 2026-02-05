@@ -16,7 +16,7 @@ export const deleteMultipleEventsTool = tool(
 
     let eventsToDelete: any[] = [];
 
-    console.log('🗑️ [DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, searchQuery });
+    console.log('[DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, searchQuery });
 
     if (date) {
       // Delete events on a specific date - use getRawEvents to avoid expanded recurring instances
@@ -47,7 +47,7 @@ export const deleteMultipleEventsTool = tool(
           eventsToDelete = matchingEvents;
           console.log(`🔍 [DELETE-MULTIPLE-EVENTS TOOL] Found ${eventsToDelete.length} events matching: ${searchQuery}`);
         } catch (error) {
-          console.error('❌ [DELETE-MULTIPLE-EVENTS TOOL] Search error:', error);
+          console.error('[DELETE-MULTIPLE-EVENTS TOOL] Search error:', error);
           throw new Error(`Failed to search for events: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
@@ -62,7 +62,7 @@ export const deleteMultipleEventsTool = tool(
       return "No events found to delete";
     }
 
-    console.log(`🗑️ [DELETE-MULTIPLE-EVENTS TOOL] Deleting ${uniqueEvents.length} unique events`);
+    console.log(`[DELETE-MULTIPLE-EVENTS TOOL] Deleting ${uniqueEvents.length} unique events`);
 
     let deletedCount = 0;
     const errors: string[] = [];
@@ -76,7 +76,7 @@ export const deleteMultipleEventsTool = tool(
         try {
           await zepGraphService.deleteCalendarEvent(userId, event.id, event.title);
         } catch (graphError) {
-          console.warn(`⚠️ [DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
+          console.warn(`[DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
           // Non-critical - event is deleted from DB which is what matters
         }
       } else {

@@ -18,7 +18,7 @@ export const deleteGoalTool = tool(
   async ({ goalId, searchQuery }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     let targetGoalId = goalId;
@@ -26,7 +26,7 @@ export const deleteGoalTool = tool(
     // If no goalId provided, search for the goal
     if (!targetGoalId) {
       if (!searchQuery) {
-        return "❌ Either goalId or searchQuery must be provided";
+        return "Either goalId or searchQuery must be provided";
       }
 
       console.log('🔍 [DELETE-GOAL TOOL] Searching for goal to delete:', searchQuery);
@@ -68,14 +68,14 @@ export const deleteGoalTool = tool(
         if (matchingGoals.length > 0) {
           targetGoalId = matchingGoals[0].id;
           const goalToDelete = matchingGoals[0];
-          console.log('✅ [DELETE-GOAL TOOL] Found goal to delete:', goalToDelete.title);
+          console.log('[DELETE-GOAL TOOL] Found goal to delete:', goalToDelete.title);
 
           // Delete the goal
           const supabaseService = getSupabaseService();
           const result = await supabaseService.deleteGoal(userId, goalToDelete.id, { source: 'agent', agentType: 'conversation' });
 
           if (!result.success) {
-            return `❌ Failed to delete goal: ${result.error}`;
+            return `Failed to delete goal: ${result.error}`;
           }
 
           // Remove from Zep knowledge graph (fire-and-forget for speed)
@@ -90,18 +90,18 @@ export const deleteGoalTool = tool(
           };
           removeFromGraph();
 
-          return `✅ GOAL: "${goalToDelete.title}" has been deleted`;
+          return `GOAL: "${goalToDelete.title}" has been deleted`;
         } else {
-          return `❌ No goal found matching: "${searchQuery}". Available goals: ${goals.map((g: any) => g.title).join(', ')}`;
+          return `No goal found matching: "${searchQuery}". Available goals: ${goals.map((g: any) => g.title).join(', ')}`;
         }
       } catch (error) {
-        console.error('❌ [DELETE-GOAL TOOL] Search error:', error);
-        return `❌ Failed to find goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error('[DELETE-GOAL TOOL] Search error:', error);
+        return `Failed to find goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     }
 
     if (!targetGoalId) {
-      return "❌ Failed to identify goal to delete - this should not happen";
+      return "Failed to identify goal to delete - this should not happen";
     }
 
     // Direct goalId provided - fetch goal details first, then delete
@@ -115,7 +115,7 @@ export const deleteGoalTool = tool(
       const result = await supabaseService.deleteGoal(userId, targetGoalId, { source: 'agent', agentType: 'conversation' });
 
       if (!result.success) {
-        return `❌ Failed to delete goal: ${result.error}`;
+        return `Failed to delete goal: ${result.error}`;
       }
 
       // Remove from Zep knowledge graph (fire-and-forget for speed)
@@ -134,13 +134,13 @@ export const deleteGoalTool = tool(
 
       // Format response with goal details
       if (goalToDelete) {
-        return `✅ GOAL: "${goalToDelete.title}" has been deleted`;
+        return `GOAL: "${goalToDelete.title}" has been deleted`;
       }
 
-      return `✅ Goal deleted successfully`;
+      return `Goal deleted successfully`;
     } catch (error) {
-      console.error('❌ [delete-goal] Error:', error);
-      return `❌ Error deleting goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[delete-goal] Error:', error);
+      return `Error deleting goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

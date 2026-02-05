@@ -15,7 +15,7 @@ const supabase = createClient(
 );
 
 async function main() {
-  console.log('📋 Categories by User\n');
+  console.log('Categories by User\n');
 
   // Get all categories with user_id
   const { data: categories } = await supabase
@@ -46,14 +46,14 @@ async function main() {
       .map(([name, count]) => ({ name, count }));
 
     if (dups.length > 0) {
-      console.log('  ⚠️  Duplicates:');
+      console.log('   Duplicates:');
       dups.forEach(d => console.log(`    - ${d.name}: ${d.count}x`));
     } else {
-      console.log('  ✅ No duplicates');
+      console.log('  No duplicates');
     }
   }
 
-  console.log('\n\n📊 Summary:');
+  console.log('\n\nSummary:');
   console.log(`Total users: ${byUser.size}`);
   console.log(`Total categories: ${categories?.length}`);
 }

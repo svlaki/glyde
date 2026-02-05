@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
-import { PageHeader } from '../components/PageHeader'
+import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { GoalCard } from '../components/GoalCard'
 import { GoalDetailPanel } from '../components/GoalDetailPanel'
 import { GoalForm } from '../components/GoalForm'
@@ -163,21 +163,21 @@ export function GoalsPage() {
     <div style={{
       height: '100vh',
       display: 'flex',
-      flexDirection: 'column',
       overflow: 'hidden',
       background: colors.bgSecondary
     }}>
-      {/* Header */}
-      <PageHeader />
+      {/* Vertical Sidebar */}
+      <VerticalSidebar />
 
-      {/* Main Content */}
+      {/* Main Content - offset by sidebar width */}
       <div style={{
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
-        minHeight: 0
+        minHeight: 0,
+        marginLeft: `${SIDEBAR_WIDTH}px`,
       }}>
-        {/* Left Sidebar - Goals List */}
+        {/* Left Panel - Goals List */}
         <div style={{
           width: '350px',
           borderRight: `1px solid ${colors.border}`,

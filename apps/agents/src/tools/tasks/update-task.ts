@@ -6,7 +6,7 @@ export const updateTaskTool = tool(
   async ({ taskId, searchQuery, title, description, dueDate, priority, status, category, energyRequired, estimatedDuration }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
-      return "❌ User ID required";
+      return "User ID required";
     }
 
     let targetTaskId = taskId;
@@ -14,7 +14,7 @@ export const updateTaskTool = tool(
     // If no taskId provided, search for the task
     if (!targetTaskId) {
       if (!searchQuery) {
-        return "❌ Either taskId or searchQuery must be provided";
+        return "Either taskId or searchQuery must be provided";
       }
 
       console.log('🔍 [UPDATE-TASK TOOL] Searching for task to update:', searchQuery);
@@ -55,18 +55,18 @@ export const updateTaskTool = tool(
 
         if (matchingTasks.length > 0) {
           targetTaskId = matchingTasks[0].id;
-          console.log('✅ [UPDATE-TASK TOOL] Found task to update:', matchingTasks[0].title);
+          console.log('[UPDATE-TASK TOOL] Found task to update:', matchingTasks[0].title);
         } else {
-          return `❌ No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
+          return `No task found matching: "${searchQuery}". Available tasks: ${tasks.map((t: any) => t.title).join(', ')}`;
         }
       } catch (error) {
-        console.error('❌ [UPDATE-TASK TOOL] Search error:', error);
-        return `❌ Failed to find task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error('[UPDATE-TASK TOOL] Search error:', error);
+        return `Failed to find task: ${error instanceof Error ? error.message : 'Unknown error'}`;
       }
     }
 
     if (!targetTaskId) {
-      return "❌ Failed to identify task to update";
+      return "Failed to identify task to update";
     }
 
     try {
@@ -77,7 +77,7 @@ export const updateTaskTool = tool(
       const originalTask = tasks.find((t: any) => t.id === targetTaskId);
 
       if (!originalTask) {
-        return `❌ Task not found with ID: ${targetTaskId}`;
+        return `Task not found with ID: ${targetTaskId}`;
       }
 
       const updates: any = {};
@@ -95,7 +95,7 @@ export const updateTaskTool = tool(
       const task = await supabaseService.updateTask(userId, targetTaskId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
-        return "❌ Failed to update task";
+        return "Failed to update task";
       }
 
       // Build detailed change description
@@ -131,10 +131,10 @@ export const updateTaskTool = tool(
       const taskTitle = task.title || originalTask?.title || 'Task';
       const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
-      return `✅ TASK: "${taskTitle}" has been updated${changeDescription}`;
+      return `TASK: "${taskTitle}" has been updated${changeDescription}`;
     } catch (error) {
-      console.error('❌ [update-task] Error:', error);
-      return `❌ Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('[update-task] Error:', error);
+      return `Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   },
   {

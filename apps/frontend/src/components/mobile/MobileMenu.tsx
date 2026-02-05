@@ -2,6 +2,7 @@ import { Drawer } from 'vaul'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
+import { getTypography } from '../../styles/typography'
 
 interface MobileMenuProps {
   isOpen: boolean
@@ -9,9 +10,11 @@ interface MobileMenuProps {
 }
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
-  const { signOut } = useAuth()
+  const { signOut, preferredName, user } = useAuth()
   const { isDarkMode, toggleDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const typography = getTypography(true) // Mobile context
+  const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
   const handleSignOut = () => {
     onClose()
@@ -21,7 +24,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const menuItemStyle = {
     display: 'block',
     padding: '12px 16px',
-    fontSize: '16px',
+    ...typography.bodyLg,
     color: colors.textPrimary,
     textDecoration: 'none',
     borderRadius: '8px',
@@ -70,13 +73,20 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             borderBottom: `1px solid ${colors.border}`
           }}>
             <Drawer.Title className="serif" style={{
-              fontSize: '24px',
-              fontWeight: '700',
+              ...typography.displaySm,
+              fontWeight: 700,
               margin: 0,
               color: colors.textPrimary
             }}>
               Glyde
             </Drawer.Title>
+            <p style={{
+              ...typography.bodyMd,
+              color: colors.textSecondary,
+              margin: '8px 0 0 0'
+            }}>
+              Hello, {displayName}
+            </p>
           </div>
 
           {/* Menu items */}
@@ -84,11 +94,14 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             <a href="/calendar" onClick={onClose} style={getActiveStyle('/calendar')}>
               Calendar
             </a>
+            <a href="/plan" onClick={onClose} style={getActiveStyle('/plan')}>
+              Plan
+            </a>
             <a href="/aspects" onClick={onClose} style={getActiveStyle('/aspects')}>
               Aspects
             </a>
-            <a href="/rules" onClick={onClose} style={getActiveStyle('/rules')}>
-              Rules
+            <a href="/connections" onClick={onClose} style={getActiveStyle('/connections')}>
+              Connections
             </a>
             <a href="/profile" onClick={onClose} style={getActiveStyle('/profile')}>
               Profile

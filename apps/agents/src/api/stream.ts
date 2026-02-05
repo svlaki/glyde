@@ -23,10 +23,10 @@ async function ensureAgentsInitialized(): Promise<void> {
   if (!initializationPromise) {
     initializationPromise = initializeAgents()
       .then(() => {
-        console.log('✅ [STREAM] Agents initialized successfully');
+        console.log('[STREAM] Agents initialized successfully');
       })
       .catch(error => {
-        console.error('❌ [STREAM] Failed to initialize agents:', error);
+        console.error('[STREAM] Failed to initialize agents:', error);
         throw error;
       })
       .finally(() => {
@@ -39,7 +39,7 @@ async function ensureAgentsInitialized(): Promise<void> {
 
 // Kick off initialization eagerly
 ensureAgentsInitialized().catch(error => {
-  console.error('❌ [STREAM] Agent initialization failed during startup:', error);
+  console.error('[STREAM] Agent initialization failed during startup:', error);
 });
 
 /**
@@ -168,7 +168,7 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
 
     // Check if agent supports streaming
     if (typeof agent.streamMessage !== 'function') {
-      console.error('❌ [STREAM] Agent does not support streaming, falling back to non-streaming');
+      console.error('[STREAM] Agent does not support streaming, falling back to non-streaming');
       // Fallback: use regular processMessage and send entire response
       const response = await agent.processMessage(agentContext, message);
       res.write(`0:${JSON.stringify(response.content)}\n`);
@@ -190,7 +190,7 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         if (event.type === 'status' && event.content) {
           // Send status updates as SSE-style events that frontend can parse
           // Format: [STATUS:message] - frontend will strip this and show in UI
-          console.log(`📊 [STREAM] Status: ${event.content}`);
+          console.log(`[STREAM] Status: ${event.content}`);
           res.write(`[STATUS:${event.content}]`);
         } else if (event.type === 'text-delta' && event.content) {
           fullResponse += event.content;
@@ -206,23 +206,23 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         } else if (event.type === 'tool-end' && event.toolName) {
           console.log(`🔧 [STREAM] Tool ended: ${event.toolName}`);
         } else if (event.type === 'error') {
-          console.error(`❌ [STREAM] Error event: ${event.content}`);
+          console.error(`[STREAM] Error event: ${event.content}`);
           res.write(`\n\nError: ${event.content || 'Unknown error'}`);
         }
       }
 
-      console.log(`✅ [STREAM] Completed stream for user ${context.userId} in ${Date.now() - startTime}ms`);
-      console.log(`✅ [STREAM] Total chunks sent: ${chunkCount}, Full response length: ${fullResponse.length}`);
+      console.log(`[STREAM] Completed stream for user ${context.userId} in ${Date.now() - startTime}ms`);
+      console.log(`[STREAM] Total chunks sent: ${chunkCount}, Full response length: ${fullResponse.length}`);
 
     } catch (streamError) {
-      console.error('❌ [STREAM] Error during streaming:', streamError);
+      console.error('[STREAM] Error during streaming:', streamError);
       res.write(`\n\nError: ${streamError instanceof Error ? streamError.message : 'Stream error'}`);
     }
 
     res.end();
 
   } catch (error) {
-    console.error('❌ [STREAM] Error in stream endpoint:', error);
+    console.error('[STREAM] Error in stream endpoint:', error);
     if (!res.headersSent) {
       res.status(500).json({
         error: 'Failed to process stream',

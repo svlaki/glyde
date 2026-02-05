@@ -12,6 +12,7 @@ interface AuthContextValue {
   isLoading: boolean
   loading: boolean
   session: Session | null
+  preferredName: string | null
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
@@ -25,7 +26,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [preferredName, setPreferredName] = useState<string | null>(null)
   const startupTriggeredRef = useRef<Set<string>>(new Set())
+
+  // Fetch user's preferred name from profile table
+  async function fetchPreferredName(userId: string): Promise<string | null> {
+    try {
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+
+      const fetchPromise = supabase
+        .from('profile')
+        .select('preferred_name, display_name')
+        .eq('id', userId)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error fetching preferred name:', error)
+            return null
+          }
+          return data?.preferred_name || data?.display_name || null
+        })
+
+      return await Promise.race([fetchPromise, timeoutPromise])
+    } catch (error) {
+      console.error('Error fetching preferred name:', error)
+      return null
+    }
+  }
 
   useEffect(() => {
     // Check for existing session on mount
@@ -39,12 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(result.data.session.user)
           setIsAuthenticated(true)
 
+          // Fetch preferred name in background (don't block auth)
+          fetchPreferredName(result.data.session.user.id).then(name => {
+            setPreferredName(name)
+          })
+
           // Call user schema creation with the initial session
           await callUserSchemaCreation(result.data.session)
         } else {
           setSession(null)
           setUser(null)
           setIsAuthenticated(false)
+          setPreferredName(null)
         }
       } catch (error) {
         console.error('Error getting initial session:', error)
@@ -64,7 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsAuthenticated(!!session?.user)
 
           if (session?.user && session.access_token) {
+            // Fetch preferred name in background (don't block auth)
+            fetchPreferredName(session.user.id).then(name => {
+              setPreferredName(name)
+            })
+
             await callUserSchemaCreation(session)
+          } else {
+            setPreferredName(null)
           }
         } catch (error) {
           console.error('Error in auth state change:', error)
@@ -85,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refresh_token = params.get('refresh_token')
 
           if (access_token) {
-            console.log('✅ OAuth tokens received via deep link')
+            console.log('OAuth tokens received via deep link')
             await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || ''
@@ -117,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Interactions are now created directly by the agent via create_interaction tool
     // They can be generated on-demand via the refresh button in the UI
-    console.log('✅ Ready to generate interactions on-demand');
+    console.log('Ready to generate interactions on-demand');
   }
 
   async function signIn(email: string, password: string) {
@@ -176,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setSession(null)
       setIsAuthenticated(false)
+      setPreferredName(null)
       startupTriggeredRef.current.clear()
     } catch (error) {
       console.error('Sign out error:', error)
@@ -188,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     loading: isLoading,
     session,
+    preferredName,
     signIn,
     signUp,
     signInWithGoogle,

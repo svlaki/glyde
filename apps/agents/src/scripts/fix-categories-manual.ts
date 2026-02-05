@@ -18,7 +18,7 @@ const supabase = createClient(
 function cleanCategoryName(name: string): string {
   // Remove emojis - this list covers the common ones we saw
   let result = name
-    .replace(/[✈️✈🎶👥📚💼🧹🎬🛒🏋️‍♀️🏋️‍♂️🏋🏋️❤️❤🏥🎨🤝👶🏡]/g, '')
+    .replace(/[✈️✈👥📚🎬🛒🏋️‍♀️🏋️‍♂️🏋🏋️❤️❤🏥🎨🤝👶]/g, '')
     .replace(/[\u2600-\u27BF]/g, '')  // Misc symbols and emoticons
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Surrogate pairs (extended emojis)
     .trim();
@@ -31,7 +31,7 @@ async function main() {
 
   try {
     // Step 1: Get all categories
-    console.log('📋 Step 1: Fetching all categories...');
+    console.log('Step 1: Fetching all categories...');
     const { data: categories, error: fetchError } = await supabase
       .from('categories')
       .select('*')
@@ -44,7 +44,7 @@ async function main() {
     console.log(`Found ${categories?.length} categories\n`);
 
     // Step 2: Clean names and track changes
-    console.log('🧹 Step 2: Cleaning category names...');
+    console.log('Step 2: Cleaning category names...');
     const updates: Array<{ id: string; oldName: string; newName: string }> = [];
 
     for (const cat of categories!) {
@@ -93,7 +93,7 @@ async function main() {
 
     // Delete emoji versions that conflict
     if (toDelete.length > 0) {
-      console.log(`\n🗑️  Deleting ${toDelete.length} emoji categories that conflict...`);
+      console.log(`\n Deleting ${toDelete.length} emoji categories that conflict...`);
       const { error: deleteError } = await supabase
         .from('categories')
         .delete()
@@ -102,11 +102,11 @@ async function main() {
       if (deleteError) {
         console.error(`  - Delete failed:`, deleteError.message);
       } else {
-        console.log('✅ Emoji conflicting categories deleted');
+        console.log('Emoji conflicting categories deleted');
       }
     }
 
-    console.log('✅ Names cleaned\n');
+    console.log('Names cleaned\n');
 
     // Step 3: Find and remove remaining duplicates
     console.log('🔍 Step 3: Finding remaining duplicates...');
@@ -141,7 +141,7 @@ async function main() {
       if (deleteError) {
         throw new Error(`Failed to delete duplicates: ${deleteError.message}`);
       }
-      console.log('✅ Duplicates removed\n');
+      console.log('Duplicates removed\n');
     }
 
     // Step 4: Update all icons to capital letters
@@ -162,10 +162,10 @@ async function main() {
       }
     }
 
-    console.log('✅ All icons updated\n');
+    console.log('All icons updated\n');
 
     // Step 5: Show final results
-    console.log('📊 Final Results:\n');
+    console.log('Final Results:\n');
     const { data: final } = await supabase
       .from('categories')
       .select('name, icon, color')
@@ -178,10 +178,10 @@ async function main() {
       color: c.color
     })));
 
-    console.log('\n✅ Category fix complete!');
+    console.log('\nCategory fix complete!');
 
   } catch (err) {
-    console.error('❌ Error:', err);
+    console.error('Error:', err);
     process.exit(1);
   }
 }
