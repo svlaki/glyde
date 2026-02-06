@@ -220,9 +220,20 @@ export function useProfileData(): ProfileData {
       })
     }
 
+    // Deduplicate recurring events: count each series once, skip past events
+    const now = new Date()
+    const countedSeriesIds = new Set<string>()
     for (const event of events) {
-      // Skip recurring instances - only count the parent event
-      if (event.is_instance || event.parent_event_id) continue
+      // For recurring events, skip if the series has ended
+      if (event.recurrence_end && new Date(event.recurrence_end) < now) continue
+      // For non-recurring events, skip if already in the past
+      if (!event.is_recurring && !event.parent_event_id && new Date(event.end_time) < now) continue
+
+      // Use parent_event_id as the series key, or event.id for standalone events
+      const seriesKey = event.parent_event_id || event.id
+      if (countedSeriesIds.has(seriesKey)) continue
+      countedSeriesIds.add(seriesKey)
+
       const aspId = event.aspect_id
       if (aspId && breakdownMap.has(aspId)) {
         const entry = breakdownMap.get(aspId)!

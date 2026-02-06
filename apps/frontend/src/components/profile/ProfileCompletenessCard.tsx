@@ -3,66 +3,43 @@ import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { ProfileSummary } from '../../lib/profileService'
-import { PROFILE_SECTIONS } from '../../lib/profileSections'
+import type { UserProfile } from '../../lib/profileService'
+import { useAuth } from '../../lib/authContext'
 import { EditButton } from '../ui/IconButtons'
 
 interface ProfileCompletenessCardProps {
-  summary: ProfileSummary | null
+  summary?: any
+  profile?: UserProfile | null
+  onProfileUpdated?: () => void
 }
 
-const SECTION_LABELS: Record<string, string> = Object.fromEntries(
-  PROFILE_SECTIONS.map(s => [s.key, s.label])
-)
-
-function CircleArc({ percentage, size }: { percentage: number; size: number }) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
-
-  const strokeWidth = 6
-  const radius = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference - (percentage / 100) * circumference
-  const trackColor = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
-
-  return (
-    <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={trackColor}
-        strokeWidth={strokeWidth}
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={colors.success}
-        strokeWidth={strokeWidth}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-      />
-    </svg>
-  )
+interface OverviewField {
+  label: string
+  value: string | undefined
 }
 
-export function ProfileCompletenessCard({ summary }: ProfileCompletenessCardProps) {
+export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProps) {
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
+  const { user } = useAuth()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
   const navigate = useNavigate()
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const barBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
-  const percentage = summary?.completenessPercentage ?? 0
-  const sections = summary?.sections ?? {}
-  const circleSize = isMobile ? 80 : 96
+
+  const profileAny = profile as any
+
+  const fields: OverviewField[] = [
+    { label: 'Name', value: profileAny?.preferred_name || profileAny?.display_name },
+    { label: 'Email', value: user?.email },
+    { label: 'Occupation', value: profileAny?.occupation },
+    { label: 'Field of Study', value: profileAny?.field_of_study },
+    { label: 'Timezone', value: profileAny?.timezone },
+    { label: 'Birthday', value: profileAny?.birthday },
+  ]
+
+  const filledFields = fields.filter(f => f.value)
 
   return (
     <div style={{
@@ -78,7 +55,7 @@ export function ProfileCompletenessCard({ summary }: ProfileCompletenessCardProp
         alignItems: 'center',
       }}>
         <div style={{ ...typography.headingMd, color: colors.textPrimary }}>
-          Profile Completeness
+          About
         </div>
         <EditButton
           onClick={() => navigate('/profile/edit')}
@@ -88,77 +65,31 @@ export function ProfileCompletenessCard({ summary }: ProfileCompletenessCardProp
       </div>
 
       <div style={{
-        padding: isMobile ? '8px 16px 16px' : '8px 20px 20px',
+        padding: isMobile ? '0 16px 16px' : '0 20px 20px',
         display: 'flex',
-        gap: isMobile ? '16px' : '24px',
-        alignItems: 'flex-start',
+        flexDirection: 'column',
+        gap: '10px',
       }}>
-        {/* Circle indicator */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <CircleArc percentage={percentage} size={circleSize} />
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <span style={{
-              ...typography.displaySm,
-              color: colors.textPrimary,
-            }}>
-              {percentage}%
-            </span>
+        {filledFields.length === 0 ? (
+          <div style={{ ...typography.bodySm, color: colors.textTertiary, padding: '8px 0' }}>
+            No profile info yet. Tap edit to add details.
           </div>
-        </div>
-
-        {/* Section bars */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {Object.entries(sections).map(([key, data]) => {
-            const label = SECTION_LABELS[key] || key
-            const sectionPct = Math.round(data.completeness)
-
-            return (
-              <div key={key}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: '3px',
-                }}>
-                  <span style={{ ...typography.labelMd, color: colors.textSecondary }}>
-                    {label}
-                  </span>
-                  <span style={{ ...typography.labelMd, color: colors.textTertiary }}>
-                    {sectionPct}%
-                  </span>
-                </div>
-                <div style={{
-                  height: '3px',
-                  borderRadius: '1.5px',
-                  background: barBg,
-                }}>
-                  <div style={{
-                    height: '100%',
-                    borderRadius: '1.5px',
-                    background: colors.accent,
-                    width: `${sectionPct}%`,
-                    opacity: 0.6,
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-            )
-          })}
-
-          {Object.keys(sections).length === 0 && (
-            <div style={{ ...typography.bodySm, color: colors.textTertiary }}>
-              Complete your profile to see progress
+        ) : (
+          filledFields.map(field => (
+            <div key={field.label} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <span style={{ ...typography.labelMd, color: colors.textSecondary }}>
+                {field.label}
+              </span>
+              <span style={{ ...typography.bodySm, color: colors.textPrimary }}>
+                {field.value}
+              </span>
             </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
     </div>
   )

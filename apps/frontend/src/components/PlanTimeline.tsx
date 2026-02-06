@@ -642,22 +642,6 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
           </div>
         </div>
 
-        {/* Month markers */}
-        {monthMarkers.map((marker, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${marker.position}%`,
-              top: '10px',
-              transform: 'translateX(-50%)',
-              fontSize: fontSize.xs,
-              color: colors.textTertiary
-            }}
-          >
-            {marker.label}
-          </div>
-        ))}
 
         {/* Timeline items */}
         {timelineItems.map(item => (

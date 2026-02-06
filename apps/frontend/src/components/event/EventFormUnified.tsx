@@ -373,32 +373,12 @@ export function EventFormUnified({
     )
   }
 
-  const titleInput = (
-    <input
-      type="text"
-      value={form.title}
-      onChange={(e) => form.setTitle(e.target.value)}
-      required
-      placeholder="Event title"
-      style={{
-        width: '100%',
-        padding: '0',
-        ...typography.headingLg,
-        fontWeight: 600,
-        background: 'transparent',
-        color: colors.textPrimary,
-        border: 'none',
-        outline: 'none'
-      }}
-    />
-  )
-
   return (
     <>
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        headerContent={titleInput}
+        title={event?.id ? 'Edit Event' : 'New Event'}
         maxWidth="500px"
         preventAutoFocus={!!event?.id}
       >
@@ -417,6 +397,19 @@ export function EventFormUnified({
             flex: 1,
             minHeight: 0
           }}>
+            {/* Title */}
+            <div>
+              <FormLabel>Title *</FormLabel>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => form.setTitle(e.target.value)}
+                required
+                placeholder="Event title"
+                style={inputStyle}
+              />
+            </div>
+
             {/* Location */}
             <div>
               <FormLabel>Location</FormLabel>

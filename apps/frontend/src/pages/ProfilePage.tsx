@@ -124,7 +124,7 @@ function ProfilePageDesktop() {
                 gridTemplateColumns: '1fr 1fr',
                 gap: '16px',
               }}>
-                <ProfileCompletenessCard summary={data.profileSummary} />
+                <ProfileCompletenessCard summary={data.profileSummary} profile={data.profile} />
                 <ActivityInsightsCard taskInsights={data.taskInsights} />
                 <GoalsSection />
                 <AspectBreakdownCard breakdown={data.aspectBreakdown} />
