@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
-import { useCategories } from '../../lib/categoryContext'
+import { useAspects } from '../../lib/aspectContext'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
 import { supabase } from '../../lib/supabase'
@@ -15,7 +15,7 @@ interface CalendarEvent {
   start_time: string
   end_time: string
   description?: string
-  category?: string
+  aspect?: string
   color?: string
   recurrence_rule?: string
   parent_event_id?: string
@@ -36,7 +36,7 @@ interface MobileCalendarProps {
 
 export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateChange, hideMonthDayHeaders = false, scrollToDate }: MobileCalendarProps) {
   const { user, session } = useAuth()
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(true) // Mobile context
@@ -117,10 +117,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     momentumRafId: null
   })
 
-  // Get event color based on category
+  // Get event color based on aspect
   const getEventColor = (event: CalendarEvent): string => {
-    if (event.category) {
-      return getCategoryColor(event.category)
+    if (event.aspect) {
+      return getAspectColor(event.aspect)
     }
     return event.color || '#3b82f6'
   }
@@ -1671,7 +1671,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
             if (eventData.start_time) updates.start_time = eventData.start_time
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
-            if (eventData.category) updates.category = eventData.category
+            if (eventData.aspect) updates.aspect = eventData.aspect
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
             await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
           }

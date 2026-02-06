@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
+import { useDarkMode } from '../lib/darkModeContext'
+import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typography'
 import {
   createSharedAspect,
   getUserSharedAspects,
@@ -8,18 +11,23 @@ import {
   removeMember,
   updateMemberRole,
   deleteSharedAspect,
-  SharedAspect,
-  SharedAspectMember
 } from '../lib/sharedAspectService'
-import { getFriends, Friend } from '../lib/friendshipService'
+import type { SharedAspect, SharedAspectMember } from '../lib/sharedAspectService'
+import { getFriends } from '../lib/friendshipService'
+import type { Friend } from '../lib/friendshipService'
 
 export function SharedAspectsSection() {
   const { user, session } = useAuth()
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+  const typography = getTypography(false)
+
   const [aspects, setAspects] = useState<SharedAspect[]>([])
   const [selectedAspectId, setSelectedAspectId] = useState<string | null>(null)
   const [members, setMembers] = useState<SharedAspectMember[]>([])
   const [friends, setFriends] = useState<Friend[]>([])
   const [newAspectName, setNewAspectName] = useState('')
+  const [newAspectColor, setNewAspectColor] = useState('#3b82f6')
   const [selectedFriendId, setSelectedFriendId] = useState('')
   const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('viewer')
   const [loading, setLoading] = useState(false)
@@ -79,7 +87,7 @@ export function SharedAspectsSection() {
     setLoading(true)
     setError(null)
 
-    const response = await createSharedAspect(newAspectName, accessToken)
+    const response = await createSharedAspect(newAspectName, accessToken, undefined, newAspectColor)
     if (response.success) {
       setNewAspectName('')
       loadAspects()
@@ -149,60 +157,140 @@ export function SharedAspectsSection() {
 
   const currentAspect = aspects.find(a => a.id === selectedAspectId)
   const isOwner = currentAspect?.owner_id === user?.id
+  const userRole = members.find(m => m.user_id === user?.id)?.role
+  const canAddMembers = isOwner || userRole === 'editor'
+
+  const inputStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    fontSize: fontSize.base,
+    fontFamily: fontFamily.sans,
+    background: colors.bgTertiary,
+    color: colors.textPrimary,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    outline: 'none'
+  }
+
+  const buttonStyle = {
+    padding: '10px 16px',
+    fontSize: fontSize.sm,
+    fontFamily: fontFamily.sans,
+    fontWeight: fontWeight.medium,
+    background: colors.primary,
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'opacity 0.15s'
+  }
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Shared Aspects</h2>
+    <div style={{ background: colors.bgSecondary, borderRadius: '12px', padding: '24px' }}>
+      <h2 style={{ ...typography.headingLg, fontWeight: fontWeight.bold, color: colors.textPrimary, marginBottom: '24px' }}>
+        Shared Aspects
+      </h2>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-800">
+        <div style={{
+          marginBottom: '16px',
+          padding: '12px 16px',
+          background: hexToRgba(colors.error, 0.1),
+          border: `1px solid ${hexToRgba(colors.error, 0.3)}`,
+          borderRadius: '8px',
+          color: colors.error,
+          fontSize: fontSize.sm
+        }}>
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
         {/* Aspects List */}
-        <div className="col-span-1">
-          <h3 className="font-semibold mb-4">Your Aspects</h3>
+        <div>
+          <h3 style={{ ...typography.labelLg, fontWeight: fontWeight.semibold, color: colors.textSecondary, marginBottom: '16px' }}>
+            Your Aspects
+          </h3>
 
           {/* Create new aspect form */}
-          <form onSubmit={handleCreateAspect} className="mb-6 p-4 bg-gray-50 rounded">
+          <form onSubmit={handleCreateAspect} style={{
+            marginBottom: '20px',
+            padding: '16px',
+            background: colors.bgTertiary,
+            borderRadius: '10px'
+          }}>
             <input
               type="text"
               placeholder="New aspect name"
               value={newAspectName}
               onChange={(e) => setNewAspectName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded mb-2"
+              style={{ ...inputStyle, marginBottom: '10px' }}
               disabled={loading}
             />
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+              <input
+                type="color"
+                value={newAspectColor}
+                onChange={(e) => setNewAspectColor(e.target.value)}
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  padding: '2px',
+                  borderRadius: '8px',
+                  border: `1px solid ${colors.border}`,
+                  cursor: 'pointer'
+                }}
+              />
+              <span style={{ ...typography.bodySm, color: colors.textTertiary, alignSelf: 'center' }}>
+                Pick a color
+              </span>
+            </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+              style={{ ...buttonStyle, width: '100%', opacity: loading ? 0.6 : 1 }}
             >
               {loading ? 'Creating...' : 'Create Aspect'}
             </button>
           </form>
 
           {/* Aspects list */}
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {aspects.length === 0 ? (
-              <p className="text-gray-500 text-sm">No shared aspects yet</p>
+              <p style={{ ...typography.bodySm, color: colors.textTertiary }}>
+                No shared aspects yet. Create one to share calendars with friends.
+              </p>
             ) : (
               aspects.map((aspect) => (
                 <button
                   key={aspect.id}
                   onClick={() => setSelectedAspectId(aspect.id)}
-                  className={`w-full text-left p-3 rounded transition ${
-                    selectedAspectId === aspect.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '14px 16px',
+                    borderRadius: '10px',
+                    border: selectedAspectId === aspect.id ? `2px solid ${colors.primary}` : `1px solid ${colors.border}`,
+                    background: selectedAspectId === aspect.id ? hexToRgba(colors.primary, 0.08) : colors.bgTertiary,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
                 >
-                  <div className="font-medium">{aspect.name}</div>
-                  <div className="text-xs">
-                    {aspect.icon && <span className="mr-2">{aspect.icon}</span>}
-                    {aspect.owner_id === user?.id ? 'Owner' : 'Member'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: aspect.color || '#3b82f6'
+                    }} />
+                    <div>
+                      <div style={{ ...typography.bodyBase, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
+                        {aspect.name}
+                      </div>
+                      <div style={{ ...typography.bodySm, color: colors.textTertiary }}>
+                        {aspect.owner_id === user?.id ? 'Owner' : 'Member'}
+                      </div>
+                    </div>
                   </div>
                 </button>
               ))
@@ -211,34 +299,62 @@ export function SharedAspectsSection() {
         </div>
 
         {/* Aspect Details and Members */}
-        {currentAspect && (
-          <div className="col-span-2">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-xl font-semibold">{currentAspect.name}</h3>
-                {currentAspect.description && (
-                  <p className="text-sm text-gray-600 mt-1">{currentAspect.description}</p>
-                )}
+        {currentAspect ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '50%',
+                  background: currentAspect.color || '#3b82f6'
+                }} />
+                <div>
+                  <h3 style={{ ...typography.headingMd, fontWeight: fontWeight.semibold, color: colors.textPrimary }}>
+                    {currentAspect.name}
+                  </h3>
+                  {currentAspect.description && (
+                    <p style={{ ...typography.bodySm, color: colors.textSecondary, marginTop: '4px' }}>
+                      {currentAspect.description}
+                    </p>
+                  )}
+                </div>
               </div>
               {isOwner && (
                 <button
                   onClick={() => handleDeleteAspect(currentAspect.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.medium,
+                    color: colors.error,
+                    background: 'transparent',
+                    border: `1px solid ${colors.error}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
                 >
                   Delete
                 </button>
               )}
             </div>
 
-            {/* Add member form (only for owner/editor) */}
-            {(isOwner || members.find(m => m.user_id === user?.id && m.role === 'editor')) && (
-              <form onSubmit={handleAddMember} className="mb-6 p-4 bg-gray-50 rounded">
-                <label className="text-sm font-medium block mb-2">Add Friend</label>
-                <div className="flex gap-2 mb-2">
+            {/* Add member form */}
+            {canAddMembers && (
+              <form onSubmit={handleAddMember} style={{
+                marginBottom: '24px',
+                padding: '16px',
+                background: colors.bgTertiary,
+                borderRadius: '10px'
+              }}>
+                <label style={{ ...typography.labelMd, fontWeight: fontWeight.medium, color: colors.textSecondary, display: 'block', marginBottom: '10px' }}>
+                  Add Friend to Aspect
+                </label>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <select
                     value={selectedFriendId}
                     onChange={(e) => setSelectedFriendId(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
+                    style={{ ...inputStyle, flex: 1 }}
                     disabled={loading}
                   >
                     <option value="">Select a friend...</option>
@@ -253,7 +369,7 @@ export function SharedAspectsSection() {
                   <select
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
-                    className="px-3 py-2 border border-gray-300 rounded text-sm"
+                    style={{ ...inputStyle, width: '120px' }}
                   >
                     <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
@@ -261,49 +377,111 @@ export function SharedAspectsSection() {
                   <button
                     type="submit"
                     disabled={loading || !selectedFriendId}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm"
+                    style={{
+                      ...buttonStyle,
+                      background: '#10b981',
+                      opacity: loading || !selectedFriendId ? 0.6 : 1
+                    }}
                   >
-                    {loading ? 'Adding...' : 'Add'}
+                    Add
                   </button>
                 </div>
+                <p style={{ ...typography.bodySm, color: colors.textTertiary, marginTop: '8px' }}>
+                  Editors can add events and members. Viewers can only see events.
+                </p>
               </form>
             )}
 
             {/* Members list */}
             <div>
-              <h4 className="font-semibold mb-3">Members ({members.length})</h4>
-              <div className="space-y-2">
+              <h4 style={{ ...typography.labelLg, fontWeight: fontWeight.semibold, color: colors.textSecondary, marginBottom: '12px' }}>
+                Members ({members.length})
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {members.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No members yet</p>
+                  <p style={{ ...typography.bodySm, color: colors.textTertiary }}>
+                    No members yet. Add friends to share this aspect.
+                  </p>
                 ) : (
                   members.map((member) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <div>
-                        <div className="font-medium text-sm">
-                          {member.user?.display_name}
-                          {member.user_id === currentAspect.owner_id && (
-                            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              Owner
-                            </span>
-                          )}
+                    <div
+                      key={member.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '14px 16px',
+                        background: colors.bgTertiary,
+                        borderRadius: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          background: colors.bgHover,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: fontSize.sm,
+                          fontWeight: fontWeight.semibold,
+                          color: colors.textSecondary
+                        }}>
+                          {member.user?.display_name?.charAt(0)?.toUpperCase() || '?'}
                         </div>
-                        <div className="text-xs text-gray-600">{member.user?.email}</div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ ...typography.bodyBase, fontWeight: fontWeight.medium, color: colors.textPrimary }}>
+                              {member.user?.display_name || 'Unknown'}
+                            </span>
+                            {member.role === 'owner' && (
+                              <span style={{
+                                fontSize: fontSize.xs,
+                                fontWeight: fontWeight.semibold,
+                                background: hexToRgba(colors.primary, 0.15),
+                                color: colors.primary,
+                                padding: '2px 8px',
+                                borderRadius: '10px'
+                              }}>
+                                Owner
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ ...typography.bodySm, color: colors.textTertiary }}>
+                            {member.user?.email}
+                          </div>
+                        </div>
                       </div>
                       {isOwner && member.role !== 'owner' && (
-                        <div className="flex gap-2">
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                           <select
                             value={member.role}
-                            onChange={(e) =>
-                              handleUpdateMemberRole(member.id, e.target.value as 'editor' | 'viewer')
-                            }
-                            className="text-xs px-2 py-1 border border-gray-300 rounded"
+                            onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as 'editor' | 'viewer')}
+                            style={{
+                              padding: '6px 10px',
+                              fontSize: fontSize.sm,
+                              border: `1px solid ${colors.border}`,
+                              borderRadius: '6px',
+                              background: colors.bgSecondary,
+                              color: colors.textPrimary,
+                              cursor: 'pointer'
+                            }}
                           >
                             <option value="editor">Editor</option>
                             <option value="viewer">Viewer</option>
                           </select>
                           <button
                             onClick={() => handleRemoveMember(member.id)}
-                            className="text-red-600 hover:text-red-800 text-xs font-medium"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: fontSize.sm,
+                              fontWeight: fontWeight.medium,
+                              color: colors.error,
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
                           >
                             Remove
                           </button>
@@ -314,6 +492,17 @@ export function SharedAspectsSection() {
                 )}
               </div>
             </div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '200px',
+            color: colors.textTertiary,
+            fontSize: fontSize.base
+          }}>
+            Select an aspect to view details
           </div>
         )}
       </div>

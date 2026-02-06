@@ -6,7 +6,7 @@ export interface Goal {
   user_id: string
   title: string
   description?: string
-  category?: string
+  aspect?: string
   target_date?: string
   status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
   progress?: number
@@ -57,7 +57,7 @@ export async function fetchUserGoals(
   accessToken: string,
   filters?: {
     status?: string
-    category?: string
+    aspect?: string
     goal_type?: string
     target_before?: string
     target_after?: string
@@ -103,7 +103,7 @@ export async function createUserGoal(
   goalData: {
     title: string
     description?: string
-    category?: string
+    aspect?: string
     target_date?: string
     status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
     progress?: number

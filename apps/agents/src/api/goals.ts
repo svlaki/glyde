@@ -9,13 +9,13 @@ export async function getUserGoals(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { status, category, goal_type, target_before, target_after } = req.body;
+    const { status, aspect, goal_type, target_before, target_after } = req.body;
 
     console.log('Fetching goals for user:', userId);
 
     const filters: any = {};
     if (status) filters.status = status;
-    if (category) filters.category = category;
+    if (aspect) filters.aspect = aspect;
     if (goal_type) filters.goalType = goal_type;
     if (target_before) filters.targetBefore = target_before;
     if (target_after) filters.targetAfter = target_after;
@@ -49,7 +49,7 @@ export async function createUserGoal(req: Request, res: Response): Promise<void>
     const createdGoal = await getSupabaseService().createGoal(userId, {
       title: goalData.title,
       description: goalData.description,
-      category: goalData.category,
+      aspect: goalData.aspect,
       targetDate: goalData.target_date,
       status: goalData.status,
       progress: goalData.progress,
@@ -97,7 +97,7 @@ export async function updateUserGoal(req: Request, res: Response): Promise<void>
     const updatedGoal = await getSupabaseService().updateGoal(userId, goal_id, {
       title: updates.title,
       description: updates.description,
-      category: updates.category,
+      aspect: updates.aspect,
       targetDate: updates.target_date,
       status: updates.status,
       progress: updates.progress,

@@ -240,7 +240,7 @@ export async function deleteUserEvent(req: Request, res: Response): Promise<void
 
 export async function createRecurringEvent(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, title, start_time, recurrence_rule, recurrence_end, location, description, category } = req.body;
+    const { user_id, title, start_time, recurrence_rule, recurrence_end, location, description, aspect } = req.body;
 
     // Validate required fields
     if (!user_id) {
@@ -276,7 +276,7 @@ export async function createRecurringEvent(req: Request, res: Response): Promise
       end_time: req.body.end_time || new Date(new Date(start_time).getTime() + 60 * 60 * 1000).toISOString(),
       location: location || '',
       description: description || '',
-      category: category || 'Personal',
+      aspect: aspect || 'Personal',
       recurrence_rule,
       recurrence_end: recurrence_end || null
     });

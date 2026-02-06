@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
-import { createUserCategory, updateUserCategory, deleteUserCategory, Category } from '../lib/categoryService'
+import { useAspects } from '../lib/aspectContext'
+import { createUserAspect, updateUserAspect, deleteUserAspect } from '../lib/aspectService'
+import type { Aspect } from '../lib/aspectService'
 import { AspectCard } from '../components/AspectCard'
 import { AspectForm } from '../components/AspectForm'
 import { GoalsByAspect } from '../components/GoalsByAspect'
@@ -28,47 +29,47 @@ function AspectsPageMobile() {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { categories, loading, error, refreshCategories } = useCategories()
-  const [selectedAspect, setSelectedAspect] = useState<Category | null>(null)
+  const { aspects, loading, error, refreshAspects } = useAspects()
+  const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingAspect, setEditingAspect] = useState<Category | undefined>(undefined)
+  const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
     setIsFormOpen(true)
   }
 
-  const handleEditAspect = (aspect: Category) => {
+  const handleEditAspect = (aspect: Aspect) => {
     setEditingAspect(aspect)
     setIsFormOpen(true)
   }
 
-  const handleDeleteAspect = async (aspect: Category) => {
+  const handleDeleteAspect = async (aspect: Aspect) => {
     if (!user || !session) return
 
     try {
-      await deleteUserCategory(user, aspect.id!, session.access_token)
+      await deleteUserAspect(user, aspect.id!, session.access_token)
       if (selectedAspect?.id === aspect.id) {
         setSelectedAspect(null)
       }
-      await refreshCategories()
+      await refreshAspects()
     } catch (error) {
       console.error('Error deleting aspect:', error)
       alert('Failed to delete aspect. Please try again.')
     }
   }
 
-  const handleSaveAspect = async (aspectData: Partial<Category>) => {
+  const handleSaveAspect = async (aspectData: Partial<Aspect>) => {
     if (!user || !session) return
 
     try {
       if (aspectData.id) {
         const { id, ...updates } = aspectData
-        await updateUserCategory(user, id, updates, session.access_token)
+        await updateUserAspect(user, id, updates, session.access_token)
       } else {
-        await createUserCategory(user, aspectData as any, session.access_token)
+        await createUserAspect(user, aspectData as any, session.access_token)
       }
-      await refreshCategories()
+      await refreshAspects()
       setIsFormOpen(false)
     } catch (error) {
       console.error('Error saving aspect:', error)
@@ -158,7 +159,7 @@ function AspectsPageMobile() {
           }}>
             Error: {error}
           </div>
-        ) : categories.length === 0 ? (
+        ) : aspects.length === 0 ? (
           <EmptyState
             title="No aspects yet"
             description="Create your first aspect to get started"
@@ -169,7 +170,7 @@ function AspectsPageMobile() {
             flexDirection: 'column',
             gap: '12px'
           }}>
-            {categories.map(aspect => (
+            {aspects.map(aspect => (
               <AspectCard
                 key={aspect.id}
                 aspect={aspect}
@@ -198,56 +199,56 @@ function AspectsPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false)
-  const { categories, loading, error, refreshCategories } = useCategories()
-  const [selectedAspect, setSelectedAspect] = useState<Category | null>(null)
+  const { aspects, loading, error, refreshAspects } = useAspects()
+  const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingAspect, setEditingAspect] = useState<Category | undefined>(undefined)
+  const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
 
-  // Auto-select first aspect when categories load
+  // Auto-select first aspect when aspects load
   useEffect(() => {
-    if (!selectedAspect && categories.length > 0) {
-      setSelectedAspect(categories[0])
+    if (!selectedAspect && aspects.length > 0) {
+      setSelectedAspect(aspects[0])
     }
-  }, [categories, selectedAspect])
+  }, [aspects, selectedAspect])
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
     setIsFormOpen(true)
   }
 
-  const handleEditAspect = (aspect: Category) => {
+  const handleEditAspect = (aspect: Aspect) => {
     setEditingAspect(aspect)
     setIsFormOpen(true)
   }
 
-  const handleDeleteAspect = async (aspect: Category) => {
+  const handleDeleteAspect = async (aspect: Aspect) => {
     if (!user || !session) return
 
     try {
-      await deleteUserCategory(user, aspect.id!, session.access_token)
+      await deleteUserAspect(user, aspect.id!, session.access_token)
       if (selectedAspect?.id === aspect.id) {
         setSelectedAspect(null)
       }
-      await refreshCategories()
+      await refreshAspects()
     } catch (error) {
       console.error('Error deleting aspect:', error)
       alert('Failed to delete aspect. Please try again.')
     }
   }
 
-  const handleSaveAspect = async (aspectData: Partial<Category>) => {
+  const handleSaveAspect = async (aspectData: Partial<Aspect>) => {
     if (!user || !session) return
 
     try {
       if (aspectData.id) {
         // Update existing aspect - destructure id out of updates
         const { id, ...updates } = aspectData
-        await updateUserCategory(user, id, updates, session.access_token)
+        await updateUserAspect(user, id, updates, session.access_token)
       } else {
         // Create new aspect
-        await createUserCategory(user, aspectData as any, session.access_token)
+        await createUserAspect(user, aspectData as any, session.access_token)
       }
-      await refreshCategories()
+      await refreshAspects()
       setIsFormOpen(false)
     } catch (error) {
       console.error('Error saving aspect:', error)
@@ -355,13 +356,13 @@ function AspectsPageDesktop() {
               }}>
                 Error: {error}
               </div>
-            ) : categories.length === 0 ? (
+            ) : aspects.length === 0 ? (
               <EmptyState
                 title="No aspects yet"
                 description="Create your first aspect to get started"
               />
             ) : (
-              categories.map(aspect => (
+              aspects.map(aspect => (
                 <AspectCard
                   key={aspect.id}
                   aspect={aspect}

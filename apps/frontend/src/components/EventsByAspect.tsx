@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
 import { fetchUserEvents, CalendarEvent } from '../lib/calendarService'
-import { Category } from '../lib/categoryService'
+import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
 
 interface EventsByAspectProps {
-  aspect: Category | null
+  aspect: Aspect | null
 }
 
 function formatEventTime(startTime: string, endTime: string): string {
@@ -115,9 +115,9 @@ export function EventsByAspect({ aspect }: EventsByAspectProps) {
       try {
         const { events: allEvents } = await fetchUserEvents(user, session.access_token)
 
-        // Filter events by aspect category
+        // Filter events by aspect
         const filteredEvents = allEvents.filter(event =>
-          event.category === aspect.name || event.category === aspect.id
+          event.aspect === aspect.name || event.aspect === aspect.id
         )
 
         // Sort by start time (most recent first)

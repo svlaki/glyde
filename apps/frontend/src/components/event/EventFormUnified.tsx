@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
-import { CalendarEvent, createRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
+import { createRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
+import type { CalendarEvent } from '../../lib/calendarService'
 import { buildRRuleFromForm, formatRRuleForDisplay } from '../../lib/recurrenceUtils'
 import { usePlatform } from '../../hooks/usePlatform'
 import { getColors } from '../../styles/colors'
@@ -44,6 +45,9 @@ export function EventFormUnified({
 
   const form = useEventFormState({ event: event ?? null, isOpen })
 
+  // Check if this is a friend's event (read-only)
+  const isFriendEvent = event?.is_friend_event === true
+
   const [showRecurrencePopover, setShowRecurrencePopover] = useState(false)
   const [scopeDialogAction, setScopeDialogAction] = useState<'save' | 'delete' | null>(null)
   const [pendingSaveData, setPendingSaveData] = useState<Partial<CalendarEvent> | null>(null)
@@ -84,7 +88,8 @@ export function EventFormUnified({
       title: form.title.trim(),
       location: form.location.trim(),
       ...(form.description.trim() ? { description: form.description.trim() } : {}),
-      ...(form.category ? { category: form.category } : {}),
+      ...(form.aspect ? { aspect: form.aspect } : {}),
+      visibility: form.visibility,
       start_time: startISO,
       end_time: endISO
     }
@@ -110,7 +115,7 @@ export function EventFormUnified({
           form.title.trim(),
           form.startDate.toISOString(),
           rrule,
-          form.category || 'Personal',
+          form.aspect || 'Personal',
           form.description.trim() || undefined,
           form.location.trim(),
           form.recurrence.endType === 'until' && form.recurrence.untilDate
@@ -229,6 +234,144 @@ export function EventFormUnified({
       {children}
     </label>
   )
+
+  // Read-only view for friend's events
+  if (isFriendEvent) {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        headerContent={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: colors.bgTertiary,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+              fontWeight: 600,
+              color: colors.textSecondary
+            }}>
+              {event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'}
+            </span>
+            <div>
+              <div style={{ ...typography.headingLg, fontWeight: 600, color: colors.textPrimary }}>
+                {event.title}
+              </div>
+              <div style={{ fontSize: '13px', color: colors.textSecondary }}>
+                {event.owner_display_name || 'Friend'}'s event
+              </div>
+            </div>
+          </div>
+        }
+        maxWidth="400px"
+      >
+        <div style={{
+          padding: '16px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          {/* Time */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <div>
+              <div style={{ fontWeight: 500, color: colors.textPrimary }}>
+                {form.formatDateDisplay(form.startDate)}
+              </div>
+              <div style={{ color: colors.textSecondary, fontSize: '14px' }}>
+                {form.formatTimeDisplay(form.startDate)} - {form.formatTimeDisplay(form.endDate)}
+              </div>
+            </div>
+          </div>
+
+          {/* Location (if available) */}
+          {event.location && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <span style={{ color: colors.textPrimary }}>{event.location}</span>
+            </div>
+          )}
+
+          {/* Aspect (if available) */}
+          {event.aspect && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              <span style={{ color: colors.textPrimary }}>{event.aspect}</span>
+            </div>
+          )}
+
+          {/* Privacy notice */}
+          <div style={{
+            background: colors.bgTertiary,
+            padding: '12px 14px',
+            borderRadius: '8px',
+            fontSize: '13px',
+            color: colors.textTertiary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '8px'
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            This is a friend's event. Some details are hidden for privacy.
+          </div>
+
+          {/* Close button */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            paddingTop: '12px',
+            borderTop: `1px solid ${colors.border}`
+          }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontFamily: fontFamily.sans,
+                background: colors.bgTertiary,
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )
+  }
 
   const titleInput = (
     <input
@@ -445,9 +588,49 @@ export function EventFormUnified({
 
             {/* Aspect */}
             <AspectDropdown
-              value={form.category}
-              onChange={form.setCategory}
+              value={form.aspect}
+              onChange={form.setAspect}
             />
+
+            {/* Visibility */}
+            <div>
+              <FormLabel>Who can see this</FormLabel>
+              <div style={{
+                display: 'flex',
+                gap: '8px'
+              }}>
+                {(['private', 'friends', 'public'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => form.setVisibility(option)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      fontFamily: fontFamily.sans,
+                      background: form.visibility === option ? colors.primary : colors.bgTertiary,
+                      color: form.visibility === option ? '#fff' : colors.textSecondary,
+                      border: `1px solid ${form.visibility === option ? colors.primary : colors.border}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {option === 'private' ? 'Only me' : option === 'friends' ? 'Friends' : 'Public'}
+                  </button>
+                ))}
+              </div>
+              <div style={{
+                marginTop: '6px',
+                fontSize: '12px',
+                color: colors.textTertiary
+              }}>
+                {form.visibility === 'private' && 'Only you can see this event'}
+                {form.visibility === 'friends' && 'Friends you\'ve added can see this event'}
+                {form.visibility === 'public' && 'All friends can see this event on their calendar'}
+              </div>
+            </div>
 
             {/* Description */}
             <div>

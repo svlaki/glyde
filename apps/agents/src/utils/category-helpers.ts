@@ -64,7 +64,7 @@ export async function getCategoryByName(
 ): Promise<Category | null> {
   try {
     const { data, error } = await client
-      .from('categories')
+      .from('aspects')
       .select('*')
       .eq('user_id', userId)
       .eq('name', name)
@@ -93,7 +93,7 @@ export async function getCategoryById(
 ): Promise<Category | null> {
   try {
     const { data, error } = await client
-      .from('categories')
+      .from('aspects')
       .select('*')
       .eq('user_id', userId)
       .eq('id', categoryId)
@@ -170,7 +170,7 @@ export async function createDefaultCategories(
   try {
     // Check if user already has categories
     const { data: existing } = await client
-      .from('categories')
+      .from('aspects')
       .select('id')
       .eq('user_id', userId)
       .limit(1);

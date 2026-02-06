@@ -4,7 +4,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const updateGoalTool = tool(
-  async ({ goalId, title, description, targetDate, status, progress, category, priorityScore, milestones }, config) => {
+  async ({ goalId, title, description, targetDate, status, progress, aspect, priorityScore, milestones }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -26,7 +26,7 @@ export const updateGoalTool = tool(
       if (targetDate !== undefined && targetDate !== null && targetDate.trim() !== '') updates.targetDate = targetDate;
       if (status !== undefined && status !== null) updates.status = status;
       if (progress !== undefined && progress !== null) updates.progress = progress;
-      if (category !== undefined && category !== null && category.trim() !== '') updates.category = category;
+      if (aspect !== undefined && aspect !== null && aspect.trim() !== '') updates.aspect = aspect;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
       if (milestones !== undefined && milestones !== null) updates.milestones = milestones;
 
@@ -81,8 +81,8 @@ export const updateGoalTool = tool(
           changes.push(`target date changed to ${dateStr}`);
         }
       }
-      if (category !== undefined && originalGoal?.category !== category) {
-        changes.push(`category changed to "${category}"`);
+      if (aspect !== undefined && originalGoal?.aspect !== aspect) {
+        changes.push(`aspect changed to "${aspect}"`);
       }
       if (milestones !== undefined && milestones !== null) {
         changes.push(`milestones updated (${milestones.length} total)`);
@@ -106,7 +106,7 @@ export const updateGoalTool = tool(
       targetDate: z.string().optional().nullable().describe("New target date (ISO format)"),
       status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("New status"),
       progress: z.number().min(0).max(100).optional().nullable().describe("Progress percentage (0-100)"),
-      category: z.string().optional().nullable().describe("New category name"),
+      aspect: z.string().optional().nullable().describe("New aspect name"),
       priorityScore: z.number().min(1).max(10).optional().nullable().describe("New priority score (1-10)"),
       milestones: z.array(z.object({
         title: z.string().describe("Milestone title"),

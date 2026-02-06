@@ -182,7 +182,7 @@ async function rebuildUserGraph(
           taskId: task.id,
           title: task.title,
           priority: task.priority || 'medium',
-          category: task.category,
+          aspect: task.aspect,
           energy_required: task.energy_required || 'medium',
         });
         result.tasksAdded++;
@@ -247,7 +247,7 @@ async function rebuildUserGraph(
         await zepGraphService.addCalendarEvent(userId, {
           eventId: event.id,
           title: event.title,
-          category: event.category || 'personal',
+          aspect: event.aspect || 'personal',
           duration_minutes: durationMinutes,
           location: event.location,
         });

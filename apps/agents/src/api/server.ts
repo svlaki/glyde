@@ -37,7 +37,7 @@ import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeU
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserPlan, createUserPlan, updateUserPlan, deleteUserPlan } from './plans.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
-import { getUserCategories, createUserCategory, updateUserCategory, deleteUserCategory, getCategoryColor } from './categories.js';
+import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor } from './aspects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
@@ -318,12 +318,12 @@ app.post('/api/profile/update', updateUserProfile);
 app.post('/api/profile/field', updateProfileField);
 app.post('/api/profile/batch-update', batchUpdateProfileFields);
 
-// Categories endpoints
-app.post('/api/categories', getUserCategories);
-app.post('/api/categories/create', createUserCategory);
-app.post('/api/categories/update', updateUserCategory);
-app.post('/api/categories/delete', deleteUserCategory);
-app.post('/api/categories/color', getCategoryColor);
+// Aspects endpoints
+app.post('/api/aspects', getUserAspects);
+app.post('/api/aspects/create', createUserAspect);
+app.post('/api/aspects/update', updateUserAspect);
+app.post('/api/aspects/delete', deleteUserAspect);
+app.post('/api/aspects/color', getAspectColor);
 
 // Onboarding endpoints
 app.post('/api/onboarding/complete', completeOnboarding);

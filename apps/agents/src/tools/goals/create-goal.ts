@@ -4,7 +4,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createGoalTool = tool(
-  async ({ title, description, targetDate, category, goalType, priorityScore, energyRequirement, reviewFrequency, milestones, milestoneType }, config) => {
+  async ({ title, description, targetDate, aspect, goalType, priorityScore, energyRequirement, reviewFrequency, milestones, milestoneType }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -23,7 +23,7 @@ export const createGoalTool = tool(
         title,
         description: description || undefined,
         targetDate: targetDate || undefined,
-        category: category || 'personal',
+        aspect: aspect || 'personal',
         goalType: goalType || 'SMART',
         priorityScore: priorityScore || 5,
         energyRequirement: energyRequirement || undefined,
@@ -58,12 +58,12 @@ export const createGoalTool = tool(
   },
   {
     name: "create_goal",
-    description: "Create a new goal. Use this when the user wants to set a long-term objective, ambition, or something they want to achieve. IMPORTANT: Every goal MUST have a category (Health, Work, Finance, Personal, or Education). Goals support two milestone types: 'dated' (with specific due dates, appears on timeline) for deadline-driven goals, or 'ordered' (sequential steps without dates) for aspirational goals like 'become a doctor' or 'learn piano'. The system will infer the type if not specified.",
+    description: "Create a new goal. Use this when the user wants to set a long-term objective, ambition, or something they want to achieve. IMPORTANT: Every goal MUST have an aspect (Health, Work, Finance, Personal, or Education). Goals support two milestone types: 'dated' (with specific due dates, appears on timeline) for deadline-driven goals, or 'ordered' (sequential steps without dates) for aspirational goals like 'become a doctor' or 'learn piano'. The system will infer the type if not specified.",
     schema: z.object({
       title: z.string().describe("Goal title"),
       description: z.string().optional().nullable().describe("Goal description"),
       targetDate: z.string().optional().nullable().describe("Target completion date (ISO format)"),
-      category: z.string().describe("REQUIRED: Category name for the goal. Must be one of: 'Health' (fitness, wellness), 'Work' (career, professional), 'Finance' (money, savings), 'Personal' (relationships, hobbies), or 'Education' (learning, skills). Every goal MUST have a category."),
+      aspect: z.string().describe("REQUIRED: Aspect name for the goal. Must be one of: 'Health' (fitness, wellness), 'Work' (career, professional), 'Finance' (money, savings), 'Personal' (relationships, hobbies), or 'Education' (learning, skills). Every goal MUST have an aspect."),
       goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Type of goal"),
       priorityScore: z.number().min(1).max(10).optional().nullable().describe("Priority score (1-10)"),
       energyRequirement: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy requirement"),

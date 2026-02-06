@@ -212,7 +212,7 @@ async function extractSchedulingPatterns(
 
     for (const event of pastEvents) {
       const hour = new Date(event.start_time).getHours();
-      const category = event.category || 'general';
+      const category = event.aspect || 'general';
       const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
 
       if (!categoryByTimeOfDay.has(category)) {
@@ -248,7 +248,7 @@ async function extractSchedulingPatterns(
 
     for (const event of pastEvents) {
       const dayOfWeek = dayNames[new Date(event.start_time).getDay()];
-      const category = event.category || 'general';
+      const category = event.aspect || 'general';
 
       if (!categoryByDayOfWeek.has(category)) {
         categoryByDayOfWeek.set(category, new Map());
@@ -283,7 +283,7 @@ async function extractSchedulingPatterns(
     const categoryDurations = new Map<string, number[]>();
 
     for (const event of pastEvents) {
-      const category = event.category || 'general';
+      const category = event.aspect || 'general';
       if (event.start_time && event.end_time) {
         const duration = (new Date(event.end_time).getTime() - new Date(event.start_time).getTime()) / 60000;
         if (duration > 0 && duration < 480) { // Ignore invalid or very long events

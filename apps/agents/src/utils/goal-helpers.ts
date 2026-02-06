@@ -5,7 +5,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
  */
 export interface GoalFilters {
   status?: string;
-  category?: string;
+  aspect?: string;
   goalType?: string;
   parentGoalId?: string;
   targetBefore?: string;
@@ -13,9 +13,9 @@ export interface GoalFilters {
 }
 
 /**
- * Goal with category data
+ * Goal with aspect data
  */
-export interface GoalWithCategory {
+export interface GoalWithAspect {
   id: string;
   user_id: string;
   title: string;
@@ -27,25 +27,25 @@ export interface GoalWithCategory {
   progress?: number;
   created_at: string;
   updated_at: string;
-  category?: string; // For backward compatibility
-  category_id?: string;
-  category_name?: string;
-  category_color?: string;
-  category_icon?: string;
+  aspect?: string; // For backward compatibility
+  aspect_id?: string;
+  aspect_name?: string;
+  aspect_color?: string;
+  aspect_icon?: string;
 }
 
 /**
- * Get goals with category data using RPC function
+ * Get goals with aspect data using RPC function
  * Includes client-side filtering for various criteria
  */
-export async function getGoalsWithCategories(
+export async function getGoalsWithAspects(
   client: SupabaseClient,
   userId: string,
   filters?: GoalFilters
-): Promise<GoalWithCategory[]> {
+): Promise<GoalWithAspect[]> {
   try {
-    // Use the RPC function that joins category data
-    const { data, error } = await client.rpc('get_goals_with_categories', {
+    // Use the RPC function that joins aspect data
+    const { data, error } = await client.rpc('get_goals_with_aspects', {
       p_user_id: userId
     });
 
@@ -54,7 +54,7 @@ export async function getGoalsWithCategories(
       return [];
     }
 
-    console.log('📥 [GoalHelpers] RPC returned:', {
+    console.log('[GoalHelpers] RPC returned:', {
       dataExists: !!data,
       rawCount: data?.length || 0,
       sampleGoal: data?.[0] ? { id: data[0].id, title: data[0].title, user_id: data[0].user_id } : null
@@ -67,12 +67,12 @@ export async function getGoalsWithCategories(
       filteredGoals = filteredGoals.filter((g: any) => g.status === filters.status);
     }
 
-    if (filters?.category) {
+    if (filters?.aspect) {
       // Strip emoji and do case-insensitive matching
-      const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+      const normalizedAspect = filters.aspect.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
       filteredGoals = filteredGoals.filter((g: any) => {
-        const categoryName = (g.category_name || g.category || '').toLowerCase();
-        return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+        const aspectName = (g.aspect_name || g.aspect || '').toLowerCase();
+        return aspectName === normalizedAspect || aspectName.includes(normalizedAspect);
       });
     }
 
@@ -92,8 +92,8 @@ export async function getGoalsWithCategories(
       filteredGoals = filteredGoals.filter((g: any) => g.target_date && g.target_date >= filters.targetAfter!);
     }
 
-    console.log(`[GoalHelpers] Found ${filteredGoals.length} goals with categories`);
-    return filteredGoals as GoalWithCategory[];
+    console.log(`[GoalHelpers] Found ${filteredGoals.length} goals with aspects`);
+    return filteredGoals as GoalWithAspect[];
   } catch (error) {
     console.error('[GoalHelpers] Exception getting goals:', error);
     return [];
@@ -101,15 +101,15 @@ export async function getGoalsWithCategories(
 }
 
 /**
- * Get a single goal by ID with category data
+ * Get a single goal by ID with aspect data
  */
 export async function getGoalById(
   client: SupabaseClient,
   userId: string,
   goalId: string
-): Promise<GoalWithCategory | null> {
+): Promise<GoalWithAspect | null> {
   try {
-    const goals = await getGoalsWithCategories(client, userId);
+    const goals = await getGoalsWithAspects(client, userId);
     const goal = goals.find(g => g.id === goalId);
     return goal || null;
   } catch (error) {

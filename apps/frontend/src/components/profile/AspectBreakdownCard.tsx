@@ -1,5 +1,5 @@
 import { useDarkMode } from '../../lib/darkModeContext'
-import { useCategories } from '../../lib/categoryContext'
+import { useAspects } from '../../lib/aspectContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -12,13 +12,13 @@ interface AspectBreakdownCardProps {
 function AspectRow({ item, maxActivity }: { item: AspectBreakdown; maxActivity: number }) {
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
 
-  const activity = item.taskCount + item.goalCount
+  const activity = item.eventCount + item.taskCount + item.goalCount
   const barWidth = maxActivity > 0 ? (activity / maxActivity) * 100 : 0
-  const categoryColor = getCategoryColor(item.categoryName)
+  const aspectColor = getAspectColor(item.categoryName)
   const barBg = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
 
   return (
@@ -38,7 +38,7 @@ function AspectRow({ item, maxActivity }: { item: AspectBreakdown; maxActivity: 
             width: '8px',
             height: '8px',
             borderRadius: '2px',
-            background: categoryColor,
+            background: aspectColor,
             flexShrink: 0,
           }} />
           <span style={{ ...typography.bodySm, color: colors.textPrimary }}>
@@ -51,6 +51,7 @@ function AspectRow({ item, maxActivity }: { item: AspectBreakdown; maxActivity: 
           display: 'flex',
           gap: '8px',
         }}>
+          {item.eventCount > 0 && <span>{item.eventCount} event{item.eventCount !== 1 ? 's' : ''}</span>}
           {item.taskCount > 0 && <span>{item.taskCount} task{item.taskCount !== 1 ? 's' : ''}</span>}
           {item.goalCount > 0 && <span>{item.goalCount} goal{item.goalCount !== 1 ? 's' : ''}</span>}
           {activity === 0 && <span>No activity</span>}
@@ -65,7 +66,7 @@ function AspectRow({ item, maxActivity }: { item: AspectBreakdown; maxActivity: 
           <div style={{
             height: '100%',
             borderRadius: '2px',
-            background: categoryColor,
+            background: aspectColor,
             width: `${barWidth}%`,
             opacity: 0.7,
             transition: 'width 0.3s ease',
@@ -83,7 +84,7 @@ export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
   const typography = getTypography(isMobile)
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const maxActivity = Math.max(...breakdown.map(b => b.taskCount + b.goalCount), 1)
+  const maxActivity = Math.max(...breakdown.map(b => b.eventCount + b.taskCount + b.goalCount), 1)
 
   return (
     <div style={{

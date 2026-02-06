@@ -20,7 +20,7 @@ import { entityFields, EntityType, EdgeType } from '@getzep/zep-cloud';
 export interface ICalendarEventEntity {
   eventId?: string;
   title?: string;
-  category?: string;
+  aspect?: string;
   duration_minutes?: number;
   energy_level?: string;
   location?: string;
@@ -34,7 +34,7 @@ export interface ITaskEntity {
   taskId?: string;
   title?: string;
   priority?: string;
-  category?: string;
+  aspect?: string;
   estimated_duration?: number;
   actual_duration?: number;
   satisfaction_rating?: number;

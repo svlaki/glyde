@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { useRules } from '../lib/ruleContext'
-import { fetchUserTasks, Task } from '../lib/taskService'
-import { fetchUserGoals, Goal } from '../lib/goalService'
-import { fetchUserProfile, ProfileSummary, UserProfile } from '../lib/profileService'
-import { fetchConnections, Connection } from '../lib/connectionService'
+import { fetchUserTasks } from '../lib/taskService'
+import type { Task } from '../lib/taskService'
+import { fetchUserGoals } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
+import { fetchUserEvents } from '../lib/calendarService'
+import type { CalendarEvent } from '../lib/calendarService'
+import { fetchUserProfile } from '../lib/profileService'
+import type { ProfileSummary, UserProfile } from '../lib/profileService'
+import { fetchConnections } from '../lib/connectionService'
+import type { Connection } from '../lib/connectionService'
 
 export interface TaskInsights {
   allTasks: Task[]
@@ -28,6 +34,7 @@ export interface GoalInsights {
 export interface AspectBreakdown {
   categoryId: string
   categoryName: string
+  eventCount: number
   taskCount: number
   goalCount: number
   completedCount: number
@@ -65,11 +72,12 @@ const emptyGoalInsights: GoalInsights = {
 
 export function useProfileData(): ProfileData {
   const { user, session } = useAuth()
-  const { categories, getCategoryColor } = useCategories()
+  const { aspects, getAspectColor } = useAspects()
   const { rules } = useRules()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [events, setEvents] = useState<CalendarEvent[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null)
@@ -89,7 +97,8 @@ export function useProfileData(): ProfileData {
       setError(null)
 
       try {
-        const [tasksResult, goalsResult, profileResult, connectionsResult] = await Promise.all([
+        const [eventsResult, tasksResult, goalsResult, profileResult, connectionsResult] = await Promise.all([
+          fetchUserEvents(user!, session!.access_token),
           fetchUserTasks(user!, session!.access_token, {}),
           fetchUserGoals(user!, session!.access_token, {}),
           fetchUserProfile(user!, session!.access_token),
@@ -102,6 +111,7 @@ export function useProfileData(): ProfileData {
           setError(tasksResult.error || goalsResult.error || profileResult.error)
         }
 
+        setEvents(eventsResult.events || [])
         setTasks(tasksResult.tasks || [])
         setGoals(goalsResult.goals || [])
         setProfileSummary(profileResult.summary || null)
@@ -199,21 +209,35 @@ export function useProfileData(): ProfileData {
   const aspectBreakdown = useMemo<AspectBreakdown[]>(() => {
     const breakdownMap = new Map<string, AspectBreakdown>()
 
-    for (const cat of categories) {
-      breakdownMap.set(cat.id, {
-        categoryId: cat.id,
-        categoryName: cat.name,
+    for (const asp of aspects) {
+      breakdownMap.set(asp.id, {
+        categoryId: asp.id,
+        categoryName: asp.name,
+        eventCount: 0,
         taskCount: 0,
         goalCount: 0,
         completedCount: 0,
       })
     }
 
+    for (const event of events) {
+      // Skip recurring instances - only count the parent event
+      if (event.is_instance || event.parent_event_id) continue
+      const aspId = event.aspect_id
+      if (aspId && breakdownMap.has(aspId)) {
+        const entry = breakdownMap.get(aspId)!
+        breakdownMap.set(aspId, {
+          ...entry,
+          eventCount: entry.eventCount + 1,
+        })
+      }
+    }
+
     for (const task of tasks) {
-      const catId = task.category_id
-      if (catId && breakdownMap.has(catId)) {
-        const entry = breakdownMap.get(catId)!
-        breakdownMap.set(catId, {
+      const aspId = task.aspect_id
+      if (aspId && breakdownMap.has(aspId)) {
+        const entry = breakdownMap.get(aspId)!
+        breakdownMap.set(aspId, {
           ...entry,
           taskCount: entry.taskCount + 1,
           completedCount: task.status === 'completed' ? entry.completedCount + 1 : entry.completedCount,
@@ -222,10 +246,10 @@ export function useProfileData(): ProfileData {
     }
 
     for (const goal of goals) {
-      const matchedCat = categories.find(c => c.name === goal.category)
-      if (matchedCat && breakdownMap.has(matchedCat.id)) {
-        const entry = breakdownMap.get(matchedCat.id)!
-        breakdownMap.set(matchedCat.id, {
+      const matchedAsp = aspects.find(a => a.name === goal.aspect)
+      if (matchedAsp && breakdownMap.has(matchedAsp.id)) {
+        const entry = breakdownMap.get(matchedAsp.id)!
+        breakdownMap.set(matchedAsp.id, {
           ...entry,
           goalCount: entry.goalCount + 1,
         })
@@ -233,8 +257,8 @@ export function useProfileData(): ProfileData {
     }
 
     return Array.from(breakdownMap.values())
-      .sort((a, b) => (b.taskCount + b.goalCount) - (a.taskCount + a.goalCount))
-  }, [tasks, goals, categories])
+      .sort((a, b) => (b.eventCount + b.taskCount + b.goalCount) - (a.eventCount + a.taskCount + a.goalCount))
+  }, [events, tasks, goals, aspects])
 
   return {
     loading,

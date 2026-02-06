@@ -203,7 +203,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 description: eventData.description || '',
                 start_time: startTime,
                 end_time: endTime,
-                category_id: eventData.categoryId || null,
+                aspect_id: eventData.categoryId || null,
                 location: eventData.location || null,
               });
               console.log(`[INTERACTION RESPONSE] Event created: ${actionResult?.id}`);
@@ -218,7 +218,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 title: taskData.title || 'Task',
                 description: taskData.description || '',
                 dueDate: taskData.dueDate || null,
-                category_id: taskData.categoryId || null,
+                aspect_id: taskData.categoryId || null,
               });
               console.log(`[INTERACTION RESPONSE] Task created: ${actionResult?.id}`);
 
@@ -233,7 +233,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 title: taskData.title,
                 description: taskData.description,
                 dueDate: taskData.dueDate,
-                category_id: taskData.categoryId,
+                aspect_id: taskData.categoryId,
                 status: taskData.status as any,
               });
               console.log(`[INTERACTION RESPONSE] Task updated: ${taskId}`);
@@ -248,7 +248,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 title: goalData.title || 'Goal',
                 description: goalData.description || '',
                 targetDate: goalData.targetDate || null,
-                category_id: goalData.categoryId || null,
+                aspect_id: goalData.categoryId || null,
                 goalType: goalData.goalType || 'SMART',
               });
               console.log(`[INTERACTION RESPONSE] Goal created: ${actionResult?.id}`);

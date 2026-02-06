@@ -1,10 +1,10 @@
 import { calendarTools } from './calendar/index.js';
 import {
-  createCategoryTool,
-  listCategoriesTool,
-  updateCategoryTool,
-  deleteCategoryTool
-} from './categories/index.js';
+  createAspectTool,
+  listAspectsTool,
+  updateAspectTool,
+  deleteAspectTool
+} from './aspects/index.js';
 import { taskTools } from './tasks/index.js';
 import { goalTools } from './goals/index.js';
 import { profileTools } from './profile/index.js';
@@ -38,11 +38,11 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
-    // Register all category tools
-    this.tools.set(createCategoryTool.name, createCategoryTool);
-    this.tools.set(listCategoriesTool.name, listCategoriesTool);
-    this.tools.set(updateCategoryTool.name, updateCategoryTool);
-    this.tools.set(deleteCategoryTool.name, deleteCategoryTool);
+    // Register all aspect tools
+    this.tools.set(createAspectTool.name, createAspectTool);
+    this.tools.set(listAspectsTool.name, listAspectsTool);
+    this.tools.set(updateAspectTool.name, updateAspectTool);
+    this.tools.set(deleteAspectTool.name, deleteAspectTool);
 
     // Register all task tools
     taskTools.forEach(tool => {
@@ -111,10 +111,10 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): any[] {
+  getToolsByCategory(category: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
-      categories: ['create_category', 'list_categories', 'update_category', 'delete_category'],
+      aspects: ['create_aspect', 'list_aspects', 'update_aspect', 'delete_aspect'],
       tasks: ['create_task', 'update_task', 'delete_task', 'list_tasks', 'complete_task', 'search_tasks'],
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],
@@ -154,7 +154,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'categories' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): string[] {
+  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

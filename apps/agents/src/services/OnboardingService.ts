@@ -1,5 +1,5 @@
 import { getSupabaseService } from './SupabaseService.js';
-import { CategoryService } from './CategoryService.js';
+import { AspectService } from './AspectService.js';
 import { ZepOnboardingSeedService } from './ZepOnboardingSeedService.js';
 
 export interface OnboardingData {
@@ -82,8 +82,8 @@ export class OnboardingService {
       throw new Error(`Failed to complete onboarding: ${error.message}`);
     }
 
-    // Create categories for each aspect
-    await this.createCategoriesForAspects(userId, data.aspects);
+    // Create aspects for each life aspect
+    await this.createAspectsFromSelection(userId, data.aspects);
 
     // Create goals in the user's schema
     await this.createGoalsForUser(userId, data.goals);
@@ -139,8 +139,8 @@ export class OnboardingService {
       throw new Error(`Failed to complete onboarding: ${error.message}`);
     }
 
-    // Step 5: Create categories for each aspect
-    await this.createCategoriesForAspects(userId, data.aspects);
+    // Step 5: Create aspects for each life aspect
+    await this.createAspectsFromSelection(userId, data.aspects);
 
     // Step 6: Create goals in the user's schema
     await this.createGoalsForUser(userId, data.goals);
@@ -168,10 +168,10 @@ export class OnboardingService {
   private static async clearPreviousOnboardingData(userId: string): Promise<void> {
     const supabase = getSupabaseService().getClient();
 
-    // NOTE: We intentionally DO NOT delete categories or goals here
+    // NOTE: We intentionally DO NOT delete aspects or goals here
     // Users may have existing data they want to preserve across re-onboarding
-    // Categories and goals are created additively during onboarding
-    console.log(`Preserving existing categories and goals for user`);
+    // Aspects and goals are created additively during onboarding
+    console.log(`Preserving existing aspects and goals for user`);
 
     // Reset profile onboarding-related fields
     const { error: profileError } = await supabase
@@ -237,16 +237,16 @@ export class OnboardingService {
   }
 
   /**
-   * Create categories for the selected aspects
-   * NOTE: Skips if user already has categories to preserve existing setup during re-onboarding
+   * Create aspects for the selected life aspects
+   * NOTE: Skips if user already has aspects to preserve existing setup during re-onboarding
    */
-  private static async createCategoriesForAspects(userId: string, aspects: string[]): Promise<void> {
-    const categoryService = new CategoryService();
+  private static async createAspectsFromSelection(userId: string, aspects: string[]): Promise<void> {
+    const aspectService = new AspectService();
 
-    // Check if user already has categories - if so, preserve them completely
-    const existingCategories = await categoryService.getCategories(userId);
-    if (existingCategories && existingCategories.length > 0) {
-      console.log(`User already has ${existingCategories.length} categories, preserving existing setup`);
+    // Check if user already has aspects - if so, preserve them completely
+    const existingAspects = await aspectService.getAspects(userId);
+    if (existingAspects && existingAspects.length > 0) {
+      console.log(`User already has ${existingAspects.length} aspects, preserving existing setup`);
       return;
     }
 
@@ -266,7 +266,7 @@ export class OnboardingService {
     // Default colors to cycle through if aspect not in predefined list
     const defaultColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316', '#06b6d4'];
 
-    console.log(`Creating categories for ${aspects.length} aspects...`);
+    console.log(`Creating ${aspects.length} aspects...`);
 
     for (let i = 0; i < aspects.length; i++) {
       const aspect = aspects[i];
@@ -274,15 +274,15 @@ export class OnboardingService {
 
       try {
         // Use upsert to handle duplicates gracefully
-        await categoryService.upsertCategory(userId, {
+        await aspectService.upsertAspect(userId, {
           name: aspect,
           color: color,
           description: `${aspect} activities and events`
         });
-        console.log(`Created/updated category for aspect: ${aspect}`);
+        console.log(`Created/updated aspect: ${aspect}`);
       } catch (error: any) {
-        // Don't fail the whole onboarding if one category fails
-        console.error(` Failed to create category for aspect ${aspect}:`, error.message);
+        // Don't fail the whole onboarding if one aspect fails
+        console.error(` Failed to create aspect ${aspect}:`, error.message);
       }
     }
   }

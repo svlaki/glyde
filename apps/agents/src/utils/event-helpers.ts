@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Database event type with category information
+ * Database event type with aspect information
  */
 export interface DatabaseEvent {
   id: string;
@@ -13,11 +13,11 @@ export interface DatabaseEvent {
   description?: string;
   created_at?: string;
   updated_at?: string;
-  category?: string; // For backward compatibility
-  category_id?: string;
-  category_name?: string;
-  category_color?: string;
-  category_icon?: string;
+  aspect?: string; // For backward compatibility
+  aspect_id?: string;
+  aspect_name?: string;
+  aspect_color?: string;
+  aspect_icon?: string;
   // Recurring event fields
   recurrence_rule?: string;
   recurrence_end?: string;
@@ -28,18 +28,18 @@ export interface DatabaseEvent {
 }
 
 /**
- * Get events with category data using RPC function
- * This uses the database function `get_events_with_categories` which performs
+ * Get events with aspect data using RPC function
+ * This uses the database function `get_events_with_aspects` which performs
  * the join server-side for better performance
  */
-export async function getEventsWithCategories(
+export async function getEventsWithAspects(
   client: SupabaseClient,
   userId: string,
   startDate?: string,
   endDate?: string
 ): Promise<DatabaseEvent[]> {
   try {
-    const { data, error } = await client.rpc('get_events_with_categories', {
+    const { data, error } = await client.rpc('get_events_with_aspects', {
       p_user_id: userId,
       p_start_date: startDate || null,
       p_end_date: endDate || null
@@ -50,7 +50,7 @@ export async function getEventsWithCategories(
       return [];
     }
 
-    console.log('[EventHelpers] Retrieved', data?.length || 0, 'events (UTC) with categories');
+    console.log('[EventHelpers] Retrieved', data?.length || 0, 'events (UTC) with aspects');
 
     // Transform to match DatabaseEvent interface - convert timestamps to ISO 8601
     const transformedEvents: DatabaseEvent[] = (data || []).map((event: any) => ({
@@ -64,11 +64,11 @@ export async function getEventsWithCategories(
       description: event.description,
       created_at: event.created_at,
       updated_at: event.updated_at,
-      category: event.category_name || 'Personal', // For backward compatibility
-      category_id: event.category_id,
-      category_name: event.category_name,
-      category_color: event.category_color,
-      category_icon: event.category_icon
+      aspect: event.aspect_name || 'Personal', // For backward compatibility
+      aspect_id: event.aspect_id,
+      aspect_name: event.aspect_name,
+      aspect_color: event.aspect_color,
+      aspect_icon: event.aspect_icon
     }));
 
     return transformedEvents;
@@ -79,7 +79,7 @@ export async function getEventsWithCategories(
 }
 
 /**
- * Get a single event by ID with category data
+ * Get a single event by ID with aspect data
  */
 export async function getEventById(
   client: SupabaseClient,
@@ -88,7 +88,7 @@ export async function getEventById(
 ): Promise<DatabaseEvent | null> {
   try {
     // Get all events and filter (could be optimized with a separate RPC function)
-    const events = await getEventsWithCategories(client, userId);
+    const events = await getEventsWithAspects(client, userId);
     const event = events.find(e => e.id === eventId);
     return event || null;
   } catch (error) {

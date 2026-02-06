@@ -284,12 +284,13 @@ export class ZepGraphService {
   async addCalendarEvent(userId: string, event: Partial<ICalendarEventEntity>): Promise<string> {
     try {
       // Add event to user's graph as structured data (no thread needed)
+      // Note: Zep schema uses 'category' field, but our app uses 'aspect' terminology
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('CalendarEvent', {
           supabase_id: event.eventId,  // Store Supabase UUID for precise matching
           title: event.title,
-          category: event.category || 'personal',
+          category: event.aspect || 'personal',  // Map aspect to Zep's category field
           duration_minutes: event.duration_minutes,
           energy_level: event.energy_level || 'medium',
           location: event.location,
@@ -312,11 +313,12 @@ export class ZepGraphService {
   async updateCalendarEvent(userId: string, eventId: string, updatedEvent: Partial<ICalendarEventEntity>): Promise<void> {
     try {
       // Adding new data automatically invalidates old facts with same entities
+      // Note: Zep schema uses 'category' field, but our app uses 'aspect' terminology
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('CalendarEvent', {
           title: updatedEvent.title,
-          category: updatedEvent.category,
+          category: updatedEvent.aspect,  // Map aspect to Zep's category field
           duration_minutes: updatedEvent.duration_minutes,
           energy_level: updatedEvent.energy_level,
           location: updatedEvent.location,
@@ -360,13 +362,14 @@ export class ZepGraphService {
    */
   async addTask(userId: string, task: Partial<ITaskEntity>): Promise<string> {
     try {
+      // Note: Zep schema uses 'category' field, but our app uses 'aspect' terminology
       await this.client.graph.add({
         userId: userId,
         ...formatEntityForGraph('Task', {
           supabase_id: task.taskId,  // Store Supabase UUID for precise matching
           title: task.title,
           priority: task.priority || 'medium',
-          category: task.category,
+          category: task.aspect,  // Map aspect to Zep's category field
           estimated_duration: task.estimated_duration,
           actual_duration: task.actual_duration,
           satisfaction_rating: task.satisfaction_rating,

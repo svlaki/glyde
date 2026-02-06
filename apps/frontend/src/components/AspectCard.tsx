@@ -1,11 +1,11 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { Category } from '../lib/categoryService'
+import type { Aspect } from '../lib/aspectService'
 import { getColors } from '../styles/colors'
 import { getTypography, fontWeight, lineHeight } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 
 interface AspectCardProps {
-  aspect: Category
+  aspect: Aspect
   isSelected: boolean
   onClick: () => void
   onEdit: () => void

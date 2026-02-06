@@ -18,7 +18,7 @@ export interface PromptContext {
   zepGraphContext?: string; // Optional: Personal context from Zep graph (flight confirmations, travel details, preferences, etc.)
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
   // New context fields
-  userCategories?: any[]; // User's categories with IDs
+  userAspects?: any[]; // User's aspects with IDs
   userProfile?: DatabaseProfile | null; // Full user profile
   recentUserActivity?: ActivityLogEntry[]; // Recent manual changes by user
   recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
@@ -26,18 +26,18 @@ export interface PromptContext {
 }
 
 /**
- * Build category context showing available categories with IDs
+ * Build aspect context showing available aspects with IDs
  */
-export function buildCategoryContext(categories: any[]): string {
-  if (!categories || categories.length === 0) {
-    return '\n\nCATEGORIES: Using defaults (no custom categories yet).';
+export function buildAspectContext(aspects: any[]): string {
+  if (!aspects || aspects.length === 0) {
+    return '\n\nASPECTS: Using defaults (no custom aspects yet).';
   }
 
-  const categoryList = categories
-    .map(c => `  - "${c.name}" (ID: ${c.id})${c.color ? ` [${c.color}]` : ''}`)
+  const aspectList = aspects
+    .map(a => `  - "${a.name}" (ID: ${a.id})${a.color ? ` [${a.color}]` : ''}`)
     .join('\n');
 
-  return `\n\nAVAILABLE CATEGORIES (${categories.length}) - Use these IDs when creating events/tasks/goals:\n${categoryList}`;
+  return `\n\nAVAILABLE ASPECTS (${aspects.length}) - Use these IDs when creating events/tasks/goals:\n${aspectList}`;
 }
 
 /**
@@ -171,7 +171,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     toolCount,
     zepGraphContext,
     rulesContext,
-    userCategories,
+    userAspects,
     userProfile,
     recentUserActivity,
     recentAgentActivity,
@@ -182,7 +182,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
   const toolInfo = toolCount ? `\n\nYou have access to ${toolCount} specialized tools for calendar, tasks, goals, memory, and more.` : '';
 
   // Build new context sections
-  const categoryContext = buildCategoryContext(userCategories || []);
+  const aspectContext = buildAspectContext(userAspects || []);
   const profileContext = buildProfileContext(userProfile || null);
   const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
 
@@ -223,7 +223,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${categoryContext}${profileContext}${activityContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${aspectContext}${profileContext}${activityContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
@@ -272,23 +272,23 @@ When user mentions a goal, use a conversational approach to gather details BEFOR
    - You: "Love that! How often are you thinking - once a week, or more like 3-4 times?"
    - Wait for their answer before creating anything
 
-2. CREATE GOAL WITH MILESTONES AND CATEGORY (CRITICAL):
+2. CREATE GOAL WITH MILESTONES AND ASPECT (CRITICAL):
    You MUST pass milestones to create_goal WITH due_date for each milestone.
    Without due_date, milestones won't appear on the timeline!
 
-   CATEGORY IS MANDATORY - Every goal MUST have a category:
+   ASPECT IS MANDATORY - Every goal MUST have an aspect:
    - Health: Fitness, wellness, medical, nutrition goals
    - Work: Career, job, professional development goals
    - Finance: Money, savings, investment goals
    - Personal: Relationships, hobbies, lifestyle goals
    - Education: Learning, skills, academic goals
 
-   NEVER create a goal without assigning a category!
+   NEVER create a goal without assigning an aspect!
 
    CALL create_goal WITH milestones like this:
    create_goal({
      title: "Go to the gym 3x/week",
-     category: "Health",  // REQUIRED - must match one of user's categories
+     aspect: "Health",  // REQUIRED - must match one of user's aspects
      goalType: "habit",
      milestones: [
        { title: "Week 1 - Complete first week", due_date: "2026-02-05", status: "pending" },
@@ -530,9 +530,9 @@ EVENT CREATION:
 - Ask for time if not specified
 - Default to 1 hour duration
 - Parse natural language: "2pm tomorrow", "lunch Tuesday", "5pm"
-- ALWAYS call list_categories FIRST to see what categories exist
-- Create new categories for specific entities (individual classes, projects, clients)
-- Use existing categories only when they accurately describe the activity
+- ALWAYS call list_aspects FIRST to see what aspects exist
+- Create new aspects for specific entities (individual classes, projects, clients)
+- Use existing aspects only when they accurately describe the activity
 - Conflicts detected automatically - suggest alternatives
 
 RECURRING EVENT CREATION (NEW FEATURE):
@@ -559,7 +559,7 @@ HOW TO USE create_recurring_event:
    - title: Event name
    - start_time: ISO format timestamp (in user's timezone, NO Z suffix)
    - recurrence_rule: RFC 5545 RRULE format OR natural language pattern
-   - category: Event category
+   - aspect: Event aspect
    - description: Event description (optional)
    - location: Event location (optional)
 3. Example: User says "Add a daily standup at 9am every weekday"
@@ -567,7 +567,7 @@ HOW TO USE create_recurring_event:
        title="Daily Standup",
        start_time="2025-02-03T09:00:00",
        recurrence_rule="FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
-       category="Work"
+       aspect="Work"
      )
 
 MODIFYING RECURRING EVENTS:
@@ -611,12 +611,12 @@ TOOL SELECTION (CRITICAL - FOLLOW EXACTLY):
   DO NOT list_tasks first, update_task will find it
 - Delete all on date → delete_multiple_events with date
 - Clear calendar → delete_multiple_events with searchQuery "*"
-- UPDATE event → update_event (supports category changes)
+- UPDATE event → update_event (supports aspect changes)
   IMPORTANT: update_event only searches recent events (today + 14 days). If not found, it will tell you.
   If tool returns multiple matches:
     • If user said "all"/"all of them" → call list_events/search_events to get IDs, then loop calling update_event(eventId=...) for each
     • Otherwise → ask user which one they meant
-- SEARCH/FIND events → search_events with text/category (for viewing only)
+- SEARCH/FIND events → search_events with text/aspect (for viewing only)
 - List range → list_events with dates
 
 CRITICAL TEMPORAL BEHAVIOR:
@@ -646,62 +646,62 @@ If create_event returns "Time conflict detected":
 - User needs to explicitly say they want to cancel/replace the conflicting event
 - Don't assume - ask them: "You have [X] at that time. Would you like me to cancel it and schedule [Y] instead?"
 
-CATEGORY WORKFLOW (CRITICAL):
-1. ALWAYS call list_categories FIRST before creating events/tasks/goals
-2. For SPECIFIC named entities → create SPECIFIC categories:
+ASPECT WORKFLOW (CRITICAL):
+1. ALWAYS call list_aspects FIRST before creating events/tasks/goals
+2. For SPECIFIC named entities → create SPECIFIC aspects:
    - Classes: Create "CS173A", "PHIL 1" (NOT generic "School")
    - Projects: Create "Project Phoenix" (NOT "Work")
    - Clients: Create "Client Acme" (NOT "Work")
    - Jobs/Employment: Create "Ignite", "Google", "Acme Corp" (NOT generic "Work" or "Personal")
    - Side gigs/Freelance: Create "Uber", "Tutoring" (NOT generic "Work")
    - Recurring activities: Create "Weekly D&D" (NOT "Hobbies")
-3. Use existing broad categories ONLY for truly generic activities
-4. When uncertain → create specific category rather than force-fit into generic ones
-5. LISTEN FOR EMPLOYMENT KEYWORDS: "job", "work at", "working for", "employed at" → Create category for that employer
+3. Use existing broad aspects ONLY for truly generic activities
+4. When uncertain → create specific aspect rather than force-fit into generic ones
+5. LISTEN FOR EMPLOYMENT KEYWORDS: "job", "work at", "working for", "employed at" → Create aspect for that employer
 
-CATEGORY EXAMPLES:
-"Add CS173A class Tuesday 1:30pm" → list_categories → create_category("CS173A") → create_event(category="CS173A")
-"Meeting for Project Phoenix" → list_categories → create_category("Project Phoenix") → create_event(category="Project Phoenix")
-"Call about my job at Ignite" → list_categories → create_category("Ignite") → create_event(category="Ignite")
-"Shift at Starbucks tomorrow" → list_categories → create_category("Starbucks") → create_event(category="Starbucks")
-"Workout at gym" → list_categories → use existing "Fitness" if available, or create "Gym"
-"Add CS173A class" → create_event(category="School") ← WRONG! Use specific category
-"Project Phoenix meeting" → create_event(category="Work") ← WRONG! Create specific category
-"Call about Ignite job" → create_event(category="Personal") ← WRONG! Create "Ignite" category
+ASPECT EXAMPLES:
+"Add CS173A class Tuesday 1:30pm" → list_aspects → create_aspect("CS173A") → create_event(aspect="CS173A")
+"Meeting for Project Phoenix" → list_aspects → create_aspect("Project Phoenix") → create_event(aspect="Project Phoenix")
+"Call about my job at Ignite" → list_aspects → create_aspect("Ignite") → create_event(aspect="Ignite")
+"Shift at Starbucks tomorrow" → list_aspects → create_aspect("Starbucks") → create_event(aspect="Starbucks")
+"Workout at gym" → list_aspects → use existing "Fitness" if available, or create "Gym"
+"Add CS173A class" → create_event(aspect="School") ← WRONG! Use specific aspect
+"Project Phoenix meeting" → create_event(aspect="Work") ← WRONG! Create specific aspect
+"Call about Ignite job" → create_event(aspect="Personal") ← WRONG! Create "Ignite" aspect
 
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task
-- ALWAYS assign appropriate category based on task nature (Work, School, Health & Hygiene, Shopping, Finance, etc.)
+- ALWAYS assign appropriate aspect based on task nature (Work, School, Health & Hygiene, Shopping, Finance, etc.)
 - Ask for due date if important ("when do you need this done?")
 - Default to 'medium' priority unless user specifies
 - List existing tasks when user asks "what do I need to do?" or similar
 - Mark tasks complete when user says they finished something
-- Update task details (due date, priority, category) when user asks
+- Update task details (due date, priority, aspect) when user asks
 
 BULK CATEGORY UPDATES (CRITICAL - MUST BE SEQUENTIAL):
-When user asks to "move X to category Y" or "put all X in category Y" or "categorize X as Y":
+When user asks to "move X to aspect Y" or "put all X in aspect Y" or "assign X to aspect Y":
 
 CRITICAL SEQUENCE - DO NOT CALL TOOLS IN PARALLEL:
-1. FIRST: Call list_categories to check if destination category exists
-2. SECOND: If category doesn't exist, call create_category and WAIT for it to complete
-3. THIRD: ONLY AFTER category exists, call bulk_update_events
+1. FIRST: Call list_aspects to check if destination aspect exists
+2. SECOND: If aspect doesn't exist, call create_aspect and WAIT for it to complete
+3. THIRD: ONLY AFTER aspect exists, call bulk_update_events
 
-Use bulk_update_events for moving multiple events to a category:
-  - bulk_update_events(searchQuery="mendicants", category="Mendicants")
+Use bulk_update_events for moving multiple events to an aspect:
+  - bulk_update_events(searchQuery="mendicants", aspect="Mendicants")
   - The tool will find all events matching the search and update them
-  - Category MUST exist before calling this tool!
+  - Aspect MUST exist before calling this tool!
 
 For tasks and goals, use individual update calls:
   - list_tasks() → filter for matching items → update_task for each
   - list_goals() → filter for matching items → update_goal for each
 
-Example: "move all mendicants events to Mendicants category" should:
-  1. list_categories → check if "Mendicants" exists
-  2. If not: create_category("Mendicants") → WAIT for response
-  3. THEN: bulk_update_events(searchQuery="mendicants", category="Mendicants")
+Example: "move all mendicants events to Mendicants aspect" should:
+  1. list_aspects → check if "Mendicants" exists
+  2. If not: create_aspect("Mendicants") → WAIT for response
+  3. THEN: bulk_update_events(searchQuery="mendicants", aspect="Mendicants")
 
-WRONG: Calling create_category and bulk_update_events at the same time (parallel)
-RIGHT: create_category FIRST, wait for success, THEN bulk_update_events
+WRONG: Calling create_aspect and bulk_update_events at the same time (parallel)
+RIGHT: create_aspect FIRST, wait for success, THEN bulk_update_events
 
 INTELLIGENT EVENT ENRICHMENT WITH WEB SEARCH:
 When creating events with restaurants, venues, or locations mentioned:
@@ -778,7 +778,7 @@ Assistant: → Calls update_memory_advanced({
     "User is making a major life priority shift"
   ],
   importance: "high",
-  category: "values",
+  aspect: "values",
   triggerEarlyPersistence: true
 }) → "I've noted this important shift in your priorities. This will help me suggest better work-life balance in the future."
 
@@ -802,9 +802,9 @@ CRITICAL: USE EVENT IDs FROM CONTEXT DIRECTLY
 - NEVER say "tools aren't seeing events" - extract the IDs and use them!
 
 IMPORTANT: TOOLS RETURN FULL EVENT/TASK DETAILS INCLUDING CATEGORIES
-- list_events returns: title, time, location, category, AND unique ID for each event
-- search_events returns: title, time, location, category, AND unique ID for each event
-- You CAN see what category every event is currently assigned to
+- list_events returns: title, time, location, aspect, AND unique ID for each event
+- search_events returns: title, time, location, aspect, AND unique ID for each event
+- You CAN see what aspect every event is currently assigned to
 - When asked to recategorize, FIRST look at YOUR CALENDAR context above, THEN update mismatched ones
 - NEVER say you can't see categories - YOU CAN!
 
@@ -812,7 +812,7 @@ CRITICAL: FIXING YOUR OWN MISTAKES
 If the user reports you made an error (e.g., "you removed all the names", "you deleted wrong events"):
 1. LOOK AT YOUR PREVIOUS MESSAGES IN THIS CONVERSATION
 2. You likely JUST mentioned those names/details - use them to restore the data!
-3. Example: If you said "Updated 'Rock Music Class - Preparation' to category X" and user says names are gone:
+3. Example: If you said "Updated 'Rock Music Class - Preparation' to aspect X" and user says names are gone:
    - You KNOW the title was "Rock Music Class - Preparation"
    - You KNOW the time slot from your previous message
    - USE that information to restore it - don't ask the user to repeat it!

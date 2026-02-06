@@ -124,7 +124,7 @@ export async function createCategory(userId: string, data: {
 }) {
   const supabase = getSupabaseClient();
   const { data: category, error } = await supabase
-    .from('categories')
+    .from('aspects')
     .insert({
       user_id: userId,
       ...data
@@ -139,7 +139,7 @@ export async function createCategory(userId: string, data: {
 export async function updateCategory(userId: string, categoryId: string, updates: any) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from('categories')
+    .from('aspects')
     .update(updates)
     .eq('user_id', userId)
     .eq('id', categoryId)
@@ -153,7 +153,7 @@ export async function updateCategory(userId: string, categoryId: string, updates
 export async function deleteCategory(userId: string, categoryId: string) {
   const supabase = getSupabaseClient();
   const { error } = await supabase
-    .from('categories')
+    .from('aspects')
     .delete()
     .eq('user_id', userId)
     .eq('id', categoryId);
@@ -164,7 +164,7 @@ export async function deleteCategory(userId: string, categoryId: string) {
 export async function getCategories(userId: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from('categories')
+    .from('aspects')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false});

@@ -11,20 +11,26 @@ export interface CalendarEvent {
   description?: string
   created_at?: string
   updated_at?: string
-  // Old category fields (deprecated but kept for backward compatibility)
-  category?: string
+  // Old aspect fields (deprecated but kept for backward compatibility)
+  aspect?: string
   color?: string
-  // New category fields from unified category system
-  category_id?: string
-  category_name?: string
-  category_color?: string
-  category_icon?: string
+  // New aspect fields from unified aspect system
+  aspect_id?: string
+  aspect_name?: string
+  aspect_color?: string
+  aspect_icon?: string
   // Recurring event fields
   recurrence_rule?: string
   recurrence_end?: string
   parent_event_id?: string
   is_recurring?: boolean
   is_instance?: boolean
+  // Visibility settings
+  visibility?: 'private' | 'friends' | 'public'
+  // Friend event fields (when viewing friend's event)
+  is_friend_event?: boolean
+  owner_display_name?: string
+  owner_avatar_url?: string
 }
 
 /**
@@ -339,7 +345,7 @@ export async function fetchExpandedEvents(
  * @param title Event title
  * @param startTime Start time in ISO format
  * @param recurrenceRule RFC 5545 RRULE format
- * @param category Optional category
+ * @param aspect Optional aspect
  * @param description Optional description
  * @param location Optional location
  * @param recurrenceEnd Optional end date for recurrence
@@ -350,7 +356,7 @@ export async function createRecurringEvent(
   title: string,
   startTime: string,
   recurrenceRule: string,
-  category?: string,
+  aspect?: string,
   description?: string,
   location?: string,
   recurrenceEnd?: string,
@@ -379,7 +385,7 @@ export async function createRecurringEvent(
         title,
         start_time: startTime,
         recurrence_rule: recurrenceRule,
-        category: category || 'Personal',
+        aspect: aspect || 'Personal',
         description: description || '',
         location: location || '',
         recurrence_end: recurrenceEnd || null

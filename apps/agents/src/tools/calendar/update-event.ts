@@ -2,11 +2,11 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
-import { CategoryService } from "../../services/CategoryService.js";
+import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateEventTool = tool(
-  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, category }, config) => {
+  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -22,7 +22,7 @@ export const updateEventTool = tool(
     // Initialize services
     const supabaseService = new SupabaseService();
     const zepGraphService = new ZepGraphService();
-    const categoryService = new CategoryService();
+    const aspectService = new AspectService();
 
     // If no eventId provided, search for the event using Zep and direct search
     if (!targetEventId && searchQuery) {
@@ -121,10 +121,10 @@ export const updateEventTool = tool(
         return `"${originalEvent.title}" on ${instanceDate} is part of a recurring series. To change the time:\n` +
           `- To reschedule just THIS instance: Use update_recurring_event with scope 'this_instance'\n` +
           `- To reschedule ALL instances: Use update_recurring_event with scope 'entire_series'\n\n` +
-          `I can update the title, description, location, or category for the entire series if you'd like.`;
+          `I can update the title, description, location, or aspect for the entire series if you'd like.`;
       }
 
-      // For metadata changes (title, description, location, category), update the parent (affects all instances)
+      // For metadata changes (title, description, location, aspect), update the parent (affects all instances)
       console.log(`[UPDATE-EVENT TOOL] Updating parent recurring event: ${originalEvent.parent_event_id}`);
       targetEventId = originalEvent.parent_event_id;
     }
@@ -146,7 +146,7 @@ export const updateEventTool = tool(
         end_time: endTimeUTC,
         location: location || undefined,
         description: description || undefined,
-        category: category || undefined,
+        aspect: aspect || undefined,
       },
       { source: 'agent', agentType: 'conversation' }
     );
@@ -176,8 +176,8 @@ export const updateEventTool = tool(
       const endTimeStr = newEndDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       changes.push(`moved to ${dateStr} from ${startTimeStr} to ${endTimeStr}`);
     }
-    if (category && originalEvent?.category !== category) {
-      changes.push(`category changed to "${category}"`);
+    if (aspect && originalEvent?.aspect !== aspect) {
+      changes.push(`aspect changed to "${aspect}"`);
     }
     if (location && originalEvent?.location !== location) {
       changes.push(`location changed to "${location}"`);
@@ -189,7 +189,7 @@ export const updateEventTool = tool(
   },
   {
     name: "update_event",
-    description: "Update an existing calendar event. Use eventId for precision when available. If eventId is not provided, use searchQuery with optional currentStartTime to disambiguate same-named events. Can update event category and details.",
+    description: "Update an existing calendar event. Use eventId for precision when available. If eventId is not provided, use searchQuery with optional currentStartTime to disambiguate same-named events. Can update event aspect and details.",
     schema: z.object({
       eventId: z.string().optional().nullable().describe("Event ID to update (preferred - use this when you have the ID from a previous search or list)"),
       searchQuery: z.string().optional().nullable().describe("Search query to find the event if eventId is not provided (e.g., 'grocery trip', 'meeting with John', 'workout yesterday')"),
@@ -199,7 +199,7 @@ export const updateEventTool = tool(
       endTime: z.string().optional().nullable().describe("New end time in ISO format - leave empty to keep existing"),
       location: z.string().optional().nullable().describe("New event location - leave empty to keep existing"),
       description: z.string().optional().nullable().describe("New event description - leave empty to keep existing"),
-      category: z.string().optional().nullable().describe("Update event category (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing category."),
+      aspect: z.string().optional().nullable().describe("Update event aspect (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing aspect."),
     }),
   }
 );

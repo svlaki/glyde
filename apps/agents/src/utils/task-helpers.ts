@@ -5,7 +5,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
  */
 export interface TaskFilters {
   status?: string;
-  category?: string;
+  aspect?: string;
   priority?: string;
   parentGoalId?: string;
   dueBefore?: string;
@@ -13,9 +13,9 @@ export interface TaskFilters {
 }
 
 /**
- * Task with category data
+ * Task with aspect data
  */
-export interface TaskWithCategory {
+export interface TaskWithAspect {
   id: string;
   user_id: string;
   title: string;
@@ -27,27 +27,27 @@ export interface TaskWithCategory {
   parent_goal_id?: string;
   created_at: string;
   updated_at: string;
-  category?: string; // For backward compatibility
-  category_id?: string;
-  category_name?: string;
-  category_color?: string;
-  category_icon?: string;
+  aspect?: string; // For backward compatibility
+  aspect_id?: string;
+  aspect_name?: string;
+  aspect_color?: string;
+  aspect_icon?: string;
 }
 
 /**
- * Get tasks with category data using RPC function
+ * Get tasks with aspect data using RPC function
  * Includes client-side filtering for various criteria
  */
-export async function getTasksWithCategories(
+export async function getTasksWithAspects(
   client: SupabaseClient,
   userId: string,
   filters?: TaskFilters
-): Promise<TaskWithCategory[]> {
+): Promise<TaskWithAspect[]> {
   try {
-    console.log('🔍 [TaskHelpers] Getting tasks for user:', userId);
+    console.log('[TaskHelpers] Getting tasks for user:', userId);
 
-    // Use the RPC function that joins category data
-    const { data, error } = await client.rpc('get_tasks_with_categories', {
+    // Use the RPC function that joins aspect data
+    const { data, error } = await client.rpc('get_tasks_with_aspects', {
       p_user_id: userId
     });
 
@@ -56,7 +56,7 @@ export async function getTasksWithCategories(
       return [];
     }
 
-    console.log('🔍 [TaskHelpers] Raw RPC data:', {
+    console.log('[TaskHelpers] Raw RPC data:', {
       type: typeof data,
       isArray: Array.isArray(data),
       count: data?.length || 0,
@@ -70,12 +70,12 @@ export async function getTasksWithCategories(
       filteredTasks = filteredTasks.filter((t: any) => t.status === filters.status);
     }
 
-    if (filters?.category) {
+    if (filters?.aspect) {
       // Strip emoji and do case-insensitive matching
-      const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+      const normalizedAspect = filters.aspect.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
       filteredTasks = filteredTasks.filter((t: any) => {
-        const categoryName = (t.category_name || t.category || '').toLowerCase();
-        return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+        const aspectName = (t.aspect_name || t.aspect || '').toLowerCase();
+        return aspectName === normalizedAspect || aspectName.includes(normalizedAspect);
       });
     }
 
@@ -95,8 +95,8 @@ export async function getTasksWithCategories(
       filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date >= filters.dueAfter!);
     }
 
-    console.log(`[TaskHelpers] Found ${filteredTasks.length} tasks with categories`);
-    return filteredTasks as TaskWithCategory[];
+    console.log(`[TaskHelpers] Found ${filteredTasks.length} tasks with aspects`);
+    return filteredTasks as TaskWithAspect[];
   } catch (error) {
     console.error('[TaskHelpers] Exception getting tasks:', error);
     return [];
@@ -104,15 +104,15 @@ export async function getTasksWithCategories(
 }
 
 /**
- * Get a single task by ID with category data
+ * Get a single task by ID with aspect data
  */
 export async function getTaskById(
   client: SupabaseClient,
   userId: string,
   taskId: string
-): Promise<TaskWithCategory | null> {
+): Promise<TaskWithAspect | null> {
   try {
-    const tasks = await getTasksWithCategories(client, userId);
+    const tasks = await getTasksWithAspects(client, userId);
     const task = tasks.find(t => t.id === taskId);
     return task || null;
   } catch (error) {

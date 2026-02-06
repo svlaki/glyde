@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const listTasksTool = tool(
-  async ({ status, category, priority, dueBefore, dueAfter }, config) => {
+  async ({ status, aspect, priority, dueBefore, dueAfter }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -14,7 +14,7 @@ export const listTasksTool = tool(
       const filters: any = {};
 
       if (status) filters.status = status;
-      if (category) filters.category = category;
+      if (aspect) filters.aspect = aspect;
       if (priority) filters.priority = priority;
       if (dueBefore) filters.dueBefore = dueBefore;
       if (dueAfter) filters.dueAfter = dueAfter;
@@ -29,8 +29,8 @@ export const listTasksTool = tool(
         const dueStr = task.due_date ? ` (Due: ${new Date(task.due_date).toLocaleDateString()})` : '';
         const priorityStr = task.priority ? ` [${task.priority.toUpperCase()}]` : '';
         const statusStr = task.status ? ` - ${task.status}` : '';
-        const categoryStr = task.category_name ? ` [${task.category_name}]` : (task.category ? ` [${task.category}]` : '');
-        return `${index + 1}. ${task.title}${priorityStr}${categoryStr}${dueStr}${statusStr}\n   ID: ${task.id}`;
+        const aspectStr = task.aspect_name ? ` [${task.aspect_name}]` : (task.aspect ? ` [${task.aspect}]` : '');
+        return `${index + 1}. ${task.title}${priorityStr}${aspectStr}${dueStr}${statusStr}\n   ID: ${task.id}`;
       }).join('\n');
 
       return `Found ${tasks.length} task(s):\n${taskList}`;
@@ -44,7 +44,7 @@ export const listTasksTool = tool(
     description: "List tasks with optional filters. Use this to show the user their tasks, find specific tasks, or check what they need to do.",
     schema: z.object({
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Filter by status"),
-      category: z.string().optional().nullable().describe("Filter by category"),
+      aspect: z.string().optional().nullable().describe("Filter by aspect"),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Filter by priority"),
       dueBefore: z.string().optional().nullable().describe("Show tasks due before this date (ISO format)"),
       dueAfter: z.string().optional().nullable().describe("Show tasks due after this date (ISO format)"),

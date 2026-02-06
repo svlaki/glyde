@@ -1,39 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, updateRecurringEvent, deleteRecurringEvent } from '../lib/calendarService'
+import { fetchExpandedEvents, fetchFriendsEvents, updateEvent, deleteEvent, createEvent, updateRecurringEvent, deleteRecurringEvent } from '../lib/calendarService'
+import type { CalendarEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typography'
 import { EventFormUnified } from './event'
 import { getRecurrenceBadge } from '../lib/recurrenceUtils'
 
-interface CalendarEvent {
-  id: string
-  title: string
-  start_time: string
-  end_time: string
-  description?: string
-  category?: string
-  color?: string
-  // Recurrence fields
-  recurrence_rule?: string
-  parent_event_id?: string
-  is_recurring?: boolean
-  is_instance?: boolean
-}
-
 type ViewType = 'day' | 'week' | 'month'
 
 export function Calendar() {
   const { user, session } = useAuth()
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [friendsEvents, setFriendsEvents] = useState<CalendarEvent[]>([])
+  const [showFriendsEvents, setShowFriendsEvents] = useState(() => {
+    const saved = localStorage.getItem('calendar-show-friends-events')
+    return saved !== 'false' // Default to true
+  })
   const [view, setView] = useState<ViewType>('week')
   const [currentTime, setCurrentTime] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
@@ -41,6 +32,14 @@ export function Calendar() {
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragPreview, setDragPreview] = useState<{ date: Date; hour: number; quarter: number } | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Persist friends events toggle
+  useEffect(() => {
+    localStorage.setItem('calendar-show-friends-events', showFriendsEvents.toString())
+  }, [showFriendsEvents])
+
+  // Combine user events and friends events for display
+  const allEvents = showFriendsEvents ? [...events, ...friendsEvents] : events
 
 
   // Get current week dates
@@ -93,11 +92,11 @@ export function Calendar() {
     return dates
   }
 
-  // Get event color based on category
+  // Get event color based on aspect
   const getEventColor = (event: CalendarEvent): string => {
-    // If event has a category, use category color
-    if (event.category) {
-      return getCategoryColor(event.category)
+    // If event has an aspect, use aspect color
+    if (event.aspect) {
+      return getAspectColor(event.aspect)
     }
     // Otherwise use event's color or default
     return event.color || '#3b82f6'
@@ -183,10 +182,18 @@ export function Calendar() {
           events: userEvents
         })
 
+        // Fetch friends' events
+        const { events: friendEvents } = await fetchFriendsEvents(user, session?.access_token)
+        console.log('[Calendar] Friends events result:', {
+          count: friendEvents?.length,
+          events: friendEvents
+        })
+
         // Only update if still subscribed (component not unmounted)
         if (isSubscribed) {
           setEvents(userEvents || [])
-          console.log('[Calendar] State updated with', userEvents?.length, 'events')
+          setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
+          console.log('[Calendar] State updated with', userEvents?.length, 'user events and', friendEvents?.length, 'friends events')
         }
       } catch (error) {
         console.error('[Calendar] Error loading events:', error)
@@ -301,17 +308,12 @@ export function Calendar() {
 
   // Get events for a specific date and hour
   const getEventsForSlot = (date: Date, hour: number) => {
-    const filtered = events.filter(event => {
+    const filtered = allEvents.filter(event => {
       const eventStart = new Date(event.start_time)
       const eventDate = eventStart.toDateString()
       const eventHour = eventStart.getHours()
 
       const matches = eventDate === date.toDateString() && eventHour === hour
-
-      // Log only when we have events to help debug
-      if (matches && events.length > 0) {
-        console.log(`[getEventsForSlot] Found event for ${date.toDateString()} at ${hour}:00 -`, event.title)
-      }
 
       return matches
     })
@@ -358,7 +360,7 @@ export function Calendar() {
 
   // Get events for a specific date (for month view)
   const getEventsForDate = (date: Date) => {
-    return events.filter(event => {
+    return allEvents.filter(event => {
       const eventStart = new Date(event.start_time)
       return eventStart.toDateString() === date.toDateString()
     }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
@@ -420,7 +422,7 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.category ? { category: eventData.category } : {})
+            ...(eventData.aspect ? { category: eventData.aspect } : {})
           },
           session?.access_token
         )
@@ -448,7 +450,7 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.category ? { category: eventData.category } : {})
+            ...(eventData.aspect ? { category: eventData.aspect } : {})
           },
           session?.access_token
         )
@@ -483,7 +485,7 @@ export function Calendar() {
       start_time: startTime.toISOString(),
       end_time: endTime.toISOString(),
       description: '',
-      category: ''
+      aspect: ''
     }
 
     setSelectedEvent(newEventTemplate)
@@ -561,7 +563,7 @@ export function Calendar() {
             start_time: newStartTime.toISOString(),
             end_time: newEndTime.toISOString(),
             description: task.description || `Scheduled time for task: ${task.title}`,
-            category: task.category_name || task.category || ''
+            aspect: task.aspect_name || task.aspect || ''
           },
           session?.access_token
         )
@@ -667,6 +669,48 @@ export function Calendar() {
           {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Friends Events Toggle */}
+          <button
+            onClick={() => setShowFriendsEvents(!showFriendsEvents)}
+            title={showFriendsEvents ? "Hide friends' events" : "Show friends' events"}
+            style={{
+              padding: '6px 10px',
+              ...typography.labelMd,
+              fontWeight: showFriendsEvents ? fontWeight.semibold : fontWeight.medium,
+              background: showFriendsEvents ? hexToRgba('#10b981', 0.15) : colors.bgTertiary,
+              color: showFriendsEvents ? '#10b981' : colors.textSecondary,
+              border: `1px solid ${showFriendsEvents ? hexToRgba('#10b981', 0.3) : colors.border}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s'
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Friends
+            {friendsEvents.length > 0 && (
+              <span style={{
+                background: showFriendsEvents ? '#10b981' : colors.textTertiary,
+                color: '#fff',
+                fontSize: fontSize.xs,
+                fontWeight: fontWeight.semibold,
+                padding: '1px 5px',
+                borderRadius: '10px',
+                minWidth: '18px',
+                textAlign: 'center'
+              }}>
+                {friendsEvents.length}
+              </span>
+            )}
+          </button>
+
           {/* View Toggle - Mobile pill style */}
           <div style={{
             display: 'flex',
@@ -871,6 +915,7 @@ export function Calendar() {
                     }}>
                       {dayEvents.slice(0, 2).map((event) => {
                         const eventColor = getEventColor(event)
+                        const isFriendEvent = event.is_friend_event
                         return (
                           <div
                             key={event.id}
@@ -880,7 +925,7 @@ export function Calendar() {
                               setIsFormOpen(true)
                             }}
                             style={{
-                              background: hexToRgba(eventColor, 0.12),
+                              background: hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
                               borderLeft: `2px solid ${eventColor}`,
                               color: colors.textPrimary,
                               fontSize: fontSize.xs,
@@ -893,18 +938,37 @@ export function Calendar() {
                               whiteSpace: 'nowrap',
                               cursor: 'pointer',
                               transition: 'background 0.15s ease',
-                              flexShrink: 0
+                              flexShrink: 0,
+                              opacity: isFriendEvent ? 0.7 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, 0.2)
+                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
+                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12)
                             }}
-                            title={`${event.title}${getRecurrenceBadge(event) ? ' (recurring)' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                            title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                           >
-                            {event.title}
-                            {getRecurrenceBadge(event) && <span style={{ marginLeft: '3px', fontSize: fontSize.xs, opacity: 0.7 }}>R</span>}
+                            {isFriendEvent && (
+                              <span style={{
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                background: hexToRgba(eventColor, 0.3),
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '7px',
+                                flexShrink: 0
+                              }}>
+                                {event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'}
+                              </span>
+                            )}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
+                            {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, opacity: 0.7 }}>R</span>}
                           </div>
                         )
                       })}
@@ -1103,12 +1167,13 @@ export function Calendar() {
                             minute: '2-digit',
                             hour12: true
                           })
+                          const isFriendEvent = event.is_friend_event
 
                           return (
                             <div
                               key={event.id}
-                              draggable={true}
-                              onDragStart={(e) => handleDragStart(e, event)}
+                              draggable={!isFriendEvent}
+                              onDragStart={(e) => !isFriendEvent && handleDragStart(e, event)}
                               onDragEnd={handleDragEnd}
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -1122,26 +1187,27 @@ export function Calendar() {
                                 right: layout.right === '2px' ? '4px' : layout.right,
                                 width: layout.width,
                                 height: `${height}px`,
-                                background: hexToRgba(eventColor, 0.12),
+                                background: hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
                                 borderLeft: `3px solid ${eventColor}`,
                                 color: eventColor,
                                 borderRadius: '4px',
                                 padding: '3px 8px',
                                 overflow: 'hidden',
                                 zIndex: layout.zIndex,
-                                cursor: draggingEvent?.id === event.id ? 'grabbing' : 'grab',
+                                cursor: isFriendEvent ? 'pointer' : (draggingEvent?.id === event.id ? 'grabbing' : 'grab'),
                                 transition: 'background 0.15s ease',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '2px'
+                                gap: '2px',
+                                opacity: isFriendEvent ? 0.7 : 1
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, 0.2)
+                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, 0.12)
+                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12)
                               }}
-                              title={`${event.title}${getRecurrenceBadge(event) ? ' (recurring)' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                              title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                             >
                               <div style={{
                                 ...typography.labelMd,
@@ -1154,6 +1220,22 @@ export function Calendar() {
                                 alignItems: 'center',
                                 gap: '4px'
                               }}>
+                                {/* Friend avatar indicator */}
+                                {isFriendEvent && (
+                                  <span style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '50%',
+                                    background: hexToRgba(eventColor, 0.3),
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '8px',
+                                    flexShrink: 0
+                                  }}>
+                                    {event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'}
+                                  </span>
+                                )}
                                 <span>{event.title}</span>
                                 {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, flexShrink: 0, opacity: 0.7 }}>R</span>}
                               </div>
@@ -1167,7 +1249,7 @@ export function Calendar() {
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap'
                                 }}>
-                                  {startTime}
+                                  {isFriendEvent ? `${event.owner_display_name || 'Friend'} - ${startTime}` : startTime}
                                 </div>
                               )}
                             </div>
@@ -1251,7 +1333,7 @@ export function Calendar() {
             if (eventData.start_time) updates.start_time = eventData.start_time
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
-            if (eventData.category) updates.category = eventData.category
+            if (eventData.aspect) updates.category = eventData.aspect
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
             await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
           }

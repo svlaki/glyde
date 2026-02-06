@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createTaskTool = tool(
-  async ({ title, description, dueDate, priority, category, energyRequired, estimatedDuration }, config) => {
+  async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -17,7 +17,7 @@ export const createTaskTool = tool(
         description: description || undefined,
         dueDate: dueDate || undefined,
         priority: priority || 'medium',
-        category: category || 'Personal',
+        aspect: aspect || 'Personal',
         energyRequired: energyRequired || undefined,
         estimatedDuration: estimatedDuration || undefined,
       }, { source: 'agent', agentType: 'conversation' });
@@ -35,13 +35,13 @@ export const createTaskTool = tool(
   },
   {
     name: "create_task",
-    description: "Create a new task. IMPORTANT: You must specify the correct category/aspect that matches the user's existing categories. Check the user's categories first and use the exact category name.",
+    description: "Create a new task. IMPORTANT: You must specify the correct aspect that matches the user's existing aspects. Check the user's aspects first and use the exact aspect name.",
     schema: z.object({
       title: z.string().describe("Task title"),
       description: z.string().optional().nullable().describe("Task description"),
       dueDate: z.string().optional().nullable().describe("Due date (ISO format)"),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Priority level"),
-      category: z.string().describe("Category name - MUST match an existing user category exactly (e.g., 'CS 525', 'Personal', 'Health'). Check user's categories first."),
+      aspect: z.string().describe("Aspect name - MUST match an existing user aspect exactly (e.g., 'CS 525', 'Personal', 'Health'). Check user's aspects first."),
       energyRequired: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy level required"),
       estimatedDuration: z.number().optional().nullable().describe("Estimated duration in minutes"),
     }),

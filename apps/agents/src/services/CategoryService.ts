@@ -42,7 +42,7 @@ export class CategoryService {
   async getCategories(userId: string): Promise<Category[]> {
     try {
       let query = this.supabase
-        .from('categories')
+        .from('aspects')
         .select('*')
         .eq('user_id', userId)
         .order('display_order', { ascending: true });
@@ -67,7 +67,7 @@ export class CategoryService {
   async getCategoryByName(userId: string, name: string): Promise<Category | null> {
     try {
       const { data, error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .select('*')
         .eq('user_id', userId)
         .eq('name', name)
@@ -91,7 +91,7 @@ export class CategoryService {
   async getCategoryById(userId: string, categoryId: string): Promise<Category | null> {
     try {
       const { data, error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .select('*')
         .eq('user_id', userId)
         .eq('id', categoryId)
@@ -128,7 +128,7 @@ export class CategoryService {
       }
 
       const { data, error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .insert({
           user_id: userId,
           name: input.name.trim(),
@@ -175,7 +175,7 @@ export class CategoryService {
       }
 
       const { data, error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .upsert({
           user_id: userId,
           name: input.name.trim(),
@@ -241,7 +241,7 @@ export class CategoryService {
       if (updates.context !== undefined) updateData.context = updates.context;
 
       const { data, error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .update(updateData)
         .eq('id', categoryId)
         .eq('user_id', userId)
@@ -285,7 +285,7 @@ export class CategoryService {
       const updatedContext = { ...category.context, ...context };
 
       const { error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .update({ context: updatedContext })
         .eq('id', categoryId)
         .eq('user_id', userId);
@@ -316,7 +316,7 @@ export class CategoryService {
       }
 
       const { error } = await this.supabase
-        .from('categories')
+        .from('aspects')
         .delete()
         .eq('id', categoryId)
         .eq('user_id', userId);

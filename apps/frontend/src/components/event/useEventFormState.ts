@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CalendarEvent } from '../../lib/calendarService'
+import type { CalendarEvent } from '../../lib/calendarService'
 import { parseRRuleToForm, buildRRuleFromForm, getNextOccurrences } from '../../lib/recurrenceUtils'
 
 export interface RecurrenceState {
@@ -58,11 +58,14 @@ interface UseEventFormStateOptions {
   isOpen: boolean
 }
 
+export type EventVisibility = 'private' | 'friends' | 'public'
+
 export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const [title, setTitle] = useState('')
   const [location, setLocation] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
+  const [aspect, setAspect] = useState('')
+  const [visibility, setVisibility] = useState<EventVisibility>('private')
   const [startDate, setStartDate] = useState<Date>(new Date())
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
@@ -88,7 +91,8 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setTitle(event.title || '')
       setLocation(event.location || '')
       setDescription(event.description || '')
-      setCategory(event.category || '')
+      setAspect(event.aspect || '')
+      setVisibility(event.visibility || 'private')
 
       if (event.start_time) {
         setStartDate(new Date(event.start_time))
@@ -132,7 +136,8 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setTitle('')
       setLocation('')
       setDescription('')
-      setCategory('')
+      setAspect('')
+      setVisibility('private')
 
       const now = new Date()
       const roundedStart = new Date(now)
@@ -263,7 +268,8 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
     title, setTitle,
     location, setLocation,
     description, setDescription,
-    category, setCategory,
+    aspect, setAspect,
+    visibility, setVisibility,
     startDate, setStartDate,
     endDate, setEndDate,
     loading, setLoading,

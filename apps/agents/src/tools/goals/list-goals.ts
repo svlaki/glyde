@@ -3,12 +3,12 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const listGoalsTool = tool(
-  async ({ status, category, goalType }, config) => {
+  async ({ status, aspect, goalType }, config) => {
     const userId = config?.configurable?.userId;
     console.log('[LIST-GOALS TOOL] Called with:', {
       userId,
       status,
-      category,
+      aspect,
       goalType,
       hasConfig: !!config,
       configKeys: config ? Object.keys(config) : []
@@ -24,7 +24,7 @@ export const listGoalsTool = tool(
       const filters: any = {};
 
       if (status) filters.status = status;
-      if (category) filters.category = category;
+      if (aspect) filters.aspect = aspect;
       if (goalType) filters.goalType = goalType;
 
       console.log('🔍 [LIST-GOALS TOOL] Fetching goals with filters:', filters);
@@ -57,7 +57,7 @@ export const listGoalsTool = tool(
     description: "List goals with optional filters. Use this to show the user their goals, check progress, or find specific objectives.",
     schema: z.object({
       status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("Filter by status"),
-      category: z.string().optional().nullable().describe("Filter by category"),
+      aspect: z.string().optional().nullable().describe("Filter by aspect"),
       goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Filter by goal type"),
     }),
   }

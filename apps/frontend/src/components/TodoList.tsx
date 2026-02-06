@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
-import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, Task } from '../lib/taskService'
+import { useAspects } from '../lib/aspectContext'
+import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask } from '../lib/taskService'
+import type { Task } from '../lib/taskService'
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontSize, fontWeight } from '../styles/typography'
@@ -23,7 +24,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
-  const { categories } = useCategories()
+  const { aspects } = useAspects()
   const [tasks, setTasks] = useState<Task[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -77,7 +78,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
     await createUserTask(user, session.access_token, {
       title: taskData.title!,
       description: taskData.description,
-      category: taskData.category,
+      aspect: taskData.aspect,
       due_date: taskData.due_date,
       priority: taskData.priority,
       status: 'pending'
@@ -97,7 +98,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
     await updateUserTask(user, session.access_token, editingTask.id, {
       title: taskData.title,
       description: taskData.description,
-      category: taskData.category,
+      aspect: taskData.aspect,
       due_date: taskData.due_date,
       priority: taskData.priority
     })
@@ -106,20 +107,20 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   }
 
   const getTaskColor = (task: Task): string => {
-    // First try category_color from task
-    if (task.category_color) {
-      return task.category_color
+    // First try aspect_color from task
+    if (task.aspect_color) {
+      return task.aspect_color
     }
 
-    // Then try to find category by name or id
-    const category = categories.find(c =>
-      c.id === task.category_id ||
-      c.name === task.category_name ||
-      c.name === task.category
+    // Then try to find aspect by name or id
+    const aspect = aspects.find(a =>
+      a.id === task.aspect_id ||
+      a.name === task.aspect_name ||
+      a.name === task.aspect
     )
 
-    if (category?.color) {
-      return category.color
+    if (aspect?.color) {
+      return aspect.color
     }
 
     // Default color

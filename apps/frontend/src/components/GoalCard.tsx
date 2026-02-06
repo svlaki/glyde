@@ -1,6 +1,6 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
-import { Goal } from '../lib/goalService'
+import { useAspects } from '../lib/aspectContext'
+import type { Goal } from '../lib/goalService'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontWeight, lineHeight } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
@@ -16,9 +16,9 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
 
-  const aspectColor = goal.category ? getCategoryColor(goal.category) : undefined
+  const aspectColor = goal.aspect ? getAspectColor(goal.aspect) : undefined
 
   return (
     <div

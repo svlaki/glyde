@@ -2,51 +2,51 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
-import { CategoryService } from "../../services/CategoryService.js";
+import { AspectService } from "../../services/AspectService.js";
 
 export const bulkUpdateEventsTool = tool(
-  async ({ searchQuery, eventIds, category, title, location, description }, config) => {
+  async ({ searchQuery, eventIds, aspect, title, location, description }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       throw new Error("User ID is required for bulk updating events");
     }
 
     // Validate that at least one update field is provided (empty strings and null don't count)
-    const hasCategory = category !== undefined && category !== null && category !== '';
+    const hasAspect = aspect !== undefined && aspect !== null && aspect !== '';
     const hasTitle = title !== undefined && title !== null && title !== '';
     const hasLocation = location !== undefined && location !== null && location !== '';
     const hasDescription = description !== undefined && description !== null && description !== '';
 
-    if (!hasCategory && !hasTitle && !hasLocation && !hasDescription) {
-      throw new Error("At least one non-empty field to update must be provided (category, title, location, or description)");
+    if (!hasAspect && !hasTitle && !hasLocation && !hasDescription) {
+      throw new Error("At least one non-empty field to update must be provided (aspect, title, location, or description)");
     }
 
     // Initialize services
     const supabaseService = new SupabaseService();
     const zepGraphService = new ZepGraphService();
-    const categoryService = new CategoryService();
+    const aspectService = new AspectService();
 
-    // Validate category exists before proceeding (prevents race condition with create_category)
-    if (hasCategory) {
-      console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Validating category: "${category}"`);
-      const existingCategory = await categoryService.getCategoryByName(userId, category!);
+    // Validate aspect exists before proceeding (prevents race condition with create_aspect)
+    if (hasAspect) {
+      console.log(`🔍 [BULK-UPDATE-EVENTS TOOL] Validating aspect: "${aspect}"`);
+      const existingAspect = await aspectService.getAspectByName(userId, aspect!);
 
-      if (!existingCategory) {
-        const allCategories = await categoryService.getCategories(userId);
-        const categoryNames = allCategories.map(c => c.name).join(', ');
+      if (!existingAspect) {
+        const allAspects = await aspectService.getAspects(userId);
+        const aspectNames = allAspects.map(a => a.name).join(', ');
 
         throw new Error(
-          `Category "${category}" does not exist. ` +
-          `Available categories: [${categoryNames}]. ` +
-          `Create the category first using create_category, then call bulk_update_events.`
+          `Aspect "${aspect}" does not exist. ` +
+          `Available aspects: [${aspectNames}]. ` +
+          `Create the aspect first using create_aspect, then call bulk_update_events.`
         );
       }
-      console.log(`[BULK-UPDATE-EVENTS TOOL] Category "${category}" validated`);
+      console.log(`[BULK-UPDATE-EVENTS TOOL] Aspect "${aspect}" validated`);
     }
 
     let eventsToUpdate: any[] = [];
 
-    console.log('[BULK-UPDATE-EVENTS TOOL] Processing bulk update:', { searchQuery, eventIds, category, title });
+    console.log('[BULK-UPDATE-EVENTS TOOL] Processing bulk update:', { searchQuery, eventIds, aspect, title });
 
     // Find events to update
     if (eventIds && eventIds.length > 0) {
@@ -96,7 +96,7 @@ export const bulkUpdateEventsTool = tool(
     // Prepare update data - only include non-empty values
     // Empty strings and null should NOT be applied as updates
     const updateData: any = {};
-    if (hasCategory) updateData.category = category;
+    if (hasAspect) updateData.aspect = aspect;
     if (hasTitle) updateData.title = title;
     if (hasLocation) updateData.location = location;
     if (hasDescription) updateData.description = description;
@@ -129,7 +129,7 @@ export const bulkUpdateEventsTool = tool(
               await zepGraphService.updateCalendarEvent(userId, event.id, {
                 eventId: updatedEvent.id,
                 title: updatedEvent.title,
-                category: category || event.category || 'Personal',
+                aspect: aspect || event.aspect || 'Personal',
                 duration_minutes: durationMinutes,
                 energy_level: 'medium',
                 location: updatedEvent.location || undefined,
@@ -152,7 +152,7 @@ export const bulkUpdateEventsTool = tool(
 
     // Build detailed response
     const updateFields: string[] = [];
-    if (category) updateFields.push(`category to "${category}"`);
+    if (aspect) updateFields.push(`aspect to "${aspect}"`);
     if (title) updateFields.push(`title to "${title}"`);
     if (location) updateFields.push(`location to "${location}"`);
     if (description) updateFields.push(`description`);
@@ -189,11 +189,11 @@ export const bulkUpdateEventsTool = tool(
   },
   {
     name: "bulk_update_events",
-    description: "Update multiple events at once based on search criteria or event IDs. Perfect for bulk category changes, mass edits, or moving groups of events to a category. IMPORTANT: Includes both past and future events in the search.",
+    description: "Update multiple events at once based on search criteria or event IDs. Perfect for bulk aspect changes, mass edits, or moving groups of events to an aspect. IMPORTANT: Includes both past and future events in the search.",
     schema: z.object({
       searchQuery: z.string().optional().nullable().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
       eventIds: z.array(z.string()).optional().nullable().describe("Optional: Array of specific event IDs to update instead of using search"),
-      category: z.string().optional().nullable().describe("New category to assign to all matching events. MUST be an existing category - call list_categories first or create_category BEFORE this tool."),
+      aspect: z.string().optional().nullable().describe("New aspect to assign to all matching events. MUST be an existing aspect - call list_aspects first or create_aspect BEFORE this tool."),
       title: z.string().optional().nullable().describe("Optional: New title for all matching events (use cautiously)"),
       location: z.string().optional().nullable().describe("Optional: New location for all matching events"),
       description: z.string().optional().nullable().describe("Optional: New description for all matching events"),

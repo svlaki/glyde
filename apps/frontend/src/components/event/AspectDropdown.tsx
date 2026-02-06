@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
-import { useCategories } from '../../lib/categoryContext'
-import { createUserCategory, Category } from '../../lib/categoryService'
+import { useAspects } from '../../lib/aspectContext'
+import { createUserAspect } from '../../lib/aspectService'
+import type { Aspect } from '../../lib/aspectService'
 import { AspectForm } from '../AspectForm'
 import { getColors } from '../../styles/colors'
 import { getTypography, fontSize, fontWeight } from '../../styles/typography'
@@ -17,7 +18,7 @@ export function AspectDropdown({ value, onChange }: AspectDropdownProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false)
-  const { categories, refreshCategories } = useCategories()
+  const { aspects, refreshAspects } = useAspects()
 
   const [isOpen, setIsOpen] = useState(false)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
@@ -37,17 +38,17 @@ export function AspectDropdown({ value, onChange }: AspectDropdownProps) {
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [isOpen])
 
-  const getCategoryColor = (categoryName: string): string => {
-    const cat = categories.find(c => c.name === categoryName)
-    return cat?.color || '#999'
+  const getAspectColor = (aspectName: string): string => {
+    const asp = aspects.find(a => a.name === aspectName)
+    return asp?.color || '#999'
   }
 
-  const handleCreateAspect = async (aspectData: Partial<Category>) => {
+  const handleCreateAspect = async (aspectData: Partial<Aspect>) => {
     if (!user || !session) return
 
     try {
-      await createUserCategory(user, aspectData as any, session.access_token)
-      await refreshCategories()
+      await createUserAspect(user, aspectData as any, session.access_token)
+      await refreshAspects()
       if (aspectData.name) {
         onChange(aspectData.name)
       }
@@ -101,7 +102,7 @@ export function AspectDropdown({ value, onChange }: AspectDropdownProps) {
                 width: '10px',
                 height: '10px',
                 borderRadius: '50%',
-                background: getCategoryColor(value),
+                background: getAspectColor(value),
                 flexShrink: 0
               }} />
               <span style={{ ...typography.bodyMd }}>{value}</span>
@@ -151,7 +152,7 @@ export function AspectDropdown({ value, onChange }: AspectDropdownProps) {
             >
               None
             </div>
-            {categories.map(cat => (
+            {aspects.map(cat => (
               <div
                 key={cat.id}
                 onClick={() => {

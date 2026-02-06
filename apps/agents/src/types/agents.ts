@@ -42,7 +42,7 @@ export interface Goal {
   id: string;
   title: string;
   description: string;
-  category: 'productivity' | 'health' | 'learning' | 'personal' | 'career';
+  aspect: 'productivity' | 'health' | 'learning' | 'personal' | 'career';
   priority: 'low' | 'medium' | 'high';
   status: 'active' | 'completed' | 'paused' | 'cancelled';
   targetDate?: string;
@@ -64,7 +64,7 @@ export interface GoalMetric {
 export interface BehaviorInsight {
   id: string;
   type: 'pattern' | 'trend' | 'anomaly' | 'suggestion';
-  category: 'scheduling' | 'productivity' | 'communication' | 'wellness';
+  aspect: 'scheduling' | 'productivity' | 'communication' | 'wellness';
   title: string;
   description: string;
   confidence: number; // 0-1

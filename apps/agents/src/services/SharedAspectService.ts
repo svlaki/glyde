@@ -94,21 +94,6 @@ export class SharedAspectService {
         }
       }
 
-      // 3. Log activity
-      await this.supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: ownerId,
-          entity_type: 'shared_aspect',
-          entity_id: aspect.id,
-          operation: 'create',
-          changes: {
-            name: data.name
-          },
-          source: 'user'
-        })
-        .throwOnError()
-
       return {
         success: true,
         data: aspect
@@ -189,37 +174,6 @@ export class SharedAspectService {
           error: 'Failed to add member'
         }
       }
-
-      // 5. Log activity
-      await this.supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: userId,
-          entity_type: 'shared_aspect_member',
-          entity_id: newMember.id,
-          operation: 'create',
-          changes: {
-            invited_user_id: invitedUserId,
-            role
-          },
-          source: 'user'
-        })
-        .throwOnError()
-
-      // 6. Create user interaction for invited user
-      await this.supabase
-        .from('user_interactions')
-        .insert({
-          user_id: invitedUserId,
-          interaction_type: 'shared_aspect_invite',
-          question: 'You have been invited to a shared aspect',
-          metadata: {
-            aspect_id: aspectId,
-            inviter_id: userId,
-            role
-          }
-        })
-        .throwOnError()
 
       return {
         success: true,

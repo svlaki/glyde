@@ -18,7 +18,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
  * - No text search needed
  */
 export const searchTasksTool = tool(
-  async ({ query, status, category, priority, dueBefore, dueAfter }, config) => {
+  async ({ query, status, aspect, priority, dueBefore, dueAfter }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -56,11 +56,11 @@ export const searchTasksTool = tool(
       if (status) {
         matchedTasks = matchedTasks.filter((t) => t.status === status);
       }
-      if (category) {
-        const normalizedCategory = category.toLowerCase().trim();
+      if (aspect) {
+        const normalizedAspect = aspect.toLowerCase().trim();
         matchedTasks = matchedTasks.filter((t) => {
-          const categoryName = (t.category_name || t.category || '').toLowerCase();
-          return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+          const aspectName = (t.aspect_name || t.aspect || '').toLowerCase();
+          return aspectName === normalizedAspect || aspectName.includes(normalizedAspect);
         });
       }
       if (priority) {
@@ -82,9 +82,9 @@ export const searchTasksTool = tool(
         const dueStr = task.due_date ? ` (Due: ${new Date(task.due_date).toLocaleDateString()})` : '';
         const priorityStr = task.priority ? ` [${task.priority.toUpperCase()}]` : '';
         const statusStr = task.status ? ` - ${task.status}` : '';
-        const categoryStr = task.category_name ? ` [${task.category_name}]` : (task.category ? ` [${task.category}]` : '');
+        const aspectStr = task.aspect_name ? ` [${task.aspect_name}]` : (task.aspect ? ` [${task.aspect}]` : '');
         const descriptionPreview = task.description ? ` - ${task.description.substring(0, 60)}${task.description.length > 60 ? '...' : ''}` : '';
-        return `${index + 1}. ${task.title}${priorityStr}${categoryStr}${dueStr}${statusStr}${descriptionPreview}`;
+        return `${index + 1}. ${task.title}${priorityStr}${aspectStr}${dueStr}${statusStr}${descriptionPreview}`;
       }).join('\n');
 
       return `🔍 Found ${matchedTasks.length} task(s) matching "${query}":\n${taskList}`;
@@ -95,11 +95,11 @@ export const searchTasksTool = tool(
   },
   {
     name: "search_tasks",
-    description: "Search tasks by text content in title and description. Use this to find tasks containing specific keywords or phrases. Supports optional filters for status, category, priority, and due dates.",
+    description: "Search tasks by text content in title and description. Use this to find tasks containing specific keywords or phrases. Supports optional filters for status, aspect, priority, and due dates.",
     schema: z.object({
       query: z.string().describe("Search query to match in task title or description (case-insensitive, partial matching)"),
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Optional: Filter by status"),
-      category: z.string().optional().nullable().describe("Optional: Filter by category"),
+      aspect: z.string().optional().nullable().describe("Optional: Filter by aspect"),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Optional: Filter by priority"),
       dueBefore: z.string().optional().nullable().describe("Optional: Show tasks due before this date (ISO format)"),
       dueAfter: z.string().optional().nullable().describe("Optional: Show tasks due after this date (ISO format)"),

@@ -1,9 +1,12 @@
 // Unified search service for events, tasks, and goals
 
 import { User } from '@supabase/supabase-js'
-import { fetchExpandedEvents, CalendarEvent } from './calendarService'
-import { fetchUserTasks, Task } from './taskService'
-import { fetchUserGoals, Goal } from './goalService'
+import { fetchExpandedEvents } from './calendarService'
+import type { CalendarEvent } from './calendarService'
+import { fetchUserTasks } from './taskService'
+import type { Task } from './taskService'
+import { fetchUserGoals } from './goalService'
+import type { Goal } from './goalService'
 
 export type SearchResultType = 'event' | 'task' | 'goal'
 

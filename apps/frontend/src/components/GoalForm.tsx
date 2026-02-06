@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
-import { createUserCategory, Category } from '../lib/categoryService'
+import { useAspects } from '../lib/aspectContext'
+import { createUserAspect } from '../lib/aspectService'
+import type { Aspect } from '../lib/aspectService'
 import { Goal } from '../lib/goalService'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
@@ -48,7 +49,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { categories, refreshCategories, getCategoryColor } = useCategories()
+  const { aspects, refreshAspects, getAspectColor } = useAspects()
   const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -70,7 +71,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     if (goal) {
       setTitle(goal.title || '')
       setDescription(goal.description || '')
-      setCategory(goal.category || '')
+      setCategory(goal.aspect || '')
       if ((goal as any).due_date) {
         setDueDate(new Date((goal as any).due_date))
         setHasDueDate(true)
@@ -146,12 +147,12 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
     return undefined
   }, [editingField])
 
-  const handleCreateAspect = async (aspectData: Partial<Category>) => {
+  const handleCreateAspect = async (aspectData: Partial<Aspect>) => {
     if (!user || !session) return
 
     try {
-      await createUserCategory(user, aspectData as any, session.access_token)
-      await refreshCategories()
+      await createUserAspect(user, aspectData as any, session.access_token)
+      await refreshAspects()
       // Auto-select the newly created aspect
       if (aspectData.name) {
         setCategory(aspectData.name)
@@ -174,7 +175,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         id: goal?.id,
         title: title.trim(),
         description: description.trim() || undefined,
-        category: category || undefined
+        aspect: category || undefined
       }
       if (hasDueDate && dueDate) {
         goalData.due_date = dueDate.toISOString()
@@ -278,14 +279,14 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
               {category ? (
                 <>
                   {(() => {
-                    const cat = categories.find(c => c.name === category)
-                    return cat ? (
+                    const asp = aspects.find(a => a.name === category)
+                    return asp ? (
                       <>
                         <div style={{
                           width: '12px',
                           height: '12px',
                           borderRadius: '50%',
-                          background: getCategoryColor(category),
+                          background: getAspectColor(category),
                           flexShrink: 0
                         }} />
                         <span>{category}</span>
@@ -344,7 +345,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   </div>
                 )}
                 {/* Existing aspects */}
-                {categories.map(cat => (
+                {aspects.map(cat => (
                   <div
                     key={cat.id}
                     onClick={() => {
@@ -371,7 +372,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       width: '12px',
                       height: '12px',
                       borderRadius: '50%',
-                      background: getCategoryColor(cat.name),
+                      background: getAspectColor(cat.name),
                       flexShrink: 0
                     }} />
                     <span>{cat.name}</span>

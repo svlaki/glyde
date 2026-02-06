@@ -1,7 +1,7 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
-import { Connection } from '../lib/connectionService'
+import type { Connection } from '../lib/connectionService'
 
 interface ConnectionCardProps {
   connection: Connection

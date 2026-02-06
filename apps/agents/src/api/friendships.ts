@@ -165,4 +165,104 @@ router.delete('/:friendshipId', authenticateRequest, async (req: Request, res: R
   }
 })
 
+/**
+ * Update friend notes
+ * PUT /friends/:friendshipId/notes
+ * Body: { notes: string }
+ */
+router.put('/:friendshipId/notes', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { friendshipId } = req.params
+    const { notes } = req.body
+
+    if (!friendshipId) {
+      return res.status(400).json({ success: false, error: 'Friendship ID is required' })
+    }
+
+    if (typeof notes !== 'string') {
+      return res.status(400).json({ success: false, error: 'Notes must be a string' })
+    }
+
+    const supabase = getSupabaseClient()
+    const friendshipService = new FriendshipService(supabase)
+
+    const result = await friendshipService.updateFriendNotes(friendshipId, userId, notes)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error updating friend notes:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Add aspect to friend
+ * POST /friends/:friendshipId/aspects
+ * Body: { aspectId: string }
+ */
+router.post('/:friendshipId/aspects', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { friendshipId } = req.params
+    const { aspectId } = req.body
+
+    if (!friendshipId) {
+      return res.status(400).json({ success: false, error: 'Friendship ID is required' })
+    }
+
+    if (!aspectId || typeof aspectId !== 'string') {
+      return res.status(400).json({ success: false, error: 'Aspect ID is required' })
+    }
+
+    const supabase = getSupabaseClient()
+    const friendshipService = new FriendshipService(supabase)
+
+    const result = await friendshipService.addFriendAspect(friendshipId, userId, aspectId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error adding friend aspect:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Remove aspect from friend
+ * DELETE /friends/:friendshipId/aspects/:aspectId
+ */
+router.delete('/:friendshipId/aspects/:aspectId', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { friendshipId, aspectId } = req.params
+
+    if (!friendshipId) {
+      return res.status(400).json({ success: false, error: 'Friendship ID is required' })
+    }
+
+    if (!aspectId) {
+      return res.status(400).json({ success: false, error: 'Aspect ID is required' })
+    }
+
+    const supabase = getSupabaseClient()
+    const friendshipService = new FriendshipService(supabase)
+
+    const result = await friendshipService.removeFriendAspect(friendshipId, userId, aspectId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error removing friend aspect:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
 export default router

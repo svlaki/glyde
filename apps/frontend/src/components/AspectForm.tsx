@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useCategories } from '../lib/categoryContext'
-import { Category } from '../lib/categoryService'
+import { useAspects } from '../lib/aspectContext'
+import type { Aspect } from '../lib/aspectService'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
@@ -8,10 +8,10 @@ import { useDarkMode } from '../lib/darkModeContext'
 import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 
 interface AspectFormProps {
-  aspect?: Category | undefined
+  aspect?: Aspect | undefined
   isOpen: boolean
   onClose: () => void
-  onSave: (aspect: Partial<Category>) => Promise<void>
+  onSave: (aspect: Partial<Aspect>) => Promise<void>
 }
 
 // Ordered color palette - aspects will be assigned these colors in sequence
@@ -37,7 +37,7 @@ const PRESET_COLORS = [
 export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { categories } = useCategories()
+  const { aspects } = useAspects()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
@@ -56,11 +56,11 @@ export function AspectForm({ aspect, isOpen, onClose, onSave }: AspectFormProps)
       setName('')
       setDescription('')
       // Assign color based on number of existing aspects (cycles through palette)
-      const nextColorIndex = categories.length % PRESET_COLORS.length
+      const nextColorIndex = aspects.length % PRESET_COLORS.length
       setColor(PRESET_COLORS[nextColorIndex])
       setContext('')
     }
-  }, [aspect, isOpen, categories.length])
+  }, [aspect, isOpen, aspects.length])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

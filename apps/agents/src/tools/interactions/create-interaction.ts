@@ -15,19 +15,14 @@ export const createInteractionTool = tool(
     }
     console.log('🔧 [CREATE-INTERACTION] userId:', userId);
 
-    // Validate interaction type and structure
+    // Log warnings for missing metadata (but still create the interaction)
     if (type === "yes_no" && (!metadata || !metadata.followUp)) {
       console.warn('⚠️ [create-interaction] YES_NO interaction created WITHOUT followUp - clicking "yes" will do nothing!');
       console.warn('⚠️ [create-interaction] Metadata received:', JSON.stringify(metadata, null, 2));
     }
 
-    // For multiple_choice, followUp is optional - user can just pick an option or dismiss
-    if (type === "multiple_choice" && (!options || options.length === 0)) {
-      console.warn('⚠️ [create-interaction] MULTIPLE_CHOICE interaction created WITHOUT options!');
-    }
-
-    // Log warning if directAction is missing in followUp (only for yes_no with followUp)
-    if (type === "yes_no" && metadata?.followUp && (!metadata.followUp.metadata?.directAction)) {
+    // Log warning if directAction is missing in followUp
+    if (metadata?.followUp && (!metadata.followUp.metadata?.directAction)) {
       console.warn('⚠️ [create-interaction] followUp is missing directAction - picking a time will do nothing!');
     }
 
@@ -63,13 +58,13 @@ export const createInteractionTool = tool(
   },
   {
     name: "create_interaction",
-    description: "Create an interactive prompt for the user. For yes_no with scheduling: include metadata with followUp. For multiple_choice: just provide options, user can pick one or dismiss.",
+    description: "Create an interactive prompt for the user. CRITICAL: For yes_no type, you MUST include metadata with a followUp object containing the time selection question. Without metadata.followUp, clicking 'yes' does nothing!",
     schema: z.object({
       question: z.string().describe("The question or prompt to show the user"),
-      type: z.enum(["yes_no", "multiple_choice"]).describe("Type: 'yes_no' for yes/no decision (can have followUp), 'multiple_choice' for direct options (user picks or dismisses)"),
-      options: z.array(z.string()).optional().nullable().describe("Array of options for user (required for multiple_choice). Examples: ['Task A', 'Task B', 'Task C'] or ['9:00am', '2:00pm', '6:00pm']"),
+      type: z.enum(["yes_no", "multiple_choice"]).describe("Type of interaction: yes_no for simple yes/no questions, multiple_choice for options"),
+      options: z.array(z.string()).optional().nullable().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
-      metadata: z.record(z.any()).optional().nullable().describe("Optional metadata. For yes_no with follow-up: { action: 'suggestion', context: 'why', followUp: { question: 'When?', type: 'multiple_choice', options: [...], metadata: { directAction: {...} } } }. For simple multiple_choice: { action: 'task_selection', context: 'free time available' }"),
+      metadata: z.record(z.any()).optional().nullable().describe("IMPORTANT for yes_no type! Should contain: { action: string, context: string, followUp: { question: string, type: 'multiple_choice', options: ['9:00am', '12:00pm', '6:00pm'], metadata: { directAction: { type: 'create_event', eventData: {...} } } } }. Without followUp, clicking 'yes' won't do anything."),
     }),
   }
 );

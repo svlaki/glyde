@@ -10,7 +10,7 @@ import { toZonedTime } from "date-fns-tz";
  * Provides insights and analytics about the user's calendar:
  * - Meeting density and time allocation
  * - Free time availability
- * - Category distribution
+ * - Aspect distribution
  * - Busiest/quietest periods
  * - Work-life balance metrics
  *
@@ -80,23 +80,23 @@ export const analyzeScheduleTool = tool(
       const totalHours = Math.round(totalMinutes / 60 * 10) / 10;
       const avgEventDuration = Math.round(totalMinutes / events.length);
 
-      // Category breakdown
-      const categoryMap = new Map<string, { count: number; minutes: number }>();
+      // Aspect breakdown
+      const aspectMap = new Map<string, { count: number; minutes: number }>();
       events.forEach(event => {
-        const category = event.category_name || event.category || 'Uncategorized';
+        const aspect = event.aspect_name || event.aspect || 'Uncategorized';
         const duration = differenceInMinutes(new Date(event.end_time), new Date(event.start_time));
 
-        const existing = categoryMap.get(category) || { count: 0, minutes: 0 };
-        categoryMap.set(category, {
+        const existing = aspectMap.get(aspect) || { count: 0, minutes: 0 };
+        aspectMap.set(aspect, {
           count: existing.count + 1,
           minutes: existing.minutes + duration
         });
       });
 
-      // Sort categories by time spent
-      const categoryBreakdown = Array.from(categoryMap.entries())
+      // Sort aspects by time spent
+      const aspectBreakdown = Array.from(aspectMap.entries())
         .sort((a, b) => b[1].minutes - a[1].minutes)
-        .slice(0, 5) // Top 5 categories
+        .slice(0, 5) // Top 5 aspects
         .map(([name, stats]) => {
           const hours = Math.round(stats.minutes / 60 * 10) / 10;
           const percentage = Math.round((stats.minutes / totalMinutes) * 100);
@@ -140,8 +140,8 @@ export const analyzeScheduleTool = tool(
 • Average event duration: ${avgEventDuration} minutes
 • Calendar load: ${meetingLoad}% of working hours
 
-**Top Categories:**
-${categoryBreakdown}
+**Top Aspects:**
+${aspectBreakdown}
 
 **Daily Pattern:**
 • Busiest day: ${busiestDay ? `${busiestDay[0]} (${busiestDayHours}h)` : 'N/A'}
@@ -158,7 +158,7 @@ ${loadAssessment}`;
   },
   {
     name: "analyze_schedule",
-    description: "Analyze the user's schedule and provide insights about time allocation, meeting density, category breakdown, and work-life balance. Use when users ask about their schedule patterns or workload.",
+    description: "Analyze the user's schedule and provide insights about time allocation, meeting density, aspect breakdown, and work-life balance. Use when users ask about their schedule patterns or workload.",
     schema: z.object({
       period: z.enum(["today", "week", "next-week"]).optional().nullable().describe("Time period to analyze (default: 'week' for current week)"),
       startDate: z.string().optional().nullable().describe("Custom start date (ISO format) - overrides period"),

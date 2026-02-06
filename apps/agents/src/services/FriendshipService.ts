@@ -10,11 +10,22 @@ export interface Friendship {
   updated_at: string
 }
 
+export interface FriendAspect {
+  id: string
+  name: string
+  color: string
+  icon?: string
+}
+
 export interface Friend {
+  friendship_id: string
   friend_id: string
   friend_email: string
   friend_display_name: string
+  friend_avatar_url?: string
   friendship_status: string
+  notes?: string
+  aspects: FriendAspect[]
   created_at: string
 }
 
@@ -116,36 +127,6 @@ export class FriendshipService {
         }
       }
 
-      // 6. Log to user_activity_log
-      await this.supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: requesterId,
-          entity_type: 'friendship',
-          entity_id: friendship.id,
-          operation: 'create',
-          changes: {
-            status: 'pending',
-            target_user_id: addresseeId
-          },
-          source: 'user'
-        })
-        .throwOnError()
-
-      // 7. Create user_interaction for addressee (notification)
-      await this.supabase
-        .from('user_interactions')
-        .insert({
-          user_id: addresseeId,
-          interaction_type: 'friend_request',
-          question: `Would you like to accept a friend request?`,
-          metadata: {
-            friendship_id: friendship.id,
-            requester_id: requesterId
-          }
-        })
-        .throwOnError()
-
       return {
         success: true,
         data: friendship
@@ -202,34 +183,6 @@ export class FriendshipService {
           error: 'Failed to accept friend request'
         }
       }
-
-      // 3. Log to user_activity_log
-      await this.supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: userId,
-          entity_type: 'friendship',
-          entity_id: friendshipId,
-          operation: 'update',
-          changes: {
-            status: { from: 'pending', to: 'accepted' }
-          },
-          source: 'user'
-        })
-        .throwOnError()
-
-      // 4. Create user_interaction for requester (notification)
-      await this.supabase
-        .from('user_interactions')
-        .insert({
-          user_id: friendship.requester_id,
-          interaction_type: 'friend_request_accepted',
-          question: `Friend request accepted`,
-          metadata: {
-            friendship_id: friendshipId
-          }
-        })
-        .throwOnError()
 
       return {
         success: true,
@@ -288,20 +241,6 @@ export class FriendshipService {
           }
         }
 
-        // Log blocking
-        await this.supabase
-          .from('user_activity_log')
-          .insert({
-            user_id: userId,
-            entity_type: 'friendship',
-            entity_id: friendshipId,
-            operation: 'update',
-            changes: {
-              status: { from: 'pending', to: 'blocked' }
-            },
-            source: 'user'
-          })
-          .throwOnError()
       } else {
         // 3. Delete record if declining
         const { error: deleteError } = await this.supabase
@@ -316,20 +255,6 @@ export class FriendshipService {
           }
         }
 
-        // Log declining
-        await this.supabase
-          .from('user_activity_log')
-          .insert({
-            user_id: userId,
-            entity_type: 'friendship',
-            entity_id: friendshipId,
-            operation: 'delete',
-            changes: {
-              reason: 'declined'
-            },
-            source: 'user'
-          })
-          .throwOnError()
       }
 
       return {
@@ -349,19 +274,96 @@ export class FriendshipService {
    */
   async getFriends(userId: string): Promise<ApiResponse<Friend[]>> {
     try {
-      const { data: friends, error } = await this.supabase
-        .rpc('get_user_friends', { p_user_id: userId })
+      // Step 1: Fetch accepted friendships
+      const { data: friendships, error: friendshipError } = await this.supabase
+        .from('user_friendships')
+        .select('id, requester_id, addressee_id, status, notes, created_at')
+        .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false })
 
-      if (error) {
+      if (friendshipError) {
+        console.error('Error fetching friendships:', friendshipError)
         return {
           success: false,
           error: 'Failed to fetch friends'
         }
       }
 
+      if (!friendships || friendships.length === 0) {
+        return {
+          success: true,
+          data: []
+        }
+      }
+
+      // Step 2: Get friend IDs (the other person in each friendship)
+      const friendIds = friendships.map(f =>
+        f.requester_id === userId ? f.addressee_id : f.requester_id
+      )
+      const friendshipIds = friendships.map(f => f.id)
+
+      // Step 3: Fetch profiles for all friends
+      const { data: profiles, error: profileError } = await this.supabase
+        .from('profile')
+        .select('id, email, display_name, avatar_url')
+        .in('id', friendIds)
+
+      if (profileError) {
+        console.error('Error fetching profiles:', profileError)
+        return {
+          success: false,
+          error: 'Failed to fetch friends'
+        }
+      }
+
+      // Step 4: Fetch aspects for all friendships
+      const { data: friendAspects, error: aspectError } = await this.supabase
+        .from('friend_aspects')
+        .select('friendship_id, aspect_id, aspects!inner(id, name, color, icon)')
+        .in('friendship_id', friendshipIds)
+
+      // Build profile and aspect maps
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+      const aspectMap = new Map<string, FriendAspect[]>()
+
+      if (friendAspects && !aspectError) {
+        for (const fa of friendAspects) {
+          const existing = aspectMap.get(fa.friendship_id) || []
+          const asp = fa.aspects as unknown as { id: string; name: string; color: string; icon?: string }
+          existing.push({
+            id: asp.id,
+            name: asp.name,
+            color: asp.color,
+            icon: asp.icon
+          })
+          aspectMap.set(fa.friendship_id, existing)
+        }
+      }
+
+      // Step 5: Combine the data
+      const friends: Friend[] = friendships.map(friendship => {
+        const friendId = friendship.requester_id === userId
+          ? friendship.addressee_id
+          : friendship.requester_id
+        const profile = profileMap.get(friendId)
+
+        return {
+          friendship_id: friendship.id,
+          friend_id: friendId,
+          friend_email: profile?.email || '',
+          friend_display_name: profile?.display_name || 'Unknown',
+          friend_avatar_url: profile?.avatar_url,
+          friendship_status: friendship.status,
+          notes: friendship.notes || undefined,
+          aspects: aspectMap.get(friendship.id) || [],
+          created_at: friendship.created_at
+        }
+      })
+
       return {
         success: true,
-        data: friends || []
+        data: friends
       }
     } catch (error) {
       console.error('Error getting friends:', error)
@@ -377,37 +379,58 @@ export class FriendshipService {
    */
   async getPendingRequests(userId: string): Promise<ApiResponse<FriendRequest[]>> {
     try {
-      const { data: requests, error } = await this.supabase
+      // Step 1: Fetch pending friendships
+      const { data: friendships, error: friendshipError } = await this.supabase
         .from('user_friendships')
-        .select(
-          `
-          id,
-          requester_id,
-          status,
-          created_at,
-          requester:profile!requester_id(email, display_name, avatar_url)
-          `
-        )
+        .select('id, requester_id, status, created_at')
         .eq('addressee_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
 
-      if (error) {
+      if (friendshipError) {
+        console.error('Error fetching friendships:', friendshipError)
         return {
           success: false,
           error: 'Failed to fetch friend requests'
         }
       }
 
-      const formattedRequests = requests?.map((req: any) => ({
-        id: req.id,
-        requester_id: req.requester_id,
-        requester_email: req.requester.email,
-        requester_display_name: req.requester.display_name,
-        requester_avatar_url: req.requester.avatar_url,
-        status: req.status,
-        created_at: req.created_at
-      })) || []
+      if (!friendships || friendships.length === 0) {
+        return {
+          success: true,
+          data: []
+        }
+      }
+
+      // Step 2: Fetch profile data for all requesters
+      const requesterIds = friendships.map(f => f.requester_id)
+      const { data: profiles, error: profileError } = await this.supabase
+        .from('profile')
+        .select('id, email, display_name, avatar_url')
+        .in('id', requesterIds)
+
+      if (profileError) {
+        console.error('Error fetching profiles:', profileError)
+        return {
+          success: false,
+          error: 'Failed to fetch friend requests'
+        }
+      }
+
+      // Step 3: Combine the data
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+      const formattedRequests = friendships.map(friendship => {
+        const profile = profileMap.get(friendship.requester_id)
+        return {
+          id: friendship.id,
+          requester_id: friendship.requester_id,
+          requester_email: profile?.email || '',
+          requester_display_name: profile?.display_name || 'Unknown',
+          requester_avatar_url: profile?.avatar_url,
+          status: friendship.status as 'pending' | 'accepted' | 'blocked',
+          created_at: friendship.created_at
+        }
+      })
 
       return {
         success: true,
@@ -479,21 +502,6 @@ export class FriendshipService {
         }
       }
 
-      // 3. Log to user_activity_log
-      await this.supabase
-        .from('user_activity_log')
-        .insert({
-          user_id: userId,
-          entity_type: 'friendship',
-          entity_id: friendshipId,
-          operation: 'delete',
-          changes: {
-            reason: 'user_removed'
-          },
-          source: 'user'
-        })
-        .throwOnError()
-
       return {
         success: true
       }
@@ -502,6 +510,189 @@ export class FriendshipService {
       return {
         success: false,
         error: 'Failed to remove friend'
+      }
+    }
+  }
+
+  /**
+   * Update notes for a friendship
+   */
+  async updateFriendNotes(
+    friendshipId: string,
+    userId: string,
+    notes: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      // Verify userId is part of friendship
+      const { data: friendship, error: lookupError } = await this.supabase
+        .from('user_friendships')
+        .select('requester_id, addressee_id')
+        .eq('id', friendshipId)
+        .single()
+
+      if (lookupError || !friendship) {
+        return {
+          success: false,
+          error: 'Friendship not found'
+        }
+      }
+
+      if (friendship.requester_id !== userId && friendship.addressee_id !== userId) {
+        return {
+          success: false,
+          error: 'You do not have permission to update this friendship'
+        }
+      }
+
+      // Update notes
+      const { error: updateError } = await this.supabase
+        .from('user_friendships')
+        .update({ notes, updated_at: new Date().toISOString() })
+        .eq('id', friendshipId)
+
+      if (updateError) {
+        return {
+          success: false,
+          error: 'Failed to update notes'
+        }
+      }
+
+      return {
+        success: true
+      }
+    } catch (error) {
+      console.error('Error updating friend notes:', error)
+      return {
+        success: false,
+        error: 'Failed to update notes'
+      }
+    }
+  }
+
+  /**
+   * Add an aspect to a friendship
+   */
+  async addFriendAspect(
+    friendshipId: string,
+    userId: string,
+    aspectId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      // Verify userId is part of friendship
+      const { data: friendship, error: lookupError } = await this.supabase
+        .from('user_friendships')
+        .select('requester_id, addressee_id')
+        .eq('id', friendshipId)
+        .single()
+
+      if (lookupError || !friendship) {
+        return {
+          success: false,
+          error: 'Friendship not found'
+        }
+      }
+
+      if (friendship.requester_id !== userId && friendship.addressee_id !== userId) {
+        return {
+          success: false,
+          error: 'You do not have permission to update this friendship'
+        }
+      }
+
+      // Verify aspect belongs to user
+      const { data: aspect, error: aspectError } = await this.supabase
+        .from('aspects')
+        .select('id')
+        .eq('id', aspectId)
+        .eq('user_id', userId)
+        .single()
+
+      if (aspectError || !aspect) {
+        return {
+          success: false,
+          error: 'Aspect not found'
+        }
+      }
+
+      // Add aspect (ignore if already exists)
+      const { error: insertError } = await this.supabase
+        .from('friend_aspects')
+        .upsert({
+          friendship_id: friendshipId,
+          aspect_id: aspectId
+        }, { onConflict: 'friendship_id,aspect_id' })
+
+      if (insertError) {
+        return {
+          success: false,
+          error: 'Failed to add aspect'
+        }
+      }
+
+      return {
+        success: true
+      }
+    } catch (error) {
+      console.error('Error adding friend aspect:', error)
+      return {
+        success: false,
+        error: 'Failed to add aspect'
+      }
+    }
+  }
+
+  /**
+   * Remove an aspect from a friendship
+   */
+  async removeFriendAspect(
+    friendshipId: string,
+    userId: string,
+    aspectId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      // Verify userId is part of friendship
+      const { data: friendship, error: lookupError } = await this.supabase
+        .from('user_friendships')
+        .select('requester_id, addressee_id')
+        .eq('id', friendshipId)
+        .single()
+
+      if (lookupError || !friendship) {
+        return {
+          success: false,
+          error: 'Friendship not found'
+        }
+      }
+
+      if (friendship.requester_id !== userId && friendship.addressee_id !== userId) {
+        return {
+          success: false,
+          error: 'You do not have permission to update this friendship'
+        }
+      }
+
+      // Remove aspect
+      const { error: deleteError } = await this.supabase
+        .from('friend_aspects')
+        .delete()
+        .eq('friendship_id', friendshipId)
+        .eq('aspect_id', aspectId)
+
+      if (deleteError) {
+        return {
+          success: false,
+          error: 'Failed to remove aspect'
+        }
+      }
+
+      return {
+        success: true
+      }
+    } catch (error) {
+      console.error('Error removing friend aspect:', error)
+      return {
+        success: false,
+        error: 'Failed to remove aspect'
       }
     }
   }

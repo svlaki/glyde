@@ -4,7 +4,8 @@ import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { Connection, triggerSync, getGoogleAuthUrl } from '../../lib/connectionService'
+import { triggerSync, getGoogleAuthUrl } from '../../lib/connectionService'
+import type { Connection } from '../../lib/connectionService'
 
 interface ConnectionsStatusCardProps {
   connections: Connection[]

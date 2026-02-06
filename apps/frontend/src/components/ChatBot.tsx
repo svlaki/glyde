@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { mobileSpacing } from '../styles/mobileStyles'
@@ -99,7 +99,7 @@ const SUGGESTIONS = [
 export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false }, ref) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
-  const { refreshCategories } = useCategories()
+  const { refreshAspects } = useAspects()
   const location = useLocation()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
@@ -538,8 +538,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       // Save bot message to API (fire and forget)
       saveMessageToAPI(botMessage)
 
-      // Refresh categories in case agent created/modified any
-      refreshCategories()
+      // Refresh aspects in case agent created/modified any
+      refreshAspects()
 
     } catch (error) {
       if ((error as Error).name === 'AbortError') {

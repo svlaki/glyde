@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const updateTaskTool = tool(
-  async ({ taskId, searchQuery, title, description, dueDate, priority, status, category, energyRequired, estimatedDuration }, config) => {
+  async ({ taskId, searchQuery, title, description, dueDate, priority, status, aspect, energyRequired, estimatedDuration }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -88,7 +88,7 @@ export const updateTaskTool = tool(
       if (dueDate !== undefined) updates.dueDate = dueDate;
       if (priority !== undefined) updates.priority = priority;
       if (status !== undefined) updates.status = status;
-      if (category !== undefined) updates.category = category;
+      if (aspect !== undefined) updates.aspect = aspect;
       if (energyRequired !== undefined) updates.energyRequired = energyRequired;
       if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
 
@@ -124,8 +124,8 @@ export const updateTaskTool = tool(
           changes.push(`status changed to ${status}`);
         }
       }
-      if (category !== undefined && originalTask?.category !== category) {
-        changes.push(`category changed to "${category}"`);
+      if (aspect !== undefined && originalTask?.aspect !== aspect) {
+        changes.push(`aspect changed to "${aspect}"`);
       }
 
       const taskTitle = task.title || originalTask?.title || 'Task';
@@ -148,7 +148,7 @@ export const updateTaskTool = tool(
       dueDate: z.string().nullable().optional().describe("New due date (ISO format)"),
       priority: z.enum(["low", "medium", "high", "urgent"]).nullable().optional().describe("New priority level"),
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).nullable().optional().describe("New status"),
-      category: z.string().nullable().optional().describe("New category name"),
+      aspect: z.string().nullable().optional().describe("New aspect name"),
       energyRequired: z.enum(["low", "medium", "high"]).nullable().optional().describe("Energy level required"),
       estimatedDuration: z.number().nullable().optional().describe("Estimated duration in minutes"),
     }),

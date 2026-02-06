@@ -1,9 +1,9 @@
-// DEPRECATED: This file is deprecated in favor of useCategories hook
-// Use the CategoryContext instead for dynamic category colors from the backend
+// DEPRECATED: This file is deprecated in favor of useAspects hook
+// Use the AspectContext instead for dynamic aspect colors from the backend
 // This file will be removed in a future update
 
 /**
- * @deprecated Use useCategories() hook instead
+ * @deprecated Use useAspects() hook instead
  */
 export const CATEGORY_COLORS: Record<string, string> = {
   'Work': '#3b82f6',
@@ -21,7 +21,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
 };
 
 /**
- * @deprecated Use useCategories().getCategoryColor() instead
+ * @deprecated Use useAspects().getAspectColor() instead
  */
 export function getCategoryColor(category?: string, fallback: string = '#6B7280'): string {
   if (!category) {

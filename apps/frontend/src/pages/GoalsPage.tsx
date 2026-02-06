@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, Goal } from '../lib/goalService'
+import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { GoalCard } from '../components/GoalCard'
 import { GoalDetailPanel } from '../components/GoalDetailPanel'
@@ -146,7 +147,7 @@ export function GoalsPage() {
         await createUserGoal(user, session.access_token, {
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category,
+          aspect: goalData.aspect,
           milestones: goalData.milestones,
           milestone_type: goalData.milestone_type
         })

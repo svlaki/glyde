@@ -3,7 +3,7 @@ import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult
 import { AgentType } from '../types/agents.js';
 
 // Activity log types
-export type ActivityEntityType = 'event' | 'task' | 'goal' | 'category' | 'profile' | 'rule';
+export type ActivityEntityType = 'event' | 'task' | 'goal' | 'aspect' | 'profile' | 'rule';
 export type ActivityOperation = 'create' | 'update' | 'delete' | 'complete' | 'uncomplete' | 'archive';
 export type ActivitySource = 'user' | 'agent';
 
@@ -55,18 +55,18 @@ export class SupabaseService {
   }
 
   /**
-   * Helper: Resolve category_id from either category_id or category name
+   * Helper: Resolve aspect_id from either aspect_id or aspect name
    * Eliminates 60+ lines of duplicate code across 6 methods
    */
-  private async resolveCategoryId(userId: string, category?: string, category_id?: string): Promise<string | null> {
-    if (category_id) return category_id;
-    if (!category) return null;
+  private async resolveAspectId(userId: string, aspect?: string, aspect_id?: string): Promise<string | null> {
+    if (aspect_id) return aspect_id;
+    if (!aspect) return null;
 
     const { data } = await this.client
-      .from('categories')
+      .from('aspects')
       .select('id')
       .eq('user_id', userId)
-      .eq('name', category)
+      .eq('name', aspect)
       .single();
 
     return data?.id || null;
@@ -249,26 +249,33 @@ export class SupabaseService {
   }
 
   /**
-   * Get categories for a user
+   * Get aspects for a user
    */
-  async getCategories(userId: string): Promise<any[]> {
+  async getAspects(userId: string): Promise<any[]> {
     try {
       const { data, error } = await this.client
-        .from('categories')
+        .from('aspects')
         .select('*')
         .eq('user_id', userId)
         .order('display_order', { ascending: true });
 
       if (error) {
-        console.error('Error fetching categories:', error);
+        console.error('Error fetching aspects:', error);
         return [];
       }
 
       return data || [];
     } catch (error) {
-      console.error('Exception fetching categories:', error);
+      console.error('Exception fetching aspects:', error);
       return [];
     }
+  }
+
+  /**
+   * @deprecated Use getAspects() instead
+   */
+  async getCategories(userId: string): Promise<any[]> {
+    return this.getAspects(userId);
   }
 
   // Method for agents - includes timezone conversion for proper local time display
@@ -283,9 +290,9 @@ export class SupabaseService {
   // Use this for bulk operations like deletion to avoid duplicate processing
   async getRawEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
-      // Use the new function that joins category data
+      // Use the new function that joins aspect data
       const { data, error } = await this.client
-        .rpc('get_events_with_categories', {
+        .rpc('get_events_with_aspects', {
           p_user_id: userId,
           p_start_date: startDate || null,
           p_end_date: endDate || null
@@ -308,11 +315,11 @@ export class SupabaseService {
         description: event.description,
         created_at: event.created_at,
         updated_at: event.updated_at,
-        category: event.category_name || 'Personal', // For backward compatibility
-        category_id: event.category_id,
-        category_name: event.category_name,
-        category_color: event.category_color,
-        category_icon: event.category_icon,
+        aspect: event.aspect_name || 'Personal', // For backward compatibility
+        aspect_id: event.aspect_id,
+        aspect_name: event.aspect_name,
+        aspect_color: event.aspect_color,
+        aspect_icon: event.aspect_icon,
         // Recurrence fields
         recurrence_rule: event.recurrence_rule,
         recurrence_end: event.recurrence_end,
@@ -460,7 +467,7 @@ export class SupabaseService {
   // NO timezone conversion - caller must provide UTC times
   async createEvent(
     userId: string,
-    event: Partial<DatabaseEvent> & {category?: string; category_id?: string},
+    event: Partial<DatabaseEvent> & {aspect?: string; aspect_id?: string},
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<DatabaseEvent | null> {
     try {
@@ -471,8 +478,8 @@ export class SupabaseService {
       const startTime = event.start_time || new Date().toISOString();
       const endTime = event.end_time || new Date().toISOString();
 
-      // Handle category using helper method
-      const categoryId = await this.resolveCategoryId(userId, event.category, event.category_id);
+      // Handle aspect using helper method
+      const aspectId = await this.resolveAspectId(userId, event.aspect, event.aspect_id);
 
       // Insert into public schema (RLS handles user filtering)
       const { data, error } = await this.client
@@ -484,8 +491,8 @@ export class SupabaseService {
           end_time: endTime,     // Must be UTC
           location: location,
           description: description,
-          category: event.category || 'Personal', // Keep for backward compatibility
-          category_id: categoryId,
+          category: event.aspect || 'Personal', // Deprecated text column for backward compatibility
+          aspect_id: aspectId,
           visibility: event.visibility || 'private' // Default to private for privacy
         })
         .select()
@@ -508,7 +515,7 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      // Fetch with category data
+      // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId, startTime, endTime);
       const createdEvent = eventsWithCategories.find(e => e.id === data.id);
 
@@ -524,7 +531,7 @@ export class SupabaseService {
   async updateEvent(
     userId: string,
     eventId: string,
-    updates: Partial<DatabaseEvent> & {category?: string; category_id?: string},
+    updates: Partial<DatabaseEvent> & {aspect?: string; aspect_id?: string},
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<DatabaseEvent | null> {
     try {
@@ -558,10 +565,10 @@ export class SupabaseService {
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
 
-      // Handle category using helper method
-      if (updates.category_id !== undefined || updates.category !== undefined) {
-        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
-        if (updates.category) updateData.category = updates.category; // Backward compatibility
+      // Handle aspect using helper method
+      if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
+        updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
+        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       // Update in public schema (RLS handles user filtering)
@@ -582,7 +589,7 @@ export class SupabaseService {
       const changes = this.computeChanges(
         oldEvent,
         updateData,
-        ['title', 'start_time', 'end_time', 'location', 'description', 'category', 'category_id']
+        ['title', 'start_time', 'end_time', 'location', 'description', 'aspect', 'aspect_id']
       );
       await this.logActivity(
         userId,
@@ -595,7 +602,7 @@ export class SupabaseService {
         options?.agentType || null
       );
 
-      // Fetch with category data
+      // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId);
       const updatedEvent = eventsWithCategories.find(e => e.id === eventId);
 
@@ -639,14 +646,89 @@ export class SupabaseService {
 
   /**
    * Get friends' visible events for a user
+   * Uses the get_friends_events RPC function which properly checks:
+   * - Friendship status (must be accepted friends)
+   * - Visibility settings (respects user_friend_visibility_settings)
+   * - Includes owner profile info
    */
   async getFriendsEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
+      // Use the database function that handles friendship checks and visibility settings
+      const { data, error } = await this.client
+        .rpc('get_friends_events', {
+          p_user_id: userId,
+          p_start_date: startDate || null,
+          p_end_date: endDate || null
+        });
+
+      if (error) {
+        console.error('Error fetching friends events via RPC:', error);
+        // Fall back to direct query if RPC fails (e.g., function doesn't exist yet)
+        return this.getFriendsEventsDirectQuery(userId, startDate, endDate);
+      }
+
+      // Map the RPC result to include is_friend_event flag
+      return (data || []).map((event: any) => ({
+        ...event,
+        is_friend_event: true,
+        owner_display_name: event.owner_display_name,
+        owner_avatar_url: event.owner_avatar_url
+      }));
+    } catch (error) {
+      console.error('Error in getFriendsEvents:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fallback direct query for friends events (when RPC is not available)
+   */
+  private async getFriendsEventsDirectQuery(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
+    try {
+      // First get list of friends
+      const { data: friendships, error: friendsError } = await this.client
+        .from('user_friendships')
+        .select('requester_id, addressee_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+
+      if (friendsError || !friendships?.length) {
+        return [];
+      }
+
+      // Get friend IDs
+      const friendIds = friendships.map(f =>
+        f.requester_id === userId ? f.addressee_id : f.requester_id
+      );
+
+      // Get visibility settings (friends the user has opted out of seeing)
+      const { data: hiddenFriends } = await this.client
+        .from('user_friend_visibility_settings')
+        .select('friend_id')
+        .eq('user_id', userId)
+        .eq('show_events', false);
+
+      const hiddenFriendIds = new Set((hiddenFriends || []).map(h => h.friend_id));
+
+      // Filter to visible friends
+      const visibleFriendIds = friendIds.filter(id => !hiddenFriendIds.has(id));
+
+      if (!visibleFriendIds.length) {
+        return [];
+      }
+
+      // Get events from visible friends
       let query = this.client
         .from('events')
-        .select('*')
+        .select(`
+          *,
+          profile:user_id (
+            display_name,
+            avatar_url
+          )
+        `)
         .in('visibility', ['friends', 'public'])
-        .neq('user_id', userId);
+        .in('user_id', visibleFriendIds);
 
       if (startDate) {
         query = query.gte('start_time', startDate);
@@ -658,13 +740,19 @@ export class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching friends events:', error);
+        console.error('Error in getFriendsEventsDirectQuery:', error);
         return [];
       }
 
-      return data || [];
+      // Map to include friend event flags
+      return (data || []).map((event: any) => ({
+        ...event,
+        is_friend_event: true,
+        owner_display_name: event.profile?.display_name || 'Friend',
+        owner_avatar_url: event.profile?.avatar_url
+      }));
     } catch (error) {
-      console.error('Error in getFriendsEvents:', error);
+      console.error('Error in getFriendsEventsDirectQuery:', error);
       return [];
     }
   }
@@ -708,8 +796,8 @@ export class SupabaseService {
   async createRecurringEvent(
     userId: string,
     event: Partial<DatabaseEvent> & {
-      category?: string;
-      category_id?: string;
+      aspect?: string;
+      aspect_id?: string;
       recurrence_rule: string; // RFC 5545 format
       recurrence_end?: string; // Optional end date for recurrence
     }
@@ -727,8 +815,8 @@ export class SupabaseService {
         return null;
       }
 
-      // Handle category
-      const categoryId = await this.resolveCategoryId(userId, event.category, event.category_id);
+      // Handle aspect
+      const aspectId = await this.resolveAspectId(userId, event.aspect, event.aspect_id);
 
       // Insert parent recurring event
       const { data, error } = await this.client
@@ -740,8 +828,8 @@ export class SupabaseService {
           end_time: endTime,
           location: location,
           description: description,
-          category: event.category || 'Personal',
-          category_id: categoryId,
+          category: event.aspect || 'Personal',
+          aspect_id: aspectId,
           recurrence_rule: rrule,
           recurrence_end: event.recurrence_end || null,
           parent_event_id: null, // This is the parent
@@ -757,26 +845,26 @@ export class SupabaseService {
 
       console.log('[SupabaseService] Created recurring event:', data.id);
 
-      // Get category info if we have a category_id
-      let categoryName = event.category || 'Personal';
-      let categoryColor = '#3b82f6';
-      let categoryIcon = null;
+      // Get aspect info if we have an aspect_id
+      let aspectName = event.aspect || 'Personal';
+      let aspectColor = '#3b82f6';
+      let aspectIcon = null;
 
-      if (categoryId) {
-        const { data: categoryData } = await this.client
-          .from('categories')
+      if (aspectId) {
+        const { data: aspectData } = await this.client
+          .from('aspects')
           .select('name, color, icon')
-          .eq('id', categoryId)
+          .eq('id', aspectId)
           .single();
 
-        if (categoryData) {
-          categoryName = categoryData.name;
-          categoryColor = categoryData.color;
-          categoryIcon = categoryData.icon;
+        if (aspectData) {
+          aspectName = aspectData.name;
+          aspectColor = aspectData.color;
+          aspectIcon = aspectData.icon;
         }
       }
 
-      // Return the created event with category data directly (avoid re-fetching which can fail due to expansion logic)
+      // Return the created event with aspect data directly (avoid re-fetching which can fail due to expansion logic)
       const createdEvent: DatabaseEvent = {
         id: data.id,
         user_id: data.user_id,
@@ -787,11 +875,11 @@ export class SupabaseService {
         description: data.description,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        category: categoryName,
-        category_id: categoryId || undefined,
-        category_name: categoryName,
-        category_color: categoryColor,
-        category_icon: categoryIcon || undefined,
+        aspect: aspectName,
+        aspect_id: aspectId || undefined,
+        aspect_name: aspectName,
+        aspect_color: aspectColor,
+        aspect_icon: aspectIcon || undefined,
         recurrence_rule: data.recurrence_rule,
         recurrence_end: data.recurrence_end,
         parent_event_id: data.parent_event_id,
@@ -854,8 +942,8 @@ export class SupabaseService {
           end_time: instanceEndDate.toISOString(),
           location: updates.location !== undefined ? updates.location : parent.location,
           description: updates.description !== undefined ? updates.description : parent.description,
-          category: updates.category || parent.category,
-          category_id: updates.category_id || parent.category_id,
+          category: updates.aspect || parent.aspect,
+          aspect_id: updates.aspect_id || parent.aspect_id,
           parent_event_id: parentEventId, // Link back to parent
           is_recurring: false
         })
@@ -869,7 +957,7 @@ export class SupabaseService {
 
       console.log('[SupabaseService] Created instance override for parent:', parentEventId);
 
-      // Fetch with category data
+      // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId, instanceStartDate.toISOString(), instanceEndDate.toISOString());
       const createdInstance = eventsWithCategories.find(e => e.id === data.id);
 
@@ -950,8 +1038,8 @@ export class SupabaseService {
       if (updates.end_time) updateData.end_time = updates.end_time;
       if (updates.recurrence_rule) updateData.recurrence_rule = updates.recurrence_rule;
       if (updates.recurrence_end !== undefined) updateData.recurrence_end = updates.recurrence_end;
-      if (updates.category_id) updateData.category_id = updates.category_id;
-      if (updates.category) updateData.category = updates.category;
+      if (updates.aspect_id) updateData.aspect_id = updates.aspect_id;
+      if (updates.aspect) updateData.category = updates.aspect;
 
       const { data, error } = await this.client
         .from('events')
@@ -969,7 +1057,7 @@ export class SupabaseService {
 
       console.log('[SupabaseService] Updated recurring series:', parentEventId);
 
-      // Fetch with category data
+      // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId);
       const updatedEvent = eventsWithCategories.find(e => e.id === data.id);
 
@@ -1009,8 +1097,8 @@ export class SupabaseService {
     taskData: {
       title: string;
       description?: string;
-      category?: string;
-      category_id?: string;
+      aspect?: string;
+      aspect_id?: string;
       dueDate?: string;
       priority?: 'low' | 'medium' | 'high' | 'urgent';
       status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -1024,8 +1112,8 @@ export class SupabaseService {
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<any> {
     try {
-      // Handle category using helper method
-      const categoryId = await this.resolveCategoryId(userId, taskData.category, taskData.category_id);
+      // Handle aspect using helper method
+      const aspectId = await this.resolveAspectId(userId, taskData.aspect, taskData.aspect_id);
 
       const { data, error } = await this.client
         .from('tasks')
@@ -1033,8 +1121,8 @@ export class SupabaseService {
           user_id: userId,
           title: taskData.title,
           description: taskData.description,
-          category: taskData.category || 'Personal', // Keep for backward compatibility
-          category_id: categoryId,
+          category: taskData.aspect || 'Personal', // Deprecated text column for backward compatibility
+          aspect_id: aspectId,
           due_date: taskData.dueDate,
           priority: taskData.priority || 'medium',
           status: taskData.status || 'pending',
@@ -1078,7 +1166,7 @@ export class SupabaseService {
    */
   async getTasks(userId: string, filters?: {
     status?: string;
-    category?: string;
+    aspect?: string;
     priority?: string;
     parentGoalId?: string;
     dueBefore?: string;
@@ -1087,9 +1175,9 @@ export class SupabaseService {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting tasks for user:', userId);
 
-      // Use the new function that joins category data
+      // Use the new function that joins aspect data
       const { data, error } = await this.client
-        .rpc('get_tasks_with_categories', {
+        .rpc('get_tasks_with_aspects', {
           p_user_id: userId
         });
 
@@ -1104,12 +1192,12 @@ export class SupabaseService {
       if (filters?.status) {
         filteredTasks = filteredTasks.filter((t: any) => t.status === filters.status);
       }
-      if (filters?.category) {
+      if (filters?.aspect) {
         // Strip emoji and do case-insensitive matching
-        const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+        const normalizedAspect = filters.aspect.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
         filteredTasks = filteredTasks.filter((t: any) => {
-          const categoryName = (t.category_name || t.category || '').toLowerCase();
-          return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+          const aspectName = (t.aspect_name || t.aspect || '').toLowerCase();
+          return aspectName === normalizedAspect || aspectName.includes(normalizedAspect);
         });
       }
       if (filters?.priority) {
@@ -1144,7 +1232,7 @@ export class SupabaseService {
       interactionType: 'yes_no' | 'multiple_choice' | 'confirmation' | 'choice';
       options?: string[] | null;
       priority?: number;
-      categoryId?: string | null;
+      aspectId?: string | null;
       entityId?: string | null;
       metadata?: Record<string, any> | null;
       expiresAt?: string | null;
@@ -1158,7 +1246,7 @@ export class SupabaseService {
         interaction_type: interaction.interactionType,
         options: interaction.options ?? null,
         priority: interaction.priority ?? 5,
-        category_id: interaction.categoryId ?? null,
+        aspect_id: interaction.aspectId ?? null,
         entity_id: interaction.entityId ?? null,
         metadata: interaction.metadata ?? null,
         expires_at: interaction.expiresAt ?? null,
@@ -1218,7 +1306,7 @@ export class SupabaseService {
         .from('user_interactions')
         .select(`
           *,
-          category:categories(id, name, color)
+          aspect:aspects(id, name, color)
         `)
         .eq('user_id', userId)
         .in('status', ['pending', 'active'])
@@ -1560,8 +1648,8 @@ export class SupabaseService {
     updates: {
       title?: string;
       description?: string;
-      category?: string;
-      category_id?: string;
+      aspect?: string;
+      aspect_id?: string;
       dueDate?: string;
       priority?: 'low' | 'medium' | 'high' | 'urgent';
       status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -1617,10 +1705,10 @@ export class SupabaseService {
       if (updates.completionNotes !== undefined) updateData.completion_notes = updates.completionNotes;
       if (updates.recurringPattern !== undefined) updateData.recurring_pattern = updates.recurringPattern;
 
-      // Handle category using helper method
-      if (updates.category_id !== undefined || updates.category !== undefined) {
-        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
-        if (updates.category) updateData.category = updates.category; // Backward compatibility
+      // Handle aspect using helper method
+      if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
+        updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
+        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       const { data, error } = await this.client
@@ -1640,7 +1728,7 @@ export class SupabaseService {
       const changes = this.computeChanges(
         oldTask,
         updateData,
-        ['title', 'description', 'due_date', 'priority', 'status', 'category', 'category_id']
+        ['title', 'description', 'due_date', 'priority', 'status', 'aspect', 'aspect_id']
       );
       await this.logActivity(
         userId,
@@ -1775,8 +1863,8 @@ export class SupabaseService {
     goalData: {
       title: string;
       description?: string;
-      category?: string;
-      category_id?: string;
+      aspect?: string;
+      aspect_id?: string;
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
@@ -1797,8 +1885,8 @@ export class SupabaseService {
     try {
       console.log('[SUPABASE SERVICE] Creating goal for user:', userId);
 
-      // Handle category using helper method
-      const categoryId = await this.resolveCategoryId(userId, goalData.category, goalData.category_id);
+      // Handle aspect using helper method
+      const aspectId = await this.resolveAspectId(userId, goalData.aspect, goalData.aspect_id);
 
       const { data, error } = await this.client
         .from('goals')
@@ -1806,8 +1894,8 @@ export class SupabaseService {
           user_id: userId,
           title: goalData.title,
           description: goalData.description,
-          category: goalData.category || 'Personal', // Keep for backward compatibility
-          category_id: categoryId,
+          category: goalData.aspect || 'Personal', // Deprecated text column for backward compatibility
+          aspect_id: aspectId,
           target_date: goalData.targetDate,
           status: goalData.status || 'active',
           progress: goalData.progress || 0,
@@ -1856,16 +1944,16 @@ export class SupabaseService {
    */
   async getGoals(userId: string, filters?: {
     status?: string;
-    category?: string;
+    aspect?: string;
     goalType?: string;
     parentGoalId?: string;
     targetBefore?: string;
     targetAfter?: string;
   }): Promise<any[]> {
     try {
-      // Use the new function that joins category data
+      // Use the new function that joins aspect data
       const { data, error } = await this.client
-        .rpc('get_goals_with_categories', {
+        .rpc('get_goals_with_aspects', {
           p_user_id: userId
         });
 
@@ -1880,12 +1968,12 @@ export class SupabaseService {
       if (filters?.status) {
         filteredGoals = filteredGoals.filter((g: any) => g.status === filters.status);
       }
-      if (filters?.category) {
+      if (filters?.aspect) {
         // Strip emoji and do case-insensitive matching
-        const normalizedCategory = filters.category.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
+        const normalizedAspect = filters.aspect.replace(/[\p{Emoji}\s]+/gu, '').trim().toLowerCase();
         filteredGoals = filteredGoals.filter((g: any) => {
-          const categoryName = (g.category_name || g.category || '').toLowerCase();
-          return categoryName === normalizedCategory || categoryName.includes(normalizedCategory);
+          const aspectName = (g.aspect_name || g.aspect || '').toLowerCase();
+          return aspectName === normalizedAspect || aspectName.includes(normalizedAspect);
         });
       }
       if (filters?.goalType) {
@@ -1903,10 +1991,10 @@ export class SupabaseService {
 
       console.log(`[SUPABASE SERVICE] Found ${filteredGoals.length} goals with categories`);
 
-      // Map category_name to category for frontend compatibility
+      // Map aspect_name to aspect for frontend compatibility
       return filteredGoals.map((g: any) => ({
         ...g,
-        category: g.category_name || g.category  // Use category_name from RPC, fallback to category
+        aspect: g.aspect_name || g.aspect  // Use aspect_name from RPC, fallback to category
       }));
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception getting goals:', error);
@@ -1923,8 +2011,8 @@ export class SupabaseService {
     updates: {
       title?: string;
       description?: string;
-      category?: string;
-      category_id?: string;
+      aspect?: string;
+      aspect_id?: string;
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
@@ -1981,10 +2069,10 @@ export class SupabaseService {
       if (updates.energyRequirement !== undefined) updateData.energy_requirement = updates.energyRequirement;
       if (updates.reviewFrequency !== undefined) updateData.review_frequency = updates.reviewFrequency;
 
-      // Handle category using helper method
-      if (updates.category_id !== undefined || updates.category !== undefined) {
-        updateData.category_id = await this.resolveCategoryId(userId, updates.category, updates.category_id);
-        if (updates.category) updateData.category = updates.category; // Backward compatibility
+      // Handle aspect using helper method
+      if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
+        updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
+        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       const { data, error } = await this.client
@@ -2004,7 +2092,7 @@ export class SupabaseService {
       const changes = this.computeChanges(
         oldGoal,
         updateData,
-        ['title', 'description', 'target_date', 'status', 'progress', 'category', 'category_id']
+        ['title', 'description', 'target_date', 'status', 'progress', 'aspect', 'aspect_id']
       );
       await this.logActivity(
         userId,

@@ -3,7 +3,7 @@ import { getSupabaseService } from '../services/SupabaseService.js';
 
 export async function getUserTasks(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, status, category, priority, due_before, due_after } = req.body;
+    const { user_id, status, aspect, priority, due_before, due_after } = req.body;
 
     if (!user_id) {
       res.status(400).json({ error: 'user_id is required' });
@@ -15,7 +15,7 @@ export async function getUserTasks(req: Request, res: Response): Promise<void> {
 
     const filters: any = {};
     if (status) filters.status = status;
-    if (category) filters.category = category;
+    if (aspect) filters.aspect = aspect;
     if (priority) filters.priority = priority;
     if (due_before) filters.dueBefore = due_before;
     if (due_after) filters.dueAfter = due_after;
@@ -49,7 +49,7 @@ export async function createUserTask(req: Request, res: Response): Promise<void>
     const createdTask = await getSupabaseService().createTask(userId, {
       title: taskData.title,
       description: taskData.description,
-      category: taskData.category,
+      aspect: taskData.aspect,
       dueDate: taskData.due_date,
       priority: taskData.priority,
       status: taskData.status,
@@ -92,7 +92,7 @@ export async function updateUserTask(req: Request, res: Response): Promise<void>
     const updatedTask = await getSupabaseService().updateTask(userId, task_id, {
       title: updates.title,
       description: updates.description,
-      category: updates.category,
+      aspect: updates.aspect,
       dueDate: updates.due_date,
       priority: updates.priority,
       status: updates.status,

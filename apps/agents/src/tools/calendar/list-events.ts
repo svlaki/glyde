@@ -50,9 +50,9 @@ export const listEventsTool = tool(
     const eventList = limitedEvents.map(event => {
       // Format UTC times for user's timezone
       const eventTime = formatEventTime(event.start_time, timezone);
-      const categoryLabel = event.category ? `\n   🏷️ ${event.category}` : '';
+      const aspectLabel = event.aspect ? `\n   🏷️ ${event.aspect}` : '';
 
-      return `${event.title}\n   ${eventTime}${event.location ? `\n   ${event.location}` : ''}${categoryLabel}\n   ID: ${event.id}`;
+      return `${event.title}\n   ${eventTime}${event.location ? `\n   ${event.location}` : ''}${aspectLabel}\n   ID: ${event.id}`;
     });
 
     const totalText = events.length > effectiveLimit ? ` (showing first ${effectiveLimit} of ${events.length})` : '';

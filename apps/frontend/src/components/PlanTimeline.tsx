@@ -2,10 +2,11 @@ import { useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useDarkMode } from '../lib/darkModeContext'
 import { useAuth } from '../lib/authContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
-import { Goal, updateUserGoal } from '../lib/goalService'
+import { updateUserGoal } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
 import { DndProvider, useDrag, useDrop } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 
@@ -266,7 +267,7 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
 function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTimelineProps) {
   const { isDarkMode } = useDarkMode()
   const { user, accessToken } = useAuth()
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
   const colors = getColors(isDarkMode)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -277,8 +278,8 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
     let hasNonDateBasedItems = false
 
     goals.forEach(goal => {
-      // Get color from category context (uses user's actual category colors)
-      const goalColor = goal.category ? getCategoryColor(goal.category) : ACCENT_COLORS.primary
+      // Get color from aspect context (uses user's actual aspect colors)
+      const goalColor = goal.aspect ? getAspectColor(goal.aspect) : ACCENT_COLORS.primary
 
       // Add goal target date
       if (goal.target_date) {
@@ -351,7 +352,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
       timelineItems: items,
       isDateBased: hasDateBasedItems && !hasNonDateBasedItems
     }
-  }, [goals, getCategoryColor])
+  }, [goals, getAspectColor])
 
   // Calculate timeline range (only for date-based timelines)
   const { timelineStart, timelineEnd } = useMemo(() => {
@@ -453,7 +454,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
 
   // Get the primary goal's category color for background
   const primaryGoal = goals[0]
-  const goalColor = getCategoryColor(primaryGoal?.category)
+  const goalColor = getAspectColor(primaryGoal?.aspect)
   const bgColor = `${goalColor}15` // 15 = ~8% opacity in hex
 
   if (timelineItems.length === 0) {

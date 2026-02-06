@@ -1,8 +1,19 @@
+export interface FriendAspect {
+  id: string
+  name: string
+  color: string
+  icon?: string
+}
+
 export interface Friend {
+  friendship_id: string
   friend_id: string
   friend_email: string
   friend_display_name: string
+  friend_avatar_url?: string
   friendship_status: string
+  notes?: string
+  aspects: FriendAspect[]
   created_at: string
 }
 
@@ -172,6 +183,89 @@ export async function removeFriend(
     return data
   } catch (error) {
     console.error('Error removing friend:', error)
+    return { success: false, error: 'Network error' }
+  }
+}
+
+export async function updateFriendNotes(
+  friendshipId: string,
+  notes: string,
+  accessToken: string
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`${API_URL}/api/friends/${friendshipId}/notes`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ notes })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      return { success: false, error: error.error || 'Failed to update notes' }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error updating friend notes:', error)
+    return { success: false, error: 'Network error' }
+  }
+}
+
+export async function addFriendAspect(
+  friendshipId: string,
+  aspectId: string,
+  accessToken: string
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`${API_URL}/api/friends/${friendshipId}/aspects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ aspectId })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      return { success: false, error: error.error || 'Failed to add aspect' }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error adding friend aspect:', error)
+    return { success: false, error: 'Network error' }
+  }
+}
+
+export async function removeFriendAspect(
+  friendshipId: string,
+  aspectId: string,
+  accessToken: string
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`${API_URL}/api/friends/${friendshipId}/aspects/${aspectId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      return { success: false, error: error.error || 'Failed to remove aspect' }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error removing friend aspect:', error)
     return { success: false, error: 'Network error' }
   }
 }

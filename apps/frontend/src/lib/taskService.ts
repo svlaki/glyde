@@ -5,10 +5,10 @@ export interface Task {
   user_id: string
   title: string
   description?: string
-  category?: string // DEPRECATED: use category_name
-  category_id?: string
-  category_name?: string // From categories table join
-  category_color?: string // From categories table join
+  aspect?: string // DEPRECATED: use aspect_name
+  aspect_id?: string
+  aspect_name?: string // From aspects table join
+  aspect_color?: string // From aspects table join
   due_date?: string
   priority?: 'low' | 'medium' | 'high' | 'urgent'
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
@@ -33,7 +33,7 @@ export async function fetchUserTasks(
   accessToken: string,
   filters?: {
     status?: string
-    category?: string
+    aspect?: string
     priority?: string
     due_before?: string
     due_after?: string
@@ -78,7 +78,7 @@ export async function createUserTask(
   taskData: {
     title: string
     description?: string
-    category?: string
+    aspect?: string
     due_date?: string
     priority?: 'low' | 'medium' | 'high' | 'urgent'
     status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'

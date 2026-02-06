@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
-import { createUserCategory, Category } from '../lib/categoryService'
+import { useAspects } from '../lib/aspectContext'
+import { createUserAspect } from '../lib/aspectService'
+import type { Aspect } from '../lib/aspectService'
 import { useAuth } from '../lib/authContext'
 import { Task } from '../lib/taskService'
 import { AspectForm } from './AspectForm'
@@ -48,7 +49,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { categories, refreshCategories } = useCategories()
+  const { aspects, refreshAspects } = useAspects()
   const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -71,8 +72,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
       console.log('[TaskForm] Populating fields with task:', task)
       setTitle(task.title || '')
       setDescription(task.description || '')
-      // Handle different category field names
-      setCategory(task.category_name || task.category || '')
+      // Handle different aspect field names
+      setCategory(task.aspect_name || task.aspect || '')
 
       // Parse due date
       if (task.due_date) {
@@ -152,7 +153,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
       }
       if (task?.id) taskData.id = task.id
       if (description.trim()) taskData.description = description.trim()
-      if (category) taskData.category = category
+      if (category) taskData.aspect = category
       if (hasDueDate && dueDate) taskData.due_date = dueDate.toISOString()
       await onSave(taskData)
       onClose()
@@ -165,12 +166,12 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     }
   }
 
-  const handleCreateAspect = async (aspectData: Partial<Category>) => {
+  const handleCreateAspect = async (aspectData: Partial<Aspect>) => {
     if (!user || !session) return
 
     try {
-      await createUserCategory(user, aspectData as any, session.access_token)
-      await refreshCategories()
+      await createUserAspect(user, aspectData as any, session.access_token)
+      await refreshAspects()
       // Auto-select the newly created aspect
       if (aspectData.name) {
         setCategory(aspectData.name)
@@ -183,9 +184,9 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
     }
   }
 
-  const getCategoryColor = (categoryName: string): string => {
-    const cat = categories.find(c => c.name === categoryName)
-    return cat?.color || '#999'
+  const getAspectColor = (aspectName: string): string => {
+    const asp = aspects.find(a => a.name === aspectName)
+    return asp?.color || '#999'
   }
 
   const titleInput = (
@@ -257,7 +258,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     width: '8px',
                     height: '8px',
                     borderRadius: '50%',
-                    background: getCategoryColor(category),
+                    background: getAspectColor(category),
                     flexShrink: 0
                   }} />
                   <span>{category}</span>
@@ -308,7 +309,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                 >
                   None
                 </div>
-                {categories.map(cat => (
+                {aspects.map(cat => (
                   <div
                     key={cat.id}
                     onClick={() => {

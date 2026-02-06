@@ -1,8 +1,8 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
-import { CalendarMapping } from '../lib/connectionService'
+import type { CalendarMapping } from '../lib/connectionService'
 
 interface CalendarListItemProps {
   mapping: CalendarMapping
@@ -19,10 +19,10 @@ export function CalendarListItem({
 }: CalendarListItemProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { categories } = useCategories()
+  const { aspects } = useAspects()
 
-  const selectedCategory = mapping.category_id
-    ? categories.find(c => c.id === mapping.category_id)
+  const selectedAspect = mapping.category_id
+    ? aspects.find(a => a.id === mapping.category_id)
     : null
 
   return (
@@ -107,20 +107,20 @@ export function CalendarListItem({
         }}
       >
         <option value="">No aspect</option>
-        {categories.map(category => (
-          <option key={category.id} value={category.id}>
-            {category.name}
+        {aspects.map(aspect => (
+          <option key={aspect.id} value={aspect.id}>
+            {aspect.name}
           </option>
         ))}
       </select>
 
-      {/* Category Color Preview */}
-      {selectedCategory && mapping.is_synced && (
+      {/* Aspect Color Preview */}
+      {selectedAspect && mapping.is_synced && (
         <div style={{
           width: '8px',
           height: '8px',
           borderRadius: '50%',
-          background: selectedCategory.color || colors.textTertiary,
+          background: selectedAspect.color || colors.textTertiary,
           flexShrink: 0
         }} />
       )}

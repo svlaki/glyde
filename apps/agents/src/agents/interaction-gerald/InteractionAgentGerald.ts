@@ -97,10 +97,14 @@ export class InteractionAgentGerald extends BaseAgent {
       // Filter to future/ongoing events
       const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
 
+      // Filter to only actionable tasks and goals to prevent suggesting actions on completed/cancelled items
+      const activeTasks = userTasks?.filter(t => t.status === 'pending' || t.status === 'in_progress') || [];
+      const activeGoals = userGoals?.filter(g => g.status === 'active') || [];
+
       console.log(`[GERALD] Context loaded:
         - Events: ${userEvents.length} (filtered from ${allEvents.length})
-        - Tasks: ${userTasks?.length || 0}
-        - Goals: ${userGoals?.length || 0}
+        - Tasks: ${activeTasks.length} active (filtered from ${userTasks?.length || 0})
+        - Goals: ${activeGoals.length} active (filtered from ${userGoals?.length || 0})
         - Categories: ${userCategories?.length || 0}`);
 
       // Build conversation history
@@ -120,14 +124,14 @@ export class InteractionAgentGerald extends BaseAgent {
 
       messages.push(new HumanMessage(message));
 
-      // Invoke LangGraph with full context
+      // Invoke LangGraph with filtered context
       const result = await this.graph.invoke({
         messages: messages,
         userId: context.userId,
         timezone: userTimezone,
         userEvents: userEvents || [],
-        userTasks: userTasks || [],
-        userGoals: userGoals || [],
+        userTasks: activeTasks,
+        userGoals: activeGoals,
         userProfile: userProfile || null,
         userCategories: userCategories || [],
       }, {
@@ -353,14 +357,10 @@ export class InteractionAgentGerald extends BaseAgent {
    */
   private buildTaskContext(tasks: any[], timezone: string): string {
     if (!tasks || tasks.length === 0) {
-      return `\nTASKS: No tasks found.`;
+      return `\nTASKS: No active tasks.`;
     }
 
-    // Separate by status
-    const pending = tasks.filter(t => t.status !== 'completed');
-    const completed = tasks.filter(t => t.status === 'completed').slice(0, 3);
-
-    const pendingLines = pending.slice(0, 10).map((t, idx) => {
+    const taskLines = tasks.slice(0, 10).map((t, idx) => {
       const dueStr = t.due_date
         ? ` (Due: ${formatInTimeZone(toDate(t.due_date), timezone, 'MMM d')})`
         : '';
@@ -368,17 +368,12 @@ export class InteractionAgentGerald extends BaseAgent {
       const categoryInfo = t.category_name
         ? ` [${t.category_name}${t.category_id ? `, catId: ${t.category_id}` : ''}]`
         : '';
+      const statusStr = t.status === 'in_progress' ? ' (in progress)' : '';
       const desc = t.description ? ` - ${t.description.substring(0, 50)}...` : '';
-      return `  ${idx + 1}. ${t.title}${priorityStr}${dueStr}${categoryInfo}${desc}`;
+      return `  ${idx + 1}. ${t.title}${priorityStr}${statusStr}${dueStr}${categoryInfo}${desc}`;
     });
 
-    let taskStr = `\nTASKS (${pending.length} pending):\n${pendingLines.join('\n')}`;
-
-    if (completed.length > 0) {
-      taskStr += `\n\nRecently completed: ${completed.map(t => t.title).join(', ')}`;
-    }
-
-    return taskStr;
+    return `\nTASKS (${tasks.length} active):\n${taskLines.join('\n')}`;
   }
 
   /**
@@ -387,12 +382,10 @@ export class InteractionAgentGerald extends BaseAgent {
    */
   private buildGoalContext(goals: any[], timezone: string): string {
     if (!goals || goals.length === 0) {
-      return `\nGOALS: No goals set yet.`;
+      return `\nGOALS: No active goals.`;
     }
 
-    const activeGoals = goals.filter(g => g.status === 'active');
-
-    const goalLines = activeGoals.slice(0, 8).map((g) => {
+    const goalLines = goals.slice(0, 8).map((g) => {
       const progress = g.progress != null ? ` (${g.progress}% complete)` : '';
       const targetStr = g.target_date
         ? ` - Target: ${formatInTimeZone(toDate(g.target_date), timezone, 'MMM d, yyyy')}`
@@ -404,7 +397,7 @@ export class InteractionAgentGerald extends BaseAgent {
       return `  - "${g.title}"${progress}${targetStr}${categoryInfo}${desc}`;
     });
 
-    return `\nGOALS (${activeGoals.length} active):\n${goalLines.join('\n')}`;
+    return `\nGOALS (${goals.length} active):\n${goalLines.join('\n')}`;
   }
 
   /**

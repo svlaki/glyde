@@ -6,15 +6,15 @@ export interface DatabaseEvent {
   start_time: string;
   end_time: string;
   location?: string;
-  category?: string;  // For backward compatibility
+  aspect?: string;  // For backward compatibility
   created_at: string;
   updated_at: string;
 
-  // Extended category fields (populated by get_events_with_categories RPC)
-  category_id?: string;
-  category_name?: string;
-  category_color?: string;
-  category_icon?: string;
+  // Extended aspect fields (populated by get_events_with_aspects RPC)
+  aspect_id?: string;
+  aspect_name?: string;
+  aspect_color?: string;
+  aspect_icon?: string;
 
   // Recurring event fields
   recurrence_rule?: string;  // RFC 5545 RRULE format
@@ -26,7 +26,7 @@ export interface DatabaseEvent {
   visibility?: 'private' | 'friends' | 'public';  // Event visibility setting
 }
 
-export interface DatabaseCategory {
+export interface DatabaseAspect {
   id: string;
   user_id: string;
   name: string;

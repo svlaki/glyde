@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useDarkMode } from '../lib/darkModeContext'
-import { fetchUserGoals, Goal } from '../lib/goalService'
-import { fetchUserEvents, CalendarEvent } from '../lib/calendarService'
-import { fetchUserTasks, Task } from '../lib/taskService'
-import { Category } from '../lib/categoryService'
+import { fetchUserGoals } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
+import { fetchUserEvents } from '../lib/calendarService'
+import type { CalendarEvent } from '../lib/calendarService'
+import { fetchUserTasks } from '../lib/taskService'
+import type { Task } from '../lib/taskService'
+import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { EditButton, DeleteButton } from './ui/IconButtons'
 
 interface GoalsByAspectProps {
-  aspect: Category | null
+  aspect: Aspect | null
   onEdit?: (() => void) | undefined
   onDelete?: (() => void) | undefined
 }
@@ -39,9 +42,9 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
         // Fetch goals
         const { goals: allGoals } = await fetchUserGoals(user, session.access_token, {})
         const filteredGoals = allGoals.filter(goal =>
-          goal.category === aspect.name ||
-          goal.category === aspect.id ||
-          goal.category === aspect.id?.toString()
+          goal.aspect === aspect.name ||
+          goal.aspect === aspect.id ||
+          goal.aspect === aspect.id?.toString()
         )
         setGoals(filteredGoals)
 
@@ -50,9 +53,9 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
         console.log('All events:', allEvents)
         console.log('Looking for aspect:', aspect)
         const filteredEvents = allEvents.filter(event => {
-          const matches = event.category === aspect.name ||
-                         event.category === aspect.id ||
-                         event.category === aspect.id?.toString()
+          const matches = event.aspect === aspect.name ||
+                         event.aspect === aspect.id ||
+                         event.aspect === aspect.id?.toString()
           if (matches) {
             console.log('Event matches:', event)
           }
@@ -64,12 +67,12 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
         // Fetch tasks
         const { tasks: allTasks } = await fetchUserTasks(user, session.access_token, {})
         const filteredTasks = allTasks.filter(task =>
-          task.category === aspect.name ||
-          task.category === aspect.id ||
-          task.category === aspect.id?.toString() ||
-          task.category_name === aspect.name ||
-          task.category_id === aspect.id ||
-          task.category_id === aspect.id?.toString()
+          task.aspect === aspect.name ||
+          task.aspect === aspect.id ||
+          task.aspect === aspect.id?.toString() ||
+          task.aspect_name === aspect.name ||
+          task.aspect_id === aspect.id ||
+          task.aspect_id === aspect.id?.toString()
         )
         setTasks(filteredTasks)
       } catch (error) {

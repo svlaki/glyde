@@ -13,7 +13,7 @@ import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { buildSystemPrompt } from './prompts.js';
-import { DatabaseProfile, DatabaseCategory } from '../../types/database.js';
+import { DatabaseProfile, DatabaseAspect } from '../../types/database.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -35,7 +35,7 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
-  userCategories: Annotation<any[]>({
+  userAspects: Annotation<any[]>({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
@@ -80,12 +80,12 @@ export class ConversationAgent extends BaseAgent {
       const supabaseService = new SupabaseService();
 
       // Parallel data fetching for better performance
-      const [userProfile, allEvents, allTasks, allGoals, userCategories, recentUserActivity, recentAgentActivity] = await Promise.all([
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, recentUserActivity, recentAgentActivity] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
-        supabaseService.getCategories(context.userId),
+        supabaseService.getAspects(context.userId),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5), // Last 5 agent actions
       ]);
@@ -113,7 +113,7 @@ export class ConversationAgent extends BaseAgent {
       // Filter and limit events (max 15 future/ongoing events)
       const now = new Date();
       const userEvents = allEvents
-        .filter(event => new Date(event.end_time) >= now)
+        .filter((event: any) => new Date(event.end_time) >= now)
         .slice(0, 15);
       console.log(`Loading ${userEvents?.length || 0} future/ongoing events (limited from ${allEvents?.length || 0} total) for user ${context.userId}`);
 
@@ -125,7 +125,7 @@ export class ConversationAgent extends BaseAgent {
       const userGoals = allGoals.slice(0, 8);
       console.log(`Loading ${userGoals?.length || 0} goals (limited from ${allGoals?.length || 0} total) for user ${context.userId}`);
 
-      console.log(`Loading ${userCategories?.length || 0} categories for user ${context.userId}`);
+      console.log(`Loading ${userAspects?.length || 0} aspects for user ${context.userId}`);
       console.log(`Loading ${recentUserActivity?.length || 0} recent user activities, ${recentAgentActivity?.length || 0} recent agent activities`);
 
       // Build conversation history from context
@@ -161,7 +161,7 @@ export class ConversationAgent extends BaseAgent {
         userEvents: userEvents || [],
         userTasks: userTasks || [],
         userGoals: userGoals || [],
-        userCategories: userCategories || [],
+        userAspects: userAspects || [],
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
@@ -169,7 +169,7 @@ export class ConversationAgent extends BaseAgent {
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
-          relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
+          relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
           totalFacts: memoryContext.graphiti.totalFacts
         } : null
       });
@@ -205,9 +205,9 @@ export class ConversationAgent extends BaseAgent {
 
 IMPORTANT INSTRUCTIONS:
 - Do NOT use emojis in any output, logging, or generated content
-- Do NOT suggest or create category names with emojis
-- Keep all responses and category names plain text without emoji characters
-- When processing categories, remove any emoji characters if provided by the user`;
+- Do NOT suggest or create aspect names with emojis
+- Keep all responses and aspect names plain text without emoji characters
+- When processing aspects, remove any emoji characters if provided by the user`;
   }
 
   getCapabilities(): string[] {
@@ -239,13 +239,13 @@ IMPORTANT INSTRUCTIONS:
 
       // Parallel data fetching - run all async operations concurrently
       // This significantly reduces time-to-first-token
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userCategories, recentUserActivity, recentAgentActivity] = await Promise.all([
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, recentUserActivity, recentAgentActivity] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
-        supabaseService.getCategories(context.userId),
+        supabaseService.getAspects(context.userId),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
       ]);
@@ -264,7 +264,7 @@ IMPORTANT INSTRUCTIONS:
       // Filter and limit events (max 15 future/ongoing events)
       const now = new Date();
       const userEvents = allEvents
-        .filter(event => new Date(event.end_time) >= now)
+        .filter((event: any) => new Date(event.end_time) >= now)
         .slice(0, 15);
 
       // Limit tasks and goals
@@ -320,14 +320,14 @@ IMPORTANT INSTRUCTIONS:
         userEvents: userEvents || [],
         userTasks: userTasks || [],
         userGoals: userGoals || [],
-        userCategories: userCategories || [],
+        userAspects: userAspects || [],
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
         currentPage: (context as any).currentPage || 'dashboard',
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
-          relevantFacts: memoryContext.graphiti.relevantFacts.map(f => f.fact).join('\n- '),
+          relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
           totalFacts: memoryContext.graphiti.totalFacts
         } : null
       };
@@ -438,8 +438,8 @@ IMPORTANT INSTRUCTIONS:
             const localHour = parseInt(formatInTimeZone(startDate, state.timezone, 'H'));
             const timeOfDay = localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening';
 
-            const categoryStr = e.category ? ` [${e.category}]` : '';
-            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''}${categoryStr} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}] (ID: ${e.id})`;
+            const aspectStr = e.aspect ? ` [${e.aspect}]` : '';
+            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''}${aspectStr} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}] (ID: ${e.id})`;
           }).join('\n')}`
         : `\n\nUSER'S CALENDAR: No events found`;
 
@@ -455,8 +455,8 @@ IMPORTANT INSTRUCTIONS:
             const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
             const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
             const statusStr = t.status === 'completed' ? ' [done]' : t.status === 'in_progress' ? ' [in progress]' : '';
-            const categoryStr = t.category ? ` {${t.category}}` : '';
-            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}${categoryStr} (ID: ${t.id})`;
+            const aspectStr = t.aspect ? ` {${t.aspect}}` : '';
+            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}${aspectStr} (ID: ${t.id})`;
           }).join('\n')}`
         : `\n\nUSER'S TASKS: No tasks found`;
 
@@ -472,8 +472,8 @@ IMPORTANT INSTRUCTIONS:
             const targetStr = g.target_date ? ` (Target: ${formatInTimeZone(toDate(g.target_date), state.timezone, 'MMM d, yyyy')})` : '';
             const progressStr = g.progress !== null && g.progress !== undefined ? ` - ${g.progress}% complete` : '';
             const statusStr = g.status ? ` [${g.status.toUpperCase()}]` : '';
-            const categoryStr = g.category ? ` (${g.category})` : '';
-            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${categoryStr} (ID: ${g.id})`;
+            const aspectStr = g.aspect ? ` (${g.aspect})` : '';
+            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${aspectStr} (ID: ${g.id})`;
           }).join('\n')}`
         : `\n\nUSER'S GOALS: No goals set`;
 
@@ -526,7 +526,7 @@ IMPORTANT INSTRUCTIONS:
       // Pass tool count from ToolRegistry for dynamic prompt generation
       // Include Zep's pre-formatted context block with user summary and relevant facts
       // Include user rules for behavioral guidance
-      // Include categories, profile, and recent activity for context awareness
+      // Include aspects, profile, and recent activity for context awareness
       const systemMessage = buildSystemPrompt({
         timezone: state.timezone,
         eventContext,
@@ -538,7 +538,7 @@ IMPORTANT INSTRUCTIONS:
         toolCount: tools.length,
         zepGraphContext: zepThreadContext, // Use Zep's built-in context block
         rulesContext, // User's custom rules
-        userCategories: state.userCategories, // Available categories with IDs
+        userAspects: state.userAspects, // Available aspects with IDs
         userProfile: state.userProfile, // User profile with preferences
         recentUserActivity: state.recentUserActivity, // Recent manual changes
         recentAgentActivity: state.recentAgentActivity, // Recent agent actions

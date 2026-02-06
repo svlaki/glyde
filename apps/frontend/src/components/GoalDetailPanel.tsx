@@ -1,7 +1,8 @@
 import { useDarkMode } from '../lib/darkModeContext'
-import { useCategories } from '../lib/categoryContext'
+import { useAspects } from '../lib/aspectContext'
 import { useAuth } from '../lib/authContext'
-import { Goal, updateUserGoal } from '../lib/goalService'
+import { updateUserGoal } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
 import { EmptyState } from './EmptyState'
 import { getColors, hexToRgba } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
@@ -17,10 +18,10 @@ interface GoalDetailPanelProps {
 export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetailPanelProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
-  const { getCategoryColor } = useCategories()
+  const { getAspectColor } = useAspects()
   const { user, session } = useAuth()
 
-  const aspectColor = goal?.category ? getCategoryColor(goal.category) : undefined
+  const aspectColor = goal?.aspect ? getAspectColor(goal.aspect) : undefined
 
   const toggleMilestone = async (index: number) => {
     if (!goal || !goal.milestones || !user || !session?.access_token) return

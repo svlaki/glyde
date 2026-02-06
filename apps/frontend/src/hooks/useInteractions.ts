@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/authContext';
 import { interactionService, InteractionWithCategory } from '../lib/interactions/interactionService';
-import { useCategories } from '../lib/categoryContext';
+import { useAspects } from '../lib/aspectContext';
 
 export interface UIInteraction {
   id: string;
@@ -20,13 +20,13 @@ export function useInteractions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const { categories } = useCategories();
+  const { aspects } = useAspects();
 
   // Transform DB interaction to UI format
   const transformInteraction = useCallback((dbInteraction: InteractionWithCategory): UIInteraction => {
-    // Find category details
-    const category = dbInteraction.category ||
-      (dbInteraction.category_id ? categories.find(c => c.id === dbInteraction.category_id) : null);
+    // Find aspect details
+    const aspect = dbInteraction.category ||
+      (dbInteraction.category_id ? aspects.find(a => a.id === dbInteraction.category_id) : null);
 
     return {
       id: dbInteraction.id,
@@ -34,12 +34,12 @@ export function useInteractions() {
       type: dbInteraction.interaction_type as UIInteraction['type'],
       options: dbInteraction.options,
       priority: dbInteraction.priority,
-      category: category?.name,
-      categoryColor: category?.color,
+      category: aspect?.name,
+      categoryColor: aspect?.color,
       entityId: dbInteraction.entity_id,
       metadata: dbInteraction.metadata,
     };
-  }, [categories]);
+  }, [aspects]);
 
   // Load initial interactions
   const loadInteractions = useCallback(async () => {

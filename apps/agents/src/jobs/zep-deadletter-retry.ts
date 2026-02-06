@@ -154,7 +154,7 @@ async function retryItem(
             await zepGraphService.addCalendarEvent(user_id, {
               eventId: payload.eventId,
               title: payload.title,
-              category: payload.category || '',
+              aspect: payload.category || '',  // Legacy deadletter entries use category
               duration_minutes: payload.duration_minutes,
               energy_level: payload.energy_level || 'medium',
               location: payload.location,
@@ -179,7 +179,7 @@ async function retryItem(
               taskId: payload.taskId,
               title: payload.title,
               priority: payload.priority || 'medium',
-              category: payload.category,
+              aspect: payload.category,  // Legacy deadletter entries use category field
               estimated_duration: payload.estimated_duration,
               actual_duration: payload.actual_duration,
               satisfaction_rating: payload.satisfaction_rating,
