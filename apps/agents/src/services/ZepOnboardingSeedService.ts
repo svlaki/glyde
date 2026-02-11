@@ -187,7 +187,7 @@ export class ZepOnboardingSeedService {
 
     // Seed Goal entities
     if (data.goals && data.goals.length > 0) {
-      const goalStrings = data.goals.map(g => typeof g === 'string' ? g : g.title);
+      const goalStrings = data.goals;
       await this.seedGoals(userId, goalStrings);
     }
 
@@ -260,7 +260,7 @@ export class ZepOnboardingSeedService {
     // Life aspects as preferences
     if (data.aspects) {
       for (const rawAspect of data.aspects) {
-        const aspectName = typeof rawAspect === 'string' ? rawAspect : rawAspect.name;
+        const aspectName = rawAspect;
         preferences.push({
           preference_type: 'life_aspect',
           key: aspectName.toLowerCase().replace(/[\/\s]+/g, '_'),
