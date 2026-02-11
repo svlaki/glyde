@@ -24,19 +24,17 @@ export async function completeOnboarding(req: Request, res: Response) {
         fullName,
         preferredName,
         birthday,
-        gender,
         selectedCalendars,
         otherCalendar,
         occupation,
         fieldOfStudy,
         aspects,
         goals,
-        habits,
         timezone
       } = req.body;
 
       // Validate required V2 fields
-      if (!fullName || !birthday || !gender || !occupation || !aspects || !goals || !timezone) {
+      if (!fullName || !birthday || !occupation || !aspects || !goals || !timezone) {
         res.status(400).json({
           success: false,
           error: 'Missing required fields for V2 onboarding'
@@ -49,14 +47,12 @@ export async function completeOnboarding(req: Request, res: Response) {
         fullName,
         preferredName,
         birthday,
-        gender,
         selectedCalendars: selectedCalendars || [],
         otherCalendar,
         occupation,
         fieldOfStudy,
         aspects,
         goals,
-        habits: habits || [],
         timezone
       });
     } else {

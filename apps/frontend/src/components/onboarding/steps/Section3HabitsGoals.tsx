@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useDarkMode } from '../../../lib/darkModeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
-import { HABIT_OPTIONS } from '../../../lib/onboardingService'
+import { DEFAULT_ASPECTS } from '../../../lib/onboardingService'
 
 export function Section3HabitsGoals() {
   const { isDarkMode } = useDarkMode()
@@ -14,8 +14,7 @@ export function Section3HabitsGoals() {
     addGoal,
     removeGoal,
     addAspect,
-    removeAspect,
-    toggleHabit
+    removeAspect
   } = useOnboarding()
 
   const [expandedAspect, setExpandedAspect] = useState<string | null>(null)
@@ -53,7 +52,7 @@ export function Section3HabitsGoals() {
         marginBottom: '8px',
         textAlign: 'center'
       }}>
-        Your habits and goals
+        Your goals
       </h2>
       <p style={{
         fontSize: '14px',
@@ -371,69 +370,6 @@ export function Section3HabitsGoals() {
         </div>
       </div>
 
-      {/* Habits/Personality */}
-      <div style={sectionStyle}>
-        <label style={labelStyle}>
-          Do any of these apply to you? Select all that apply.
-        </label>
-        <p style={{
-          fontSize: '12px',
-          color: colors.textTertiary,
-          marginBottom: '12px'
-        }}>
-          This helps us understand your productivity patterns.
-        </p>
-
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          {HABIT_OPTIONS.map(habit => {
-            const isSelected = state.habits.includes(habit.id)
-            return (
-              <button
-                key={habit.id}
-                type="button"
-                onClick={() => toggleHabit(habit.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  border: `1px solid ${isSelected ? '#3b82f6' : colors.border}`,
-                  backgroundColor: isSelected ? (isDarkMode ? '#1e3a5f' : '#eff6ff') : colors.bgSecondary,
-                  color: colors.textPrimary,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  textAlign: 'left'
-                }}
-              >
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '4px',
-                  border: `2px solid ${isSelected ? '#3b82f6' : colors.border}`,
-                  backgroundColor: isSelected ? '#3b82f6' : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  {isSelected && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
-                <span>{habit.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }

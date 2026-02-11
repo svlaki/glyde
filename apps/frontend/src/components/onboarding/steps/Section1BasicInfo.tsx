@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useDarkMode } from '../../../lib/darkModeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
-import { GENDER_OPTIONS } from '../../../lib/onboardingService'
 import { usePlatform } from '../../../hooks/usePlatform'
 import { DatePickerMobile } from '../../mobile/DatePickerMobile'
 
@@ -145,37 +144,6 @@ export function Section1BasicInfo() {
         </p>
       </div>
 
-      {/* Gender */}
-      <div style={fieldGroupStyle}>
-        <label style={labelStyle}>
-          Gender <span style={{ color: '#ef4444' }}>*</span>
-        </label>
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px'
-        }}>
-          {GENDER_OPTIONS.map(option => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => updateField('gender', option.value)}
-              style={{
-                padding: '10px 16px',
-                borderRadius: '8px',
-                border: `1px solid ${state.gender === option.value ? '#3b82f6' : colors.border}`,
-                backgroundColor: state.gender === option.value ? '#3b82f6' : colors.bgSecondary,
-                color: state.gender === option.value ? '#ffffff' : colors.textPrimary,
-                fontSize: '14px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

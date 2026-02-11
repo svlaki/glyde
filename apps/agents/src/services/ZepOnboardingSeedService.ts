@@ -17,20 +17,6 @@ export interface ZepOnboardingSeedResult {
   errors: string[];
 }
 
-// Habit ID to human-readable description mapping
-const HABIT_DESCRIPTIONS: Record<string, string> = {
-  'deadlines': 'I struggle to stay on top of deadlines',
-  'task-switching': 'I find it difficult to switch tasks quickly',
-  'procrastinator': 'I am a huge procrastinator',
-  'easily-distracted': 'I get easily distracted',
-  'poor-time-estimation': 'I often underestimate how long tasks take',
-  'overcommit': 'I tend to overcommit myself',
-  'forget-tasks': 'I frequently forget tasks or appointments',
-  'work-life-balance': 'I struggle with work-life balance',
-  'perfectionist': 'I spend too much time perfecting things',
-  'energy-management': 'I have trouble managing my energy throughout the day'
-};
-
 export class ZepOnboardingSeedService {
   private memoryService: ZepMemoryService;
   private graphService: ZepGraphService;
@@ -142,10 +128,6 @@ export class ZepOnboardingSeedService {
       lines.push(`I am ${age} years old.`);
     }
 
-    if (data.gender && data.gender.toLowerCase() !== 'prefer not to say') {
-      lines.push(`I identify as ${data.gender.toLowerCase()}.`);
-    }
-
     // Occupation and education
     lines.push(`I work as a ${data.occupation}.`);
     if (data.fieldOfStudy) {
@@ -160,16 +142,6 @@ export class ZepOnboardingSeedService {
     // Goals
     if (goalsSummary) {
       lines.push(goalsSummary);
-    }
-
-    // Habits/challenges - translate IDs to human-readable descriptions
-    if (data.habits && data.habits.length > 0) {
-      const habitDescriptions = data.habits
-        .map(id => HABIT_DESCRIPTIONS[id] || id)
-        .filter(desc => desc);
-      if (habitDescriptions.length > 0) {
-        lines.push(`Some challenges I face: ${habitDescriptions.join('; ')}.`);
-      }
     }
 
     // Timezone
@@ -219,11 +191,6 @@ export class ZepOnboardingSeedService {
       await this.seedGoals(userId, goalStrings);
     }
 
-    // Seed habit patterns
-    if (data.habits && data.habits.length > 0) {
-      await this.seedHabitPatterns(userId, data.habits);
-    }
-
     console.log(`[ZepOnboardingSeed] Graph entities seeded for user ${userId}`);
   }
 
@@ -260,15 +227,6 @@ export class ZepOnboardingSeedService {
         key: 'birthday',
         value: data.birthday,
         importance: 'medium'
-      });
-    }
-
-    if (data.gender) {
-      preferences.push({
-        preference_type: 'demographic',
-        key: 'gender',
-        value: data.gender,
-        importance: 'low'
       });
     }
 
@@ -351,27 +309,6 @@ export class ZepOnboardingSeedService {
       } catch (error: any) {
         console.warn(`[ZepOnboardingSeed] Failed to add goal "${goalTitle}":`, error.message);
         // Continue with other goals
-      }
-    }
-  }
-
-  /**
-   * Seeds habit patterns as Pattern entities
-   */
-  private async seedHabitPatterns(userId: string, habitIds: string[]): Promise<void> {
-    for (const habitId of habitIds) {
-      try {
-        const description = HABIT_DESCRIPTIONS[habitId] || habitId;
-        await this.graphService.addUserPattern(userId, {
-          pattern_key: `onboarding_habit_${habitId}`,  // Unique key for deduplication
-          pattern_type: 'self_reported_challenge',
-          description: description,
-          confidence_score: 0.9, // High confidence - user self-reported
-          frequency: 'ongoing'
-        });
-      } catch (error: any) {
-        console.warn(`[ZepOnboardingSeed] Failed to add habit pattern "${habitId}":`, error.message);
-        // Continue with other habits
       }
     }
   }

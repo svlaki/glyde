@@ -25,7 +25,6 @@ export interface OnboardingState {
   fullName: string
   preferredName: string
   birthday: string
-  gender: string
 
   // Section 2: Calendar
   selectedCalendars: string[]
@@ -40,7 +39,7 @@ export interface OnboardingState {
   connectionId: string | null
   calendarMappings: CalendarMapping[]
 
-  // Section 3: Habits & Goals
+  // Section 3: Goals
   occupation: string
   isStudent: boolean
   fieldOfStudy: string
@@ -50,7 +49,6 @@ export interface OnboardingState {
   goals: string[]
   goalDescriptions: Record<string, string>
   currentGoal: string
-  habits: string[]
 
   // Auto-detected
   timezone: string
@@ -77,7 +75,6 @@ type OnboardingAction =
   | { type: 'REMOVE_GOAL'; index: number }
   | { type: 'ADD_ASPECT'; aspect: string }
   | { type: 'REMOVE_ASPECT'; aspect: string }
-  | { type: 'TOGGLE_HABIT'; habitId: string }
   | { type: 'TOGGLE_CALENDAR'; calendarId: string }
   | { type: 'PREFILL'; data: PrefillData }
   | { type: 'RESET' }
@@ -95,7 +92,6 @@ interface OnboardingContextType {
   removeGoal: (index: number) => void
   addAspect: () => void
   removeAspect: (aspect: string) => void
-  toggleHabit: (habitId: string) => void
   toggleCalendar: (calendarId: string) => void
 }
 
@@ -106,7 +102,6 @@ const initialState: OnboardingState = {
   fullName: '',
   preferredName: '',
   birthday: '',
-  gender: '',
   selectedCalendars: [],
   otherCalendar: '',
   wantsToImport: false,
@@ -124,7 +119,6 @@ const initialState: OnboardingState = {
   goals: [],
   goalDescriptions: {},
   currentGoal: '',
-  habits: [],
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
   timezoneConfirmed: false,
   loading: false,
@@ -234,13 +228,6 @@ function onboardingReducer(state: OnboardingState, action: OnboardingAction): On
       }
     }
 
-    case 'TOGGLE_HABIT':
-      if (state.habits.includes(action.habitId)) {
-        return { ...state, habits: state.habits.filter(h => h !== action.habitId) }
-      } else {
-        return { ...state, habits: [...state.habits, action.habitId] }
-      }
-
     case 'TOGGLE_CALENDAR':
       if (action.calendarId === 'none') {
         // If selecting 'none', clear other selections
@@ -335,10 +322,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const canProceedSection1 = useCallback(() => {
     return (
       state.fullName.trim().length > 0 &&
-      state.birthday.length > 0 &&
-      state.gender.length > 0
+      state.birthday.length > 0
     )
-  }, [state.fullName, state.birthday, state.gender])
+  }, [state.fullName, state.birthday])
 
   const canProceedSection2 = useCallback(() => {
     // Section 2 is always valid - user can skip calendar import
@@ -373,10 +359,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'REMOVE_ASPECT', aspect })
   }, [])
 
-  const toggleHabit = useCallback((habitId: string) => {
-    dispatch({ type: 'TOGGLE_HABIT', habitId })
-  }, [])
-
   const toggleCalendar = useCallback((calendarId: string) => {
     dispatch({ type: 'TOGGLE_CALENDAR', calendarId })
   }, [])
@@ -395,7 +377,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       removeGoal,
       addAspect,
       removeAspect,
-      toggleHabit,
       toggleCalendar
     }}>
       {children}

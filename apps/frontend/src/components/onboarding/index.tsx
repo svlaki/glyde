@@ -100,14 +100,12 @@ function OnboardingContent() {
         fullName: state.fullName,
         preferredName: state.preferredName || undefined,
         birthday: state.birthday,
-        gender: state.gender,
         selectedCalendars: state.selectedCalendars,
         otherCalendar: state.otherCalendar || undefined,
         occupation: state.occupation,
         fieldOfStudy: state.isStudent ? state.fieldOfStudy : undefined,
-        aspects,
-        goals,
-        habits: state.habits,
+        aspects: state.aspects,
+        goals: state.goals,
         timezone: state.timezone
       }
 
