@@ -67,7 +67,7 @@ function ProfilePageMobile() {
               />
               <ActivityInsightsCard taskInsights={data.taskInsights} />
               <AspectBreakdownCard breakdown={data.aspectBreakdown} />
-              <ConnectionsStatusCard connections={data.connections} />
+              <ConnectionsStatusCard connections={data.connections} onConnectionChanged={data.refreshConnections} />
 
               <GoalsSection />
               <RulesSection />
@@ -128,7 +128,7 @@ function ProfilePageDesktop() {
                 <ActivityInsightsCard taskInsights={data.taskInsights} />
                 <GoalsSection />
                 <AspectBreakdownCard breakdown={data.aspectBreakdown} />
-                <ConnectionsStatusCard connections={data.connections} />
+                <ConnectionsStatusCard connections={data.connections} onConnectionChanged={data.refreshConnections} />
                 <RulesSection />
               </div>
             </>

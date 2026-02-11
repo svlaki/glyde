@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { triggerSync, getGoogleAuthUrl } from '../../lib/connectionService'
+import { triggerSync, getGoogleAuthUrl, handleGoogleCallback, disconnectConnection } from '../../lib/connectionService'
 import type { Connection } from '../../lib/connectionService'
 
 interface ConnectionsStatusCardProps {
   connections: Connection[]
+  onConnectionChanged?: () => void
 }
 
 const SYNC_STATUS_COLORS: Record<string, { light: string; dark: string }> = {
@@ -35,13 +36,14 @@ function formatLastSynced(dateStr: string | null): string {
   return `${diffDays}d ago`
 }
 
-function ConnectionRow({ connection }: { connection: Connection }) {
+function ConnectionRow({ connection, onConnectionChanged }: { connection: Connection; onConnectionChanged?: () => void }) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
   const [syncing, setSyncing] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
 
   const statusColors = SYNC_STATUS_COLORS[connection.sync_status] || SYNC_STATUS_COLORS.pending
   const statusBg = isDarkMode ? statusColors.dark : statusColors.light
@@ -51,8 +53,20 @@ function ConnectionRow({ connection }: { connection: Connection }) {
     setSyncing(true)
     try {
       await triggerSync(user, connection.id, session.access_token)
+      onConnectionChanged?.()
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!user || !session || disconnecting) return
+    setDisconnecting(true)
+    try {
+      await disconnectConnection(user, connection.id, session.access_token)
+      onConnectionChanged?.()
+    } finally {
+      setDisconnecting(false)
     }
   }
 
@@ -88,36 +102,107 @@ function ConnectionRow({ connection }: { connection: Connection }) {
         </div>
       </div>
 
-      <button
-        onClick={handleSync}
-        disabled={syncing}
-        style={{
-          background: 'transparent',
-          border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-          borderRadius: '4px',
-          padding: '4px 10px',
-          cursor: syncing ? 'default' : 'pointer',
-          color: colors.textSecondary,
-          ...typography.labelMd,
-          opacity: syncing ? 0.5 : 1,
-          flexShrink: 0,
-        }}
-      >
-        {syncing ? 'Syncing...' : 'Sync'}
-      </button>
+      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+            borderRadius: '4px',
+            padding: '4px 10px',
+            cursor: syncing ? 'default' : 'pointer',
+            color: colors.textSecondary,
+            ...typography.labelMd,
+            opacity: syncing ? 0.5 : 1,
+          }}
+        >
+          {syncing ? 'Syncing...' : 'Sync'}
+        </button>
+        <button
+          onClick={handleDisconnect}
+          disabled={disconnecting}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+            borderRadius: '4px',
+            padding: '4px 10px',
+            cursor: disconnecting ? 'default' : 'pointer',
+            color: colors.textTertiary,
+            ...typography.labelMd,
+            opacity: disconnecting ? 0.5 : 1,
+          }}
+        >
+          {disconnecting ? '...' : 'Disconnect'}
+        </button>
+      </div>
     </div>
   )
 }
 
-export function ConnectionsStatusCard({ connections }: ConnectionsStatusCardProps) {
+export function ConnectionsStatusCard({ connections, onConnectionChanged }: ConnectionsStatusCardProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
   const [connecting, setConnecting] = useState(false)
+  const popupRef = useRef<Window | null>(null)
+  const onConnectionChangedRef = useRef(onConnectionChanged)
+
+  // Keep ref in sync without retriggering useEffect
+  useEffect(() => {
+    onConnectionChangedRef.current = onConnectionChanged
+  }, [onConnectionChanged])
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+
+  // Listen for OAuth callback postMessage from popup
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (popupRef.current && event.source !== popupRef.current) return
+
+      const { type, code, state, error } = event.data || {}
+
+      if (type === 'GOOGLE_CONNECTION_CALLBACK') {
+        if (error) {
+          console.error('[ConnectionsStatusCard] OAuth error:', error)
+          setConnecting(false)
+          return
+        }
+
+        if (code && state && user && session) {
+          try {
+            await handleGoogleCallback(user, code, state, session.access_token)
+            onConnectionChangedRef.current?.()
+          } catch (err) {
+            console.error('[ConnectionsStatusCard] Callback error:', err)
+          }
+        }
+        popupRef.current = null
+        setConnecting(false)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [user, session])
+
+  // Detect popup closed without completing OAuth
+  useEffect(() => {
+    if (!connecting || !popupRef.current) return
+
+    const interval = setInterval(() => {
+      if (popupRef.current?.closed) {
+        popupRef.current = null
+        setConnecting(false)
+        clearInterval(interval)
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [connecting])
 
   const handleConnect = async () => {
     if (!user || !session || connecting) return
@@ -125,9 +210,28 @@ export function ConnectionsStatusCard({ connections }: ConnectionsStatusCardProp
     try {
       const { authUrl } = await getGoogleAuthUrl(user, session.access_token)
       if (authUrl) {
-        window.location.href = authUrl
+        const width = 500
+        const height = 600
+        const left = window.screenX + (window.outerWidth - width) / 2
+        const top = window.screenY + (window.outerHeight - height) / 2
+
+        const popup = window.open(
+          authUrl,
+          'google-oauth',
+          `width=${width},height=${height},left=${left},top=${top},popup=1`
+        )
+
+        if (!popup) {
+          console.error('[ConnectionsStatusCard] Popup blocked')
+          setConnecting(false)
+        } else {
+          popupRef.current = popup
+        }
+      } else {
+        setConnecting(false)
       }
-    } finally {
+    } catch (err) {
+      console.error('[ConnectionsStatusCard] Connection error:', err)
       setConnecting(false)
     }
   }
@@ -180,7 +284,7 @@ export function ConnectionsStatusCard({ connections }: ConnectionsStatusCardProp
         ) : (
           <>
             {connections.map(conn => (
-              <ConnectionRow key={conn.id} connection={conn} />
+              <ConnectionRow key={conn.id} connection={conn} onConnectionChanged={onConnectionChanged} />
             ))}
           </>
         )}

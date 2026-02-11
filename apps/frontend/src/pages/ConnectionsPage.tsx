@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
+import { useConnections } from '../lib/connectionContext'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
@@ -6,59 +8,30 @@ import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
 import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
 
-export function ConnectionsPage() {
-  const { isMobile } = usePlatform()
-
-  if (isMobile) {
-    return <ConnectionsPageMobile />
-  }
-
-  return <ConnectionsPageDesktop />
+const SYNC_STATUS_COLORS: Record<string, { light: string; dark: string }> = {
+  synced: { light: 'rgba(34,197,94,0.15)', dark: 'rgba(74,222,128,0.15)' },
+  syncing: { light: 'rgba(245,158,11,0.15)', dark: 'rgba(251,191,36,0.15)' },
+  pending: { light: 'rgba(245,158,11,0.15)', dark: 'rgba(251,191,36,0.15)' },
+  error: { light: 'rgba(239,68,68,0.15)', dark: 'rgba(248,113,113,0.15)' },
 }
 
-// Reusable connection item component
-interface ConnectionItemProps {
-  icon: React.ReactNode
-  label: string
-  status: 'coming_soon' | 'connected' | 'connect'
-  colors: ReturnType<typeof getColors>
-  isMobile?: boolean
+function formatLastSynced(dateStr: string | null): string {
+  if (!dateStr) return 'Never'
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ago`
 }
 
-function ConnectionItem({ icon, label, status, colors, isMobile }: ConnectionItemProps) {
-  return (
-    <div style={{
-      padding: isMobile ? '16px 20px' : '14px 24px',
-      background: colors.bgTertiary,
-      borderRadius: '8px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      opacity: status === 'coming_soon' ? 0.5 : 1,
-      minHeight: isMobile ? '56px' : 'auto'
-    }}>
-      {icon}
-      <span style={{
-        fontSize: isMobile ? '15px' : '14px',
-        color: status === 'coming_soon' ? colors.textTertiary : colors.textPrimary,
-        flex: 1
-      }}>
-        {label}
-      </span>
-      <span style={{
-        fontSize: '12px',
-        color: colors.textTertiary,
-        background: colors.bgSecondary,
-        padding: '4px 10px',
-        borderRadius: '4px'
-      }}>
-        {status === 'coming_soon' ? 'Coming Soon' : status === 'connected' ? 'Connected' : 'Connect'}
-      </span>
-    </div>
-  )
-}
-
-// Calendar icon component
 function CalendarIcon({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -70,7 +43,6 @@ function CalendarIcon({ color }: { color: string }) {
   )
 }
 
-// File icon component
 function FileIcon({ color }: { color: string }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -80,6 +52,258 @@ function FileIcon({ color }: { color: string }) {
       <path d="M9 15l3-3 3 3" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
+}
+
+interface ComingSoonItemProps {
+  icon: React.ReactNode
+  label: string
+  colors: ReturnType<typeof getColors>
+  isMobile?: boolean
+}
+
+function ComingSoonItem({ icon, label, colors, isMobile }: ComingSoonItemProps) {
+  return (
+    <div style={{
+      padding: isMobile ? '16px 20px' : '14px 24px',
+      background: colors.bgTertiary,
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      opacity: 0.5,
+      minHeight: isMobile ? '56px' : 'auto',
+    }}>
+      {icon}
+      <span style={{
+        fontSize: isMobile ? '15px' : '14px',
+        color: colors.textTertiary,
+        flex: 1,
+      }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: '12px',
+        color: colors.textTertiary,
+        background: colors.bgSecondary,
+        padding: '4px 10px',
+        borderRadius: '4px',
+      }}>
+        Coming Soon
+      </span>
+    </div>
+  )
+}
+
+function GoogleConnectionSection({ isMobile }: { isMobile: boolean }) {
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+  const typography = getTypography(isMobile)
+  const { connections, connectGoogle, disconnect, triggerSync, isLoading } = useConnections()
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  const googleConnections = connections.filter(c => c.provider === 'google')
+  const hasGoogle = googleConnections.length > 0
+
+  const handleConnect = async () => {
+    setActionLoading('connect')
+    try {
+      await connectGoogle()
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSync = async (connectionId: string) => {
+    setActionLoading(`sync-${connectionId}`)
+    try {
+      await triggerSync(connectionId)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDisconnect = async (connectionId: string) => {
+    setActionLoading(`disconnect-${connectionId}`)
+    try {
+      await disconnect(connectionId)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  if (!hasGoogle) {
+    return (
+      <div style={{
+        padding: isMobile ? '16px 20px' : '14px 24px',
+        background: colors.bgTertiary,
+        borderRadius: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        minHeight: isMobile ? '56px' : 'auto',
+      }}>
+        <CalendarIcon color={colors.textPrimary} />
+        <span style={{
+          fontSize: isMobile ? '15px' : '14px',
+          color: colors.textPrimary,
+          flex: 1,
+        }}>
+          Google Calendar
+        </span>
+        <button
+          onClick={handleConnect}
+          disabled={actionLoading === 'connect' || isLoading}
+          style={{
+            fontSize: '12px',
+            color: colors.textPrimary,
+            background: colors.bgSecondary,
+            padding: '6px 14px',
+            borderRadius: '4px',
+            border: 'none',
+            cursor: actionLoading === 'connect' ? 'default' : 'pointer',
+            fontWeight: 500,
+            opacity: actionLoading === 'connect' ? 0.5 : 1,
+          }}
+        >
+          {actionLoading === 'connect' ? 'Connecting...' : 'Connect'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {googleConnections.map(conn => {
+        const statusColors = SYNC_STATUS_COLORS[conn.sync_status] || SYNC_STATUS_COLORS.pending
+        const statusBg = isDarkMode ? statusColors.dark : statusColors.light
+
+        return (
+          <div
+            key={conn.id}
+            style={{
+              padding: isMobile ? '16px 20px' : '14px 24px',
+              background: colors.bgTertiary,
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CalendarIcon color={colors.textPrimary} />
+              <span style={{
+                fontSize: isMobile ? '15px' : '14px',
+                color: colors.textPrimary,
+                flex: 1,
+              }}>
+                {conn.calendar_name || 'Google Calendar'}
+              </span>
+              <span style={{
+                padding: '3px 10px',
+                borderRadius: '10px',
+                background: statusBg,
+                fontSize: '11px',
+                fontWeight: 500,
+                color: colors.textSecondary,
+              }}>
+                {conn.sync_status}
+              </span>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingLeft: '32px',
+            }}>
+              <span style={{ ...typography.labelMd, color: colors.textTertiary }}>
+                Last synced: {formatLastSynced(conn.last_synced_at)}
+              </span>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleSync(conn.id)}
+                  disabled={actionLoading === `sync-${conn.id}`}
+                  style={{
+                    fontSize: '12px',
+                    color: colors.textSecondary,
+                    background: colors.bgSecondary,
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: actionLoading === `sync-${conn.id}` ? 'default' : 'pointer',
+                    opacity: actionLoading === `sync-${conn.id}` ? 0.5 : 1,
+                  }}
+                >
+                  {actionLoading === `sync-${conn.id}` ? 'Syncing...' : 'Sync'}
+                </button>
+                <button
+                  onClick={() => handleDisconnect(conn.id)}
+                  disabled={actionLoading === `disconnect-${conn.id}`}
+                  style={{
+                    fontSize: '12px',
+                    color: colors.textTertiary,
+                    background: 'transparent',
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                    cursor: actionLoading === `disconnect-${conn.id}` ? 'default' : 'pointer',
+                    opacity: actionLoading === `disconnect-${conn.id}` ? 0.5 : 1,
+                  }}
+                >
+                  {actionLoading === `disconnect-${conn.id}` ? '...' : 'Disconnect'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+function ConnectionsContent({ isMobile }: { isMobile: boolean }) {
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '12px' : '8px',
+    }}>
+      <GoogleConnectionSection isMobile={isMobile} />
+
+      <ComingSoonItem
+        icon={<CalendarIcon color={colors.textTertiary} />}
+        label="Outlook Calendar"
+        colors={colors}
+        isMobile={isMobile}
+      />
+      <ComingSoonItem
+        icon={<CalendarIcon color={colors.textTertiary} />}
+        label="Apple Calendar"
+        colors={colors}
+        isMobile={isMobile}
+      />
+      <ComingSoonItem
+        icon={<FileIcon color={colors.textTertiary} />}
+        label="Import .ics file"
+        colors={colors}
+        isMobile={isMobile}
+      />
+    </div>
+  )
+}
+
+export function ConnectionsPage() {
+  const { isMobile } = usePlatform()
+
+  if (isMobile) {
+    return <ConnectionsPageMobile />
+  }
+
+  return <ConnectionsPageDesktop />
 }
 
 function ConnectionsPageDesktop() {
@@ -92,9 +316,8 @@ function ConnectionsPageDesktop() {
       height: '100vh',
       display: 'flex',
       overflow: 'hidden',
-      background: colors.bgPrimary
+      background: colors.bgPrimary,
     }}>
-      {/* Vertical Sidebar */}
       <VerticalSidebar />
 
       <div style={{
@@ -108,74 +331,45 @@ function ConnectionsPageDesktop() {
         <div style={{
           padding: '24px 20px',
           borderBottom: `1px solid ${colors.border}`,
-          background: colors.bgPrimary
+          background: colors.bgPrimary,
         }}>
           <h1 style={{
             ...typography.headingXl,
             fontWeight: 600,
             color: colors.textPrimary,
-            margin: 0
+            margin: 0,
           }}>
             Connections
           </h1>
           <p style={{
             ...typography.bodyMd,
             color: colors.textSecondary,
-            margin: '8px 0 0 0'
+            margin: '8px 0 0 0',
           }}>
-            Calendar integrations are coming soon.
+            Manage your calendar integrations.
           </p>
         </div>
 
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '20px'
+          padding: '20px',
         }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <ConnectionItem
-              icon={<CalendarIcon color={colors.textTertiary} />}
-              label="Google Calendar"
-              status="coming_soon"
-              colors={colors}
-            />
-            <ConnectionItem
-              icon={<CalendarIcon color={colors.textTertiary} />}
-              label="Outlook Calendar"
-              status="coming_soon"
-              colors={colors}
-            />
-            <ConnectionItem
-              icon={<CalendarIcon color={colors.textTertiary} />}
-              label="Apple Calendar"
-              status="coming_soon"
-              colors={colors}
-            />
-            <ConnectionItem
-              icon={<FileIcon color={colors.textTertiary} />}
-              label="Import .ics file"
-              status="coming_soon"
-              colors={colors}
-            />
-          </div>
+          <ConnectionsContent isMobile={false} />
         </div>
 
         <div style={{
           padding: '16px 20px',
           borderTop: `1px solid ${colors.border}`,
-          background: colors.bgPrimary
+          background: colors.bgPrimary,
         }}>
           <p style={{
             ...typography.bodySm,
             color: colors.textSecondary,
             margin: 0,
-            textAlign: 'center'
+            textAlign: 'center',
           }}>
-            Calendar sync will allow you to keep your events in sync automatically.
+            Calendar sync keeps your events in sync automatically.
           </p>
         </div>
       </div>
@@ -197,63 +391,27 @@ function ConnectionsPageMobile() {
         paddingLeft: mobileSpacing.paddingX,
         paddingRight: mobileSpacing.paddingX,
         paddingTop: mobileSpacing.paddingTop,
-        paddingBottom: mobileSpacing.paddingBottomNoTabs
+        paddingBottom: mobileSpacing.paddingBottomNoTabs,
       }}>
-        {/* Description */}
         <p style={{
           fontSize: '14px',
           color: colors.textSecondary,
           margin: '0 0 24px 0',
-          lineHeight: '1.5'
+          lineHeight: '1.5',
         }}>
-          Calendar integrations are coming soon. Connect your calendars to keep events in sync automatically.
+          Manage your calendar integrations.
         </p>
 
-        {/* Connections List */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}>
-          <ConnectionItem
-            icon={<CalendarIcon color={colors.textTertiary} />}
-            label="Google Calendar"
-            status="coming_soon"
-            colors={colors}
-            isMobile
-          />
-          <ConnectionItem
-            icon={<CalendarIcon color={colors.textTertiary} />}
-            label="Outlook Calendar"
-            status="coming_soon"
-            colors={colors}
-            isMobile
-          />
-          <ConnectionItem
-            icon={<CalendarIcon color={colors.textTertiary} />}
-            label="Apple Calendar"
-            status="coming_soon"
-            colors={colors}
-            isMobile
-          />
-          <ConnectionItem
-            icon={<FileIcon color={colors.textTertiary} />}
-            label="Import .ics file"
-            status="coming_soon"
-            colors={colors}
-            isMobile
-          />
-        </div>
+        <ConnectionsContent isMobile={true} />
 
-        {/* Info Footer */}
         <p style={{
           fontSize: '12px',
           color: colors.textTertiary,
           margin: '32px 0 0 0',
           textAlign: 'center',
-          lineHeight: '1.5'
+          lineHeight: '1.5',
         }}>
-          Calendar sync will allow you to keep your events in sync automatically.
+          Calendar sync keeps your events in sync automatically.
         </p>
       </div>
     </div>
