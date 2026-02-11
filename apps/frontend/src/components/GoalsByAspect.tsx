@@ -11,15 +11,57 @@ import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
-import { EditButton, DeleteButton } from './ui/IconButtons'
+import { EditButton, DeleteButton, ShareButton } from './ui/IconButtons'
+import { formatRRuleForDisplay } from '../lib/recurrenceUtils'
+
+/**
+ * Deduplicate recurring event instances - keeps only one card per recurring series.
+ * For each parent, picks the next upcoming instance (or most recent if all are past).
+ * Non-recurring events pass through unchanged.
+ */
+function deduplicateRecurringEvents(events: CalendarEvent[]): CalendarEvent[] {
+  const now = new Date()
+  const nonRecurring: CalendarEvent[] = []
+  const recurringGroups = new Map<string, CalendarEvent[]>()
+
+  for (const event of events) {
+    const parentId = event.parent_event_id
+    if (parentId) {
+      const group = recurringGroups.get(parentId) || []
+      recurringGroups.set(parentId, [...group, event])
+    } else if (event.is_recurring) {
+      // Parent event that has instances - group by its own id
+      const group = recurringGroups.get(event.id) || []
+      recurringGroups.set(event.id, [...group, event])
+    } else {
+      nonRecurring.push(event)
+    }
+  }
+
+  // For each recurring group, pick the best representative instance
+  const representatives: CalendarEvent[] = []
+  for (const [, instances] of recurringGroups) {
+    // Sort by start_time ascending
+    const sorted = [...instances].sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
+
+    // Pick next upcoming instance, or last one if all past
+    const upcoming = sorted.find(e => new Date(e.start_time) >= now)
+    representatives.push(upcoming || sorted[sorted.length - 1])
+  }
+
+  return [...nonRecurring, ...representatives]
+}
 
 interface GoalsByAspectProps {
   aspect: Aspect | null
   onEdit?: (() => void) | undefined
   onDelete?: (() => void) | undefined
+  onShare?: (() => void) | undefined
 }
 
-export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) {
+export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspectProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -50,19 +92,16 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
 
         // Fetch events
         const { events: allEvents } = await fetchUserEvents(user, session.access_token)
-        console.log('All events:', allEvents)
-        console.log('Looking for aspect:', aspect)
-        const filteredEvents = allEvents.filter(event => {
-          const matches = event.aspect === aspect.name ||
-                         event.aspect === aspect.id ||
-                         event.aspect === aspect.id?.toString()
-          if (matches) {
-            console.log('Event matches:', event)
-          }
-          return matches
-        })
-        console.log('Filtered events:', filteredEvents)
-        setEvents(filteredEvents)
+        const filteredEvents = allEvents.filter(event =>
+          event.aspect === aspect.name ||
+          event.aspect === aspect.id ||
+          event.aspect === aspect.id?.toString()
+        )
+
+        // Deduplicate recurring event instances - show only one card per series
+        // For recurring events, keep only the next upcoming instance (or the most recent if all past)
+        const deduplicatedEvents = deduplicateRecurringEvents(filteredEvents)
+        setEvents(deduplicatedEvents)
 
         // Fetch tasks
         const { tasks: allTasks } = await fetchUserTasks(user, session.access_token, {})
@@ -182,7 +221,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
             </div>
           </div>
           {/* Action Buttons */}
-          {(onEdit || onDelete) && (
+          {(onEdit || onShare || onDelete) && (
             <div style={{ display: 'flex', gap: '6px' }}>
               {onEdit && (
                 <EditButton
@@ -192,6 +231,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                   }}
                   title="Edit aspect"
                                   />
+              )}
+              {onShare && (
+                <ShareButton
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onShare()
+                  }}
+                  title="Share aspect"
+                />
               )}
               {onDelete && (
                 <DeleteButton
@@ -253,17 +301,37 @@ export function GoalsByAspect({ aspect, onEdit, onDelete }: GoalsByAspectProps) 
                 }}
               >
                 <div style={{
-                  fontSize: fontSize.base,
-                  fontWeight: fontWeight.semibold,
-                  color: colors.textPrimary,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   marginBottom: '4px'
                 }}>
-                  {event.title}
+                  <div style={{
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
+                    color: colors.textPrimary
+                  }}>
+                    {event.title}
+                  </div>
+                  {event.is_recurring && event.recurrence_rule && (
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '1px 6px',
+                      borderRadius: '3px',
+                      background: colors.bgTertiary,
+                      color: colors.textSecondary,
+                      fontWeight: fontWeight.medium,
+                      flexShrink: 0
+                    }}>
+                      {formatRRuleForDisplay(event.recurrence_rule)}
+                    </span>
+                  )}
                 </div>
                 <div style={{
                   fontSize: fontSize.xs,
                   color: colors.textSecondary
                 }}>
+                  {event.is_recurring ? 'Next: ' : ''}
                   {new Date(event.start_time).toLocaleString('en-US', {
                     weekday: 'short',
                     month: 'short',

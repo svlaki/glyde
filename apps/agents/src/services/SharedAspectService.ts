@@ -44,23 +44,20 @@ export interface UpdateSharedAspectDto {
 export class SharedAspectService {
   constructor(private supabase: SupabaseClient) {}
 
-  /**
-   * Create a new shared aspect
-   */
   async createSharedAspect(
     ownerId: string,
     data: CreateSharedAspectDto
   ): Promise<ApiResponse<SharedAspect>> {
     try {
-      // 1. Create the aspect
       const { data: aspect, error: createError } = await this.supabase
-        .from('shared_aspects')
+        .from('aspects')
         .insert({
+          user_id: ownerId,
           name: data.name,
+          color: data.color || '#3b82f6',
           description: data.description || null,
-          color: data.color || null,
           icon: data.icon || null,
-          owner_id: ownerId
+          visibility: 'shared'
         })
         .select()
         .single()
@@ -72,9 +69,8 @@ export class SharedAspectService {
         }
       }
 
-      // 2. Add owner as member with role='owner'
       const { error: memberError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .insert({
           aspect_id: aspect.id,
           user_id: ownerId,
@@ -82,9 +78,8 @@ export class SharedAspectService {
         })
 
       if (memberError) {
-        // Clean up the aspect if member creation fails
         await this.supabase
-          .from('shared_aspects')
+          .from('aspects')
           .delete()
           .eq('id', aspect.id)
 
@@ -94,9 +89,20 @@ export class SharedAspectService {
         }
       }
 
+      const response: SharedAspect = {
+        id: aspect.id,
+        name: aspect.name,
+        description: aspect.description,
+        color: aspect.color,
+        icon: aspect.icon,
+        owner_id: aspect.user_id,
+        created_at: aspect.created_at,
+        updated_at: aspect.updated_at
+      }
+
       return {
         success: true,
-        data: aspect
+        data: response
       }
     } catch (error) {
       console.error('Error creating shared aspect:', error)
@@ -107,9 +113,6 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Add a member to a shared aspect
-   */
   async addMember(
     aspectId: string,
     userId: string,
@@ -117,9 +120,8 @@ export class SharedAspectService {
     role: 'editor' | 'viewer'
   ): Promise<ApiResponse<SharedAspectMember>> {
     try {
-      // 1. Verify userId is owner or editor
       const { data: userMember, error: memberCheckError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('role')
         .eq('aspect_id', aspectId)
         .eq('user_id', userId)
@@ -132,7 +134,6 @@ export class SharedAspectService {
         }
       }
 
-      // 2. Verify invited user is a friend
       const friendshipService = new FriendshipService(this.supabase)
       const areFriends = await friendshipService.areFriends(userId, invitedUserId)
       if (!areFriends) {
@@ -142,9 +143,8 @@ export class SharedAspectService {
         }
       }
 
-      // 3. Check if already a member
       const { data: existingMember } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('id')
         .eq('aspect_id', aspectId)
         .eq('user_id', invitedUserId)
@@ -157,9 +157,8 @@ export class SharedAspectService {
         }
       }
 
-      // 4. Create member record
       const { data: newMember, error: insertError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .insert({
           aspect_id: aspectId,
           user_id: invitedUserId,
@@ -188,9 +187,6 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Update a member's role
-   */
   async updateMemberRole(
     aspectId: string,
     userId: string,
@@ -198,9 +194,8 @@ export class SharedAspectService {
     newRole: 'editor' | 'viewer'
   ): Promise<ApiResponse<SharedAspectMember>> {
     try {
-      // 1. Verify userId is owner
       const { data: userMember, error: ownerCheckError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('role')
         .eq('aspect_id', aspectId)
         .eq('user_id', userId)
@@ -213,9 +208,8 @@ export class SharedAspectService {
         }
       }
 
-      // 2. Get member to update
       const { data: member, error: memberError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('*')
         .eq('id', memberId)
         .eq('aspect_id', aspectId)
@@ -228,7 +222,6 @@ export class SharedAspectService {
         }
       }
 
-      // 3. Cannot change owner's role
       if (member.role === 'owner') {
         return {
           success: false,
@@ -236,9 +229,8 @@ export class SharedAspectService {
         }
       }
 
-      // 4. Update role
       const { data: updated, error: updateError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .update({ role: newRole })
         .eq('id', memberId)
         .select()
@@ -264,18 +256,14 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Remove a member from shared aspect
-   */
   async removeMember(
     aspectId: string,
     userId: string,
     memberId: string
   ): Promise<ApiResponse<void>> {
     try {
-      // 1. Verify userId is owner
       const { data: userMember, error: ownerCheckError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('role')
         .eq('aspect_id', aspectId)
         .eq('user_id', userId)
@@ -288,9 +276,8 @@ export class SharedAspectService {
         }
       }
 
-      // 2. Get member info before deletion
       const { data: member, error: memberError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('*')
         .eq('id', memberId)
         .eq('aspect_id', aspectId)
@@ -303,7 +290,6 @@ export class SharedAspectService {
         }
       }
 
-      // 3. Cannot remove owner
       if (member.role === 'owner') {
         return {
           success: false,
@@ -311,9 +297,8 @@ export class SharedAspectService {
         }
       }
 
-      // 4. Delete member
       const { error: deleteError } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .delete()
         .eq('id', memberId)
 
@@ -336,15 +321,34 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Get user's shared aspects (owned or member of)
-   */
   async getUserSharedAspects(userId: string): Promise<ApiResponse<SharedAspect[]>> {
     try {
+      const { data: memberRows, error: memberError } = await this.supabase
+        .from('aspect_members')
+        .select('aspect_id')
+        .eq('user_id', userId)
+
+      if (memberError) {
+        return {
+          success: false,
+          error: 'Failed to fetch shared aspects'
+        }
+      }
+
+      const aspectIds = (memberRows || []).map(r => r.aspect_id)
+
+      if (aspectIds.length === 0) {
+        return {
+          success: true,
+          data: []
+        }
+      }
+
       const { data: aspects, error } = await this.supabase
-        .from('shared_aspects')
+        .from('aspects')
         .select('*')
-        .or(`owner_id.eq.${userId},id.in.(SELECT aspect_id FROM shared_aspect_members WHERE user_id='${userId}')`)
+        .in('id', aspectIds)
+        .eq('visibility', 'shared')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -354,9 +358,20 @@ export class SharedAspectService {
         }
       }
 
+      const mapped: SharedAspect[] = (aspects || []).map(a => ({
+        id: a.id,
+        name: a.name,
+        description: a.description,
+        color: a.color,
+        icon: a.icon,
+        owner_id: a.user_id,
+        created_at: a.created_at,
+        updated_at: a.updated_at
+      }))
+
       return {
         success: true,
-        data: aspects || []
+        data: mapped
       }
     } catch (error) {
       console.error('Error fetching user shared aspects:', error)
@@ -367,17 +382,13 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Get members of a shared aspect
-   */
   async getAspectMembers(
     aspectId: string,
     userId: string
   ): Promise<ApiResponse<SharedAspectMember[]>> {
     try {
-      // Verify user has access to aspect
       const { data: userAccess } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select('id')
         .eq('aspect_id', aspectId)
         .eq('user_id', userId)
@@ -385,12 +396,12 @@ export class SharedAspectService {
 
       if (!userAccess) {
         const { data: aspect } = await this.supabase
-          .from('shared_aspects')
-          .select('owner_id')
+          .from('aspects')
+          .select('user_id')
           .eq('id', aspectId)
           .single()
 
-        if (!aspect || aspect.owner_id !== userId) {
+        if (!aspect || aspect.user_id !== userId) {
           return {
             success: false,
             error: 'You do not have access to this aspect'
@@ -398,9 +409,8 @@ export class SharedAspectService {
         }
       }
 
-      // Fetch members with user profile info
       const { data: members, error } = await this.supabase
-        .from('shared_aspect_members')
+        .from('aspect_members')
         .select(
           `
           id,
@@ -408,7 +418,7 @@ export class SharedAspectService {
           user_id,
           role,
           joined_at,
-          user:profile!user_id(id, email, display_name, avatar_url)
+          user:profile!aspect_members_profile_fkey(id, email, display_name, avatar_url)
           `
         )
         .eq('aspect_id', aspectId)
@@ -434,20 +444,17 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Update shared aspect metadata
-   */
   async updateSharedAspect(
     aspectId: string,
     userId: string,
     updates: UpdateSharedAspectDto
   ): Promise<ApiResponse<SharedAspect>> {
     try {
-      // Verify userId is owner
       const { data: aspect, error: lookupError } = await this.supabase
-        .from('shared_aspects')
-        .select('owner_id')
+        .from('aspects')
+        .select('user_id')
         .eq('id', aspectId)
+        .eq('visibility', 'shared')
         .single()
 
       if (lookupError || !aspect) {
@@ -457,16 +464,15 @@ export class SharedAspectService {
         }
       }
 
-      if (aspect.owner_id !== userId) {
+      if (aspect.user_id !== userId) {
         return {
           success: false,
           error: 'Only owners can update aspects'
         }
       }
 
-      // Update aspect
       const { data: updated, error: updateError } = await this.supabase
-        .from('shared_aspects')
+        .from('aspects')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
@@ -482,9 +488,20 @@ export class SharedAspectService {
         }
       }
 
+      const response: SharedAspect = {
+        id: updated.id,
+        name: updated.name,
+        description: updated.description,
+        color: updated.color,
+        icon: updated.icon,
+        owner_id: updated.user_id,
+        created_at: updated.created_at,
+        updated_at: updated.updated_at
+      }
+
       return {
         success: true,
-        data: updated
+        data: response
       }
     } catch (error) {
       console.error('Error updating shared aspect:', error)
@@ -495,16 +512,13 @@ export class SharedAspectService {
     }
   }
 
-  /**
-   * Delete a shared aspect
-   */
   async deleteSharedAspect(aspectId: string, userId: string): Promise<ApiResponse<void>> {
     try {
-      // Verify userId is owner
       const { data: aspect, error: lookupError } = await this.supabase
-        .from('shared_aspects')
-        .select('owner_id')
+        .from('aspects')
+        .select('user_id')
         .eq('id', aspectId)
+        .eq('visibility', 'shared')
         .single()
 
       if (lookupError || !aspect) {
@@ -514,16 +528,15 @@ export class SharedAspectService {
         }
       }
 
-      if (aspect.owner_id !== userId) {
+      if (aspect.user_id !== userId) {
         return {
           success: false,
           error: 'Only owners can delete aspects'
         }
       }
 
-      // Delete aspect (cascade will remove members and unlink events)
       const { error: deleteError } = await this.supabase
-        .from('shared_aspects')
+        .from('aspects')
         .delete()
         .eq('id', aspectId)
 

@@ -9,6 +9,8 @@ export interface Aspect {
   description?: string
   context?: Record<string, any>
   display_order?: number
+  visibility?: 'private' | 'shared'
+  member_role?: 'owner' | 'editor' | 'viewer'
   created_at?: string
   updated_at?: string
 }
@@ -142,6 +144,124 @@ export async function updateUserAspect(
   } catch (error) {
     console.error('Error updating aspect:', error)
     return { aspect: null, error: 'Failed to update aspect' }
+  }
+}
+
+export async function archiveUserAspect(
+  user: User,
+  aspectId: string,
+  accessToken?: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${API_URL}/api/aspects/archive`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        aspect_id: aspectId
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to archive aspect' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error archiving aspect:', error)
+    return { success: false, error: 'Failed to archive aspect' }
+  }
+}
+
+export async function unarchiveUserAspect(
+  user: User,
+  aspectId: string,
+  accessToken?: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${API_URL}/api/aspects/unarchive`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        aspect_id: aspectId
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to unarchive aspect' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    console.error('Error unarchiving aspect:', error)
+    return { success: false, error: 'Failed to unarchive aspect' }
+  }
+}
+
+export async function fetchArchivedAspects(
+  user: User,
+  accessToken?: string
+): Promise<{ aspects: Aspect[], error: string | null }> {
+  try {
+    if (!user) {
+      return { aspects: [], error: 'User not authenticated' }
+    }
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    const response = await fetch(`${API_URL}/api/aspects/archived`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { aspects: [], error: data.error || 'Failed to fetch archived aspects' }
+    }
+
+    return { aspects: data.aspects || [], error: null }
+  } catch (error) {
+    console.error('Error fetching archived aspects:', error)
+    return { aspects: [], error: 'Failed to fetch archived aspects' }
   }
 }
 

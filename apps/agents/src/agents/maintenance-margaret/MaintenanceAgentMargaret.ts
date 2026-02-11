@@ -29,11 +29,11 @@ export class MaintenanceAgentMargaret extends BaseAgent {
         console.warn('[MARGARET] Failed to add user message to Zep:', error);
       }
 
-      const [events, tasks, goals, categories] = await Promise.all([
+      const [events, tasks, goals, aspects] = await Promise.all([
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
-        supabaseService.getCategories(context.userId)
+        supabaseService.getAspects(context.userId)
       ]);
 
       const messages: BaseMessage[] = [];
@@ -54,7 +54,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
         buildMargaretSystemPrompt({
           timezone: userTimezone,
           profileContext: this.buildProfileContext(userProfile),
-          categoryContext: this.buildCategoryContext(categories),
+          aspectContext: this.buildAspectContext(aspects),
           goalContext: this.buildGoalContext(goals),
           taskContext: this.buildTaskContext(tasks),
           eventContext: this.buildEventContext(events)
@@ -111,14 +111,14 @@ export class MaintenanceAgentMargaret extends BaseAgent {
     ].join('\n');
   }
 
-  private buildCategoryContext(categories: any[]): string {
-    if (!categories || categories.length === 0) {
-      return "No categories found.";
+  private buildAspectContext(aspects: any[]): string {
+    if (!aspects || aspects.length === 0) {
+      return "No aspects found.";
     }
 
-    const trimmed = categories.slice(0, 50);
-    return trimmed.map((category: any) => {
-      return `- ${category.name} (id: ${category.id})${category.description ? `: ${category.description}` : ''}`;
+    const trimmed = aspects.slice(0, 50);
+    return trimmed.map((aspect: any) => {
+      return `- ${aspect.name} (id: ${aspect.id})${aspect.description ? `: ${aspect.description}` : ''}`;
     }).join('\n');
   }
 

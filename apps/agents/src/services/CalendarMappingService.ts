@@ -1,8 +1,11 @@
 import { google, calendar_v3 } from 'googleapis';
 import { getSupabaseClient } from './SupabaseService.js';
 import { getConnectionService, UserConnection } from './ConnectionService.js';
-import categoryService from './CategoryService.js';
+import aspectService from './AspectService.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger.js';
+
+const MAPPING_COLUMNS = 'id, user_id, connection_id, google_calendar_id, google_calendar_name, google_calendar_color, is_primary, aspect_id, is_synced, is_visible, sync_token, last_synced_at, created_at, updated_at';
 
 // Color palette for auto-created aspects (avoiding common colors that might be used)
 const ASPECT_COLOR_PALETTE = [
@@ -31,7 +34,7 @@ export interface CalendarMapping {
   google_calendar_name: string | null;
   google_calendar_color: string | null;
   is_primary: boolean;
-  category_id: string | null;
+  aspect_id: string | null;
   is_synced: boolean;
   is_visible: boolean;
   sync_token: string | null;
@@ -57,7 +60,7 @@ export interface CreateCalendarMappingInput {
   google_calendar_name?: string;
   google_calendar_color?: string;
   is_primary?: boolean;
-  category_id?: string;
+  aspect_id?: string;
   is_synced?: boolean;
   is_visible?: boolean;
 }
@@ -65,7 +68,7 @@ export interface CreateCalendarMappingInput {
 export interface UpdateCalendarMappingInput {
   google_calendar_name?: string;
   google_calendar_color?: string;
-  category_id?: string | null;
+  aspect_id?: string | null;
   is_synced?: boolean;
   is_visible?: boolean;
   sync_token?: string | null;
@@ -114,7 +117,7 @@ export class CalendarMappingService {
         timeZone: item.timeZone || null
       }));
     } catch (error) {
-      console.error('[CalendarMappingService] Error fetching calendar list:', error);
+      logger.error('[CalendarMappingService] Error fetching calendar list:', error);
       throw new Error('Failed to fetch Google calendars');
     }
   }
@@ -126,19 +129,19 @@ export class CalendarMappingService {
     try {
       const { data, error } = await this.supabase
         .from('user_calendar_mappings')
-        .select('*')
+        .select(MAPPING_COLUMNS)
         .eq('user_id', userId)
         .order('is_primary', { ascending: false })
         .order('google_calendar_name', { ascending: true });
 
       if (error) {
-        console.error('[CalendarMappingService] Error fetching mappings:', error);
+        logger.error('[CalendarMappingService] Error fetching mappings:', error);
         return [];
       }
 
       return (data || []) as CalendarMapping[];
     } catch (error) {
-      console.error('[CalendarMappingService] Exception fetching mappings:', error);
+      logger.error('[CalendarMappingService] Exception fetching mappings:', error);
       return [];
     }
   }
@@ -150,19 +153,19 @@ export class CalendarMappingService {
     try {
       const { data, error } = await this.supabase
         .from('user_calendar_mappings')
-        .select('*')
+        .select(MAPPING_COLUMNS)
         .eq('connection_id', connectionId)
         .order('is_primary', { ascending: false })
         .order('google_calendar_name', { ascending: true });
 
       if (error) {
-        console.error('[CalendarMappingService] Error fetching connection mappings:', error);
+        logger.error('[CalendarMappingService] Error fetching connection mappings:', error);
         return [];
       }
 
       return (data || []) as CalendarMapping[];
     } catch (error) {
-      console.error('[CalendarMappingService] Exception fetching connection mappings:', error);
+      logger.error('[CalendarMappingService] Exception fetching connection mappings:', error);
       return [];
     }
   }
@@ -174,19 +177,19 @@ export class CalendarMappingService {
     try {
       const { data, error } = await this.supabase
         .from('user_calendar_mappings')
-        .select('*')
+        .select(MAPPING_COLUMNS)
         .eq('connection_id', connectionId)
         .eq('is_synced', true)
         .order('is_primary', { ascending: false });
 
       if (error) {
-        console.error('[CalendarMappingService] Error fetching synced mappings:', error);
+        logger.error('[CalendarMappingService] Error fetching synced mappings:', error);
         return [];
       }
 
       return (data || []) as CalendarMapping[];
     } catch (error) {
-      console.error('[CalendarMappingService] Exception fetching synced mappings:', error);
+      logger.error('[CalendarMappingService] Exception fetching synced mappings:', error);
       return [];
     }
   }
@@ -198,7 +201,7 @@ export class CalendarMappingService {
     try {
       const { data, error } = await this.supabase
         .from('user_calendar_mappings')
-        .select('*')
+        .select(MAPPING_COLUMNS)
         .eq('id', mappingId)
         .single();
 
@@ -206,13 +209,13 @@ export class CalendarMappingService {
         if (error.code === 'PGRST116') {
           return null;
         }
-        console.error('[CalendarMappingService] Error fetching mapping:', error);
+        logger.error('[CalendarMappingService] Error fetching mapping:', error);
         return null;
       }
 
       return data as CalendarMapping;
     } catch (error) {
-      console.error('[CalendarMappingService] Exception fetching mapping:', error);
+      logger.error('[CalendarMappingService] Exception fetching mapping:', error);
       return null;
     }
   }
@@ -231,7 +234,7 @@ export class CalendarMappingService {
           google_calendar_name: input.google_calendar_name || null,
           google_calendar_color: input.google_calendar_color || null,
           is_primary: input.is_primary || false,
-          category_id: input.category_id || null,
+          aspect_id: input.aspect_id || null,
           is_synced: input.is_synced ?? (input.is_primary || false), // Primary synced by default
           is_visible: input.is_visible ?? true
         })
@@ -239,14 +242,14 @@ export class CalendarMappingService {
         .single();
 
       if (error) {
-        console.error('[CalendarMappingService] Error creating mapping:', error);
+        logger.error('[CalendarMappingService] Error creating mapping:', error);
         throw new Error(`Failed to create calendar mapping: ${error.message}`);
       }
 
-      console.log('[CalendarMappingService] Mapping created:', data.id);
+      logger.info('[CalendarMappingService] Mapping created:', data.id);
       return data as CalendarMapping;
     } catch (error) {
-      console.error('[CalendarMappingService] Exception creating mapping:', error);
+      logger.error('[CalendarMappingService] Exception creating mapping:', error);
       throw error;
     }
   }
@@ -265,7 +268,7 @@ export class CalendarMappingService {
           google_calendar_name: input.google_calendar_name || null,
           google_calendar_color: input.google_calendar_color || null,
           is_primary: input.is_primary || false,
-          category_id: input.category_id || null,
+          aspect_id: input.aspect_id || null,
           is_synced: input.is_synced ?? (input.is_primary || false),
           is_visible: input.is_visible ?? true,
           updated_at: new Date().toISOString()
@@ -276,14 +279,14 @@ export class CalendarMappingService {
         .single();
 
       if (error) {
-        console.error('[CalendarMappingService] Error upserting mapping:', error);
+        logger.error('[CalendarMappingService] Error upserting mapping:', error);
         throw new Error(`Failed to upsert calendar mapping: ${error.message}`);
       }
 
-      console.log('[CalendarMappingService] Mapping upserted:', data.id);
+      logger.info('[CalendarMappingService] Mapping upserted:', data.id);
       return data as CalendarMapping;
     } catch (error) {
-      console.error('[CalendarMappingService] Exception upserting mapping:', error);
+      logger.error('[CalendarMappingService] Exception upserting mapping:', error);
       throw error;
     }
   }
@@ -299,7 +302,7 @@ export class CalendarMappingService {
 
       if (updates.google_calendar_name !== undefined) updateData.google_calendar_name = updates.google_calendar_name;
       if (updates.google_calendar_color !== undefined) updateData.google_calendar_color = updates.google_calendar_color;
-      if (updates.category_id !== undefined) updateData.category_id = updates.category_id;
+      if (updates.aspect_id !== undefined) updateData.aspect_id = updates.aspect_id;
       if (updates.is_synced !== undefined) updateData.is_synced = updates.is_synced;
       if (updates.is_visible !== undefined) updateData.is_visible = updates.is_visible;
       if (updates.sync_token !== undefined) updateData.sync_token = updates.sync_token;
@@ -313,14 +316,14 @@ export class CalendarMappingService {
         .single();
 
       if (error) {
-        console.error('[CalendarMappingService] Error updating mapping:', error);
+        logger.error('[CalendarMappingService] Error updating mapping:', error);
         throw new Error(`Failed to update calendar mapping: ${error.message}`);
       }
 
-      console.log('[CalendarMappingService] Mapping updated:', mappingId);
+      logger.info('[CalendarMappingService] Mapping updated:', mappingId);
       return data as CalendarMapping;
     } catch (error) {
-      console.error('[CalendarMappingService] Exception updating mapping:', error);
+      logger.error('[CalendarMappingService] Exception updating mapping:', error);
       throw error;
     }
   }
@@ -337,13 +340,13 @@ export class CalendarMappingService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('[CalendarMappingService] Error deleting mapping:', error);
+        logger.error('[CalendarMappingService] Error deleting mapping:', error);
         throw new Error(`Failed to delete calendar mapping: ${error.message}`);
       }
 
-      console.log('[CalendarMappingService] Mapping deleted:', mappingId);
+      logger.info('[CalendarMappingService] Mapping deleted:', mappingId);
     } catch (error) {
-      console.error('[CalendarMappingService] Exception deleting mapping:', error);
+      logger.error('[CalendarMappingService] Exception deleting mapping:', error);
       throw error;
     }
   }
@@ -359,13 +362,13 @@ export class CalendarMappingService {
         .eq('connection_id', connectionId);
 
       if (error) {
-        console.error('[CalendarMappingService] Error deleting connection mappings:', error);
+        logger.error('[CalendarMappingService] Error deleting connection mappings:', error);
         throw new Error(`Failed to delete connection mappings: ${error.message}`);
       }
 
-      console.log('[CalendarMappingService] All mappings deleted for connection:', connectionId);
+      logger.info('[CalendarMappingService] All mappings deleted for connection:', connectionId);
     } catch (error) {
-      console.error('[CalendarMappingService] Exception deleting connection mappings:', error);
+      logger.error('[CalendarMappingService] Exception deleting connection mappings:', error);
       throw error;
     }
   }
@@ -387,8 +390,8 @@ export class CalendarMappingService {
   /**
    * Set aspect/category for a calendar
    */
-  async setAspect(mappingId: string, categoryId: string | null): Promise<CalendarMapping> {
-    return this.updateMapping(mappingId, { category_id: categoryId });
+  async setAspect(mappingId: string, aspectId: string | null): Promise<CalendarMapping> {
+    return this.updateMapping(mappingId, { aspect_id: aspectId });
   }
 
   /**
@@ -406,10 +409,10 @@ export class CalendarMappingService {
         .eq('id', mappingId);
 
       if (error) {
-        console.error('[CalendarMappingService] Error updating sync token:', error);
+        logger.error('[CalendarMappingService] Error updating sync token:', error);
       }
     } catch (error) {
-      console.error('[CalendarMappingService] Exception updating sync token:', error);
+      logger.error('[CalendarMappingService] Exception updating sync token:', error);
     }
   }
 
@@ -459,7 +462,7 @@ export class CalendarMappingService {
       console.log(`[CalendarMappingService] Synced ${results.length} calendars for connection:`, connection.id);
       return results;
     } catch (error) {
-      console.error('[CalendarMappingService] Error syncing calendar list:', error);
+      logger.error('[CalendarMappingService] Error syncing calendar list:', error);
       throw error;
     }
   }
@@ -469,12 +472,12 @@ export class CalendarMappingService {
    * Creates new aspects if no match found
    */
   async autoMapCalendarsToAspects(connection: UserConnection): Promise<void> {
-    console.log('[CalendarMappingService] Auto-mapping calendars to aspects for:', connection.id);
+    logger.info('[CalendarMappingService] Auto-mapping calendars to aspects for:', connection.id);
 
     try {
       // Get all calendars and existing aspects
       const mappings = await this.getMappingsForConnection(connection.id);
-      const existingAspects = await categoryService.getCategories(connection.user_id);
+      let existingAspects = await aspectService.getAspects(connection.user_id);
       const usedColors = new Set<string>(
         existingAspects
           .map((a: { color?: string }) => a.color?.toLowerCase())
@@ -483,7 +486,7 @@ export class CalendarMappingService {
 
       for (const mapping of mappings) {
         // Skip if already has an aspect assigned
-        if (mapping.category_id) continue;
+        if (mapping.aspect_id) continue;
 
         const calendarName = mapping.google_calendar_name || 'Calendar';
 
@@ -492,28 +495,28 @@ export class CalendarMappingService {
 
         if (matchedAspect) {
           // Use existing aspect
-          await this.updateMapping(mapping.id, { category_id: matchedAspect.id });
+          await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
           console.log(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
         } else {
           // Create new aspect with unused color
           const newColor = this.getUnusedColor(usedColors);
           usedColors.add(newColor.toLowerCase());
 
-          const newAspect = await categoryService.createCategory(connection.user_id, {
+          const newAspect = await aspectService.createAspect(connection.user_id, {
             name: this.cleanCalendarName(calendarName),
             color: newColor,
             description: `Auto-created from Google Calendar: ${calendarName}`
           });
 
           if (newAspect) {
-            await this.updateMapping(mapping.id, { category_id: newAspect.id });
-            existingAspects.push(newAspect); // Add to list for future matching
+            await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
+            existingAspects = [...existingAspects, newAspect]; // Add to list for future matching
             console.log(`[CalendarMappingService] Created new aspect "${newAspect.name}" for calendar "${calendarName}"`);
           }
         }
       }
     } catch (error) {
-      console.error('[CalendarMappingService] Error auto-mapping calendars:', error);
+      logger.error('[CalendarMappingService] Error auto-mapping calendars:', error);
       // Don't throw - mapping is optional, sync can still work
     }
   }

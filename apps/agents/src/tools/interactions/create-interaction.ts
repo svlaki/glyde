@@ -61,7 +61,7 @@ export const createInteractionTool = tool(
     description: "Create an interactive prompt for the user. CRITICAL: For yes_no type, you MUST include metadata with a followUp object containing the time selection question. Without metadata.followUp, clicking 'yes' does nothing!",
     schema: z.object({
       question: z.string().describe("The question or prompt to show the user"),
-      type: z.enum(["yes_no", "multiple_choice"]).describe("Type of interaction: yes_no for simple yes/no questions, multiple_choice for options"),
+      type: z.enum(["yes_no", "multiple_choice", "text", "rating", "time_suggestion"]).describe("Type of interaction: yes_no for yes/no questions, multiple_choice for options, text for free-form responses, rating for 1-5 ratings, time_suggestion for suggesting specific times"),
       options: z.array(z.string()).optional().nullable().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
       metadata: z.record(z.any()).optional().nullable().describe("IMPORTANT for yes_no type! Should contain: { action: string, context: string, followUp: { question: string, type: 'multiple_choice', options: ['9:00am', '12:00pm', '6:00pm'], metadata: { directAction: { type: 'create_event', eventData: {...} } } } }. Without followUp, clicking 'yes' won't do anything."),

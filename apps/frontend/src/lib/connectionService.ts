@@ -20,7 +20,7 @@ export interface CalendarMapping {
   google_calendar_name: string | null
   google_calendar_color: string | null
   is_primary: boolean
-  category_id: string | null
+  aspect_id: string | null
   is_synced: boolean
   is_visible: boolean
   sync_token: string | null
@@ -444,7 +444,7 @@ export async function updateCalendarMapping(
   user: User,
   mappingId: string,
   updates: {
-    category_id?: string | null
+    aspect_id?: string | null
     is_synced?: boolean
     is_visible?: boolean
   },

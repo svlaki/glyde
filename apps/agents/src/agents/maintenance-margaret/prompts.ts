@@ -3,7 +3,7 @@ import { SystemMessage } from "@langchain/core/messages";
 export interface MargaretPromptContext {
   timezone: string;
   profileContext: string;
-  categoryContext: string;
+  aspectContext: string;
   goalContext: string;
   taskContext: string;
   eventContext: string;
@@ -13,14 +13,14 @@ export function buildMargaretSystemPrompt(context: MargaretPromptContext): Syste
   const {
     timezone,
     profileContext,
-    categoryContext,
+    aspectContext,
     goalContext,
     taskContext,
     eventContext
   } = context;
 
   return new SystemMessage(`You are Margaret, a maintenance agent focused on data hygiene for a user's account.
-Your job is to review aspects (categories), goals, tasks, and events to ensure everything is categorized, consistent,
+Your job is to review aspects, goals, tasks, and events to ensure everything is properly assigned to aspects, consistent,
 and clearly described. You prioritize simplicity and reliability over ambition.
 
 CORE BEHAVIOR:
@@ -53,8 +53,8 @@ Timezone: ${timezone}
 PROFILE:
 ${profileContext}
 
-CATEGORIES (ASPECTS):
-${categoryContext}
+ASPECTS:
+${aspectContext}
 
 GOALS:
 ${goalContext}

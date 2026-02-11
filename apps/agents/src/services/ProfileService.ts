@@ -1,11 +1,13 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './SupabaseService.js';
+import { logger } from '../utils/logger.js';
 
 // Schema-aligned profile structure
 export interface UserProfile {
   id: string;
   email?: string;
   display_name?: string;
+  preferred_name?: string;
   avatar_url?: string;
   values?: Record<string, any>;
   preferences?: Record<string, any>;
@@ -14,6 +16,12 @@ export interface UserProfile {
   personality_traits?: Record<string, any>;
   context_data?: Record<string, any>;
   timezone?: string;
+  birthday?: string;
+  gender?: string;
+  habits?: any[];
+  field_of_study?: string;
+  occupation?: string;
+  force_reauth?: boolean;
   created_at?: string;
 }
 
@@ -36,7 +44,7 @@ export class ProfileService {
         .maybeSingle();
 
       if (error) {
-        console.error('[ProfileService] Error fetching profile:', error);
+        logger.error('[ProfileService] Error fetching profile:', error);
         return null;
       }
 
@@ -56,7 +64,7 @@ export class ProfileService {
           .single();
 
         if (createError) {
-          console.error('[ProfileService] Error creating profile:', createError);
+          logger.error('[ProfileService] Error creating profile:', createError);
           return null;
         }
 
@@ -65,7 +73,7 @@ export class ProfileService {
 
       return data as UserProfile;
     } catch (error) {
-      console.error('[ProfileService] Exception fetching profile:', error);
+      logger.error('[ProfileService] Exception fetching profile:', error);
       return null;
     }
   }
@@ -81,13 +89,13 @@ export class ProfileService {
         .eq('id', userId);
 
       if (error) {
-        console.error('[ProfileService] Error updating profile:', error);
+        logger.error('[ProfileService] Error updating profile:', error);
         throw error;
       }
 
-      console.log('[ProfileService] Profile updated successfully');
+      logger.info('[ProfileService] Profile updated successfully');
     } catch (error) {
-      console.error('[ProfileService] Exception updating profile:', error);
+      logger.error('[ProfileService] Exception updating profile:', error);
       throw error;
     }
   }
@@ -151,10 +159,10 @@ export class ProfileService {
         throw new Error('Profile not found');
       }
 
-      const columnData = (profile as any)[column] || {};
-      columnData[field] = value;
+      const existingData = (profile as any)[column] || {};
+      const updatedData = { ...existingData, [field]: value };
 
-      await this.updateProfile(userId, { [column]: columnData });
+      await this.updateProfile(userId, { [column]: updatedData });
     } catch (error) {
       console.error(`[ProfileService] Error updating field ${column}.${field}:`, error);
       throw error;
@@ -178,14 +186,14 @@ export class ProfileService {
 
       for (const update of updates) {
         if (!changes[update.column]) {
-          changes[update.column] = (profile as any)[update.column] || {};
+          changes[update.column] = { ...((profile as any)[update.column] || {}) };
         }
-        changes[update.column][update.field] = update.value;
+        changes[update.column] = { ...changes[update.column], [update.field]: update.value };
       }
 
       await this.updateProfile(userId, changes);
     } catch (error) {
-      console.error('[ProfileService] Error batch updating fields:', error);
+      logger.error('[ProfileService] Error batch updating fields:', error);
       throw error;
     }
   }
@@ -223,7 +231,7 @@ export class ProfileService {
 
       return totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
     } catch (error) {
-      console.error('[ProfileService] Error calculating completeness:', error);
+      logger.error('[ProfileService] Error calculating completeness:', error);
       return 0;
     }
   }
@@ -278,7 +286,7 @@ export class ProfileService {
 
       return summary;
     } catch (error) {
-      console.error('[ProfileService] Error generating summary:', error);
+      logger.error('[ProfileService] Error generating summary:', error);
       return {
         totalFields: 0,
         filledFields: 0,

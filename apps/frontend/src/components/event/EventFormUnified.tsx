@@ -91,7 +91,8 @@ export function EventFormUnified({
       ...(form.aspect ? { aspect: form.aspect } : {}),
       visibility: form.visibility,
       start_time: startISO,
-      end_time: endISO
+      end_time: endISO,
+      ...(form.reflection.trim() ? { reflection: form.reflection.trim() } : {}),
     }
   }
 
@@ -181,7 +182,22 @@ export function EventFormUnified({
   }
 
   const handleScopeConfirm = async (scope: 'this_instance' | 'entire_series') => {
+    const action = scopeDialogAction
     setScopeDialogAction(null)
+
+    if (action === 'delete' && onDelete) {
+      form.setLoading(true)
+      try {
+        await onDelete(scope)
+        onClose()
+      } catch (error) {
+        console.error('Error deleting recurring event:', error)
+        alert('Failed to delete recurring event. Please try again.')
+      } finally {
+        form.setLoading(false)
+      }
+      return
+    }
 
     if (pendingSaveData && onSaveRecurring) {
       form.setLoading(true)
@@ -195,17 +211,6 @@ export function EventFormUnified({
         form.setLoading(false)
         setPendingSaveData(null)
         setPendingRRule(undefined)
-      }
-    } else if (onDelete) {
-      form.setLoading(true)
-      try {
-        await onDelete(scope)
-        onClose()
-      } catch (error) {
-        console.error('Error deleting recurring event:', error)
-        alert('Failed to delete recurring event. Please try again.')
-      } finally {
-        form.setLoading(false)
       }
     }
   }
@@ -602,9 +607,9 @@ export function EventFormUnified({
                       padding: '10px 12px',
                       fontSize: '14px',
                       fontFamily: fontFamily.sans,
-                      background: form.visibility === option ? colors.primary : colors.bgTertiary,
+                      background: form.visibility === option ? colors.accent : colors.bgTertiary,
                       color: form.visibility === option ? '#fff' : colors.textSecondary,
-                      border: `1px solid ${form.visibility === option ? colors.primary : colors.border}`,
+                      border: `1px solid ${form.visibility === option ? colors.accent : colors.border}`,
                       borderRadius: '8px',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
@@ -639,6 +644,30 @@ export function EventFormUnified({
                 }}
               />
             </div>
+
+            {/* Reflection - only for past events being edited */}
+            {form.isPastEvent && form.isEditing && (
+              <div>
+                <FormLabel>Reflection</FormLabel>
+                <textarea
+                  value={form.reflection}
+                  onChange={(e) => form.setReflection(e.target.value)}
+                  rows={3}
+                  placeholder="What happened? How did it go?"
+                  style={{
+                    ...inputStyle,
+                    resize: 'vertical'
+                  }}
+                />
+                <div style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: colors.textTertiary
+                }}>
+                  Add notes about how this event went
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div style={{

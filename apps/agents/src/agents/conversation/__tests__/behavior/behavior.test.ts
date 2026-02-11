@@ -32,7 +32,7 @@ const {
   mockRuleService,
   mockZepMemoryService,
   mockZepGraphService,
-  mockCategoryService,
+  mockAspectService,
 } = vi.hoisted(() => {
   // Create mock factories inline to avoid import issues
   const mockSupabaseService = {
@@ -136,7 +136,7 @@ const {
     }),
     addGoalCheckIn: vi.fn().mockResolvedValue({}),
     getGoalCheckIns: vi.fn().mockResolvedValue([]),
-    getCategories: vi.fn().mockImplementation(async () => mockState.categories),
+    getAspects: vi.fn().mockImplementation(async () => mockState.categories),
     getExpandedEvents: vi.fn().mockImplementation(async () => mockState.events),
     getUserSettings: vi.fn().mockResolvedValue({}),
     updateUserSetting: vi.fn().mockResolvedValue(true),
@@ -218,26 +218,25 @@ const {
     searchTasks: vi.fn().mockResolvedValue([]),
   };
 
-  const mockCategoryService = {
-    getCategories: vi.fn().mockImplementation(async () => mockState.categories),
-    getCategoryByName: vi.fn().mockResolvedValue(null),
-    createCategory: vi.fn().mockImplementation(async (userId: string, nameOrInput: string | any, color?: string) => {
-      // Handle both (userId, name, color) and (userId, {name, color, ...}) signatures
-      const categoryName = typeof nameOrInput === 'object' ? nameOrInput.name : nameOrInput;
-      const categoryColor = typeof nameOrInput === 'object' ? nameOrInput.color : color;
-      const newCategory = {
-        id: `cat-${Date.now()}`,
+  const mockAspectService = {
+    getAspects: vi.fn().mockImplementation(async () => mockState.categories),
+    getAspectByName: vi.fn().mockResolvedValue(null),
+    createAspect: vi.fn().mockImplementation(async (userId: string, input: any) => {
+      const aspectName = typeof input === 'object' ? input.name : input;
+      const aspectColor = typeof input === 'object' ? input.color : '#808080';
+      const newAspect = {
+        id: `asp-${Date.now()}`,
         user_id: userId,
-        name: categoryName,
-        color: categoryColor || '#808080',
+        name: aspectName,
+        color: aspectColor || '#808080',
         created_at: new Date().toISOString(),
       };
-      mockState.categories.push(newCategory);
-      return newCategory;
+      mockState.categories.push(newAspect);
+      return newAspect;
     }),
-    updateCategory: vi.fn().mockResolvedValue({}),
-    deleteCategory: vi.fn().mockImplementation(async (_userId: string, categoryId: string) => {
-      const index = mockState.categories.findIndex((c: any) => c.id === categoryId);
+    updateAspect: vi.fn().mockResolvedValue({}),
+    deleteAspect: vi.fn().mockImplementation(async (_userId: string, aspectId: string) => {
+      const index = mockState.categories.findIndex((c: any) => c.id === aspectId);
       if (index !== -1) {
         mockState.categories.splice(index, 1);
       }
@@ -250,7 +249,7 @@ const {
     mockRuleService,
     mockZepMemoryService,
     mockZepGraphService,
-    mockCategoryService,
+    mockAspectService,
   };
 });
 
@@ -279,9 +278,9 @@ vi.mock('../../../../services/ZepGraphService.js', () => ({
   ZepGraphService: vi.fn(() => mockZepGraphService),
 }));
 
-vi.mock('../../../../services/CategoryService.js', () => ({
-  default: mockCategoryService,
-  CategoryService: vi.fn(() => mockCategoryService),
+vi.mock('../../../../services/AspectService.js', () => ({
+  default: mockAspectService,
+  AspectService: vi.fn(() => mockAspectService),
 }));
 
 // Mock Zep sync helper
@@ -371,7 +370,7 @@ function configureMocksFromContext(context: TestContext | undefined) {
 
   if (context.existingCategories) {
     mockState.categories = [...context.existingCategories];
-    mockCategoryService.getCategoryByName.mockImplementation(async (_userId: string, name: string) => {
+    mockAspectService.getAspectByName.mockImplementation(async (_userId: string, name: string) => {
       const normalized = name.toLowerCase().trim();
       return mockState.categories.find(
         (c: any) => c.name.toLowerCase().trim() === normalized
@@ -417,8 +416,8 @@ function resetMocks() {
     );
   });
 
-  // Reset CategoryService to use mockState
-  mockCategoryService.getCategoryByName.mockImplementation(async (_userId: string, name: string) => {
+  // Reset AspectService to use mockState
+  mockAspectService.getAspectByName.mockImplementation(async (_userId: string, name: string) => {
     const normalized = name.toLowerCase().trim();
     return mockState.categories.find(
       (c: any) => c.name.toLowerCase().trim() === normalized
@@ -450,11 +449,11 @@ const serviceMethodToToolMap: Record<string, string> = {
   'deleteGoal': 'delete_goal',
   'getGoals': 'list_goals',
   'addGoalCheckIn': 'check_in_goal',
-  'getCategories': 'list_categories',
-  // CategoryService methods
-  'createCategory': 'create_category',
-  'updateCategory': 'update_category',
-  'deleteCategory': 'delete_category',
+  'getAspects': 'list_aspects',
+  // AspectService methods
+  'createAspect': 'create_aspect',
+  'updateAspect': 'update_aspect',
+  'deleteAspect': 'delete_aspect',
   // RuleService methods
   'createRule': 'create_rule',
   'toggleRule': 'toggle_rule',
@@ -494,10 +493,10 @@ function extractToolCallsFromMocks(): CapturedToolCall[] {
     }
   }
 
-  // Check CategoryService mocks
-  const categoryMethods = ['createCategory', 'updateCategory', 'deleteCategory', 'getCategories'];
-  for (const method of categoryMethods) {
-    const mock = (mockCategoryService as any)[method];
+  // Check AspectService mocks
+  const aspectMethods = ['createAspect', 'updateAspect', 'deleteAspect', 'getAspects'];
+  for (const method of aspectMethods) {
+    const mock = (mockAspectService as any)[method];
     if (mock && mock.mock?.calls?.length > 0) {
       for (const callArgs of mock.mock.calls) {
         const toolName = serviceMethodToToolMap[method];

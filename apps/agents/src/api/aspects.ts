@@ -1,69 +1,53 @@
 import { Request, Response } from 'express';
 import aspectService from '../services/AspectService.js';
+import { getSupabaseClient } from '../services/SupabaseService.js';
+import { logger } from '../utils/logger.js';
+import {
+  sendErrorResponse,
+  parseBody,
+  userIdSchema,
+  createAspectSchema,
+  updateAspectSchema,
+  aspectIdSchema,
+  aspectColorSchema
+} from './utils.js';
 
 export async function getUserAspects(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.body.user_id;
-    if (!userId) {
-      res.status(400).json({ error: 'user_id is required' });
-      return;
-    }
+    const parsed = parseBody(res, userIdSchema, req.body);
+    if (!parsed) return;
 
-    console.log('Fetching aspects for user:', userId);
+    logger.info('Fetching aspects for user', { user_id: parsed.user_id });
 
-    const aspects = await aspectService.getAspects(userId);
+    const aspects = await aspectService.getAspects(parsed.user_id);
 
-    // Aspects are created during onboarding
-    // If user has no aspects, they haven't completed onboarding yet
-    // or their onboarding was done before aspect creation was added
     res.json({
       success: true,
       aspects: aspects
     });
-
   } catch (error) {
-    console.error('Error fetching user aspects:', error);
-    res.status(500).json({ error: 'Failed to fetch user aspects' });
+    sendErrorResponse(res, 500, 'Failed to fetch user aspects', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
 export async function createUserAspect(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.body.user_id;
-    if (!userId) {
-      res.status(400).json({ error: 'user_id is required' });
-      return;
-    }
+    const parsed = parseBody(res, createAspectSchema, req.body);
+    if (!parsed) return;
 
-    const { user_id: _ignoredUserId, ...aspectData } = req.body ?? {};
+    logger.info('Creating aspect for user', { user_id: parsed.user_id });
 
-    if (!aspectData.name || !aspectData.color) {
-      res.status(400).json({ error: 'name and color are required' });
-      return;
-    }
-
-    // Validate aspect data
-    if (typeof aspectData.name !== 'string' || aspectData.name.trim().length === 0) {
-      res.status(400).json({ error: 'Aspect name must be a non-empty string' });
-      return;
-    }
-
-    if (typeof aspectData.color !== 'string' || !aspectData.color.match(/^#[0-9A-Fa-f]{6}$/)) {
-      res.status(400).json({ error: 'Color must be a valid hex color (e.g., #3b82f6)' });
-      return;
-    }
-
-    console.log('Creating aspect for user:', userId);
-
-    const aspect = await aspectService.createAspect(userId, {
-      name: aspectData.name.trim(),
-      color: aspectData.color.trim(),
-      description: aspectData.description?.trim(),
-      context: aspectData.context || {}
+    const aspect = await aspectService.createAspect(parsed.user_id, {
+      name: parsed.name.trim(),
+      color: parsed.color.trim(),
+      description: parsed.description?.trim(),
+      context: parsed.context || {}
     });
 
     if (!aspect) {
-      res.status(500).json({ error: 'Failed to create aspect - service returned null' });
+      sendErrorResponse(res, 500, 'Failed to create aspect - service returned null');
       return;
     }
 
@@ -71,118 +55,152 @@ export async function createUserAspect(req: Request, res: Response): Promise<voi
       success: true,
       aspect: aspect
     });
-
   } catch (error) {
-    console.error('Error creating user aspect:', error);
-    res.status(500).json({ error: 'Failed to create user aspect' });
+    sendErrorResponse(res, 500, 'Failed to create user aspect', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
 export async function updateUserAspect(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.body.user_id;
-    if (!userId) {
-      res.status(400).json({ error: 'user_id is required' });
-      return;
-    }
+    const parsed = parseBody(res, updateAspectSchema, req.body);
+    if (!parsed) return;
 
-    const { aspect_id, ...updates } = req.body ?? {};
+    logger.info('Updating aspect', { aspect_id: parsed.aspect_id, user_id: parsed.user_id });
 
-    if (!aspect_id) {
-      res.status(400).json({ error: 'aspect_id is required' });
-      return;
-    }
-
-    // Validate updates
-    if (updates.name !== undefined && (typeof updates.name !== 'string' || updates.name.trim().length === 0)) {
-      res.status(400).json({ error: 'Aspect name must be a non-empty string' });
-      return;
-    }
-
-    if (updates.color !== undefined && (typeof updates.color !== 'string' || !updates.color.match(/^#[0-9A-Fa-f]{6}$/))) {
-      res.status(400).json({ error: 'Color must be a valid hex color (e.g., #3b82f6)' });
-      return;
-    }
-
-    console.log('Updating aspect:', aspect_id, 'for user:', userId);
-
-    const aspect = await aspectService.updateAspect(userId, aspect_id, {
-      name: updates.name?.trim(),
-      color: updates.color?.trim(),
-      description: updates.description?.trim(),
-      context: updates.context
+    const aspect = await aspectService.updateAspect(parsed.user_id, parsed.aspect_id, {
+      name: parsed.name?.trim(),
+      color: parsed.color?.trim(),
+      description: parsed.description?.trim(),
+      context: parsed.context,
+      visibility: parsed.visibility
     });
 
     if (!aspect) {
-      res.status(404).json({ error: 'Aspect not found or failed to update' });
+      sendErrorResponse(res, 404, 'Aspect not found or failed to update');
       return;
+    }
+
+    // When enabling sharing, ensure owner is in aspect_members
+    if (parsed.visibility === 'shared') {
+      const supabase = getSupabaseClient();
+      await supabase
+        .from('aspect_members')
+        .upsert(
+          { aspect_id: parsed.aspect_id, user_id: parsed.user_id, role: 'owner' },
+          { onConflict: 'aspect_id,user_id' }
+        );
+    }
+
+    // When disabling sharing, remove all members
+    if (parsed.visibility === 'private') {
+      const supabase = getSupabaseClient();
+      await supabase
+        .from('aspect_members')
+        .delete()
+        .eq('aspect_id', parsed.aspect_id);
     }
 
     res.json({
       success: true,
       aspect: aspect
     });
-
   } catch (error) {
-    console.error('Error updating user aspect:', error);
-    res.status(500).json({ error: 'Failed to update user aspect' });
+    sendErrorResponse(res, 500, 'Failed to update user aspect', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
 export async function deleteUserAspect(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.body.user_id;
-    if (!userId) {
-      res.status(400).json({ error: 'user_id is required' });
-      return;
-    }
+    const parsed = parseBody(res, aspectIdSchema, req.body);
+    if (!parsed) return;
 
-    const { aspect_id } = req.body ?? {};
+    logger.info('Deleting aspect', { aspect_id: parsed.aspect_id, user_id: parsed.user_id });
 
-    if (!aspect_id) {
-      res.status(400).json({ error: 'aspect_id is required' });
-      return;
-    }
-
-    console.log('Deleting aspect:', aspect_id, 'for user:', userId);
-
-    await aspectService.deleteAspect(userId, aspect_id);
+    await aspectService.deleteAspect(parsed.user_id, parsed.aspect_id);
 
     res.json({
       success: true,
       message: 'Aspect deleted successfully'
     });
-
   } catch (error) {
-    console.error('Error deleting user aspect:', error);
-    res.status(500).json({ error: 'Failed to delete user aspect' });
+    sendErrorResponse(res, 500, 'Failed to delete user aspect', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function archiveUserAspect(req: Request, res: Response): Promise<void> {
+  try {
+    const parsed = parseBody(res, aspectIdSchema, req.body);
+    if (!parsed) return;
+
+    await aspectService.archiveAspect(parsed.user_id, parsed.aspect_id);
+
+    res.json({
+      success: true,
+      message: 'Aspect archived successfully'
+    });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to archive user aspect', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function unarchiveUserAspect(req: Request, res: Response): Promise<void> {
+  try {
+    const parsed = parseBody(res, aspectIdSchema, req.body);
+    if (!parsed) return;
+
+    await aspectService.unarchiveAspect(parsed.user_id, parsed.aspect_id);
+
+    res.json({
+      success: true,
+      message: 'Aspect unarchived successfully'
+    });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to unarchive user aspect', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function getArchivedAspects(req: Request, res: Response): Promise<void> {
+  try {
+    const parsed = parseBody(res, userIdSchema, req.body);
+    if (!parsed) return;
+
+    const aspects = await aspectService.getArchivedAspects(parsed.user_id);
+
+    res.json({
+      success: true,
+      aspects: aspects
+    });
+  } catch (error) {
+    sendErrorResponse(res, 500, 'Failed to fetch archived aspects', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
 export async function getAspectColor(req: Request, res: Response): Promise<void> {
   try {
-    const userId = req.body.user_id;
-    if (!userId) {
-      res.status(400).json({ error: 'user_id is required' });
-      return;
-    }
+    const parsed = parseBody(res, aspectColorSchema, req.body);
+    if (!parsed) return;
 
-    const { aspect_name } = req.body ?? {};
-
-    if (!aspect_name) {
-      res.status(400).json({ error: 'aspect_name is required' });
-      return;
-    }
-
-    const color = await aspectService.getAspectColor(userId, aspect_name);
+    const color = await aspectService.getAspectColor(parsed.user_id, parsed.aspect_name);
 
     res.json({
       success: true,
       color: color
     });
-
   } catch (error) {
-    console.error('Error fetching aspect color:', error);
-    res.status(500).json({ error: 'Failed to fetch aspect color' });
+    sendErrorResponse(res, 500, 'Failed to fetch aspect color', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }

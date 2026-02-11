@@ -1,158 +1,172 @@
-# Glyde Proper - Architecture Overview
+# Glyde - Architecture Overview
 
-## Critical Schema Structure
-
-**IMPORTANT: The system uses PUBLIC SCHEMAS with RLS policies, NOT per-user schemas.**
-
-Historical context: Migration `20260122000001_drop_unused_user_schema_functions.sql` consolidated from per-user schemas (`u_<uuid>`) to the public schema. Old per-user schema data is preserved but no longer used for new data.
-
-### Database Schema
-
-All user data is in `public` schema with Row-Level Security (RLS) policies:
-
-**User Management:**
-- `auth.users` - Supabase authentication
-- `profile` - User metadata (display_name, avatar_url, timezone, preferences, context_data JSONB)
-- `user_connections` - OAuth credentials for Google/Microsoft calendars
-- `user_calendar_mappings` - Maps external calendars to Glyde aspects/categories
-
-**Calendar & Events:**
-- `public.events` - Calendar events (user_id, title, start_at, end_at, category_id, recurrence JSONB, archetype, color)
-- `public.tasks` - Todos with metadata (user_id, title, duration, energy_required, goal_id)
-- `public.goals` - Goal tracking (user_id, title, description, category_id, key_results JSONB)
-- `public.goal_check_ins` - Daily/weekly progress (user_id, goal_id, mood, confidence)
-
-**Organization & Sharing:**
-- `public.categories` - System categories (Work, Health, Personal, Learning, Finance + subcategories)
-- `user_categories` - User's category settings (active, custom colors/names)
-
-**Conversation & Memory:**
-- `public.chat_messages` - Conversation history (user_id, session_id, content, sender, embedding)
-
-**Audit:**
-- `public.user_activity_log` - All entity changes (user_id, entity_type, operation, changes JSONB, source: user|agent, agent_type)
-
-**Planning & Rules:**
-- `public.user_life_plans` - Multi-month planning (user_id, phases, reflections)
-- `public.user_rules` - Personal/org rules (user_id, rule_text, conditions)
-
-### RLS Policy Pattern
-
-All tables enforce this pattern:
-```sql
--- Users see only their own data
-CREATE POLICY "Users can access own data" ON table_name
-  FOR ALL USING (auth.uid() = user_id);
-
--- Service role (backend) bypasses RLS for background jobs
-CREATE POLICY "Service role full access" ON table_name
-  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role');
-```
-
-### Key Aspects System
-
-**Aspects** are life domains: Work, Health, Personal, Learning, Finance.
-
-Data flow:
-- Defined in `public.categories` (system-wide definitions)
-- Users select during onboarding → stored in `profile.context_data.life_aspects` (JSONB array)
-- Events/tasks/goals link to aspects via `category_id` foreign key
-- Frontend groups display by aspect
-
-### Agent Architecture
-
-**AgentRegistry Pattern:**
-- Central singleton orchestrator managing all agents
-- Routes messages to appropriate agent or defaults to conversation agent
-- Delegates between agents as needed
-
-**Agent Types:**
-- Conversation - Main interface, orchestrator
-- Interaction (Gerald) - User interaction, suggestions
-- Maintenance (Margaret) - System maintenance, consistency
-- Scheduling, Pattern Mining, Coaching, Proactive (extensible)
-
-**Memory Management:**
-- Zep Cloud integration for persistent memory contexts
-- Fallback to Supabase if Zep unavailable
-- Memory contexts: conversation, task_planning, goal_coaching
-- Conversation history in `public.chat_messages` with 1536-dim embeddings
-
-### External Integrations
-
-**Calendar Sync:**
-- Google Calendar OAuth via `user_connections`
-- Microsoft Graph OAuth via `user_connections`
-- Per-calendar sync tracking and watch subscriptions in `user_calendar_mappings`
-
-**AI/LLM:**
-- OpenAI GPT-5.1 via LangChain
-- Embeddings for vector search (1536 dimensions)
-
-**Memory Backend:**
-- Zep Cloud for multi-context memory
-- Redis + Bull for background job queues
-- ChromaNode for local vector embeddings (fallback)
-
-## File Organization
+## System Architecture
 
 ```
-apps/agents/
-├── src/
-│   ├── agents/           # Agent implementations (BaseAgent, AgentRegistry)
-│   ├── api/              # Express routes, middleware, auth
-│   ├── services/         # Business logic (SupabaseService, ZepMemoryService, etc.)
-│   ├── types/            # TypeScript interfaces and types
-│   ├── scripts/          # Utility scripts
-│   └── index.ts          # Server entry point
-
-apps/frontend/
-├── src/
-│   ├── components/       # React components
-│   ├── hooks/            # Custom React hooks
-│   ├── pages/            # Page routes
-│   ├── services/         # API clients
-│   └── types/            # TypeScript interfaces
-
-supabase/
-├── migrations/           # Database migrations (applied in order)
-└── functions/            # PostgreSQL functions (if any)
+User (Browser) --> Frontend (React/Vite :3000) --> Agent API (Express :8000) --> Supabase (PostgreSQL)
+                                                        |                            |
+                                                        +--> OpenAI GPT-5.1          +--> RLS Policies
+                                                        +--> Zep Cloud (Memory)
+                                                        +--> Tavily (Web Search)
+                                                        +--> Google Calendar API
 ```
 
-## Key Design Patterns
+## Database Schema
 
-### API Response Format
-```typescript
-interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  meta?: { total: number; page: number; limit: number }
-}
+All tables in `public` schema with Row-Level Security (RLS) policies enforcing `user_id = auth.uid()`.
+
+### Core Tables
+
+| Table | Purpose | Key Columns |
+|---|---|---|
+| `profile` | User metadata | display_name, timezone, preferences (JSONB), context_data (JSONB) |
+| `aspects` | Color-coded life categories | name, color, icon, description, context (JSONB), display_order |
+| `events` | Calendar events | title, start_time, end_time, aspect_id (FK), recurrence_rule, is_public |
+| `tasks` | To-do items | title, status, priority, due_date, aspect_id (FK) |
+| `goals` | Goal tracking | title, description, status, progress, target_date, aspect_id (FK) |
+| `life_plans` | Multi-phase life plans | title, phases (JSONB), reflections |
+| `rules` | Agent behavior constraints | rule_text, enabled, conditions |
+
+### Interaction System
+
+| Table | Purpose |
+|---|---|
+| `user_interactions` | Agent-generated questions (yes_no, multiple_choice) |
+| `interaction_responses` | User responses to interactions |
+
+### Social
+
+| Table | Purpose |
+|---|---|
+| `user_friendships` | Friend connections (status: pending/accepted/declined) |
+| `friend_aspects` | Aspects shared with specific friends |
+| `shared_aspect_members` | Members of shared aspects |
+| `user_friend_visibility_settings` | Per-friend visibility controls |
+
+### Infrastructure
+
+| Table | Purpose |
+|---|---|
+| `user_activity_log` | Audit trail (entity_type, operation, changes JSONB, source: user/agent) |
+| `user_connections` | OAuth credentials for Google/Microsoft |
+| `user_calendar_mappings` | Maps external calendars to aspects |
+| `chat_messages` | Conversation history |
+| `recurring_event_exceptions` | Overrides for recurring event instances |
+| `user_preferences` | Key-value user preferences |
+
+### Aspect Linking
+
+Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id`). A deprecated `category` text column exists on some tables for backward compatibility.
+
+## Agent Architecture
+
+### Agent Types
+
+| Agent | Class | Model | Purpose |
+|---|---|---|---|
+| Conversation | `ConversationAgent` | GPT-5.1 | Main chat interface, 55+ tools via LangGraph |
+| Interaction (Gerald) | `InteractionAgentGerald` | GPT-5.1 | Proactive suggestions with follow-up chaining |
+| Maintenance (Margaret) | `MaintenanceAgentMargaret` | GPT-5.1 | Data hygiene audits, aspect maintenance |
+
+### Tool System
+
+`ToolRegistry` singleton manages 55+ tools across 11 categories:
+
+| Category | Tools | Examples |
+|---|---|---|
+| calendar | 8 | create_event, update_event, delete_event, create_recurring_event |
+| tasks | 6 | create_task, update_task, complete_task, list_tasks |
+| goals | 5 | create_goal, update_goal, check_in_goal |
+| aspects | 5 | create_aspect, update_aspect, list_aspects, archive_aspect |
+| profile | 3 | get_profile, update_profile |
+| memory | 4 | search_memory, add_memory_fact |
+| search | 2 | web_search, search_entities |
+| interactions | 2 | create_interaction, list_interactions |
+| rules | 4 | create_rule, toggle_rule, delete_rule, list_rules |
+| plans | 3 | get_life_plan, update_life_plan |
+| social | 3 | list_friends, get_friend_details |
+
+Gerald gets a restricted tool set via `getGeraldAgentTools()`.
+
+### Memory System
+
+- **Zep Cloud**: Graph-based persistent memory. Stores user facts, preferences, patterns across sessions.
+- **ZepMemoryService**: Thread-based conversation memory with context retrieval.
+- **ZepGraphService**: Knowledge graph for user entities and relationships.
+- Fallback: Supabase `chat_messages` table for conversation history.
+
+### Agent Prompt System
+
+Each agent has:
+- `prompts.ts` with a typed `PromptContext` interface
+- `buildXxxSystemPrompt(context)` returning `SystemMessage`
+- Context includes: timezone, eventContext, taskContext, goalContext, aspectContext, profileContext, rulesContext
+- ConversationAgent prompt is ~840 lines with detailed tool selection guides
+
+## API Layer
+
+Express server (`api/server.ts`) with:
+- 60+ POST endpoints organized by domain
+- Auth middleware (`authenticateRequest`) validating Supabase JWTs
+- Input sanitization middleware
+- CORS configured for web and mobile clients
+- Rate limiting (currently disabled via `RATE_LIMIT_DISABLED`)
+
+### Key Endpoints
+
+```
+POST /api/chat              # Main conversation endpoint
+POST /api/aspects/*         # Aspect CRUD
+POST /api/events/*          # Event CRUD
+POST /api/tasks/*           # Task CRUD
+POST /api/goals/*           # Goal CRUD
+POST /api/rules/*           # Rule management
+POST /api/interactions/*    # Interaction management
+POST /api/friends/*         # Social features
+POST /api/plan/*            # Life plan management
+POST /api/connections/*     # OAuth connections
+POST /api/calendar-mappings/* # Calendar sync
 ```
 
-### Authentication Flow
-1. Supabase Auth or custom JWT
-2. Bearer token in Authorization header
-3. `authenticateRequest()` middleware validates and sets `req.authUserId`
-4. All operations use `req.authUserId` for RLS
+## Frontend Architecture
 
-### Aspect-Based Organization
-Events/tasks/goals are grouped by aspect/category for user-centric organization.
+React 18 + Vite + TypeScript + TailwindCSS.
 
-### Activity Logging
-Every mutation is logged to `user_activity_log` with:
-- Entity type (event/task/goal/category/profile/rule)
-- Operation (create/update/delete/complete)
-- Changes (before/after values)
-- Source (user or agent+agent_type)
+### Context Providers
 
-Used for audit trails and agent decision-making context.
+```
+AuthProvider > DarkModeProvider > RuleProvider > ConnectionProvider > AspectProvider
+```
 
-## Important Notes
+### Key Components
 
-1. **NO per-user schemas** - All data is in public schema with RLS
-2. **RLS enforcement** - PostgreSQL RLS policies provide data isolation
-3. **Activity logging** - Comprehensive audit trail for compliance and agent context
-4. **Zep memory** - Used for contextual AI responses, persistent across sessions
-5. **Vector embeddings** - 1536-dim vectors for semantic search in chat/events
+- `Calendar.tsx` - Main calendar view with day/week/month modes
+- `ChatBot.tsx` - Conversation interface with streaming responses
+- `FriendsSection.tsx` - Friend management, aspect tagging, notes
+- `PlanPage.tsx` - Life plan editor with resizable panels and embedded chat
+- `AspectBreakdownCard.tsx` - Aspect distribution visualization
+
+### Data Flow
+
+Frontend calls Agent API (not Supabase directly for writes). Reads use Supabase client with anon key + RLS. Real-time updates via Supabase subscriptions.
+
+## Infrastructure
+
+### Docker Compose
+
+- `glydeeee-agents`: Node.js backend, port 8000
+- `glydeeee-frontend`: Vite dev server, port 3000->5173, volume mounts for hot-reload
+
+### Development Workflow
+
+- Frontend: Edit files, changes hot-reload via Docker volume mounts
+- Agent: Edit files, rebuild with `docker compose build --no-cache agent`
+
+## Key Design Decisions
+
+1. **Public schema + RLS** over per-user schemas (simpler, scales better)
+2. **Aspects as first-class entities** over flat tags (supports context, ordering, archiving)
+3. **LangGraph over simple chains** (supports complex multi-tool workflows with recursion)
+4. **Zep Cloud over local embeddings** (persistent graph memory across sessions)
+5. **Docker Compose** for consistent dev environment across team
+6. **Agent API as gateway** - frontend doesn't call LLMs directly

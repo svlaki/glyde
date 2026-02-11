@@ -12,9 +12,8 @@ import {
   updateFriendNotes,
   addFriendAspect,
   removeFriendAspect,
-  Friend,
-  FriendRequest
 } from '../lib/friendshipService'
+import type { Friend, FriendRequest } from '../lib/friendshipService'
 import { getColors } from '../styles/colors'
 import { getTypography, fontWeight } from '../styles/typography'
 

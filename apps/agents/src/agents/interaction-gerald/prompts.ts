@@ -10,13 +10,14 @@ export interface GeraldPromptContext {
   taskContext: string;
   goalContext: string;
   profileContext: string;
-  categoryContext: string;
+  aspectContext: string;
   todayFormatted: string;
   tomorrowFormatted: string;
   tomorrowDayName: string;
   currentHour: number;
   toolCount?: number;
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
+  recentInteractionContext: string; // Recent interaction history to avoid repetition
 }
 
 /**
@@ -35,13 +36,14 @@ export function buildGeraldSystemPrompt(context: GeraldPromptContext): SystemMes
     taskContext,
     goalContext,
     profileContext,
-    categoryContext,
+    aspectContext,
     todayFormatted,
     tomorrowFormatted,
     tomorrowDayName,
     currentHour,
     toolCount,
-    rulesContext
+    rulesContext,
+    recentInteractionContext
   } = context;
 
   // Time-based context for creative suggestions
@@ -67,7 +69,7 @@ CURRENT TIME & DATE:
 
 USER CONTEXT:
 ${profileContext}
-${categoryContext}
+${aspectContext}
 ${eventContext}
 ${taskContext}
 ${goalContext}
@@ -76,10 +78,25 @@ YOUR CAPABILITIES:
 You can create interactions of various types to engage with the user, and you can directly create tasks, events, and goals. You have ${toolCount || 'several'} tools available.
 
 INTERACTION TYPES YOU CAN CREATE:
-1. "yes_no" - Simple yes/no questions with optional follow-up on yes
-2. "multiple_choice" - Multiple options for the user to choose from
+1. "yes_no" - Simple yes/no questions with follow-up scheduling. Best for: scheduling suggestions, action confirmations.
+   Example: "Want to schedule 30 minutes for your CS 525 project?"
+2. "multiple_choice" - Multiple options to choose from. Best for: time selection, preference choices, planning.
+   Example: "Which area needs the most attention this week?" with options ["Fitness", "Study", "Social", "Rest"]
+3. "text" - Free-form text response. Best for: reflections, check-ins, journaling prompts, open-ended questions.
+   Example: "What's one thing you accomplished today that you're proud of?"
+4. "rating" - 1-5 rating scale. Best for: mood checks, energy levels, satisfaction, progress self-assessment.
+   Example: "How would you rate your energy level right now?" with options ["1", "2", "3", "4", "5"]
+5. "time_suggestion" - Suggests specific times with a direct action. Best for: proactive scheduling with context.
+   Example: "I found a free slot at 2pm for your workout - want to book it?"
 
-IMPORTANT: Only use "yes_no" or "multiple_choice" types. Do NOT use any other types.
+INTERACTION VARIETY RULES (CRITICAL):
+- NEVER suggest the same pattern twice in a row (e.g., two scheduling yes_no in a row)
+- Rotate between categories: scheduling, reflection, check-in, progress review, planning
+- Maximum 2 scheduling suggestions out of every 5 interactions
+- Include at least 1 text or rating type per batch of 3 interactions
+- Review RECENT INTERACTION HISTORY below and avoid repeating dismissed topics
+- If last batch was all scheduling, this batch should include reflection/check-in types
+${recentInteractionContext}
 
 FOLLOW-UP INTERACTIONS:
 You can chain interactions! When a user responds "yes" to a yes_no question, a follow-up interaction appears automatically.
@@ -99,24 +116,24 @@ FOLLOW-UP STRUCTURE (COPY THIS EXACTLY):
       "directAction": {
         "type": "create_event",
         "eventData": {
-          "title": "The event title",
+          "title": "Activity type (e.g. Study Session, Workout, Focus Block - NOT the aspect/class name)",
           "duration": 60,
           "description": "Description of the event",
-          "categoryId": "uuid-from-categories-list"
+          "aspectId": "uuid-from-aspects-list"
         }
       }
     }
   }
 }
 
-CATEGORY ASSIGNMENT (IMPORTANT):
-- ALWAYS include "categoryId" in eventData, taskData, or goalData
-- Use the category ID from the CATEGORIES list that best matches the activity
-- If suggesting focus time for a task, use that task's category
-- If suggesting time for a goal, use that goal's category
-- For exercise/health activities, use the Health/Fitness category
-- For work activities, use the Work category
-- Match the activity to the most appropriate category
+ASPECT ASSIGNMENT (IMPORTANT):
+- ALWAYS include "aspectId" in eventData, taskData, or goalData
+- Use the aspect ID from the ASPECTS list that best matches the activity
+- If suggesting focus time for a task, use that task's aspect
+- If suggesting time for a goal, use that goal's aspect
+- For exercise/health activities, use the Health/Fitness aspect
+- For work activities, use the Work aspect
+- Match the activity to the most appropriate aspect
 
 TIME OPTIONS FORMAT:
 - Use simple time formats: "9:00am", "2:00pm", "6:30pm"
@@ -149,6 +166,13 @@ CRITICAL - AVOID CALENDAR CONFLICTS:
 - If suggesting for "today", only suggest future times (current time is shown above)
 - If the calendar is packed, suggest times for tomorrow instead
 
+EVENT TITLE FORMAT (CRITICAL):
+- Start the title with WHAT THE EVENT IS (the activity type), NOT the class/aspect name
+- The aspect name is shown separately on the calendar card via aspectId, so DO NOT repeat it in the title
+- GOOD: "Workout", "Focus Block", "Study Session", "Review Session", "Lecture", "Lab"
+- BAD: "CS 525 Focus Time", "Physics Lab" (aspect name is redundant - it shows on the card)
+- The aspect is assigned via aspectId and displayed on the card automatically
+
 COMPLETE EXAMPLE - Exercise with time follow-up:
 create_interaction(
   question: "Would you like to schedule time for exercise today?",
@@ -166,10 +190,10 @@ create_interaction(
         "directAction": {
           "type": "create_event",
           "eventData": {
-            "title": "Exercise",
+            "title": "Workout",
             "duration": 45,
             "description": "Workout session",
-            "categoryId": "<use Health/Fitness category ID from list>"
+            "aspectId": "<use Health/Fitness aspect ID from list>"
           }
         }
       }
@@ -194,10 +218,10 @@ create_interaction(
         "directAction": {
           "type": "create_event",
           "eventData": {
-            "title": "Focus: Quarterly Report",
+            "title": "Focus Block",
             "duration": 120,
             "description": "Deep work time for Quarterly Report",
-            "categoryId": "<use the task's category ID from the task context>"
+            "aspectId": "<use the task's aspect ID from the task context>"
           }
         }
       }
@@ -312,9 +336,9 @@ create_interaction(
         "directAction": {            // <-- REQUIRED!
           "type": "create_event",
           "eventData": {
-            "title": "Event title",
+            "title": "Activity type (Study Session, Workout, etc. - NOT the class/aspect name)",
             "duration": 60,
-            "categoryId": "<REQUIRED: category ID from list>"  // <-- REQUIRED!
+            "aspectId": "<REQUIRED: aspect ID from list>"  // <-- REQUIRED!
           }
         }
       }

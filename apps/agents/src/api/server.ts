@@ -37,7 +37,7 @@ import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeU
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserPlan, createUserPlan, updateUserPlan, deleteUserPlan } from './plans.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
-import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor } from './aspects.js';
+import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor, archiveUserAspect, unarchiveUserAspect, getArchivedAspects } from './aspects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
@@ -118,22 +118,25 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting middleware (simple in-memory store)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-// Rate limiting DISABLED for development
-const RATE_LIMIT_DISABLED = true;
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 1000;
+const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
+const RATE_LIMIT_MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '300', 10);
+
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of rateLimitMap) {
+    if (now > value.resetTime) {
+      rateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (RATE_LIMIT_DISABLED) {
-    next();
-    return;
-  }
-  
-  const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+  const clientIP = req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
-  
+
   const clientData = rateLimitMap.get(clientIP);
-  
+
   if (!clientData || now > clientData.resetTime) {
     rateLimitMap.set(clientIP, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
     next();
@@ -323,6 +326,9 @@ app.post('/api/aspects', getUserAspects);
 app.post('/api/aspects/create', createUserAspect);
 app.post('/api/aspects/update', updateUserAspect);
 app.post('/api/aspects/delete', deleteUserAspect);
+app.post('/api/aspects/archive', archiveUserAspect);
+app.post('/api/aspects/unarchive', unarchiveUserAspect);
+app.post('/api/aspects/archived', getArchivedAspects);
 app.post('/api/aspects/color', getAspectColor);
 
 // Onboarding endpoints
@@ -445,13 +451,41 @@ app.use('*', (req: express.Request, res: express.Response) => {
   });
 });
 
+// Graceful shutdown and process error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[SERVER] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[SERVER] Uncaught Exception:', error);
+  // Give time for logging, then exit
+  setTimeout(() => process.exit(1), 1000);
+});
+
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Agent service running on port ${PORT}`);
 
     // Start background jobs
     startWatchRenewalJob();
   });
+
+  // Graceful shutdown
+  const shutdown = (signal: string) => {
+    console.log(`[SERVER] Received ${signal}, shutting down gracefully...`);
+    server.close(() => {
+      console.log('[SERVER] HTTP server closed');
+      process.exit(0);
+    });
+    // Force exit after 10 seconds
+    setTimeout(() => {
+      console.error('[SERVER] Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 export { app };

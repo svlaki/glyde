@@ -30,8 +30,8 @@ function sendErrorResponse(res: Response, statusCode: number, message: string, m
 
 export async function getUserEvents(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, start_date, end_date } = req.body;
-    
+    const { user_id, start_date, end_date, raw } = req.body;
+
     if (!user_id) {
       sendErrorResponse(res, 400, 'user_id is required');
       return;
@@ -42,9 +42,12 @@ export async function getUserEvents(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    logger.info('Fetching events for user', { user_id, start_date, end_date });
+    logger.info('Fetching events for user', { user_id, start_date, end_date, raw });
 
-    const events = await getSupabaseService().getEvents(user_id, start_date, end_date);
+    // When raw=true, return parent events only (no recurring expansion) - useful for counts/profile
+    const events = raw
+      ? await getSupabaseService().getRawEvents(user_id, start_date, end_date)
+      : await getSupabaseService().getEvents(user_id, start_date, end_date);
     
     logger.info('Successfully fetched events', { count: events.length, user_id });
     
@@ -108,8 +111,7 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log('Creating event for user:', user_id);
-    console.log('Event data:', eventData);
+    logger.info('Creating event for user', { user_id });
 
     const createdEvent = await getSupabaseService().createEvent(user_id, {
       ...eventData,
@@ -129,7 +131,7 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
     }
 
   } catch (error) {
-    console.error('Error creating user event:', error);
+    logger.error('Error creating user event', { error: error instanceof Error ? error.message : String(error) });
     
     // Provide more specific error messages
     let errorMessage = 'Failed to create user event';
@@ -169,8 +171,7 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log('Updating event for user:', user_id);
-    console.log('Event updates:', eventDataUpdate);
+    logger.info('Updating event for user', { user_id, event_id });
 
     const updatedEvent = await getSupabaseService().updateEvent(user_id, event_id, eventDataUpdate);
     
@@ -184,7 +185,7 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
     }
 
   } catch (error) {
-    console.error('Error updating user event:', error);
+    logger.error('Error updating user event', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to update user event' });
   }
 }
@@ -216,7 +217,7 @@ export async function deleteUserEvent(req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log('Deleting event for user:', resolvedUserId);
+    logger.info('Deleting event for user', { user_id: resolvedUserId, event_id });
 
     const result = await getSupabaseService().deleteEvent(resolvedUserId, event_id);
 
@@ -229,7 +230,7 @@ export async function deleteUserEvent(req: Request, res: Response): Promise<void
     }
 
   } catch (error) {
-    console.error('Error deleting user event:', error);
+    logger.error('Error deleting user event', { error: error instanceof Error ? error.message : String(error) });
     sendErrorResponse(res, 500, 'Failed to delete user event');
   }
 }
@@ -293,7 +294,7 @@ export async function createRecurringEvent(req: Request, res: Response): Promise
       event
     });
   } catch (error) {
-    console.error('Error creating recurring event:', error);
+    logger.error('Error creating recurring event', { error: error instanceof Error ? error.message : String(error) });
     sendErrorResponse(res, 500, 'Failed to create recurring event', { error });
   }
 }
@@ -369,11 +370,35 @@ export async function updateRecurringEvent(req: Request, res: Response): Promise
         event
       });
     } else {
-      // For single instance, would need more context (which occurrence date)
-      sendErrorResponse(res, 501, 'Updating single instances is not yet fully supported via API');
+      // Single instance update using exception catalogue
+      const { instance_date, ...instanceUpdates } = updates;
+
+      if (!instance_date) {
+        sendErrorResponse(res, 400, 'instance_date is required for this_instance scope');
+        return;
+      }
+
+      const event = await getSupabaseService().updateRecurringEventInstance(
+        user_id,
+        event_id,
+        instance_date,
+        instanceUpdates
+      );
+
+      if (!event) {
+        sendErrorResponse(res, 500, 'Failed to update recurring event instance');
+        return;
+      }
+
+      logger.info('Successfully updated recurring instance', { event_id, instance_date, user_id });
+
+      res.json({
+        success: true,
+        event
+      });
     }
   } catch (error) {
-    console.error('Error updating recurring event:', error);
+    logger.error('Error updating recurring event', { error: error instanceof Error ? error.message : String(error) });
     sendErrorResponse(res, 500, 'Failed to update recurring event', { error });
   }
 }
@@ -422,7 +447,7 @@ export async function deleteRecurringEvent(req: Request, res: Response): Promise
       sendErrorResponse(res, 501, 'Deleting specific instances is not yet fully supported via API');
     }
   } catch (error) {
-    console.error('Error deleting recurring event:', error);
+    logger.error('Error deleting recurring event', { error: error instanceof Error ? error.message : String(error) });
     sendErrorResponse(res, 500, 'Failed to delete recurring event', { error });
   }
 }

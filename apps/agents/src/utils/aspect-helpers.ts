@@ -22,6 +22,7 @@ export interface AspectCreateInput {
   icon?: string;
   description?: string;
   context?: Record<string, any>;
+  visibility?: string;
 }
 
 /**

@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { getConnectionService } from '../services/ConnectionService.js';
 import { getGoogleCalendarSyncService } from '../services/GoogleCalendarSyncService.js';
 import { getCalendarMappingService } from '../services/CalendarMappingService.js';
+import { logger } from '../utils/logger.js';
 
 const connectionService = getConnectionService();
 const googleSyncService = getGoogleCalendarSyncService();
@@ -19,7 +20,7 @@ export async function getConnections(req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.log('[CONNECTIONS API] Fetching connections for user:', userId);
+    logger.info('[connections] Fetching connections for user:', userId);
 
     const connections = await connectionService.getConnections(userId);
 
@@ -41,7 +42,7 @@ export async function getConnections(req: Request, res: Response): Promise<void>
       connections: safeConnections
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error fetching connections:', error);
+    logger.error('[connections] Error fetching connections:', error);
     res.status(500).json({ error: 'Failed to fetch connections' });
   }
 }
@@ -83,7 +84,7 @@ export async function getGoogleAuthUrl(req: Request, res: Response): Promise<voi
       state: JSON.stringify({ userId, flow: 'connection' })
     });
 
-    console.log('[CONNECTIONS API] Generated Google auth URL for user:', userId);
+    logger.info('[connections] Generated Google auth URL for user:', userId);
 
     res.json({
       success: true,
@@ -91,7 +92,7 @@ export async function getGoogleAuthUrl(req: Request, res: Response): Promise<voi
       state: userId
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error generating Google auth URL:', error);
+    logger.error('[connections] Error generating Google auth URL:', error);
     res.status(500).json({ error: 'Failed to generate authorization URL' });
   }
 }
@@ -128,7 +129,7 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
       return;
     }
 
-    console.log('[CONNECTIONS API] Processing Google callback for user:', userId);
+    logger.info('[connections] Processing Google callback for user:', userId);
 
     // Exchange code for tokens
     const oauth2Client = new google.auth.OAuth2(
@@ -156,7 +157,7 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
       calendarName = calendarInfo.data.summary || calendarInfo.data.id || 'Primary Calendar';
       providerAccountId = calendarInfo.data.id || '';
     } catch (calError) {
-      console.warn('[CONNECTIONS API] Could not fetch calendar info:', calError);
+      logger.warn('[connections] Could not fetch calendar info:', calError);
     }
 
     // Create or update connection
@@ -172,7 +173,7 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
       sync_status: 'pending'
     });
 
-    console.log('[CONNECTIONS API] Connection created/updated:', connection.id);
+    logger.info('[connections] Connection created/updated:', connection.id);
 
     // Perform initial sync in background
     setImmediate(async () => {
@@ -192,7 +193,7 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
         // Update status to synced
         await connectionService.updateSyncStatus(connection.id, 'synced');
       } catch (syncError) {
-        console.error('[CONNECTIONS API] Background sync failed:', syncError);
+        logger.error('[connections] Background sync failed:', syncError);
         await connectionService.updateSyncStatus(connection.id, 'error',
           syncError instanceof Error ? syncError.message : 'Sync failed');
       }
@@ -210,7 +211,7 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
       message: 'Google Calendar connected successfully. Initial sync in progress.'
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error in Google callback:', error);
+    logger.error('[connections] Error in Google callback:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to connect Google Calendar'
     });
@@ -248,7 +249,7 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    console.log('[CONNECTIONS API] Triggering sync for connection:', connection_id);
+    logger.info('[connections] Triggering sync for connection:', connection_id);
 
     // Perform sync based on provider
     if (connection.provider === 'google') {
@@ -261,7 +262,7 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
             await googleSyncService.performInitialSync(connection);
           }
         } catch (syncError) {
-          console.error('[CONNECTIONS API] Sync failed:', syncError);
+          logger.error('[connections] Sync failed:', syncError);
         }
       });
     }
@@ -271,7 +272,7 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
       message: 'Sync started'
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error triggering sync:', error);
+    logger.error('[connections] Error triggering sync:', error);
     res.status(500).json({ error: 'Failed to trigger sync' });
   }
 }
@@ -307,14 +308,14 @@ export async function disconnectConnection(req: Request, res: Response): Promise
       return;
     }
 
-    console.log('[CONNECTIONS API] Disconnecting connection:', connection_id);
+    logger.info('[connections] Disconnecting connection:', connection_id);
 
     // Stop watch subscription if exists
     if (connection.provider === 'google' && connection.watch_channel_id) {
       try {
         await googleSyncService.stopWatchSubscription(connection);
       } catch (watchError) {
-        console.warn('[CONNECTIONS API] Failed to stop watch subscription:', watchError);
+        logger.warn('[connections] Failed to stop watch subscription:', watchError);
       }
     }
 
@@ -326,7 +327,7 @@ export async function disconnectConnection(req: Request, res: Response): Promise
       message: 'Connection disconnected successfully'
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error disconnecting:', error);
+    logger.error('[connections] Error disconnecting:', error);
     res.status(500).json({ error: 'Failed to disconnect' });
   }
 }
@@ -345,19 +346,19 @@ export async function handleGoogleWebhook(req: Request, res: Response): Promise<
     const resourceId = req.headers['x-goog-resource-id'] as string;
     const resourceState = req.headers['x-goog-resource-state'] as string;
 
-    console.log('[CONNECTIONS API] Webhook received:', {
+    logger.info('[connections] Webhook received:', {
       channelId,
       resourceState
     });
 
     // Skip sync message (sent when watch is first set up)
     if (resourceState === 'sync') {
-      console.log('[CONNECTIONS API] Received sync notification, ignoring');
+      logger.info('[connections] Received sync notification, ignoring');
       return;
     }
 
     if (!channelId) {
-      console.warn('[CONNECTIONS API] Webhook missing channel ID');
+      logger.warn('[connections] Webhook missing channel ID');
       return;
     }
 
@@ -365,27 +366,27 @@ export async function handleGoogleWebhook(req: Request, res: Response): Promise<
     const connection = await connectionService.findByChannelId(channelId);
 
     if (!connection) {
-      console.warn('[CONNECTIONS API] Webhook for unknown channel:', channelId);
+      logger.warn('[connections] Webhook for unknown channel:', channelId);
       return;
     }
 
     // Verify resource ID matches
     if (connection.watch_resource_id && connection.watch_resource_id !== resourceId) {
-      console.warn('[CONNECTIONS API] Resource ID mismatch');
+      logger.warn('[connections] Resource ID mismatch');
       return;
     }
 
     // Queue delta sync (don't block webhook response)
     setImmediate(async () => {
       try {
-        console.log('[CONNECTIONS API] Starting delta sync for connection:', connection.id);
+        logger.info('[connections] Starting delta sync for connection:', connection.id);
         await googleSyncService.performDeltaSync(connection);
       } catch (syncError) {
-        console.error('[CONNECTIONS API] Delta sync failed:', syncError);
+        logger.error('[connections] Delta sync failed:', syncError);
       }
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error processing webhook:', error);
+    logger.error('[connections] Error processing webhook:', error);
     // Don't throw - already sent 200 response
   }
 }
@@ -421,7 +422,7 @@ export async function getCalendarList(req: Request, res: Response): Promise<void
       return;
     }
 
-    console.log('[CONNECTIONS API] Fetching calendar list for connection:', connection_id);
+    logger.info('[connections] Fetching calendar list for connection:', connection_id);
 
     // Fetch calendars from Google
     const calendars = await calendarMappingService.fetchGoogleCalendarList(connection);
@@ -431,7 +432,7 @@ export async function getCalendarList(req: Request, res: Response): Promise<void
       calendars
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error fetching calendar list:', error);
+    logger.error('[connections] Error fetching calendar list:', error);
     res.status(500).json({ error: 'Failed to fetch calendars' });
   }
 }
@@ -467,7 +468,7 @@ export async function getCalendarMappings(req: Request, res: Response): Promise<
       return;
     }
 
-    console.log('[CONNECTIONS API] Fetching calendar mappings for connection:', connection_id);
+    logger.info('[connections] Fetching calendar mappings for connection:', connection_id);
 
     const mappings = await calendarMappingService.getMappingsForConnection(connection_id);
 
@@ -476,7 +477,7 @@ export async function getCalendarMappings(req: Request, res: Response): Promise<
       mappings
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error fetching calendar mappings:', error);
+    logger.error('[connections] Error fetching calendar mappings:', error);
     res.status(500).json({ error: 'Failed to fetch calendar mappings' });
   }
 }
@@ -512,7 +513,7 @@ export async function syncCalendarList(req: Request, res: Response): Promise<voi
       return;
     }
 
-    console.log('[CONNECTIONS API] Syncing calendar list for connection:', connection_id);
+    logger.info('[connections] Syncing calendar list for connection:', connection_id);
 
     const mappings = await calendarMappingService.syncCalendarList(connection);
 
@@ -522,7 +523,7 @@ export async function syncCalendarList(req: Request, res: Response): Promise<voi
       message: `Synced ${mappings.length} calendars`
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error syncing calendar list:', error);
+    logger.error('[connections] Error syncing calendar list:', error);
     res.status(500).json({ error: 'Failed to sync calendar list' });
   }
 }
@@ -538,7 +539,7 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
       return;
     }
 
-    const { mapping_id, category_id, is_synced, is_visible } = req.body ?? {};
+    const { mapping_id, aspect_id, is_synced, is_visible } = req.body ?? {};
 
     if (!mapping_id) {
       res.status(400).json({ error: 'mapping_id is required' });
@@ -558,10 +559,10 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
       return;
     }
 
-    console.log('[CONNECTIONS API] Updating calendar mapping:', mapping_id);
+    logger.info('[connections] Updating calendar mapping:', mapping_id);
 
     const updates: Record<string, unknown> = {};
-    if (category_id !== undefined) updates.category_id = category_id;
+    if (aspect_id !== undefined) updates.aspect_id = aspect_id;
     if (is_synced !== undefined) updates.is_synced = is_synced;
     if (is_visible !== undefined) updates.is_visible = is_visible;
 
@@ -573,15 +574,15 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
       if (connection) {
         setImmediate(async () => {
           try {
-            console.log('[CONNECTIONS API] Triggering initial sync for newly enabled calendar:', mapping.google_calendar_id);
+            logger.info('[connections] Triggering initial sync for newly enabled calendar:', mapping.google_calendar_id);
             await googleSyncService.performInitialSyncForCalendar(
               connection,
               mapping.google_calendar_id,
               mapping_id,
-              updated.category_id || undefined
+              updated.aspect_id || undefined
             );
           } catch (syncError) {
-            console.error('[CONNECTIONS API] Initial sync failed for calendar:', syncError);
+            logger.error('[connections] Initial sync failed for calendar:', syncError);
           }
         });
       }
@@ -592,7 +593,7 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
       mapping: updated
     });
   } catch (error) {
-    console.error('[CONNECTIONS API] Error updating calendar mapping:', error);
+    logger.error('[connections] Error updating calendar mapping:', error);
     res.status(500).json({ error: 'Failed to update calendar mapping' });
   }
 }

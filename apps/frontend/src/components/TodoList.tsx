@@ -213,7 +213,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
             No pending tasks
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
             {tasks.map(task => {
               const taskColor = getTaskColor(task)
               return (
@@ -231,14 +231,14 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                     e.currentTarget.style.opacity = '1'
                   }}
                   style={{
-                    padding: '10px 12px',
+                    padding: '6px 8px',
                     background: hexToRgba(taskColor, 0.15),
                     borderRadius: '3px',
                     border: 'none',
-                    borderLeft: `3px solid ${taskColor}`,
+                    borderLeft: `2px solid ${taskColor}`,
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '10px',
+                    gap: '7px',
                     transition: 'all 0.15s',
                     cursor: 'grab'
                   }}
@@ -262,33 +262,33 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                       handleCompleteTask(task.id)
                     }}
                     style={{
-                      width: '16px',
-                      height: '16px',
+                      width: '13px',
+                      height: '13px',
                       cursor: 'pointer',
-                      marginTop: '2px',
+                      marginTop: '1px',
                       flexShrink: 0
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
-                      fontSize: fontSize.sm,
+                      fontSize: fontSize.xs,
                       fontWeight: fontWeight.medium,
                       color: colors.textPrimary,
-                      marginBottom: task.due_date || task.priority ? '4px' : 0
+                      marginBottom: task.due_date || task.priority ? '2px' : 0
                     }}>
                       {task.title}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       {task.due_date && (
-                        <div style={{ fontSize: fontSize.xs, color: colors.textSecondary }}>
+                        <div style={{ fontSize: '10px', color: colors.textSecondary }}>
                           {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </div>
                       )}
                       {task.priority && task.priority !== 'low' && (
                         <span style={{
-                          fontSize: fontSize.xs,
-                          padding: '2px 6px',
-                          borderRadius: '3px',
+                          fontSize: '10px',
+                          padding: '1px 4px',
+                          borderRadius: '2px',
                           background: task.priority === 'urgent' ? '#fee' : task.priority === 'high' ? '#fef0e6' : '#fff9e6',
                           color: task.priority === 'urgent' ? '#c00' : task.priority === 'high' ? '#c60' : '#880',
                           fontWeight: fontWeight.medium

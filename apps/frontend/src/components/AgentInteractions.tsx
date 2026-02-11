@@ -25,11 +25,12 @@ interface Interaction {
 
 export interface AgentInteractionsProps {
   hideHeader?: boolean
+  onChatReply?: (message: string) => void
 }
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps) {
+export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInteractionsProps) {
   const { user, session } = useAuth()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -43,6 +44,8 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
   const [error, setError] = useState<string | null>(null)
   const [showCustomTimeInput, setShowCustomTimeInput] = useState<string | null>(null) // interaction ID showing custom time input
   const [customTimeInputs, setCustomTimeInputs] = useState<Record<string, string>>({}) // custom time values per interaction
+  const [showChatReply, setShowChatReply] = useState<string | null>(null) // interaction ID showing chat reply input
+  const [chatReplyInputs, setChatReplyInputs] = useState<Record<string, string>>({}) // chat reply text per interaction
 
   // Dismiss an interaction without sending a response
   const dismissInteraction = useCallback((interactionId: string) => {
@@ -156,6 +159,28 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
       // Send as "custom_time:<user input>" so backend can parse it
       handleRespond(interactionId, `custom_time:${customTime}`)
     }
+  }
+
+  // Handle chat reply submission - sends message to ChatBot with interaction context
+  const handleChatReplySubmit = (interaction: Interaction) => {
+    const chatText = chatReplyInputs[interaction.id]?.trim()
+    if (!chatText || !onChatReply) return
+
+    const contextMessage = `Regarding your suggestion: "${interaction.question}"\n\n${chatText}`
+
+    // Dismiss the interaction
+    dismissInteraction(interaction.id)
+
+    // Send to ChatBot
+    onChatReply(contextMessage)
+
+    // Clean up state
+    setChatReplyInputs(prev => {
+      const updated = { ...prev }
+      delete updated[interaction.id]
+      return updated
+    })
+    setShowChatReply(null)
   }
 
   // Trigger proactive agent to generate new interactions
@@ -779,10 +804,10 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '12px clamp(8px, 2vw, 16px) clamp(12px, 2vh, 16px)',
+        padding: '10px clamp(8px, 2vw, 16px) clamp(10px, 2vh, 14px)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px'
+        gap: '8px'
       }}>
         {isLoading ? (
           // Loading state
@@ -855,10 +880,10 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               key={interaction.id}
               style={{
                 background: colors.bgSecondary,
-                padding: '14px',
-                borderRadius: '10px',
+                padding: '10px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderLeft: `3px solid ${interaction.category?.color || getPriorityColor(interaction.priority)}`,
+                borderLeft: `2px solid ${interaction.category?.color || getPriorityColor(interaction.priority)}`,
                 position: 'relative',
                 transition: 'box-shadow 0.15s'
               }}
@@ -868,23 +893,23 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                marginBottom: '8px'
+                marginBottom: '5px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {interaction.category && (
                     <span style={{
-                      fontSize: fontSize.xs,
+                      fontSize: '10px',
                       fontWeight: fontWeight.medium,
                       color: interaction.category.color,
                       background: hexToRgba(interaction.category.color, 0.15),
-                      padding: '2px 8px',
-                      borderRadius: '4px'
+                      padding: '1px 6px',
+                      borderRadius: '3px'
                     }}>
                       {interaction.category.name}
                     </span>
                   )}
                   <span style={{
-                    fontSize: fontSize.xs,
+                    fontSize: '10px',
                     color: colors.textTertiary
                   }}>
                     {formatTimeAgo(interaction.created_at)}
@@ -894,9 +919,9 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
 
               {/* Question */}
               <p style={{
-                fontSize: fontSize.base,
+                fontSize: fontSize.sm,
                 lineHeight: lineHeight.normal,
-                margin: '0 0 12px 0',
+                margin: '0 0 8px 0',
                 color: colors.textPrimary,
                 fontFamily: fontFamily.serif
               }}>
@@ -906,13 +931,126 @@ export function AgentInteractions({ hideHeader = false }: AgentInteractionsProps
               {/* Response options */}
               {renderResponseOptions(interaction)}
 
+              {/* Chat reply section */}
+              {onChatReply && (
+                showChatReply === interaction.id ? (
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      alignItems: 'flex-end'
+                    }}>
+                      <input
+                        type="text"
+                        value={chatReplyInputs[interaction.id] || ''}
+                        onChange={(e) => setChatReplyInputs(prev => ({ ...prev, [interaction.id]: e.target.value }))}
+                        placeholder="Type a reply..."
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (chatReplyInputs[interaction.id] || '').trim()) {
+                            handleChatReplySubmit(interaction)
+                          } else if (e.key === 'Escape') {
+                            setShowChatReply(null)
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '7px 10px',
+                          fontSize: fontSize.sm,
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: '6px',
+                          background: colors.bgSecondary,
+                          color: colors.textPrimary,
+                          outline: 'none',
+                          fontFamily: 'inherit'
+                        }}
+                      />
+                      <button
+                        onClick={() => handleChatReplySubmit(interaction)}
+                        disabled={!(chatReplyInputs[interaction.id] || '').trim()}
+                        style={{
+                          padding: '7px 10px',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: (chatReplyInputs[interaction.id] || '').trim() ? 'pointer' : 'not-allowed',
+                          background: (chatReplyInputs[interaction.id] || '').trim()
+                            ? (isDarkMode ? '#f0f0f0' : '#000')
+                            : colors.bgTertiary,
+                          color: (chatReplyInputs[interaction.id] || '').trim()
+                            ? (isDarkMode ? '#000' : '#fff')
+                            : colors.textTertiary,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                        title="Send to chat"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 2L11 13" />
+                          <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setShowChatReply(null)}
+                        style={{
+                          padding: '7px 8px',
+                          border: `1px solid ${colors.border}`,
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          background: colors.bgTertiary,
+                          color: colors.textTertiary,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          fontSize: fontSize.xs
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowChatReply(interaction.id)}
+                    style={{
+                      marginTop: '6px',
+                      padding: '4px 8px',
+                      fontSize: '10px',
+                      fontWeight: fontWeight.medium,
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      color: colors.textTertiary,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = colors.textSecondary }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = colors.textTertiary }}
+                    title="Reply with a message"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    Reply
+                  </button>
+                )
+              )}
+
               {/* Loading overlay */}
               {respondingTo === interaction.id && (
                 <div style={{
                   position: 'absolute',
                   inset: 0,
                   background: hexToRgba(colors.bgSecondary, 0.7),
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'

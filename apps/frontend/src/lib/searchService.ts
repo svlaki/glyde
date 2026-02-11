@@ -96,8 +96,8 @@ function eventToSearchResult(event: CalendarEvent, query: string): SearchResult 
     description: event.description,
     date: event.start_time,
     endDate: event.end_time,
-    category: event.category_name || event.category,
-    categoryColor: event.category_color || event.color,
+    category: event.aspect_name || event.aspect,
+    categoryColor: event.aspect_color,
     preview: `${dateStr} at ${timeStr}`,
     relevanceScore: calculateRelevance(query, event.title, event.description),
     originalData: event
@@ -121,8 +121,8 @@ function taskToSearchResult(task: Task, query: string): SearchResult {
     title: task.title,
     description: task.description,
     date: task.due_date,
-    category: task.category_name || task.category,
-    categoryColor: task.category_color || task.color,
+    category: task.aspect_name || task.aspect,
+    categoryColor: task.aspect_color,
     status: task.status,
     priority: task.priority,
     preview,
@@ -133,7 +133,7 @@ function taskToSearchResult(task: Task, query: string): SearchResult {
 
 // Convert goal to search result
 function goalToSearchResult(goal: Goal, query: string): SearchResult {
-  let preview = goal.status || 'not_started'
+  let preview = goal.status || 'active'
   if (goal.progress !== undefined) {
     preview += ` - ${goal.progress}% complete`
   }

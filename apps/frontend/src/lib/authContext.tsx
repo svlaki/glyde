@@ -13,6 +13,9 @@ interface AuthContextValue {
   loading: boolean
   session: Session | null
   preferredName: string | null
+  avatarUrl: string | null
+  googleProviderToken: string | null
+  updateAvatarUrl: (url: string) => void
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signInWithGoogle: () => Promise<void>
@@ -27,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [preferredName, setPreferredName] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [googleProviderToken, setGoogleProviderToken] = useState<string | null>(null)
   const startupTriggeredRef = useRef<Set<string>>(new Set())
 
   // Fetch user's preferred name from profile table
@@ -37,13 +42,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const fetchPromise = supabase
         .from('profile')
-        .select('preferred_name, display_name')
+        .select('preferred_name, display_name, avatar_url')
         .eq('id', userId)
         .single()
         .then(({ data, error }) => {
           if (error) {
             console.error('Error fetching preferred name:', error)
             return null
+          }
+          if (data?.avatar_url) {
+            setAvatarUrl(data.avatar_url)
           }
           return data?.preferred_name || data?.display_name || null
         })
@@ -79,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null)
           setIsAuthenticated(false)
           setPreferredName(null)
+          setAvatarUrl(null)
         }
       } catch (error) {
         console.error('Error getting initial session:', error)
@@ -97,6 +106,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(session?.user ?? null)
           setIsAuthenticated(!!session?.user)
 
+          // Capture Google provider token (only available right after OAuth redirect)
+          if (session?.provider_token) {
+            setGoogleProviderToken(session.provider_token)
+          }
+
           if (session?.user && session.access_token) {
             // Fetch preferred name in background (don't block auth)
             fetchPreferredName(session.user.id).then(name => {
@@ -106,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await callUserSchemaCreation(session)
           } else {
             setPreferredName(null)
+            setAvatarUrl(null)
           }
         } catch (error) {
           console.error('Error in auth state change:', error)
@@ -218,11 +233,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(null)
       setIsAuthenticated(false)
       setPreferredName(null)
+      setAvatarUrl(null)
       startupTriggeredRef.current.clear()
     } catch (error) {
       console.error('Sign out error:', error)
     }
   }
+
+  const updateAvatarUrl = (url: string) => setAvatarUrl(url)
 
   const value: AuthContextValue = {
     user,
@@ -231,6 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: isLoading,
     session,
     preferredName,
+    avatarUrl,
+    googleProviderToken,
+    updateAvatarUrl,
     signIn,
     signUp,
     signInWithGoogle,

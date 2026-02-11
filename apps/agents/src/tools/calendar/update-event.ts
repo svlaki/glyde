@@ -6,7 +6,7 @@ import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateEventTool = tool(
-  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect }, config) => {
+  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect, reflection, isMissed }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -124,6 +124,28 @@ export const updateEventTool = tool(
           `I can update the title, description, location, or aspect for the entire series if you'd like.`;
       }
 
+      // Reflection and is_missed are per-instance -- create an override event for this instance
+      if (reflection !== undefined || isMissed !== undefined) {
+        console.log(`[UPDATE-EVENT TOOL] Per-instance update (reflection/missed) for recurring instance`);
+        const instanceUpdates: any = {};
+        if (reflection !== undefined) instanceUpdates.reflection = reflection;
+        if (isMissed !== undefined) instanceUpdates.is_missed = isMissed;
+
+        const updatedInstance = await supabaseService.updateRecurringEventInstance(
+          userId,
+          originalEvent.parent_event_id,
+          originalEvent.start_time,
+          instanceUpdates
+        );
+        if (updatedInstance) {
+          const parts: string[] = [];
+          if (reflection !== undefined) parts.push('reflection updated');
+          if (isMissed !== undefined) parts.push(isMissed ? 'marked as missed' : 'marked as attended');
+          return `EVENT: "${originalEvent.title}" - ${parts.join(', ')} (this instance only)`;
+        }
+        return "Failed to update recurring event instance.";
+      }
+
       // For metadata changes (title, description, location, aspect), update the parent (affects all instances)
       console.log(`[UPDATE-EVENT TOOL] Updating parent recurring event: ${originalEvent.parent_event_id}`);
       targetEventId = originalEvent.parent_event_id;
@@ -147,6 +169,8 @@ export const updateEventTool = tool(
         location: location || undefined,
         description: description || undefined,
         aspect: aspect || undefined,
+        reflection: reflection !== undefined && reflection !== null ? reflection : undefined,
+        is_missed: isMissed !== undefined && isMissed !== null ? isMissed : undefined,
       },
       { source: 'agent', agentType: 'conversation' }
     );
@@ -182,6 +206,12 @@ export const updateEventTool = tool(
     if (location && originalEvent?.location !== location) {
       changes.push(`location changed to "${location}"`);
     }
+    if (reflection !== undefined && reflection !== null) {
+      changes.push('reflection updated');
+    }
+    if (isMissed !== undefined && isMissed !== null) {
+      changes.push(isMissed ? 'marked as missed' : 'marked as attended');
+    }
 
     const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
@@ -200,6 +230,8 @@ export const updateEventTool = tool(
       location: z.string().optional().nullable().describe("New event location - leave empty to keep existing"),
       description: z.string().optional().nullable().describe("New event description - leave empty to keep existing"),
       aspect: z.string().optional().nullable().describe("Update event aspect (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing aspect."),
+      reflection: z.string().optional().nullable().describe("Set or update the reflection for a past event - what happened, how it went, takeaways. Only for events that have already ended."),
+      isMissed: z.boolean().optional().nullable().describe("Mark whether the user missed this event. Set to true when user says they didn't attend, false to clear."),
     }),
   }
 );

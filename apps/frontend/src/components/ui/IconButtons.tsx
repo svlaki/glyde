@@ -51,6 +51,13 @@ const RefreshIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 )
 
+// Share icon for "Share" action
+const ShareIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" stroke="none">
+    <path d="M13.5 3a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM15 3a3 3 0 1 0-5.878.87L6.467 5.54a3 3 0 1 0 0 4.92l2.655 1.67A3 3 0 1 0 12 13.5a3 3 0 0 0-.645-1.87l-2.655-1.67a3.01 3.01 0 0 0 0-.92l2.655-1.67A3 3 0 0 0 15 3zM4.5 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+  </svg>
+)
+
 // Clear/X icon for "Clear" action
 const ClearIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,6 +83,7 @@ export function NewButton({ onClick, disabled, title = 'New', mobile = false }: 
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -119,6 +127,7 @@ export function EditButton({ onClick, disabled, title = 'Edit', mobile = false }
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -162,6 +171,7 @@ export function DeleteButton({ onClick, disabled, title = 'Delete', mobile = fal
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -205,6 +215,7 @@ export function SaveButton({ onClick, disabled, title = 'Save', mobile = false }
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -248,6 +259,7 @@ export function RefreshButton({ onClick, disabled, title = 'Refresh', mobile = f
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -284,6 +296,50 @@ export function RefreshButton({ onClick, disabled, title = 'Refresh', mobile = f
   )
 }
 
+export function ShareButton({ onClick, disabled, title = 'Share', mobile = false }: IconButtonProps) {
+  const { isDarkMode } = useDarkMode()
+  const colors = getColors(isDarkMode)
+  const size = mobile ? SIZES.mobile : SIZES.desktop
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        width: size.button,
+        height: size.button,
+        padding: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: colors.bgTertiary,
+        color: colors.textSecondary,
+        border: `1px solid ${colors.border}`,
+        borderRadius: '6px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        transition: 'all 0.15s',
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.background = colors.bgHover
+          e.currentTarget.style.color = colors.textPrimary
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!disabled) {
+          e.currentTarget.style.background = colors.bgTertiary
+          e.currentTarget.style.color = colors.textSecondary
+        }
+      }}
+    >
+      <ShareIcon size={size.icon} />
+    </button>
+  )
+}
+
 export function ClearButton({ onClick, disabled, title = 'Clear', mobile = false }: IconButtonProps) {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
@@ -291,6 +347,7 @@ export function ClearButton({ onClick, disabled, title = 'Clear', mobile = false
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}

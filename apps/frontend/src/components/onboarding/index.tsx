@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { useAuth } from '../../lib/authContext'
 import { usePlatform } from '../../hooks/usePlatform'
-import { completeOnboardingV2, OnboardingDataV2 } from '../../lib/onboardingService'
+import { completeOnboardingV2 } from '../../lib/onboardingService'
+import type { OnboardingDataV2 } from '../../lib/onboardingService'
 import { getOnboardingKey } from '../OnboardingCheck'
 
 import { OnboardingProvider, useOnboarding } from './OnboardingContext'
+import type { PrefillData } from './OnboardingContext'
 import { OnboardingProgress } from './OnboardingProgress'
 import { Section1BasicInfo } from './steps/Section1BasicInfo'
 import { Section2Calendars } from './steps/Section2Calendars'
 import { Section3HabitsGoals } from './steps/Section3HabitsGoals'
+import { Section4OnboardingChat } from './steps/Section4OnboardingChat'
 import { TimezoneConfirm } from './components/TimezoneConfirm'
 
 function OnboardingContent() {
@@ -31,6 +34,27 @@ function OnboardingContent() {
   } = useOnboarding()
 
   const [showTimezone, setShowTimezone] = useState(false)
+  const [showPostOnboardingChat, setShowPostOnboardingChat] = useState(false)
+  const prefillDone = useRef(false)
+
+  // Pre-populate fields from previously saved onboarding data
+  useEffect(() => {
+    if (prefillDone.current || !user) return
+    prefillDone.current = true
+
+    // Try user-scoped key first, then legacy key
+    const raw = localStorage.getItem(getOnboardingKey(user.id))
+      || localStorage.getItem('onboardingData')
+
+    if (!raw) return
+
+    try {
+      const saved = JSON.parse(raw) as PrefillData
+      dispatch({ type: 'PREFILL', data: saved })
+    } catch {
+      // Corrupted data, ignore
+    }
+  }, [user, dispatch])
 
   const canProceed = () => {
     switch (state.currentSection) {
@@ -60,6 +84,18 @@ function OnboardingContent() {
     dispatch({ type: 'SET_ERROR', error: null })
 
     try {
+      // Build enriched aspects with descriptions
+      const aspects = state.aspects.map(name => ({
+        name,
+        description: state.aspectDescriptions[name] || undefined,
+      }))
+
+      // Build enriched goals with descriptions
+      const goals = state.goals.map(title => ({
+        title,
+        description: state.goalDescriptions[title] || undefined,
+      }))
+
       const onboardingData: OnboardingDataV2 = {
         fullName: state.fullName,
         preferredName: state.preferredName || undefined,
@@ -69,8 +105,8 @@ function OnboardingContent() {
         otherCalendar: state.otherCalendar || undefined,
         occupation: state.occupation,
         fieldOfStudy: state.isStudent ? state.fieldOfStudy : undefined,
-        aspects: state.aspects,
-        goals: state.goals,
+        aspects,
+        goals,
         habits: state.habits,
         timezone: state.timezone
       }
@@ -78,9 +114,12 @@ function OnboardingContent() {
       const result = await completeOnboardingV2(user, session.access_token, onboardingData)
 
       if (result.success) {
-        // Save to user-scoped localStorage for OnboardingCheck
-        localStorage.setItem(getOnboardingKey(user.id), JSON.stringify(onboardingData))
-        navigate('/calendar', { replace: true })
+        // Save to both user-scoped and legacy localStorage keys
+        const serialized = JSON.stringify(onboardingData)
+        localStorage.setItem(getOnboardingKey(user.id), serialized)
+        localStorage.setItem('onboardingData', serialized)
+        // Show post-onboarding agent chat instead of navigating directly
+        setShowPostOnboardingChat(true)
       } else {
         dispatch({ type: 'SET_ERROR', error: result.error || 'Failed to complete onboarding' })
       }
@@ -90,6 +129,15 @@ function OnboardingContent() {
     } finally {
       dispatch({ type: 'SET_LOADING', loading: false })
     }
+  }
+
+  // Show post-onboarding agent chat
+  if (showPostOnboardingChat) {
+    return (
+      <Section4OnboardingChat
+        onComplete={() => navigate('/calendar', { replace: true })}
+      />
+    )
   }
 
   // Show timezone confirmation overlay

@@ -8,7 +8,7 @@ export interface Goal {
   description?: string
   aspect?: string
   target_date?: string
-  status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
+  status?: 'active' | 'completed' | 'paused' | 'abandoned'
   progress?: number
   milestone_type?: 'dated' | 'ordered'
   milestones?: Array<{
@@ -33,13 +33,14 @@ export interface Goal {
   review_frequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly'
   created_at?: string
   updated_at?: string
+  is_shared?: boolean
 }
 
 export interface GoalCheckIn {
   id: string
   goal_id: string
   user_id: string
-  progress_update?: number
+  progress_update?: string
   mood_rating?: number
   confidence_level?: number
   obstacles_encountered?: string[]
@@ -105,7 +106,7 @@ export async function createUserGoal(
     description?: string
     aspect?: string
     target_date?: string
-    status?: 'not_started' | 'in_progress' | 'completed' | 'on_hold' | 'abandoned'
+    status?: 'active' | 'completed' | 'paused' | 'abandoned'
     progress?: number
     milestone_type?: 'dated' | 'ordered'
     milestones?: Array<{
@@ -237,7 +238,7 @@ export async function addGoalCheckIn(
   accessToken: string,
   goalId: string,
   checkInData: {
-    progress_update?: number
+    progress_update?: string
     mood_rating?: number
     confidence_level?: number
     obstacles_encountered?: string[]

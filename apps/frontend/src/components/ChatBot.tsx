@@ -22,6 +22,7 @@ interface Message {
 export interface ChatBotHandle {
   isLoading: boolean;
   clearChat: () => void;
+  sendMessage: (text: string) => void;
 }
 
 interface ChatBotProps {
@@ -29,6 +30,8 @@ interface ChatBotProps {
   hideHeader?: boolean;
   compact?: boolean;
   mobileEmbedded?: boolean;  // When true: no sparkle icon, reduced header gap, mobile-optimized layout
+  currentPageOverride?: string;  // Override getCurrentPage() for embedded contexts (e.g., onboarding)
+  autoSendMessage?: string;  // Auto-send this message after initialization
 }
 
 // Export ClearIcon for use in external headers
@@ -96,16 +99,17 @@ const SUGGESTIONS = [
   { label: "Find free time", icon: "" },
 ]
 
-export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false }, ref) {
-  const { user, session } = useAuth()
+export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false, currentPageOverride, autoSendMessage }, ref) {
+  const { user, session, preferredName } = useAuth()
   const { isDarkMode } = useDarkMode()
   const { refreshAspects } = useAspects()
   const location = useLocation()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
 
-  // Derive current page from pathname
+  // Derive current page from pathname (or use override for embedded contexts)
   const getCurrentPage = (): string => {
+    if (currentPageOverride) return currentPageOverride
     const path = location.pathname
     if (path === '/' || path === '/dashboard') return 'dashboard'
     if (path === '/plan') return 'plan'
@@ -147,19 +151,30 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const [streamingMessage, setStreamingMessage] = useState<string>('')
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Expose handle for external control (e.g., header integration)
+  // Expose handle for external control (e.g., header integration, interaction chat replies)
   useImperativeHandle(ref, () => ({
     get isLoading() { return isLoading },
-    clearChat: () => handleClearChat()
+    clearChat: () => handleClearChat(),
+    sendMessage: (text: string) => {
+      setInput(text)
+      // Trigger send on next tick after input state updates
+      setTimeout(() => {
+        const form = document.querySelector('form[data-chatbot-form]') as HTMLFormElement
+        if (form) {
+          form.requestSubmit()
+        }
+      }, 50)
+    }
   }), [isLoading])
 
   // Create welcome message
+  const displayName = preferredName || user?.user_metadata?.full_name?.split(' ')[0] || null
   const createWelcomeMessage = useCallback((): Message => ({
     id: 'welcome',
-    text: `Hello${user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
+    text: `Hello${displayName ? `, ${displayName}` : ''}! I'm here to help manage your schedule. What would you like to do?`,
     sender: 'bot',
     timestamp: new Date()
-  }), [user?.user_metadata?.full_name])
+  }), [displayName])
 
   // Load messages from localStorage (fallback/cache)
   const loadFromLocalStorage = useCallback((): Message[] => {
@@ -289,6 +304,25 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading, streamingMessage])
+
+  // Auto-send initial message (for embedded contexts like post-onboarding chat)
+  const autoSendFired = useRef(false)
+  useEffect(() => {
+    if (!autoSendMessage || autoSendFired.current || isInitializing || isLoading || !user || !session) return
+    autoSendFired.current = true
+    // Delay slightly to let welcome message render
+    const timer = setTimeout(() => {
+      setInput(autoSendMessage)
+      // Need to trigger send on next tick after input state updates
+      setTimeout(() => {
+        const form = document.querySelector('form[data-chatbot-form]') as HTMLFormElement
+        if (form) {
+          form.requestSubmit()
+        }
+      }, 50)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [autoSendMessage, isInitializing, isLoading, user, session])
 
   // Clear chat handler
   const handleClearChat = async () => {
@@ -1162,7 +1196,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
           </div>
         )}
 
-        <form onSubmit={handleSend} style={{ margin: mobileEmbedded ? `0 ${mobileSpacing.paddingX}` : '0' }}>
+        <form data-chatbot-form onSubmit={handleSend} style={{ margin: mobileEmbedded ? `0 ${mobileSpacing.paddingX}` : '0' }}>
           <div style={{
             display: 'flex',
             gap: mobileEmbedded ? '6px' : '10px',

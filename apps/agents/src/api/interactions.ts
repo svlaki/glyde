@@ -203,7 +203,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 description: eventData.description || '',
                 start_time: startTime,
                 end_time: endTime,
-                aspect_id: eventData.categoryId || null,
+                aspect_id: eventData.aspectId || eventData.categoryId || null,
                 location: eventData.location || null,
               });
               console.log(`[INTERACTION RESPONSE] Event created: ${actionResult?.id}`);
@@ -218,7 +218,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 title: taskData.title || 'Task',
                 description: taskData.description || '',
                 dueDate: taskData.dueDate || null,
-                aspect_id: taskData.categoryId || null,
+                aspect_id: taskData.aspectId || taskData.categoryId || null,
               });
               console.log(`[INTERACTION RESPONSE] Task created: ${actionResult?.id}`);
 
@@ -233,7 +233,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
                 title: taskData.title,
                 description: taskData.description,
                 dueDate: taskData.dueDate,
-                aspect_id: taskData.categoryId,
+                aspect_id: taskData.aspectId || taskData.categoryId,
                 status: taskData.status as any,
               });
               console.log(`[INTERACTION RESPONSE] Task updated: ${taskId}`);

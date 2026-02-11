@@ -4,7 +4,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const createGoalTool = tool(
-  async ({ title, description, targetDate, aspect, goalType, priorityScore, energyRequirement, reviewFrequency, milestones, milestoneType }, config) => {
+  async ({ title, description, targetDate, aspect, goalType, priorityScore, energyRequirement, reviewFrequency, milestones, milestoneType, parentGoalId, keyResults, blockers, resourcesNeeded, reflectionPrompts, progress, status, timeHorizon }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -30,6 +30,14 @@ export const createGoalTool = tool(
         reviewFrequency: reviewFrequency || 'weekly',
         milestones: milestones || undefined,
         milestoneType: inferredMilestoneType,
+        parentGoalId: parentGoalId || undefined,
+        keyResults: keyResults || undefined,
+        blockers: blockers || undefined,
+        resourcesNeeded: resourcesNeeded || undefined,
+        reflectionPrompts: reflectionPrompts || undefined,
+        progress: progress ?? undefined,
+        status: status || undefined,
+        timeHorizon: timeHorizon || undefined,
       }, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
@@ -75,6 +83,19 @@ export const createGoalTool = tool(
         status: z.enum(["pending", "in_progress", "completed"]).optional().nullable().describe("Milestone status"),
       })).optional().nullable().describe("List of milestones to track progress toward the goal. Generate sensible milestones based on goal type: habit goals get time-based milestones (1 week, 1 month, 3 months), achievement goals get step-based milestones (e.g., become a doctor: undergrad, MCAT, med school, residency), skill goals get proficiency milestones, project goals get phase milestones."),
       milestoneType: z.enum(["dated", "ordered"]).optional().nullable().describe("How milestones are organized: 'dated' = milestones with specific due dates (for goals with deadlines, shows on timeline), 'ordered' = sequential steps without dates (for aspirational/long-term goals like 'become a doctor'). If not specified, will be inferred: 'dated' if targetDate is set or milestones have dates, otherwise 'ordered'."),
+      parentGoalId: z.string().optional().nullable().describe("ID of a parent goal to make this a sub-goal. Use list_goals to find goal IDs."),
+      keyResults: z.array(z.object({
+        description: z.string(),
+        target_value: z.number(),
+        current_value: z.number().optional().default(0),
+        unit: z.string(),
+      })).optional().nullable().describe("Key results for OKR-type goals (e.g., [{description: 'Increase revenue', target_value: 100000, current_value: 0, unit: 'USD'}])"),
+      blockers: z.array(z.string()).optional().nullable().describe("Known blockers or obstacles for this goal"),
+      resourcesNeeded: z.array(z.string()).optional().nullable().describe("Resources needed to achieve this goal"),
+      reflectionPrompts: z.record(z.any()).optional().nullable().describe("Custom reflection prompts for check-ins"),
+      progress: z.number().min(0).max(100).optional().nullable().describe("Initial progress percentage (0-100). Defaults to 0."),
+      status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("Initial goal status. Defaults to 'active'."),
+      timeHorizon: z.enum(["long_term", "short_term"]).optional().nullable().describe("Time horizon: 'short_term' for weeks/months, 'long_term' for years. Defaults to 'short_term'."),
     }),
   }
 );

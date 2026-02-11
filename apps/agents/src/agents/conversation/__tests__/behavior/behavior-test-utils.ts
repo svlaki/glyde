@@ -89,8 +89,8 @@ export function createMockSupabaseService() {
     })),
     getGoalCheckIns: vi.fn().mockResolvedValue([]),
 
-    // Categories
-    getCategories: vi.fn().mockResolvedValue([
+    // Aspects
+    getAspects: vi.fn().mockResolvedValue([
       { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
       { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
     ]),
@@ -171,29 +171,29 @@ export function createMockZepGraphService() {
 }
 
 /**
- * Creates mock CategoryService with default implementations
+ * Creates mock AspectService with default implementations
  */
-export function createMockCategoryService() {
+export function createMockAspectService() {
   return {
-    getCategories: vi.fn().mockResolvedValue([
-      { id: 'cat-default-1', name: 'Work', color: '#4285f4' },
-      { id: 'cat-default-2', name: 'Personal', color: '#34a853' },
+    getAspects: vi.fn().mockResolvedValue([
+      { id: 'asp-default-1', name: 'Work', color: '#4285f4' },
+      { id: 'asp-default-2', name: 'Personal', color: '#34a853' },
     ]),
-    getCategoryByName: vi.fn().mockResolvedValue(null),
-    createCategory: vi.fn().mockImplementation(async (userId, name, color) => ({
-      id: `cat-${Date.now()}`,
+    getAspectByName: vi.fn().mockResolvedValue(null),
+    createAspect: vi.fn().mockImplementation(async (userId, input) => ({
+      id: `asp-${Date.now()}`,
       user_id: userId,
-      name,
-      color: color || '#808080',
+      name: input.name || input,
+      color: input.color || '#808080',
       created_at: new Date().toISOString(),
     })),
-    updateCategory: vi.fn().mockImplementation(async (userId, categoryId, updates) => ({
-      id: categoryId,
+    updateAspect: vi.fn().mockImplementation(async (userId, aspectId, updates) => ({
+      id: aspectId,
       user_id: userId,
       ...updates,
       updated_at: new Date().toISOString(),
     })),
-    deleteCategory: vi.fn().mockResolvedValue({ success: true }),
+    deleteAspect: vi.fn().mockResolvedValue({ success: true }),
   };
 }
 
@@ -209,7 +209,7 @@ export function configureMocksFromContext(
   mocks: {
     supabaseService: ReturnType<typeof createMockSupabaseService>;
     ruleService: ReturnType<typeof createMockRuleService>;
-    categoryService: ReturnType<typeof createMockCategoryService>;
+    aspectService: ReturnType<typeof createMockAspectService>;
   }
 ) {
   if (!context) return;
@@ -247,13 +247,13 @@ export function configureMocksFromContext(
     });
   }
 
-  // Configure existing categories
+  // Configure existing categories/aspects
   if (context.existingCategories) {
-    mocks.supabaseService.getCategories.mockResolvedValue(context.existingCategories);
-    mocks.categoryService.getCategories.mockResolvedValue(context.existingCategories);
+    mocks.supabaseService.getAspects.mockResolvedValue(context.existingCategories);
+    mocks.aspectService.getAspects.mockResolvedValue(context.existingCategories);
 
-    // Mock getCategoryByName to check against existing categories
-    mocks.categoryService.getCategoryByName.mockImplementation(async (userId, name) => {
+    // Mock getAspectByName to check against existing aspects
+    mocks.aspectService.getAspectByName.mockImplementation(async (userId, name) => {
       const normalized = name.toLowerCase().trim();
       return context.existingCategories?.find(
         c => c.name.toLowerCase().trim() === normalized

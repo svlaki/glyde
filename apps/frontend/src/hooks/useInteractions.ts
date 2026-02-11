@@ -26,7 +26,7 @@ export function useInteractions() {
   const transformInteraction = useCallback((dbInteraction: InteractionWithCategory): UIInteraction => {
     // Find aspect details
     const aspect = dbInteraction.category ||
-      (dbInteraction.category_id ? aspects.find(a => a.id === dbInteraction.category_id) : null);
+      (dbInteraction.aspect_id ? aspects.find(a => a.id === dbInteraction.aspect_id) : null);
 
     return {
       id: dbInteraction.id,

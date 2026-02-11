@@ -1,14 +1,19 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './SupabaseService.js';
+import { logger } from '../utils/logger.js';
+
+const ASPECT_COLUMNS = 'id, user_id, name, color, icon, description, context, display_order, visibility, archived_at, created_at, updated_at';
 
 export interface Aspect {
   id: string;
   user_id: string;
   name: string;
   color: string;
+  icon?: string;
   description?: string;
   context: AspectContext;
   display_order: number;
+  member_role?: 'owner' | 'editor' | 'viewer';
   created_at: string;
   updated_at: string;
 }
@@ -25,8 +30,10 @@ export interface AspectContext {
 export interface AspectCreateInput {
   name: string;
   color: string;
+  icon?: string;
   description?: string;
   context?: Partial<AspectContext>;
+  visibility?: string;
 }
 
 export class AspectService {
@@ -41,22 +48,57 @@ export class AspectService {
    */
   async getAspects(userId: string): Promise<Aspect[]> {
     try {
-      let query = this.supabase
+      // Fetch user's own aspects
+      const { data: ownAspects, error } = await this.supabase
         .from('aspects')
-        .select('*')
+        .select(ASPECT_COLUMNS)
         .eq('user_id', userId)
+        .is('archived_at', null)
         .order('display_order', { ascending: true });
 
-      const { data, error } = await query;
-
       if (error) {
-        console.error('[AspectService] Error fetching aspects:', error);
+        logger.error('[AspectService] Error fetching aspects:', error);
         return [];
       }
 
-      return data as Aspect[];
+      // Tag own aspects with 'owner' role
+      const ownWithRole = (ownAspects || []).map((a: any) => ({
+        ...a,
+        member_role: 'owner'
+      })) as Aspect[];
+
+      // Also fetch aspects shared with this user (where they are a member but not the owner)
+      const { data: memberRows } = await this.supabase
+        .from('aspect_members')
+        .select('aspect_id, role')
+        .eq('user_id', userId)
+        .neq('role', 'owner');
+
+      const memberMap = new Map<string, string>();
+      for (const row of (memberRows || [])) {
+        memberMap.set(row.aspect_id, row.role);
+      }
+
+      const sharedAspectIds = Array.from(memberMap.keys());
+      let sharedAspects: Aspect[] = [];
+
+      if (sharedAspectIds.length > 0) {
+        const { data: shared } = await this.supabase
+          .from('aspects')
+          .select(ASPECT_COLUMNS)
+          .in('id', sharedAspectIds)
+          .is('archived_at', null)
+          .order('display_order', { ascending: true });
+
+        sharedAspects = (shared || []).map((a: any) => ({
+          ...a,
+          member_role: memberMap.get(a.id) || 'viewer'
+        })) as Aspect[];
+      }
+
+      return [...ownWithRole, ...sharedAspects];
     } catch (error) {
-      console.error('[AspectService] Exception fetching aspects:', error);
+      logger.error('[AspectService] Exception fetching aspects:', error);
       return [];
     }
   }
@@ -68,7 +110,7 @@ export class AspectService {
     try {
       const { data, error } = await this.supabase
         .from('aspects')
-        .select('*')
+        .select(ASPECT_COLUMNS)
         .eq('user_id', userId)
         .eq('name', name)
         .single();
@@ -92,7 +134,7 @@ export class AspectService {
     try {
       const { data, error } = await this.supabase
         .from('aspects')
-        .select('*')
+        .select(ASPECT_COLUMNS)
         .eq('user_id', userId)
         .eq('id', aspectId)
         .single();
@@ -140,7 +182,7 @@ export class AspectService {
         .single();
 
       if (error) {
-        console.error('[AspectService] Error creating aspect:', error);
+        logger.error('[AspectService] Error creating aspect:', error);
         throw new Error(`Database error: ${error.message}`);
       }
 
@@ -148,10 +190,10 @@ export class AspectService {
         throw new Error('No data returned from database');
       }
 
-      console.log(`[AspectService] Created aspect: ${input.name}`);
+      logger.info(`[AspectService] Created aspect: ${input.name}`);
       return data as Aspect;
     } catch (error) {
-      console.error('[AspectService] Exception creating aspect:', error);
+      logger.error('[AspectService] Exception creating aspect:', error);
       throw error;
     }
   }
@@ -190,7 +232,7 @@ export class AspectService {
         .single();
 
       if (error) {
-        console.error('[AspectService] Error upserting aspect:', error);
+        logger.error('[AspectService] Error upserting aspect:', error);
         throw new Error(`Database error: ${error.message}`);
       }
 
@@ -198,10 +240,10 @@ export class AspectService {
         throw new Error('No data returned from database');
       }
 
-      console.log(`[AspectService] Upserted aspect: ${input.name}`);
+      logger.info(`[AspectService] Upserted aspect: ${input.name}`);
       return data as Aspect;
     } catch (error) {
-      console.error('[AspectService] Exception upserting aspect:', error);
+      logger.error('[AspectService] Exception upserting aspect:', error);
       throw error;
     }
   }
@@ -237,8 +279,10 @@ export class AspectService {
       const updateData: any = {};
       if (updates.name !== undefined) updateData.name = updates.name.trim();
       if (updates.color !== undefined) updateData.color = updates.color.trim();
+      if (updates.icon !== undefined) updateData.icon = updates.icon;
       if (updates.description !== undefined) updateData.description = updates.description?.trim();
       if (updates.context !== undefined) updateData.context = updates.context;
+      if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
 
       const { data, error } = await this.supabase
         .from('aspects')
@@ -249,7 +293,7 @@ export class AspectService {
         .single();
 
       if (error) {
-        console.error('[AspectService] Error updating aspect:', error);
+        logger.error('[AspectService] Error updating aspect:', error);
         if (error.code === 'PGRST116') {
           throw new Error('Aspect not found');
         }
@@ -260,10 +304,10 @@ export class AspectService {
         throw new Error('Aspect not found or no data returned');
       }
 
-      console.log(`[AspectService] Updated aspect: ${aspectId}`);
+      logger.info(`[AspectService] Updated aspect: ${aspectId}`);
       return data as Aspect;
     } catch (error) {
-      console.error('[AspectService] Exception updating aspect:', error);
+      logger.error('[AspectService] Exception updating aspect:', error);
       throw error;
     }
   }
@@ -294,9 +338,9 @@ export class AspectService {
         throw error;
       }
 
-      console.log(`[AspectService] Updated context for aspect: ${aspectId}`);
+      logger.info(`[AspectService] Updated context for aspect: ${aspectId}`);
     } catch (error) {
-      console.error('[AspectService] Exception updating aspect context:', error);
+      logger.error('[AspectService] Exception updating aspect context:', error);
       throw error;
     }
   }
@@ -322,16 +366,100 @@ export class AspectService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('[AspectService] Error deleting aspect:', error);
+        logger.error('[AspectService] Error deleting aspect:', error);
         if (error.code === 'PGRST116') {
           throw new Error('Aspect not found');
         }
         throw new Error(`Database error: ${error.message}`);
       }
 
-      console.log(`[AspectService] Deleted aspect: ${aspectId}`);
+      logger.info(`[AspectService] Deleted aspect: ${aspectId}`);
     } catch (error) {
-      console.error('[AspectService] Exception deleting aspect:', error);
+      logger.error('[AspectService] Exception deleting aspect:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get archived aspects for a user
+   */
+  async getArchivedAspects(userId: string): Promise<Aspect[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('aspects')
+        .select(ASPECT_COLUMNS)
+        .eq('user_id', userId)
+        .not('archived_at', 'is', null)
+        .order('archived_at', { ascending: false });
+
+      if (error) {
+        logger.error('[AspectService] Error fetching archived aspects:', error);
+        return [];
+      }
+
+      return data as Aspect[];
+    } catch (error) {
+      logger.error('[AspectService] Exception fetching archived aspects:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Archive an aspect (soft delete)
+   */
+  async archiveAspect(userId: string, aspectId: string): Promise<void> {
+    try {
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+      if (!aspectId || typeof aspectId !== 'string') {
+        throw new Error('Invalid aspect ID');
+      }
+
+      const { error } = await this.supabase
+        .from('aspects')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', aspectId)
+        .eq('user_id', userId);
+
+      if (error) {
+        logger.error('[AspectService] Error archiving aspect:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      logger.info(`[AspectService] Archived aspect: ${aspectId}`);
+    } catch (error) {
+      logger.error('[AspectService] Exception archiving aspect:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unarchive an aspect (restore)
+   */
+  async unarchiveAspect(userId: string, aspectId: string): Promise<void> {
+    try {
+      if (!userId || typeof userId !== 'string') {
+        throw new Error('Invalid user ID');
+      }
+      if (!aspectId || typeof aspectId !== 'string') {
+        throw new Error('Invalid aspect ID');
+      }
+
+      const { error } = await this.supabase
+        .from('aspects')
+        .update({ archived_at: null })
+        .eq('id', aspectId)
+        .eq('user_id', userId);
+
+      if (error) {
+        logger.error('[AspectService] Error unarchiving aspect:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      logger.info(`[AspectService] Unarchived aspect: ${aspectId}`);
+    } catch (error) {
+      logger.error('[AspectService] Exception unarchiving aspect:', error);
       throw error;
     }
   }

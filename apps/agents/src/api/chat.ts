@@ -41,7 +41,7 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
     // Query public.chat_messages table
     let query = client
       .from('chat_messages')
-      .select('id, session_id, user_id, content, sender, created_at, metadata')
+      .select('id, session_id, user_id, content, role, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
       .limit(Math.min(limit, 500)); // Cap at 500 messages
@@ -64,9 +64,8 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
       session_id: msg.session_id,
       user_id: msg.user_id,
       content: msg.content,
-      sender: msg.sender,
+      sender: msg.role,
       created_at: msg.created_at,
-      metadata: msg.metadata || {}
     }));
 
     logger.info('Fetched chat history', { userId, messageCount: messages.length });
@@ -119,9 +118,8 @@ export async function saveChatMessage(req: Request, res: Response): Promise<void
       session_id,
       user_id: userId,
       content: content.substring(0, 50000), // Limit content length
-      sender,
+      role: sender,
       created_at: new Date().toISOString(),
-      metadata: metadata || {}
     };
 
     const { data, error } = await client
@@ -182,9 +180,8 @@ export async function saveChatMessagesBatch(req: Request, res: Response): Promis
       session_id: msg.session_id || 'default',
       user_id: userId,
       content: (msg.content || '').substring(0, 50000),
-      sender: ['user', 'assistant'].includes(msg.sender) ? msg.sender : 'user',
+      role: ['user', 'assistant'].includes(msg.sender) ? msg.sender : 'user',
       created_at: msg.created_at || msg.timestamp || new Date().toISOString(),
-      metadata: msg.metadata || {}
     }));
 
     const { data, error } = await client

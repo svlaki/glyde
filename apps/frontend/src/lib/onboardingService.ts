@@ -48,8 +48,8 @@ export interface OnboardingDataV2 {
   otherCalendar?: string
   occupation: string
   fieldOfStudy?: string
-  aspects: string[]
-  goals: string[]
+  aspects: Array<{ name: string; description?: string }> | string[]
+  goals: Array<{ title: string; description?: string }> | string[]
   habits: string[]
   timezone: string
 }

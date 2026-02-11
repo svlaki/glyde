@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDarkMode } from '../lib/darkModeContext'
 import { Calendar } from '../components/Calendar'
 import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
@@ -28,6 +28,25 @@ function CalendarPageMobile() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const chatBotRef = useRef<ChatBotHandle>(null)
   const [chatIsLoading, setChatIsLoading] = useState(false)
+  const pendingChatMessage = useRef<string | null>(null)
+
+  const handleMobileChatReply = useCallback((message: string) => {
+    pendingChatMessage.current = message
+    setActiveTab('chat')
+  }, [])
+
+  // Send pending chat message after switching to chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && pendingChatMessage.current) {
+      const message = pendingChatMessage.current
+      pendingChatMessage.current = null
+      // Delay to let ChatBot mount/render
+      const timer = setTimeout(() => {
+        chatBotRef.current?.sendMessage(message)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [activeTab])
 
   // Poll ChatBot loading state for header display
   useEffect(() => {
@@ -189,7 +208,7 @@ function CalendarPageMobile() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
-              <AgentInteractions hideHeader />
+              <AgentInteractions hideHeader onChatReply={handleMobileChatReply} />
             </div>
           </div>
         )}
@@ -245,6 +264,16 @@ function CalendarPageMobile() {
 function CalendarPageDesktop() {
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
+  const chatBotRef = useRef<ChatBotHandle>(null)
+
+  const handleChatReply = useCallback((message: string) => {
+    // If chat panel is collapsed, expand it first
+    setIsRightCollapsed(false)
+    // Small delay to let panel expand before sending
+    setTimeout(() => {
+      chatBotRef.current?.sendMessage(message)
+    }, 250)
+  }, [])
 
   // Collapse state with localStorage persistence
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(() => {
@@ -410,7 +439,7 @@ function CalendarPageDesktop() {
                 overflow: 'hidden',
                 minHeight: 0
               }}>
-                <AgentInteractions />
+                <AgentInteractions onChatReply={handleChatReply} />
               </div>
 
               {/* Todo List */}
@@ -535,7 +564,7 @@ function CalendarPageDesktop() {
             </div>
           ) : (
             <>
-              <ChatBot />
+              <ChatBot ref={chatBotRef} />
 
               {/* Resize handle */}
               <div

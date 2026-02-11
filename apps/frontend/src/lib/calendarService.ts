@@ -25,8 +25,14 @@ export interface CalendarEvent {
   parent_event_id?: string
   is_recurring?: boolean
   is_instance?: boolean
+  instance_date?: string
   // Visibility settings
   visibility?: 'private' | 'friends' | 'public'
+  // Post-event metadata
+  reflection?: string
+  is_missed?: boolean
+  // Shared aspect flag
+  is_shared?: boolean
   // Friend event fields (when viewing friend's event)
   is_friend_event?: boolean
   owner_display_name?: string
@@ -44,7 +50,8 @@ export async function fetchUserEvents(
   user: User,
   accessToken?: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  options?: { raw?: boolean }
 ): Promise<{ events: CalendarEvent[], error: string | null }> {
   try {
     if (!user) {
@@ -53,11 +60,14 @@ export async function fetchUserEvents(
     }
 
     const url = `${import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'}/api/events`;
-    const body = {
+    const body: Record<string, unknown> = {
       user_id: user.id,
       start_date: startDate ? startDate.toISOString() : null,
-      end_date: endDate ? endDate.toISOString() : null
+      end_date: endDate ? endDate.toISOString() : null,
     };
+    if (options?.raw) {
+      body.raw = true;
+    }
 
     console.log('[calendarService] Fetching events:', { url, body });
 

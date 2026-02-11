@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createTaskTool = tool(
-  async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration }, config) => {
+  async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration, parentGoalId, status, contextRequired, recurringPattern }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -20,6 +20,10 @@ export const createTaskTool = tool(
         aspect: aspect || 'Personal',
         energyRequired: energyRequired || undefined,
         estimatedDuration: estimatedDuration || undefined,
+        parentGoalId: parentGoalId || undefined,
+        status: status || 'pending',
+        contextRequired: contextRequired || undefined,
+        recurringPattern: recurringPattern || undefined,
       }, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
@@ -44,6 +48,10 @@ export const createTaskTool = tool(
       aspect: z.string().describe("Aspect name - MUST match an existing user aspect exactly (e.g., 'CS 525', 'Personal', 'Health'). Check user's aspects first."),
       energyRequired: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy level required"),
       estimatedDuration: z.number().optional().nullable().describe("Estimated duration in minutes"),
+      parentGoalId: z.string().optional().nullable().describe("ID of a parent goal to link this task to. Use list_goals to find goal IDs."),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Initial task status. Defaults to 'pending'."),
+      contextRequired: z.record(z.any()).optional().nullable().describe("Context needed for this task (e.g., tools, location, prerequisites)"),
+      recurringPattern: z.record(z.any()).optional().nullable().describe("Recurring pattern config (e.g., { frequency: 'daily', interval: 1 })"),
     }),
   }
 );

@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useDarkMode } from '../../lib/darkModeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { fontFamily } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
+import { useAvatarUpload } from '../../hooks/useAvatarUpload'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
@@ -35,11 +36,13 @@ function formatMemberSince(dateStr: string | undefined): string {
 }
 
 export function ProfileHero() {
-  const { user, preferredName, signOut } = useAuth()
+  const { user, preferredName, avatarUrl, updateAvatarUrl, signOut } = useAuth()
   const { isDarkMode } = useDarkMode()
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { uploading, error: uploadError, handleFileSelect } = useAvatarUpload()
 
   const greeting = useMemo(() => getGreeting(), [])
   const initials = useMemo(() => getInitials(preferredName, user?.email), [preferredName, user?.email])
@@ -47,6 +50,26 @@ export function ProfileHero() {
   const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+  const avatarSize = isMobile ? '52px' : '64px'
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    const newUrl = await handleFileSelect(file, user.id)
+    if (newUrl) {
+      updateAvatarUrl(newUrl)
+    }
+
+    // Reset input so re-selecting the same file triggers onChange
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <div style={{
@@ -62,25 +85,86 @@ export function ProfileHero() {
       }}>
         {/* Avatar + Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-          <div style={{
-            width: isMobile ? '52px' : '64px',
-            height: isMobile ? '52px' : '64px',
-            borderRadius: '50%',
-            background: colors.bgTertiary,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+            <div
+              onClick={handleAvatarClick}
+              onMouseEnter={(e) => {
+                const overlay = e.currentTarget.querySelector('[data-edit-overlay]') as HTMLElement
+                if (overlay) overlay.style.opacity = '1'
+              }}
+              onMouseLeave={(e) => {
+                const overlay = e.currentTarget.querySelector('[data-edit-overlay]') as HTMLElement
+                if (overlay) overlay.style.opacity = '0'
+              }}
+              style={{
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: '50%',
+                background: colors.bgTertiary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                position: 'relative',
+                opacity: uploading ? 0.6 : 1,
+                transition: 'opacity 0.2s ease',
+              }}
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span style={{
+                  fontFamily: fontFamily.serif,
+                  fontSize: isMobile ? '20px' : '24px',
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                }}>
+                  {initials}
+                </span>
+              )}
+              <div
+                data-edit-overlay
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                  color: '#fff',
+                  fontSize: isMobile ? '10px' : '12px',
+                  fontFamily: fontFamily.sans,
+                  fontWeight: 600,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Edit
+              </div>
+            </div>
             <span style={{
-              fontFamily: fontFamily.serif,
-              fontSize: isMobile ? '20px' : '24px',
-              fontWeight: 600,
-              color: colors.textPrimary,
+              ...typography.bodySm,
+              color: colors.textSecondary,
+              marginTop: '4px',
+              fontSize: isMobile ? '10px' : '11px',
             }}>
-              {initials}
+              Profile picture
             </span>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
 
           <div>
             <div style={{ ...typography.displaySm, color: colors.textPrimary }}>
@@ -103,6 +187,11 @@ export function ProfileHero() {
                 </>
               )}
             </div>
+            {uploadError && (
+              <div style={{ ...typography.bodySm, color: '#d32f2f', marginTop: '4px' }}>
+                {uploadError}
+              </div>
+            )}
           </div>
         </div>
 

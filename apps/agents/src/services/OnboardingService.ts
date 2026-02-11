@@ -27,7 +27,19 @@ export interface OnboardingData {
   };
 }
 
+// Enriched aspect/goal types (with optional descriptions from onboarding)
+interface AspectItem {
+  name: string;
+  description?: string;
+}
+
+interface GoalItem {
+  title: string;
+  description?: string;
+}
+
 // V2 Onboarding data interface (new structure)
+// aspects/goals accept both plain strings (backward compat) and enriched objects
 export interface OnboardingDataV2 {
   fullName: string;
   preferredName?: string;
@@ -37,13 +49,37 @@ export interface OnboardingDataV2 {
   otherCalendar?: string;
   occupation: string;
   fieldOfStudy?: string;
-  aspects: string[];
-  goals: string[];
+  aspects: AspectItem[] | string[];
+  goals: GoalItem[] | string[];
   habits: string[];
   timezone: string;
 }
 
 export class OnboardingService {
+  /** Normalize aspects input to enriched format */
+  private static normalizeAspects(aspects: AspectItem[] | string[]): AspectItem[] {
+    return aspects.map(a =>
+      typeof a === 'string' ? { name: a } : a
+    );
+  }
+
+  /** Normalize goals input to enriched format */
+  private static normalizeGoals(goals: GoalItem[] | string[]): GoalItem[] {
+    return goals.map(g =>
+      typeof g === 'string' ? { title: g } : g
+    );
+  }
+
+  /** Extract goal titles as plain strings for summary generation */
+  private static getGoalTitles(goals: GoalItem[] | string[]): string[] {
+    return goals.map(g => typeof g === 'string' ? g : g.title);
+  }
+
+  /** Extract aspect names as plain strings */
+  private static getAspectNames(aspects: AspectItem[] | string[]): string[] {
+    return aspects.map(a => typeof a === 'string' ? a : a.name);
+  }
+
   /**
    * Complete onboarding by saving all user data to the profile table
    */
@@ -83,10 +119,10 @@ export class OnboardingService {
     }
 
     // Create aspects for each life aspect
-    await this.createAspectsFromSelection(userId, data.aspects);
+    await this.createAspectsFromSelection(userId, this.normalizeAspects(data.aspects));
 
     // Create goals in the user's schema
-    await this.createGoalsForUser(userId, data.goals);
+    await this.createGoalsForUser(userId, this.normalizeGoals(data.goals));
   }
 
   /**
@@ -98,11 +134,17 @@ export class OnboardingService {
 
     console.log(`Starting V2 onboarding for user ${userId} - clearing previous data...`);
 
+    // Normalize enriched data
+    const normalizedAspects = this.normalizeAspects(data.aspects);
+    const normalizedGoals = this.normalizeGoals(data.goals);
+    const goalTitles = this.getGoalTitles(data.goals);
+    const aspectNames = this.getAspectNames(data.aspects);
+
     // Step 1: Clear previous onboarding data
     await this.clearPreviousOnboardingData(userId);
 
     // Step 2: Generate goals summary from goals array
-    const goals_summary = this.generateGoalsSummary(data.goals);
+    const goals_summary = this.generateGoalsSummary(goalTitles);
 
     // Step 3: Prepare context data (only for non-column data)
     const context_data = {
@@ -111,7 +153,7 @@ export class OnboardingService {
         version: '2.0',
         steps_completed: ['basic_info', 'calendars', 'habits_goals']
       },
-      life_aspects: data.aspects,
+      life_aspects: aspectNames,
       calendar_imported: false,
       selected_calendars: data.selectedCalendars,
       other_calendar: data.otherCalendar
@@ -139,11 +181,11 @@ export class OnboardingService {
       throw new Error(`Failed to complete onboarding: ${error.message}`);
     }
 
-    // Step 5: Create aspects for each life aspect
-    await this.createAspectsFromSelection(userId, data.aspects);
+    // Step 5: Create aspects for each life aspect (with descriptions)
+    await this.createAspectsFromSelection(userId, normalizedAspects);
 
-    // Step 6: Create goals in the user's schema
-    await this.createGoalsForUser(userId, data.goals);
+    // Step 6: Create goals in the user's schema (with descriptions)
+    await this.createGoalsForUser(userId, normalizedGoals);
 
     console.log(`Completed V2 onboarding for user ${userId}`);
 
@@ -203,7 +245,7 @@ export class OnboardingService {
    * Create goals for the user in their schema
    * Checks for existing goals with same title to prevent duplicates
    */
-  private static async createGoalsForUser(userId: string, goals: string[]): Promise<void> {
+  private static async createGoalsForUser(userId: string, goals: GoalItem[]): Promise<void> {
     const supabase = getSupabaseService();
 
     // Get existing goals to check for duplicates
@@ -212,26 +254,26 @@ export class OnboardingService {
 
     console.log(`Creating goals for user (${existingGoals.length} existing, ${goals.length} new)...`);
 
-    for (const goalTitle of goals) {
+    for (const goal of goals) {
       // Skip if goal with same title already exists
-      if (existingTitles.has(goalTitle.toLowerCase())) {
-        console.log(`⏭️  Skipping duplicate goal: ${goalTitle}`);
+      if (existingTitles.has(goal.title.toLowerCase())) {
+        console.log(`Skipping duplicate goal: ${goal.title}`);
         continue;
       }
 
       try {
         await supabase.createGoal(userId, {
-          title: goalTitle,
-          description: `Goal created during onboarding`,
+          title: goal.title,
+          description: goal.description || 'Goal created during onboarding',
           status: 'active',
           goalType: 'SMART',
           progress: 0,
           priorityScore: 5
         });
-        console.log(`Created goal: ${goalTitle}`);
+        console.log(`Created goal: ${goal.title}`);
       } catch (error: any) {
         // Don't fail the whole onboarding if one goal fails
-        console.error(` Failed to create goal "${goalTitle}":`, error.message);
+        console.error(`Failed to create goal "${goal.title}":`, error.message);
       }
     }
   }
@@ -240,7 +282,7 @@ export class OnboardingService {
    * Create aspects for the selected life aspects
    * NOTE: Skips if user already has aspects to preserve existing setup during re-onboarding
    */
-  private static async createAspectsFromSelection(userId: string, aspects: string[]): Promise<void> {
+  private static async createAspectsFromSelection(userId: string, aspects: AspectItem[]): Promise<void> {
     const aspectService = new AspectService();
 
     // Check if user already has aspects - if so, preserve them completely
@@ -270,19 +312,20 @@ export class OnboardingService {
 
     for (let i = 0; i < aspects.length; i++) {
       const aspect = aspects[i];
-      const color = aspectColors[aspect] || defaultColors[i % defaultColors.length];
+      const color = aspectColors[aspect.name] || defaultColors[i % defaultColors.length];
+      const description = aspect.description || `${aspect.name} activities and events`;
 
       try {
         // Use upsert to handle duplicates gracefully
         await aspectService.upsertAspect(userId, {
-          name: aspect,
+          name: aspect.name,
           color: color,
-          description: `${aspect} activities and events`
+          description: description,
         });
-        console.log(`Created/updated aspect: ${aspect}`);
+        console.log(`Created/updated aspect: ${aspect.name}`);
       } catch (error: any) {
         // Don't fail the whole onboarding if one aspect fails
-        console.error(` Failed to create aspect ${aspect}:`, error.message);
+        console.error(`Failed to create aspect ${aspect.name}:`, error.message);
       }
     }
   }

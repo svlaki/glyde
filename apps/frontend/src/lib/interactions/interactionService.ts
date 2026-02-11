@@ -11,7 +11,7 @@ export interface DBInteraction {
   question: string;
   options?: string[];
   priority: number;
-  category_id?: string;
+  aspect_id?: string;
   entity_id?: string;
   metadata?: Record<string, any>;
   expires_at?: string;

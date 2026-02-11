@@ -21,8 +21,8 @@ export function CalendarListItem({
   const colors = getColors(isDarkMode)
   const { aspects } = useAspects()
 
-  const selectedAspect = mapping.category_id
-    ? aspects.find(a => a.id === mapping.category_id)
+  const selectedAspect = mapping.aspect_id
+    ? aspects.find(a => a.id === mapping.aspect_id)
     : null
 
   return (
@@ -91,7 +91,7 @@ export function CalendarListItem({
 
       {/* Aspect Selector */}
       <select
-        value={mapping.category_id || ''}
+        value={mapping.aspect_id || ''}
         onChange={(e) => onSetAspect(mapping.id, e.target.value || null)}
         disabled={isUpdating || !mapping.is_synced}
         style={{

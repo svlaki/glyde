@@ -2,6 +2,7 @@ import { google, calendar_v3 } from 'googleapis';
 import { getConnectionService, UserConnection } from './ConnectionService.js';
 import { getSupabaseService } from './SupabaseService.js';
 import { getCalendarMappingService } from './CalendarMappingService.js';
+import { logger } from '../utils/logger.js';
 
 interface SyncResult {
   eventsCreated: number;
@@ -31,14 +32,14 @@ export class GoogleCalendarSyncService {
    * Perform initial full sync for a connection
    */
   async performInitialSync(connection: UserConnection): Promise<SyncResult> {
-    console.log('[GoogleCalendarSyncService] Starting initial sync for connection:', connection.id);
+    logger.info('[GoogleCalendarSyncService] Starting initial sync for connection:', connection.id);
 
     await this.connectionService.updateSyncStatus(connection.id, 'syncing');
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       // Get events from last 3 months
       const threeMonthsAgo = new Date();
@@ -78,11 +79,11 @@ export class GoogleCalendarSyncService {
         sync_error: null
       });
 
-      console.log('[GoogleCalendarSyncService] Initial sync completed:', result);
+      logger.info('[GoogleCalendarSyncService] Initial sync completed:', result);
       return { ...result, nextSyncToken };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[GoogleCalendarSyncService] Initial sync failed:', error);
+      logger.error('[GoogleCalendarSyncService] Initial sync failed:', error);
       await this.connectionService.updateSyncStatus(connection.id, 'error', errorMessage);
       throw error;
     }
@@ -92,10 +93,10 @@ export class GoogleCalendarSyncService {
    * Perform delta sync using sync token
    */
   async performDeltaSync(connection: UserConnection): Promise<SyncResult> {
-    console.log('[GoogleCalendarSyncService] Starting delta sync for connection:', connection.id);
+    logger.info('[GoogleCalendarSyncService] Starting delta sync for connection:', connection.id);
 
     if (!connection.sync_token) {
-      console.log('[GoogleCalendarSyncService] No sync token, performing initial sync instead');
+      logger.info('[GoogleCalendarSyncService] No sync token, performing initial sync instead');
       return this.performInitialSync(connection);
     }
 
@@ -104,7 +105,7 @@ export class GoogleCalendarSyncService {
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       let allEvents: calendar_v3.Schema$Event[] = [];
       let pageToken: string | undefined;
@@ -139,12 +140,12 @@ export class GoogleCalendarSyncService {
         sync_error: null
       });
 
-      console.log('[GoogleCalendarSyncService] Delta sync completed:', result);
+      logger.info('[GoogleCalendarSyncService] Delta sync completed:', result);
       return { ...result, nextSyncToken };
     } catch (error: any) {
       // Handle sync token invalidation (410 Gone)
       if (error.code === 410 || error.status === 410) {
-        console.log('[GoogleCalendarSyncService] Sync token expired, performing full re-sync');
+        logger.info('[GoogleCalendarSyncService] Sync token expired, performing full re-sync');
         // Clear sync token and do full sync
         await this.connectionService.updateConnection(connection.id, {
           sync_token: undefined
@@ -153,7 +154,7 @@ export class GoogleCalendarSyncService {
       }
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[GoogleCalendarSyncService] Delta sync failed:', error);
+      logger.error('[GoogleCalendarSyncService] Delta sync failed:', error);
       await this.connectionService.updateSyncStatus(connection.id, 'error', errorMessage);
       throw error;
     }
@@ -163,21 +164,21 @@ export class GoogleCalendarSyncService {
    * Set up a watch subscription for push notifications
    */
   async setupWatchSubscription(connection: UserConnection): Promise<void> {
-    console.log('[GoogleCalendarSyncService] Setting up watch subscription for connection:', connection.id);
+    logger.info('[GoogleCalendarSyncService] Setting up watch subscription for connection:', connection.id);
 
     const webhookUrl = process.env.API_BASE_URL
       ? `${process.env.API_BASE_URL}/api/connections/webhook/google`
       : null;
 
     if (!webhookUrl) {
-      console.warn('[GoogleCalendarSyncService] API_BASE_URL not set, skipping watch subscription');
+      logger.warn('[GoogleCalendarSyncService] API_BASE_URL not set, skipping watch subscription');
       return;
     }
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       const channelId = `glyde-${connection.id}-${Date.now()}`;
 
@@ -202,13 +203,13 @@ export class GoogleCalendarSyncService {
           new Date(parseInt(response.data.expiration)).toISOString()
         );
 
-        console.log('[GoogleCalendarSyncService] Watch subscription created:', {
+        logger.info('[GoogleCalendarSyncService] Watch subscription created:', {
           channelId: response.data.id,
           expiration: new Date(parseInt(response.data.expiration)).toISOString()
         });
       }
     } catch (error) {
-      console.error('[GoogleCalendarSyncService] Failed to set up watch subscription:', error);
+      logger.error('[GoogleCalendarSyncService] Failed to set up watch subscription:', error);
       // Don't throw - watch is optional, sync can still work manually
     }
   }
@@ -218,16 +219,16 @@ export class GoogleCalendarSyncService {
    */
   async stopWatchSubscription(connection: UserConnection): Promise<void> {
     if (!connection.watch_channel_id || !connection.watch_resource_id) {
-      console.log('[GoogleCalendarSyncService] No watch subscription to stop');
+      logger.info('[GoogleCalendarSyncService] No watch subscription to stop');
       return;
     }
 
-    console.log('[GoogleCalendarSyncService] Stopping watch subscription:', connection.watch_channel_id);
+    logger.info('[GoogleCalendarSyncService] Stopping watch subscription:', connection.watch_channel_id);
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       await calendar.channels.stop({
         requestBody: {
@@ -237,9 +238,9 @@ export class GoogleCalendarSyncService {
       });
 
       await this.connectionService.clearWatchSubscription(connection.id);
-      console.log('[GoogleCalendarSyncService] Watch subscription stopped');
+      logger.info('[GoogleCalendarSyncService] Watch subscription stopped');
     } catch (error) {
-      console.error('[GoogleCalendarSyncService] Failed to stop watch subscription:', error);
+      logger.error('[GoogleCalendarSyncService] Failed to stop watch subscription:', error);
       // Still clear the subscription info even if stop fails
       await this.connectionService.clearWatchSubscription(connection.id);
     }
@@ -249,7 +250,7 @@ export class GoogleCalendarSyncService {
    * Renew a watch subscription
    */
   async renewWatchSubscription(connection: UserConnection): Promise<void> {
-    console.log('[GoogleCalendarSyncService] Renewing watch subscription for connection:', connection.id);
+    logger.info('[GoogleCalendarSyncService] Renewing watch subscription for connection:', connection.id);
 
     // Stop old watch first
     await this.stopWatchSubscription(connection);
@@ -267,12 +268,12 @@ export class GoogleCalendarSyncService {
     mappingId: string,
     categoryId?: string
   ): Promise<SyncResult> {
-    console.log('[GoogleCalendarSyncService] Starting initial sync for calendar:', calendarId);
+    logger.info('[GoogleCalendarSyncService] Starting initial sync for calendar:', calendarId);
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       // Get events from last 3 months
       const threeMonthsAgo = new Date();
@@ -312,10 +313,10 @@ export class GoogleCalendarSyncService {
       // Update calendar mapping with sync token
       await this.calendarMappingService.updateSyncToken(mappingId, nextSyncToken);
 
-      console.log('[GoogleCalendarSyncService] Calendar sync completed:', result);
+      logger.info('[GoogleCalendarSyncService] Calendar sync completed:', result);
       return { ...result, nextSyncToken };
     } catch (error) {
-      console.error('[GoogleCalendarSyncService] Calendar sync failed:', error);
+      logger.error('[GoogleCalendarSyncService] Calendar sync failed:', error);
       throw error;
     }
   }
@@ -330,12 +331,12 @@ export class GoogleCalendarSyncService {
     syncToken: string,
     categoryId?: string
   ): Promise<SyncResult> {
-    console.log('[GoogleCalendarSyncService] Starting delta sync for calendar:', calendarId);
+    logger.info('[GoogleCalendarSyncService] Starting delta sync for calendar:', calendarId);
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
       const oauth2Client = this.createOAuthClient(accessToken);
-      const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+      const calendar = this.createCalendarClient(oauth2Client);
 
       let allEvents: calendar_v3.Schema$Event[] = [];
       let pageToken: string | undefined;
@@ -370,12 +371,12 @@ export class GoogleCalendarSyncService {
       // Update calendar mapping with new sync token
       await this.calendarMappingService.updateSyncToken(mappingId, nextSyncToken || syncToken);
 
-      console.log('[GoogleCalendarSyncService] Calendar delta sync completed:', result);
+      logger.info('[GoogleCalendarSyncService] Calendar delta sync completed:', result);
       return { ...result, nextSyncToken };
     } catch (error: any) {
       // Handle sync token invalidation (410 Gone)
       if (error.code === 410 || error.status === 410) {
-        console.log('[GoogleCalendarSyncService] Sync token expired for calendar, performing full re-sync');
+        logger.info('[GoogleCalendarSyncService] Sync token expired for calendar, performing full re-sync');
         return this.performInitialSyncForCalendar(connection, calendarId, mappingId, categoryId);
       }
       throw error;
@@ -386,7 +387,7 @@ export class GoogleCalendarSyncService {
    * Sync all enabled calendars for a connection
    */
   async syncAllEnabledCalendars(connection: UserConnection): Promise<void> {
-    console.log('[GoogleCalendarSyncService] Syncing all enabled calendars for connection:', connection.id);
+    logger.info('[GoogleCalendarSyncService] Syncing all enabled calendars for connection:', connection.id);
 
     const mappings = await this.calendarMappingService.getSyncedMappings(connection.id);
 
@@ -398,14 +399,14 @@ export class GoogleCalendarSyncService {
             mapping.google_calendar_id,
             mapping.id,
             mapping.sync_token,
-            mapping.category_id || undefined
+            mapping.aspect_id || undefined
           );
         } else {
           await this.performInitialSyncForCalendar(
             connection,
             mapping.google_calendar_id,
             mapping.id,
-            mapping.category_id || undefined
+            mapping.aspect_id || undefined
           );
         }
       } catch (error) {
@@ -477,7 +478,7 @@ export class GoogleCalendarSyncService {
 
           // Update category if specified (allows re-sync to fix categories)
           if (categoryId) {
-            updateData.category_id = categoryId;
+            updateData.aspect_id = categoryId;
           }
 
           const { error } = await supabase
@@ -506,7 +507,7 @@ export class GoogleCalendarSyncService {
 
           // Assign category if specified
           if (categoryId) {
-            insertData.category_id = categoryId;
+            insertData.aspect_id = categoryId;
           }
 
           const { error } = await supabase
@@ -518,7 +519,7 @@ export class GoogleCalendarSyncService {
           }
         }
       } catch (error) {
-        console.error('[GoogleCalendarSyncService] Error processing event:', googleEvent.id, error);
+        logger.error('[GoogleCalendarSyncService] Error processing event', { eventId: googleEvent.id, error: error instanceof Error ? error.message : String(error) });
         // Continue with other events
       }
     }
@@ -567,6 +568,17 @@ export class GoogleCalendarSyncService {
     );
     oauth2Client.setCredentials({ access_token: accessToken });
     return oauth2Client;
+  }
+
+  /**
+   * Create a Google Calendar API client with timeout
+   */
+  private createCalendarClient(oauth2Client: any) {
+    return google.calendar({
+      version: 'v3',
+      auth: oauth2Client,
+      timeout: 30000 // 30s timeout for all Google Calendar API calls
+    });
   }
 }
 

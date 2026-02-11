@@ -35,7 +35,11 @@ const GeraldState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => null,
   }),
-  userCategories: Annotation<any[]>({
+  userAspects: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
+  recentInteractions: Annotation<any[]>({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
@@ -47,7 +51,7 @@ type GeraldStateType = typeof GeraldState.State;
  * InteractionAgentGerald - Enhanced interaction agent with:
  * - Multiple interaction types (yes_no, multiple_choice, text, rating, etc.)
  * - Ability to create tasks, events, and goals
- * - Full context awareness (events, tasks, goals, profile, categories)
+ * - Full context awareness (events, tasks, goals, profile, aspects)
  * - Follow-up interaction chaining
  * - Creative, timely suggestions based on time of day
  */
@@ -87,11 +91,11 @@ export class InteractionAgentGerald extends BaseAgent {
 
       // Fetch all user context in parallel for efficiency
       const now = new Date();
-      const [allEvents, userTasks, userGoals, userCategories] = await Promise.all([
+      const [allEvents, userTasks, userGoals, userAspects] = await Promise.all([
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
-        supabaseService.getCategories(context.userId)
+        supabaseService.getAspects(context.userId)
       ]);
 
       // Filter to future/ongoing events
@@ -101,11 +105,20 @@ export class InteractionAgentGerald extends BaseAgent {
       const activeTasks = userTasks?.filter(t => t.status === 'pending' || t.status === 'in_progress') || [];
       const activeGoals = userGoals?.filter(g => g.status === 'active') || [];
 
+      // Fetch recent interactions to avoid repetition
+      let recentInteractions: any[] = [];
+      try {
+        recentInteractions = await supabaseService.getRecentUserInteractions(context.userId, 20, 48);
+      } catch (error) {
+        console.warn('[GERALD] Failed to fetch recent interactions:', error);
+      }
+
       console.log(`[GERALD] Context loaded:
         - Events: ${userEvents.length} (filtered from ${allEvents.length})
         - Tasks: ${activeTasks.length} active (filtered from ${userTasks?.length || 0})
         - Goals: ${activeGoals.length} active (filtered from ${userGoals?.length || 0})
-        - Categories: ${userCategories?.length || 0}`);
+        - Aspects: ${userAspects?.length || 0}
+        - Recent interactions: ${recentInteractions.length}`);
 
       // Build conversation history
       const messages: BaseMessage[] = [];
@@ -133,7 +146,8 @@ export class InteractionAgentGerald extends BaseAgent {
         userTasks: activeTasks,
         userGoals: activeGoals,
         userProfile: userProfile || null,
-        userCategories: userCategories || [],
+        userAspects: userAspects || [],
+        recentInteractions: recentInteractions || [],
       }, {
         recursionLimit: 15 // Allow more steps for complex interactions with retries
       });
@@ -179,7 +193,7 @@ export class InteractionAgentGerald extends BaseAgent {
       "Create tasks, events, and goals",
       "Follow-up interaction chaining",
       "Time-of-day aware suggestions",
-      "Full context awareness (profile, events, tasks, goals, categories)",
+      "Full context awareness (profile, events, tasks, goals, aspects)",
       "Creative and personalized suggestions",
       "Goal alignment and life balance checks"
     ];
@@ -200,6 +214,8 @@ export class InteractionAgentGerald extends BaseAgent {
     console.log(`[GERALD] Loaded ${tools.length} tools from ToolRegistry`);
 
     // Define the workflow nodes
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
     const callModel = async (state: GeraldStateType) => {
       // Build event context
       const eventContext = this.buildEventContext(state.userEvents, state.timezone);
@@ -213,8 +229,8 @@ export class InteractionAgentGerald extends BaseAgent {
       // Build profile context
       const profileContext = this.buildProfileContext(state.userProfile);
 
-      // Build category context
-      const categoryContext = this.buildCategoryContext(state.userCategories);
+      // Build aspect context
+      const aspectContext = this.buildAspectContext(state.userAspects);
 
       // Calculate temporal context
       const nowUtc = new Date();
@@ -235,6 +251,9 @@ export class InteractionAgentGerald extends BaseAgent {
         console.error('[GERALD] Error loading user rules:', error);
       }
 
+      // Build recent interaction context
+      const recentInteractionContext = self.buildRecentInteractionContext(state.recentInteractions);
+
       // Build system prompt with full context
       const promptContext: GeraldPromptContext = {
         timezone: state.timezone,
@@ -242,13 +261,14 @@ export class InteractionAgentGerald extends BaseAgent {
         taskContext,
         goalContext,
         profileContext,
-        categoryContext,
+        aspectContext,
         todayFormatted,
         tomorrowFormatted,
         tomorrowDayName,
         currentHour,
         toolCount: tools.length,
         rulesContext,
+        recentInteractionContext,
       };
 
       const systemMessage = buildGeraldSystemPrompt(promptContext);
@@ -328,7 +348,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   /**
    * Build formatted event context for the prompt
-   * Includes category IDs for reference
+   * Includes aspect IDs for reference
    */
   private buildEventContext(events: any[], timezone: string): string {
     if (!events || events.length === 0) {
@@ -353,7 +373,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   /**
    * Build formatted task context for the prompt
-   * Includes category IDs so Gerald can assign the correct category when creating events for tasks
+   * Includes aspect IDs so Gerald can assign the correct aspect when creating events for tasks
    */
   private buildTaskContext(tasks: any[], timezone: string): string {
     if (!tasks || tasks.length === 0) {
@@ -378,7 +398,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   /**
    * Build formatted goal context for the prompt
-   * Includes category IDs so Gerald can assign the correct category when creating events for goals
+   * Includes aspect IDs so Gerald can assign the correct aspect when creating events for goals
    */
   private buildGoalContext(goals: any[], timezone: string): string {
     if (!goals || goals.length === 0) {
@@ -462,19 +482,45 @@ export class InteractionAgentGerald extends BaseAgent {
   }
 
   /**
-   * Build category context for the prompt
-   * Includes category IDs so Gerald can specify them when creating events/tasks/goals
+   * Build recent interaction context to help Gerald avoid repetition
    */
-  private buildCategoryContext(categories: any[]): string {
-    if (!categories || categories.length === 0) {
-      return `\nCATEGORIES: Using defaults (no categoryId needed).`;
+  private buildRecentInteractionContext(interactions: any[]): string {
+    if (!interactions || interactions.length === 0) {
+      return '\nRECENT INTERACTION HISTORY: No recent interactions.';
     }
 
-    const categoryList = categories.map(c => {
-      const desc = c.description ? ` - ${c.description.substring(0, 40)}` : '';
-      return `  - "${c.name}" (ID: ${c.id})${desc}`;
+    const lines = interactions.slice(0, 15).map(i => {
+      const status = i.status === 'responded' ? 'responded'
+        : i.status === 'dismissed' || i.status === 'expired' ? 'dismissed/ignored'
+        : i.status === 'pending' || i.status === 'active' ? 'still pending'
+        : i.status;
+      const type = i.interaction_type || 'unknown';
+      return `  - [${type}] "${i.question}" -> ${status}`;
+    });
+
+    return `\nRECENT INTERACTION HISTORY (last ${interactions.length}, newest first):
+${lines.join('\n')}
+RULES:
+- Do NOT repeat questions that were dismissed (user clearly didn't want them)
+- Do NOT re-suggest topics that were recently responded to (unless context changed)
+- Use DIFFERENT interaction types than the last 2-3 interactions
+- Vary the CATEGORY (scheduling vs reflection vs check-in vs progress)`;
+  }
+
+  /**
+   * Build aspect context for the prompt
+   * Includes aspect IDs so Gerald can specify them when creating events/tasks/goals
+   */
+  private buildAspectContext(aspects: any[]): string {
+    if (!aspects || aspects.length === 0) {
+      return `\nASPECTS: Using defaults (no aspectId needed).`;
+    }
+
+    const aspectList = aspects.map(a => {
+      const desc = a.description ? ` - ${a.description.substring(0, 40)}` : '';
+      return `  - "${a.name}" (ID: ${a.id})${desc}`;
     }).join('\n');
 
-    return `\nCATEGORIES (${categories.length}) - Use these IDs when creating events/tasks/goals:\n${categoryList}`;
+    return `\nASPECTS (${aspects.length}) - Use these IDs when creating events/tasks/goals:\n${aspectList}`;
   }
 }

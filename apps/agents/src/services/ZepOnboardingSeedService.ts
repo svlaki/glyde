@@ -215,7 +215,8 @@ export class ZepOnboardingSeedService {
 
     // Seed Goal entities
     if (data.goals && data.goals.length > 0) {
-      await this.seedGoals(userId, data.goals);
+      const goalStrings = data.goals.map(g => typeof g === 'string' ? g : g.title);
+      await this.seedGoals(userId, goalStrings);
     }
 
     // Seed habit patterns
@@ -300,11 +301,12 @@ export class ZepOnboardingSeedService {
 
     // Life aspects as preferences
     if (data.aspects) {
-      for (const aspect of data.aspects) {
+      for (const rawAspect of data.aspects) {
+        const aspectName = typeof rawAspect === 'string' ? rawAspect : rawAspect.name;
         preferences.push({
           preference_type: 'life_aspect',
-          key: aspect.toLowerCase().replace(/[\/\s]+/g, '_'),
-          value: aspect,
+          key: aspectName.toLowerCase().replace(/[\/\s]+/g, '_'),
+          value: aspectName,
           importance: 'high'
         });
       }

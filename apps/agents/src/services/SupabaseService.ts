@@ -37,7 +37,16 @@ export function initializeSupabase() {
     throw new Error('Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  supabase = createClient(supabaseUrl, supabaseKey);
+  supabase = createClient(supabaseUrl, supabaseKey, {
+    global: {
+      fetch: (url: any, options: any = {}) => {
+        return fetch(url, {
+          ...options,
+          signal: options.signal || AbortSignal.timeout(30000) // 30s timeout
+        });
+      }
+    }
+  });
 }
 
 export class SupabaseService {
@@ -257,6 +266,7 @@ export class SupabaseService {
         .from('aspects')
         .select('*')
         .eq('user_id', userId)
+        .is('archived_at', null)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -271,12 +281,6 @@ export class SupabaseService {
     }
   }
 
-  /**
-   * @deprecated Use getAspects() instead
-   */
-  async getCategories(userId: string): Promise<any[]> {
-    return this.getAspects(userId);
-  }
 
   // Method for agents - includes timezone conversion for proper local time display
   // DEPRECATED: Use getEvents() instead. This method is no longer needed.
@@ -324,7 +328,11 @@ export class SupabaseService {
         recurrence_rule: event.recurrence_rule,
         recurrence_end: event.recurrence_end,
         parent_event_id: event.parent_event_id,
-        is_recurring: event.is_recurring || false
+        is_recurring: event.is_recurring || false,
+        visibility: event.visibility || 'private',
+        is_shared: event.is_shared || false,
+        reflection: event.reflection || null,
+        is_missed: event.is_missed || false
       }));
 
       return transformedEvents;
@@ -373,10 +381,9 @@ export class SupabaseService {
           if (!exceptionMap.has(exc.parent_event_id)) {
             exceptionMap.set(exc.parent_event_id, new Set());
           }
-          // Only track deleted exceptions (modified ones have separate override events)
-          if (exc.exception_type === 'deleted') {
-            exceptionMap.get(exc.parent_event_id)!.add(exc.exception_date);
-          }
+          // Track both deleted and modified exceptions to suppress original instance expansion
+          // Modified exceptions have separate override events that appear in the regular query
+          exceptionMap.get(exc.parent_event_id)!.add(exc.exception_date);
         }
       }
 
@@ -564,6 +571,9 @@ export class SupabaseService {
       }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
+      if (updates.reflection !== undefined) updateData.reflection = updates.reflection;
+      if (updates.is_missed !== undefined) updateData.is_missed = updates.is_missed;
 
       // Handle aspect using helper method
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
@@ -589,7 +599,7 @@ export class SupabaseService {
       const changes = this.computeChanges(
         oldEvent,
         updateData,
-        ['title', 'start_time', 'end_time', 'location', 'description', 'aspect', 'aspect_id']
+        ['title', 'start_time', 'end_time', 'location', 'description', 'aspect', 'aspect_id', 'reflection', 'is_missed']
       );
       await this.logActivity(
         userId,
@@ -928,11 +938,16 @@ export class SupabaseService {
         return null;
       }
 
-      // Create instance with parent reference
-      const instanceStartDate = new Date(instanceDate);
+      // Determine start/end times for the override event
+      const instanceStartDate = updates.start_time
+        ? new Date(updates.start_time)
+        : new Date(instanceDate);
       const duration = new Date(parent.end_time).getTime() - new Date(parent.start_time).getTime();
-      const instanceEndDate = new Date(instanceStartDate.getTime() + duration);
+      const instanceEndDate = updates.end_time
+        ? new Date(updates.end_time)
+        : new Date(instanceStartDate.getTime() + duration);
 
+      // Create override event for this instance
       const { data, error } = await this.client
         .from('events')
         .insert({
@@ -944,7 +959,10 @@ export class SupabaseService {
           description: updates.description !== undefined ? updates.description : parent.description,
           category: updates.aspect || parent.aspect,
           aspect_id: updates.aspect_id || parent.aspect_id,
-          parent_event_id: parentEventId, // Link back to parent
+          visibility: updates.visibility !== undefined ? updates.visibility : parent.visibility,
+          reflection: updates.reflection !== undefined ? updates.reflection : null,
+          is_missed: updates.is_missed !== undefined ? updates.is_missed : false,
+          parent_event_id: parentEventId,
           is_recurring: false
         })
         .select()
@@ -955,7 +973,23 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('[SupabaseService] Created instance override for parent:', parentEventId);
+      // Create exception record so the original instance is suppressed
+      const exceptionDate = instanceDate.split('T')[0];
+      const { error: excError } = await this.client
+        .from('recurring_event_exceptions')
+        .upsert({
+          user_id: userId,
+          parent_event_id: parentEventId,
+          exception_date: exceptionDate,
+          exception_type: 'modified',
+          override_event_id: data.id
+        }, {
+          onConflict: 'parent_event_id,exception_date'
+        });
+
+      if (excError) {
+        console.error('[SupabaseService] Error creating exception record:', excError);
+      }
 
       // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId, instanceStartDate.toISOString(), instanceEndDate.toISOString());
@@ -1038,6 +1072,7 @@ export class SupabaseService {
       if (updates.end_time) updateData.end_time = updates.end_time;
       if (updates.recurrence_rule) updateData.recurrence_rule = updates.recurrence_rule;
       if (updates.recurrence_end !== undefined) updateData.recurrence_end = updates.recurrence_end;
+      if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
       if (updates.aspect_id) updateData.aspect_id = updates.aspect_id;
       if (updates.aspect) updateData.category = updates.aspect;
 
@@ -1229,7 +1264,7 @@ export class SupabaseService {
     interaction: {
       agentId: AgentType | string;
       question: string;
-      interactionType: 'yes_no' | 'multiple_choice' | 'confirmation' | 'choice';
+      interactionType: 'yes_no' | 'multiple_choice' | 'text' | 'rating' | 'time_suggestion' | 'confirmation' | 'choice';
       options?: string[] | null;
       priority?: number;
       aspectId?: string | null;
@@ -1452,6 +1487,37 @@ export class SupabaseService {
       return validInteractions;
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception fetching pending interactions:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get recent interactions for a user (all statuses) for context injection
+   */
+  async getRecentUserInteractions(
+    userId: string,
+    limit: number = 20,
+    hoursBack: number = 48
+  ): Promise<any[]> {
+    try {
+      const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await this.client
+        .from('user_interactions')
+        .select('id, question, interaction_type, status, created_at, metadata')
+        .eq('user_id', userId)
+        .gte('created_at', cutoffTime)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error fetching recent interactions:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception fetching recent interactions:', error);
       return [];
     }
   }
@@ -1879,6 +1945,7 @@ export class SupabaseService {
       priorityScore?: number;
       energyRequirement?: 'low' | 'medium' | 'high';
       reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
+      timeHorizon?: 'long_term' | 'short_term';
     },
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<any> {
@@ -1909,7 +1976,8 @@ export class SupabaseService {
           reflection_prompts: goalData.reflectionPrompts || {},
           priority_score: goalData.priorityScore || 5,
           energy_requirement: goalData.energyRequirement,
-          review_frequency: goalData.reviewFrequency || 'weekly'
+          review_frequency: goalData.reviewFrequency || 'weekly',
+          time_horizon: goalData.timeHorizon || 'short_term'
         })
         .select()
         .single();
@@ -2270,7 +2338,7 @@ export class SupabaseService {
           user_id: userId,
           message: message.content,
           session_id: message.session_id,
-          sender: message.sender,
+          sender: message.role,
           embedding: message.embedding
         })
       });

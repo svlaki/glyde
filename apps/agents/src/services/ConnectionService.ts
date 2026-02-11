@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { getSupabaseClient } from './SupabaseService.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger.js';
 
 export interface UserConnection {
   id: string;
@@ -69,13 +70,13 @@ export class ConnectionService {
         .order('connected_at', { ascending: false });
 
       if (error) {
-        console.error('[ConnectionService] Error fetching connections:', error);
+        logger.error('[ConnectionService] Error fetching connections:', error);
         return [];
       }
 
       return (data || []) as UserConnection[];
     } catch (error) {
-      console.error('[ConnectionService] Exception fetching connections:', error);
+      logger.error('[ConnectionService] Exception fetching connections:', error);
       return [];
     }
   }
@@ -97,13 +98,13 @@ export class ConnectionService {
           // No rows returned
           return null;
         }
-        console.error('[ConnectionService] Error fetching connection:', error);
+        logger.error('[ConnectionService] Error fetching connection:', error);
         return null;
       }
 
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception fetching connection:', error);
+      logger.error('[ConnectionService] Exception fetching connection:', error);
       return null;
     }
   }
@@ -120,13 +121,13 @@ export class ConnectionService {
         .single();
 
       if (error) {
-        console.error('[ConnectionService] Error fetching connection by ID:', error);
+        logger.error('[ConnectionService] Error fetching connection by ID:', error);
         return null;
       }
 
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception fetching connection by ID:', error);
+      logger.error('[ConnectionService] Exception fetching connection by ID:', error);
       return null;
     }
   }
@@ -153,14 +154,14 @@ export class ConnectionService {
         .single();
 
       if (error) {
-        console.error('[ConnectionService] Error creating connection:', error);
+        logger.error('[ConnectionService] Error creating connection:', error);
         throw new Error(`Failed to create connection: ${error.message}`);
       }
 
-      console.log('[ConnectionService] Connection created:', data.id);
+      logger.info('[ConnectionService] Connection created:', data.id);
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception creating connection:', error);
+      logger.error('[ConnectionService] Exception creating connection:', error);
       throw error;
     }
   }
@@ -190,14 +191,14 @@ export class ConnectionService {
         .single();
 
       if (error) {
-        console.error('[ConnectionService] Error upserting connection:', error);
+        logger.error('[ConnectionService] Error upserting connection:', error);
         throw new Error(`Failed to upsert connection: ${error.message}`);
       }
 
-      console.log('[ConnectionService] Connection upserted:', data.id);
+      logger.info('[ConnectionService] Connection upserted:', data.id);
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception upserting connection:', error);
+      logger.error('[ConnectionService] Exception upserting connection:', error);
       throw error;
     }
   }
@@ -233,14 +234,14 @@ export class ConnectionService {
         .single();
 
       if (error) {
-        console.error('[ConnectionService] Error updating connection:', error);
+        logger.error('[ConnectionService] Error updating connection:', error);
         throw new Error(`Failed to update connection: ${error.message}`);
       }
 
-      console.log('[ConnectionService] Connection updated:', connectionId);
+      logger.info('[ConnectionService] Connection updated:', connectionId);
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception updating connection:', error);
+      logger.error('[ConnectionService] Exception updating connection:', error);
       throw error;
     }
   }
@@ -257,13 +258,13 @@ export class ConnectionService {
         .eq('user_id', userId);
 
       if (error) {
-        console.error('[ConnectionService] Error deleting connection:', error);
+        logger.error('[ConnectionService] Error deleting connection:', error);
         throw new Error(`Failed to delete connection: ${error.message}`);
       }
 
-      console.log('[ConnectionService] Connection deleted:', connectionId);
+      logger.info('[ConnectionService] Connection deleted:', connectionId);
     } catch (error) {
-      console.error('[ConnectionService] Exception deleting connection:', error);
+      logger.error('[ConnectionService] Exception deleting connection:', error);
       throw error;
     }
   }
@@ -284,13 +285,13 @@ export class ConnectionService {
         if (error.code === 'PGRST116') {
           return null;
         }
-        console.error('[ConnectionService] Error finding connection by channel ID:', error);
+        logger.error('[ConnectionService] Error finding connection by channel ID:', error);
         return null;
       }
 
       return data as UserConnection;
     } catch (error) {
-      console.error('[ConnectionService] Exception finding connection by channel ID:', error);
+      logger.error('[ConnectionService] Exception finding connection by channel ID:', error);
       return null;
     }
   }
@@ -310,13 +311,13 @@ export class ConnectionService {
         .lte('watch_expiry', expiryThreshold);
 
       if (error) {
-        console.error('[ConnectionService] Error fetching expiring watches:', error);
+        logger.error('[ConnectionService] Error fetching expiring watches:', error);
         return [];
       }
 
       return (data || []) as UserConnection[];
     } catch (error) {
-      console.error('[ConnectionService] Exception fetching expiring watches:', error);
+      logger.error('[ConnectionService] Exception fetching expiring watches:', error);
       return [];
     }
   }
@@ -348,10 +349,10 @@ export class ConnectionService {
         .eq('id', connectionId);
 
       if (dbError) {
-        console.error('[ConnectionService] Error updating sync status:', dbError);
+        logger.error('[ConnectionService] Error updating sync status:', dbError);
       }
     } catch (err) {
-      console.error('[ConnectionService] Exception updating sync status:', err);
+      logger.error('[ConnectionService] Exception updating sync status:', err);
     }
   }
 
@@ -376,13 +377,13 @@ export class ConnectionService {
         .eq('id', connectionId);
 
       if (error) {
-        console.error('[ConnectionService] Error updating watch subscription:', error);
+        logger.error('[ConnectionService] Error updating watch subscription:', error);
         throw new Error(`Failed to update watch subscription: ${error.message}`);
       }
 
-      console.log('[ConnectionService] Watch subscription updated for connection:', connectionId);
+      logger.info('[ConnectionService] Watch subscription updated for connection:', connectionId);
     } catch (err) {
-      console.error('[ConnectionService] Exception updating watch subscription:', err);
+      logger.error('[ConnectionService] Exception updating watch subscription:', err);
       throw err;
     }
   }
@@ -403,10 +404,10 @@ export class ConnectionService {
         .eq('id', connectionId);
 
       if (error) {
-        console.error('[ConnectionService] Error clearing watch subscription:', error);
+        logger.error('[ConnectionService] Error clearing watch subscription:', error);
       }
     } catch (err) {
-      console.error('[ConnectionService] Exception clearing watch subscription:', err);
+      logger.error('[ConnectionService] Exception clearing watch subscription:', err);
     }
   }
 
@@ -421,7 +422,7 @@ export class ConnectionService {
       const bufferMs = 5 * 60 * 1000; // 5 minutes
 
       if (expiresAt.getTime() - now.getTime() < bufferMs) {
-        console.log('[ConnectionService] Token expired or expiring soon, refreshing...');
+        logger.info('[ConnectionService] Token expired or expiring soon, refreshing...');
         const refreshed = await this.refreshToken(connection);
         return refreshed.access_token;
       }
@@ -470,10 +471,10 @@ export class ConnectionService {
           : undefined
       });
 
-      console.log('[ConnectionService] Google token refreshed for connection:', connection.id);
+      logger.info('[ConnectionService] Google token refreshed for connection:', connection.id);
       return updated;
     } catch (error) {
-      console.error('[ConnectionService] Failed to refresh Google token:', error);
+      logger.error('[ConnectionService] Failed to refresh Google token:', error);
       await this.updateSyncStatus(connection.id, 'error', 'Failed to refresh token');
       throw new Error('Failed to refresh Google OAuth token');
     }
@@ -516,10 +517,10 @@ export class ConnectionService {
         token_expires_at: expiresAt
       });
 
-      console.log('[ConnectionService] Microsoft token refreshed for connection:', connection.id);
+      logger.info('[ConnectionService] Microsoft token refreshed for connection:', connection.id);
       return updated;
     } catch (error) {
-      console.error('[ConnectionService] Failed to refresh Microsoft token:', error);
+      logger.error('[ConnectionService] Failed to refresh Microsoft token:', error);
       await this.updateSyncStatus(connection.id, 'error', 'Failed to refresh token');
       throw new Error('Failed to refresh Microsoft OAuth token');
     }

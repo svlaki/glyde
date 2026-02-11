@@ -6,6 +6,7 @@ import { createUserAspect, updateUserAspect, deleteUserAspect } from '../lib/asp
 import type { Aspect } from '../lib/aspectService'
 import { AspectCard } from '../components/AspectCard'
 import { AspectForm } from '../components/AspectForm'
+import { AspectShareModal } from '../components/AspectShareModal'
 import { GoalsByAspect } from '../components/GoalsByAspect'
 import { EmptyState } from '../components/EmptyState'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
@@ -33,6 +34,7 @@ function AspectsPageMobile() {
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
+  const [sharingAspect, setSharingAspect] = useState<Aspect | null>(null)
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
@@ -93,8 +95,8 @@ function AspectsPageMobile() {
         }}>
           <GoalsByAspect
             aspect={selectedAspect}
-            onEdit={() => handleEditAspect(selectedAspect)}
-            onDelete={() => handleDeleteAspect(selectedAspect)}
+            onEdit={selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
           />
         </div>
 
@@ -176,8 +178,8 @@ function AspectsPageMobile() {
                 aspect={aspect}
                 isSelected={false}
                 onClick={() => setSelectedAspect(aspect)}
-                onEdit={() => handleEditAspect(aspect)}
-                onDelete={() => handleDeleteAspect(aspect)}
+                onEdit={aspect.member_role !== 'viewer' ? () => handleEditAspect(aspect) : undefined}
+                onDelete={aspect.member_role === 'owner' ? () => handleDeleteAspect(aspect) : undefined}
               />
             ))}
           </div>
@@ -189,6 +191,13 @@ function AspectsPageMobile() {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={handleSaveAspect}
+      />
+
+      <AspectShareModal
+        aspect={sharingAspect}
+        isOpen={!!sharingAspect}
+        onClose={() => setSharingAspect(null)}
+        onAspectUpdated={refreshAspects}
       />
     </div>
   )
@@ -203,6 +212,7 @@ function AspectsPageDesktop() {
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
+  const [sharingAspect, setSharingAspect] = useState<Aspect | null>(null)
 
   // Auto-select first aspect when aspects load
   useEffect(() => {
@@ -368,8 +378,8 @@ function AspectsPageDesktop() {
                   aspect={aspect}
                   isSelected={selectedAspect?.id === aspect.id}
                   onClick={() => setSelectedAspect(aspect)}
-                  onEdit={() => handleEditAspect(aspect)}
-                  onDelete={() => handleDeleteAspect(aspect)}
+                  onEdit={aspect.member_role !== 'viewer' ? () => handleEditAspect(aspect) : undefined}
+                  onDelete={aspect.member_role === 'owner' ? () => handleDeleteAspect(aspect) : undefined}
                 />
               ))
             )}
@@ -384,8 +394,9 @@ function AspectsPageDesktop() {
         }}>
           <GoalsByAspect
             aspect={selectedAspect}
-            onEdit={selectedAspect ? () => handleEditAspect(selectedAspect) : undefined}
-            onDelete={selectedAspect ? () => handleDeleteAspect(selectedAspect) : undefined}
+            onEdit={selectedAspect && selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={selectedAspect && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
+            onShare={selectedAspect && selectedAspect.member_role === 'owner' ? () => setSharingAspect(selectedAspect) : undefined}
           />
         </div>
       </div>
@@ -396,6 +407,13 @@ function AspectsPageDesktop() {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={handleSaveAspect}
+      />
+
+      <AspectShareModal
+        aspect={sharingAspect}
+        isOpen={!!sharingAspect}
+        onClose={() => setSharingAspect(null)}
+        onAspectUpdated={refreshAspects}
       />
     </div>
   )

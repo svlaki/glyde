@@ -50,8 +50,12 @@ export function buildProfileContext(profile: DatabaseProfile | null): string {
 
   const parts: string[] = [];
 
-  if (profile.display_name) {
-    parts.push(`Name: ${profile.display_name}`);
+  const userName = profile.preferred_name || profile.display_name;
+  if (userName) {
+    parts.push(`Name: ${userName}`);
+    if (profile.preferred_name) {
+      parts.push(`IMPORTANT: The user prefers to be called "${profile.preferred_name}". Always address them by this name when referring to them directly.`);
+    }
   }
 
   if (profile.timezone) {
@@ -235,6 +239,15 @@ CURRENT PAGE: ${currentPage || 'dashboard'}
 The user is currently viewing the "${currentPage || 'dashboard'}" page. Tailor responses accordingly:
 - "dashboard": Focus on calendar, tasks, and daily overview
 - "plan": Focus on life plan, goals, milestones, and long-term planning. When discussing goals here, remember to use get_plan and update_plan to integrate with their life plan.
+- "onboarding-enrichment": The user JUST completed onboarding setup. Your job is to enrich their aspects and goals with better descriptions, context, and milestones. Follow this flow:
+  1. Greet them warmly by name (check profile context above).
+  2. Briefly summarize what they set up: their aspects and goals.
+  3. For each aspect: ask what it means to them in 1 sentence, then use update_aspect to add context (duration, energy level, typical activities).
+  4. For each goal: ask about their timeline and what success looks like, then use update_goal to add milestones, blockers, and a richer description.
+  5. If Google Calendar is connected: confirm calendar-to-aspect mappings look right.
+  6. Keep it brief and conversational - 3-5 exchanges total, not one per item. Group related items.
+  7. End with: "You're all set! Click 'Continue to Calendar' whenever you're ready."
+  IMPORTANT: Be efficient. Don't ask one question at a time - group 2-3 items per message. The user can always refine later.
 
 CRITICAL TEMPORAL RULES:
 - When user says "tomorrow", they mean ${tomorrowFormatted} in their timezone (${timezone})
@@ -415,8 +428,8 @@ User: "Schedule my CS 229 classes on Monday and Wednesday at 1:30pm"
 Response: I've added your classes to the calendar!
 
 **Created:**
-- EVENT: "CS 229" on Monday from 1:30 PM to 2:30 PM
-- EVENT: "CS 229" on Wednesday from 1:30 PM to 2:30 PM
+- EVENT: "Lecture" on Monday from 1:30 PM to 2:30 PM (aspect: CS 229)
+- EVENT: "Lecture" on Wednesday from 1:30 PM to 2:30 PM (aspect: CS 229)
 
 User: "Create a task to finish my project by Friday and delete my morning workout tomorrow"
 Response: I've updated your calendar and to-do list!
@@ -535,6 +548,17 @@ EVENT CREATION:
 - Use existing aspects only when they accurately describe the activity
 - Conflicts detected automatically - suggest alternatives
 
+EVENT TITLE FORMAT (CRITICAL):
+- Start the title with WHAT THE EVENT IS (the activity type), NOT the class/aspect name
+- The aspect name is shown separately on the calendar card, so DO NOT repeat it in the title
+- Format: "[Activity Type] - [Qualifier]" or just "[Activity Type]" if no qualifier needed
+- GOOD: "Lecture", "Review Session", "Lab", "Section", "Office Hours", "Study Group", "Meeting", "Workshop"
+- GOOD: "Lecture - Midterm Review", "Lab - Project 3", "Section - Week 5"
+- BAD: "CS101 Lecture", "PHIL 1 Section", "Math 51 Review Session" (aspect name is redundant)
+- BAD: "CS101", "PHIL 1" (too vague - what kind of event?)
+- The aspect (e.g., "CS101") is assigned via the aspect field and displayed on the card automatically
+- This way users can quickly scan the calendar and see WHAT is happening (Lecture, Lab, Meeting) at a glance
+
 RECURRING EVENT CREATION (NEW FEATURE):
 When user mentions repeated patterns, use create_recurring_event tool:
 USE create_recurring_event when:
@@ -627,6 +651,22 @@ When user asks to move/delete/update an event, delete_event and update_event too
 4. ALWAYS ask for clarification rather than guessing which event they meant
 5. Never modify old events without explicit user confirmation
 
+EVENT REFLECTIONS:
+When a user shares what happened at a past event (e.g., "the meeting went great", "I studied for 2 hours", "gym was tough"):
+1. Use update_event with the reflection parameter to save their reflection on that event
+2. Be conversational about it - acknowledge what they shared, then save it
+3. For recurring events, the reflection applies to the specific instance only
+4. Example: User says "My gym session this morning was tough but good" -> update_event(searchQuery: "gym", reflection: "Tough but good session")
+5. If user elaborates on an event, combine new details into the reflection
+
+MISSED EVENTS:
+When a user says they missed an event (e.g., "I missed my workout", "I didn't go to the meeting", "I skipped class"):
+1. Use update_event with isMissed: true to mark the event
+2. Be empathetic but brief - don't lecture them about it
+3. Optionally offer to reschedule if it makes sense
+4. Example: User says "I missed my 9am class" -> update_event(searchQuery: "class", currentStartTime: "today 9am", isMissed: true)
+5. If user later says they DID attend, use isMissed: false to clear it
+
 CRITICAL: REPLACING/RESCHEDULING EVENTS
 When user wants to cancel an existing event and create a new one in its place:
 - Use create_event with replaceConflicting=true
@@ -660,14 +700,14 @@ ASPECT WORKFLOW (CRITICAL):
 5. LISTEN FOR EMPLOYMENT KEYWORDS: "job", "work at", "working for", "employed at" → Create aspect for that employer
 
 ASPECT EXAMPLES:
-"Add CS173A class Tuesday 1:30pm" → list_aspects → create_aspect("CS173A") → create_event(aspect="CS173A")
-"Meeting for Project Phoenix" → list_aspects → create_aspect("Project Phoenix") → create_event(aspect="Project Phoenix")
-"Call about my job at Ignite" → list_aspects → create_aspect("Ignite") → create_event(aspect="Ignite")
-"Shift at Starbucks tomorrow" → list_aspects → create_aspect("Starbucks") → create_event(aspect="Starbucks")
-"Workout at gym" → list_aspects → use existing "Fitness" if available, or create "Gym"
-"Add CS173A class" → create_event(aspect="School") ← WRONG! Use specific aspect
-"Project Phoenix meeting" → create_event(aspect="Work") ← WRONG! Create specific aspect
-"Call about Ignite job" → create_event(aspect="Personal") ← WRONG! Create "Ignite" aspect
+"Add CS173A class Tuesday 1:30pm" → list_aspects → create_aspect("CS173A") → create_event(title="Lecture", aspect="CS173A")
+"Meeting for Project Phoenix" → list_aspects → create_aspect("Project Phoenix") → create_event(title="Meeting", aspect="Project Phoenix")
+"Call about my job at Ignite" → list_aspects → create_aspect("Ignite") → create_event(title="Phone Call", aspect="Ignite")
+"Shift at Starbucks tomorrow" → list_aspects → create_aspect("Starbucks") → create_event(title="Shift", aspect="Starbucks")
+"Workout at gym" → list_aspects → use existing "Fitness" if available, or create "Gym" → create_event(title="Workout", aspect="Gym")
+"CS173A review session" → create_event(title="Review Session", aspect="CS173A")
+"Add CS173A class" → create_event(title="CS173A Lecture", aspect="School") ← WRONG! Use specific aspect AND activity title
+"Project Phoenix meeting" → create_event(title="Project Phoenix Meeting", aspect="Work") ← WRONG! Title should be "Meeting", aspect should be "Project Phoenix"
 
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task

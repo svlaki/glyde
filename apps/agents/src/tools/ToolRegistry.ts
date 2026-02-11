@@ -3,7 +3,8 @@ import {
   createAspectTool,
   listAspectsTool,
   updateAspectTool,
-  deleteAspectTool
+  deleteAspectTool,
+  archiveAspectTool
 } from './aspects/index.js';
 import { taskTools } from './tasks/index.js';
 import { goalTools } from './goals/index.js';
@@ -43,6 +44,7 @@ export class ToolRegistry {
     this.tools.set(listAspectsTool.name, listAspectsTool);
     this.tools.set(updateAspectTool.name, updateAspectTool);
     this.tools.set(deleteAspectTool.name, deleteAspectTool);
+    this.tools.set(archiveAspectTool.name, archiveAspectTool);
 
     // Register all task tools
     taskTools.forEach(tool => {
@@ -114,7 +116,7 @@ export class ToolRegistry {
   getToolsByCategory(category: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
-      aspects: ['create_aspect', 'list_aspects', 'update_aspect', 'delete_aspect'],
+      aspects: ['create_aspect', 'list_aspects', 'update_aspect', 'delete_aspect', 'archive_aspect'],
       tasks: ['create_task', 'update_task', 'delete_task', 'list_tasks', 'complete_task', 'search_tasks'],
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],

@@ -1,15 +1,15 @@
 import { useDarkMode } from '../lib/darkModeContext'
 import type { Aspect } from '../lib/aspectService'
-import { getColors } from '../styles/colors'
-import { getTypography, fontWeight, lineHeight } from '../styles/typography'
+import { getColors, hexToRgba } from '../styles/colors'
+import { getTypography, fontWeight, fontSize, lineHeight } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 
 interface AspectCardProps {
   aspect: Aspect
   isSelected: boolean
   onClick: () => void
-  onEdit: () => void
-  onDelete: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: AspectCardProps) {
@@ -17,6 +17,9 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
   const { isMobile } = usePlatform()
   const colors = getColors(isDarkMode)
   const typography = getTypography(isMobile)
+
+  const isShared = aspect.visibility === 'shared'
+  const isSharedWithMe = aspect.member_role && aspect.member_role !== 'owner'
 
   return (
     <div
@@ -41,15 +44,64 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
         }
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: aspect.description ? '8px' : '0' }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            ...typography.labelLg,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '2px'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: aspect.description ? '2px' : '0'
           }}>
-            {aspect.name}
+            <span style={{
+              ...typography.labelLg,
+              fontWeight: fontWeight.semibold,
+              color: colors.textPrimary,
+            }}>
+              {aspect.name}
+            </span>
+            {isSharedWithMe && (
+              <span
+                title={aspect.member_role === 'editor' ? 'Shared - Editor' : 'Shared - Viewer'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: hexToRgba(colors.accent, 0.12),
+                  color: colors.accent,
+                  fontSize: '10px',
+                  fontWeight: 500,
+                  flexShrink: 0
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.5 3a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM15 3a3 3 0 1 0-5.878.87L6.467 5.54a3 3 0 1 0 0 4.92l2.655 1.67A3 3 0 1 0 12 13.5a3 3 0 0 0-.645-1.87l-2.655-1.67a3.01 3.01 0 0 0 0-.92l2.655-1.67A3 3 0 0 0 15 3zM4.5 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                </svg>
+                {aspect.member_role === 'editor' ? 'Editor' : 'Viewer'}
+              </span>
+            )}
+            {isShared && !isSharedWithMe && (
+              <span
+                title="Shared with others"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '4px',
+                  background: hexToRgba(colors.accent, 0.12),
+                  color: colors.accent,
+                  fontSize: '11px',
+                  flexShrink: 0
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.5 3a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM15 3a3 3 0 1 0-5.878.87L6.467 5.54a3 3 0 1 0 0 4.92l2.655 1.67A3 3 0 1 0 12 13.5a3 3 0 0 0-.645-1.87l-2.655-1.67a3.01 3.01 0 0 0 0-.92l2.655-1.67A3 3 0 0 0 15 3zM4.5 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                </svg>
+              </span>
+            )}
           </div>
           {aspect.description && (
             <div style={{

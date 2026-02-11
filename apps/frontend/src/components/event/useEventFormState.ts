@@ -68,6 +68,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const [visibility, setVisibility] = useState<EventVisibility>('private')
   const [startDate, setStartDate] = useState<Date>(new Date())
   const [endDate, setEndDate] = useState<Date>(new Date())
+  const [reflection, setReflection] = useState('')
   const [loading, setLoading] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrence, setRecurrence] = useState<RecurrenceState>(defaultRecurrence)
@@ -84,6 +85,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const isRecurringEvent = !!(event?.is_recurring || event?.parent_event_id || event?.recurrence_rule)
   const isInstance = !!event?.parent_event_id
   const canSave = title.trim().length > 0
+  const isPastEvent = event ? new Date(event.end_time || '') < new Date() : false
 
   // Init from event prop when isOpen changes
   useEffect(() => {
@@ -93,6 +95,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setDescription(event.description || '')
       setAspect(event.aspect || '')
       setVisibility(event.visibility || 'private')
+      setReflection(event.reflection || '')
 
       if (event.start_time) {
         setStartDate(new Date(event.start_time))
@@ -138,6 +141,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setDescription('')
       setAspect('')
       setVisibility('private')
+      setReflection('')
 
       const now = new Date()
       const roundedStart = new Date(now)
@@ -286,11 +290,15 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
     startTimeValue, setStartTimeValue,
     endTimeValue, setEndTimeValue,
 
+    // Reflection
+    reflection, setReflection,
+
     // Computed
     isEditing,
     isRecurringEvent,
     isInstance,
     canSave,
+    isPastEvent,
 
     // Helpers
     formatDateForInput,

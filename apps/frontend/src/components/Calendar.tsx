@@ -102,6 +102,41 @@ export function Calendar() {
     return event.color || '#3b82f6'
   }
 
+  // Check if an event is in the past
+  const isEventPast = (event: CalendarEvent): boolean => {
+    return new Date(event.end_time) < new Date()
+  }
+
+  // Toggle missed status for past events
+  const handleToggleMissed = async (e: React.MouseEvent, event: CalendarEvent) => {
+    e.stopPropagation()
+    if (!user || !session) return
+
+    const newMissedStatus = !event.is_missed
+    // Optimistic update
+    setEvents(prev => prev.map(ev =>
+      ev.id === event.id ? { ...ev, is_missed: newMissedStatus } : ev
+    ))
+    try {
+      const { error } = await updateEvent(
+        user,
+        event.id,
+        { is_missed: newMissedStatus },
+        session.access_token
+      )
+      if (error) {
+        // Revert on error
+        setEvents(prev => prev.map(ev =>
+          ev.id === event.id ? { ...ev, is_missed: !newMissedStatus } : ev
+        ))
+      }
+    } catch (err) {
+      console.error('Error toggling missed status:', err)
+      setEvents(prev => prev.map(ev =>
+        ev.id === event.id ? { ...ev, is_missed: !newMissedStatus } : ev
+      ))
+    }
+  }
 
   // Parse time string flexibly (supports "2:30pm", "14:30", "2pm", etc.)
   const _parseTime = (timeStr: string): { hours: number; minutes: number } | null => {
@@ -193,7 +228,6 @@ export function Calendar() {
         if (isSubscribed) {
           setEvents(userEvents || [])
           setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
-          console.log('[Calendar] State updated with', userEvents?.length, 'user events and', friendEvents?.length, 'friends events')
         }
       } catch (error) {
         console.error('[Calendar] Error loading events:', error)
@@ -320,23 +354,27 @@ export function Calendar() {
     return filtered
   }
 
-  // Calculate overlap layout for events in the same hour
-  const getEventLayout = (event: CalendarEvent, slotEvents: CalendarEvent[]) => {
-    // Sort events by start time
-    const sortedEvents = [...slotEvents].sort((a, b) =>
-      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    )
+  // Get all events for a specific date (for overlap calculation)
+  const getEventsForDay = (date: Date) => {
+    return allEvents.filter(event => {
+      const eventStart = new Date(event.start_time)
+      return eventStart.toDateString() === date.toDateString()
+    })
+  }
 
-    // Find overlapping events
+  // Calculate overlap layout using ALL events for the day, not just same-hour events
+  const getEventLayout = (event: CalendarEvent, dayEvents: CalendarEvent[]) => {
     const eventStart = new Date(event.start_time).getTime()
     const eventEnd = new Date(event.end_time).getTime()
 
-    const overlapping = sortedEvents.filter(e => {
+    // Find all events on this day that overlap with this event's time range
+    const overlapping = dayEvents.filter(e => {
       const start = new Date(e.start_time).getTime()
       const end = new Date(e.end_time).getTime()
-      // Check if events overlap
       return (start < eventEnd && end > eventStart)
-    })
+    }).sort((a, b) =>
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    )
 
     if (overlapping.length <= 1) {
       return { width: '100%', left: '2px', right: '2px', zIndex: 3 }
@@ -422,7 +460,8 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.aspect ? { category: eventData.aspect } : {})
+            ...(eventData.aspect ? { category: eventData.aspect } : {}),
+            ...(eventData.visibility ? { visibility: eventData.visibility } : {})
           },
           session?.access_token
         )
@@ -450,7 +489,8 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.aspect ? { category: eventData.aspect } : {})
+            ...(eventData.aspect ? { category: eventData.aspect } : {}),
+            ...(eventData.visibility ? { visibility: eventData.visibility } : {})
           },
           session?.access_token
         )
@@ -962,13 +1002,49 @@ export function Calendar() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontSize: '7px',
-                                flexShrink: 0
+                                flexShrink: 0,
+                                overflow: 'hidden'
                               }}>
-                                {event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'}
+                                {event.owner_avatar_url ? (
+                                  <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
+                                )}
                               </span>
                             )}
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
-                            {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, opacity: 0.7 }}>R</span>}
+                            {(event.aspect_name || event.aspect) && (
+                              <span style={{
+                                fontSize: '7px',
+                                fontFamily: fontFamily.sans,
+                                fontWeight: fontWeight.medium,
+                                color: eventColor,
+                                opacity: 0.5,
+                                flexShrink: 0,
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {event.aspect_name || event.aspect}
+                              </span>
+                            )}
+                            {getRecurrenceBadge(event) && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.6 }}>
+                                <path d="M21.5 2v6h-6" /><path d="M2.5 22v-6h6" /><path d="M2.5 11.5a10 10 0 0 1 18.4-4.5" /><path d="M21.5 12.5a10 10 0 0 1-18.4 4.5" />
+                              </svg>
+                            )}
+                            {/* Missed indicator in month view (display only) */}
+                            {!isFriendEvent && isEventPast(event) && event.is_missed && (
+                              <span style={{
+                                fontSize: '7px',
+                                fontFamily: fontFamily.sans,
+                                fontWeight: fontWeight.semibold,
+                                textTransform: 'uppercase',
+                                color: '#ef4444',
+                                flexShrink: 0,
+                                letterSpacing: '0.3px'
+                              }}>
+                                Missed
+                              </span>
+                            )}
                           </div>
                         )
                       })}
@@ -1050,6 +1126,7 @@ export function Calendar() {
             {/* Days Columns */}
             {displayDates.map((date, dayIndex) => {
               const isToday = date.toDateString() === new Date().toDateString()
+              const dayEvents = getEventsForDay(date)
 
               return (
                 <div
@@ -1160,7 +1237,7 @@ export function Calendar() {
                         {/* Render events - Mobile-style cards with left border */}
                         {slotEvents.map(event => {
                           const { top, height } = getEventStyle(event)
-                          const layout = getEventLayout(event, slotEvents)
+                          const layout = getEventLayout(event, dayEvents)
                           const eventColor = getEventColor(event)
                           const startTime = new Date(event.start_time).toLocaleTimeString('en-US', {
                             hour: 'numeric',
@@ -1231,14 +1308,46 @@ export function Calendar() {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     fontSize: '8px',
-                                    flexShrink: 0
+                                    flexShrink: 0,
+                                    overflow: 'hidden'
                                   }}>
-                                    {event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'}
+                                    {event.owner_avatar_url ? (
+                                      <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
+                                    )}
                                   </span>
                                 )}
                                 <span>{event.title}</span>
-                                {getRecurrenceBadge(event) && <span style={{ fontSize: fontSize.xs, flexShrink: 0, opacity: 0.7 }}>R</span>}
                               </div>
+                              {/* Missed button - absolute, below title line, right side */}
+                              {!isFriendEvent && isEventPast(event) && (
+                                <button
+                                  onClick={(e) => handleToggleMissed(e, event)}
+                                  title={event.is_missed ? 'Click to mark as attended' : 'Mark as missed'}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 17,
+                                    right: 4,
+                                    padding: '0px 3px',
+                                    fontSize: '7px',
+                                    fontFamily: fontFamily.sans,
+                                    fontWeight: fontWeight.semibold,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.3px',
+                                    border: 'none',
+                                    borderRadius: '2px',
+                                    cursor: 'pointer',
+                                    lineHeight: '12px',
+                                    zIndex: 1,
+                                    background: event.is_missed ? '#ef4444' : hexToRgba(eventColor, 0.15),
+                                    color: event.is_missed ? '#fff' : hexToRgba(eventColor, 0.5),
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  Missed
+                                </button>
+                              )}
                               {height > 30 && (
                                 <div style={{
                                   fontSize: fontSize.xs,
@@ -1251,6 +1360,33 @@ export function Calendar() {
                                 }}>
                                   {isFriendEvent ? `${event.owner_display_name || 'Friend'} - ${startTime}` : startTime}
                                 </div>
+                              )}
+                              {/* Aspect name - bottom left */}
+                              {(event.aspect_name || event.aspect) && height > 40 && (
+                                <span style={{
+                                  position: 'absolute',
+                                  bottom: 2,
+                                  left: 8,
+                                  fontSize: '8px',
+                                  fontFamily: fontFamily.sans,
+                                  fontWeight: fontWeight.medium,
+                                  color: eventColor,
+                                  opacity: 0.45,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '60%'
+                                }}>
+                                  {event.aspect_name || event.aspect}
+                                </span>
+                              )}
+                              {getRecurrenceBadge(event) && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', bottom: 2, right: 4, opacity: 0.5, flexShrink: 0 }}>
+                                  <path d="M21.5 2v6h-6" />
+                                  <path d="M2.5 22v-6h6" />
+                                  <path d="M2.5 11.5a10 10 0 0 1 18.4-4.5" />
+                                  <path d="M21.5 12.5a10 10 0 0 1-18.4 4.5" />
+                                </svg>
                               )}
                             </div>
                           )
@@ -1334,7 +1470,12 @@ export function Calendar() {
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
             if (eventData.aspect) updates.category = eventData.aspect
+            if (eventData.visibility) updates.visibility = eventData.visibility
+
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
+            if (scope === 'this_instance' && selectedEvent?.instance_date) {
+              updates.instance_date = selectedEvent.instance_date
+            }
             await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
           }
           const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)

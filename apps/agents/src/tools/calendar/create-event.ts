@@ -7,7 +7,7 @@ import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 
 export const createEventTool = tool(
-  async ({ title, startTime, endTime, location, description, category, replaceConflicting = false }, config) => {
+  async ({ title, startTime, endTime, location, description, category, visibility, replaceConflicting = false }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -139,7 +139,8 @@ export const createEventTool = tool(
       end_time: endTimeUTC,
       location: location || "",
       description: description || "",
-      aspect: validatedAspect || ''
+      aspect: validatedAspect || '',
+      visibility: visibility || 'private'
     }, { source: 'agent', agentType: 'conversation' });
 
     console.log('[CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
@@ -173,6 +174,7 @@ export const createEventTool = tool(
       location: z.string().optional().nullable().describe("Event location. Leave empty if not specified"),
       description: z.string().optional().nullable().describe("Event description. Leave empty if not specified"),
       category: z.string().optional().nullable().describe("Aspect name for this event. MUST be an existing aspect - call list_aspects first. Will NOT be auto-created. For classes/projects/clients, create a SPECIFIC aspect first using create_aspect."),
+      visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("Event visibility. 'private' = only you, 'friends' = visible to friends, 'public' = visible to everyone. Defaults to 'private'."),
       replaceConflicting: z.boolean().default(false).nullable().describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
     }),
   }

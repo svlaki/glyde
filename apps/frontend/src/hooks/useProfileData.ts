@@ -98,7 +98,7 @@ export function useProfileData(): ProfileData {
 
       try {
         const [eventsResult, tasksResult, goalsResult, profileResult, connectionsResult] = await Promise.all([
-          fetchUserEvents(user!, session!.access_token),
+          fetchUserEvents(user!, session!.access_token, undefined, undefined, { raw: true }),
           fetchUserTasks(user!, session!.access_token, {}),
           fetchUserGoals(user!, session!.access_token, {}),
           fetchUserProfile(user!, session!.access_token),
@@ -187,7 +187,7 @@ export function useProfileData(): ProfileData {
   const goalInsights = useMemo<GoalInsights>(() => {
     if (goals.length === 0) return emptyGoalInsights
 
-    const activeGoals = goals.filter(g => g.status === 'in_progress' || g.status === 'not_started').length
+    const activeGoals = goals.filter(g => g.status === 'active' || g.status === 'paused').length
     const completedGoals = goals.filter(g => g.status === 'completed').length
 
     const goalsWithProgress = goals.filter(g => typeof g.progress === 'number')
@@ -220,19 +220,13 @@ export function useProfileData(): ProfileData {
       })
     }
 
-    // Deduplicate recurring events: count each series once, skip past events
+    // Raw events = parent events only (no expanded instances), count each once
     const now = new Date()
-    const countedSeriesIds = new Set<string>()
     for (const event of events) {
-      // For recurring events, skip if the series has ended
-      if (event.recurrence_end && new Date(event.recurrence_end) < now) continue
-      // For non-recurring events, skip if already in the past
-      if (!event.is_recurring && !event.parent_event_id && new Date(event.end_time) < now) continue
-
-      // Use parent_event_id as the series key, or event.id for standalone events
-      const seriesKey = event.parent_event_id || event.id
-      if (countedSeriesIds.has(seriesKey)) continue
-      countedSeriesIds.add(seriesKey)
+      // Skip ended recurring series
+      if (event.is_recurring && event.recurrence_end && new Date(event.recurrence_end) < now) continue
+      // Skip past non-recurring events
+      if (!event.is_recurring && new Date(event.end_time) < now) continue
 
       const aspId = event.aspect_id
       if (aspId && breakdownMap.has(aspId)) {

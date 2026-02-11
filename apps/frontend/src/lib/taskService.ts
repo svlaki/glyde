@@ -14,7 +14,6 @@ export interface Task {
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
   completed_at?: string
   parent_goal_id?: string
-  color?: string
   created_at?: string
   updated_at?: string
   energy_required?: 'low' | 'medium' | 'high'
@@ -23,7 +22,7 @@ export interface Task {
   context_required?: Record<string, any>
   completion_notes?: string
   recurring_pattern?: Record<string, any>
-  task_metadata?: Record<string, any>
+  is_shared?: boolean
 }
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
@@ -83,12 +82,10 @@ export async function createUserTask(
     priority?: 'low' | 'medium' | 'high' | 'urgent'
     status?: 'pending' | 'in_progress' | 'completed' | 'cancelled'
     parent_goal_id?: string
-    color?: string
     energy_required?: 'low' | 'medium' | 'high'
     estimated_duration?: number
     context_required?: Record<string, any>
     recurring_pattern?: Record<string, any>
-    task_metadata?: Record<string, any>
   }
 ): Promise<{ task: Task | null, error: string | null }> {
   try {
