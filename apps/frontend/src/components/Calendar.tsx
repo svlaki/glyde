@@ -14,7 +14,7 @@ type ViewType = 'day' | 'week' | 'month'
 
 export function Calendar() {
   const { user, session } = useAuth()
-  const { getAspectColor } = useAspects()
+  const { getAspectColor, getAspectById } = useAspects()
   const { isDarkMode } = useDarkMode()
   const colors = getColors(isDarkMode)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
@@ -1453,6 +1453,10 @@ export function Calendar() {
       </div>
 
       {/* Unified Event Form */}
+      {(() => {
+        const selectedAspect = selectedEvent?.aspect_id ? getAspectById(selectedEvent.aspect_id) : null
+        const isViewerOnly = selectedAspect?.member_role === 'viewer'
+        return (
       <EventFormUnified
         event={selectedEvent}
         isOpen={isFormOpen}
@@ -1460,8 +1464,9 @@ export function Calendar() {
           setSelectedEvent(null)
           setIsFormOpen(false)
         }}
-        onSave={handleSaveEvent}
-        onSaveRecurring={async (eventData, scope, recurrenceRule) => {
+        isViewerOnly={isViewerOnly}
+        onSave={isViewerOnly ? async () => {} : handleSaveEvent}
+        onSaveRecurring={isViewerOnly ? undefined : async (eventData, scope, recurrenceRule) => {
           if (!user || !session) return
           if (eventData.id) {
             const updates: Record<string, string> = {}
@@ -1483,7 +1488,7 @@ export function Calendar() {
           setSelectedEvent(null)
           setIsFormOpen(false)
         }}
-        onDelete={async (scope) => {
+        onDelete={isViewerOnly ? undefined : async (scope) => {
           if (!selectedEvent || !user) return
           if (scope) {
             await deleteRecurringEvent(user, selectedEvent.id, scope, session?.access_token)
@@ -1497,6 +1502,8 @@ export function Calendar() {
           setIsFormOpen(false)
         }}
       />
+        )
+      })()}
     </div>
   )
 }
