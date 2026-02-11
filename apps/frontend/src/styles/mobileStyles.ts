@@ -33,9 +33,6 @@ export const mobileSpacing = {
   paddingTopSafe: 'calc(env(safe-area-inset-top, 0px) + 12px)',
   paddingBottomSafe: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
 
-  // Bottom padding accounting for tab bar (70px)
-  paddingBottomWithTabs: 'calc(70px + env(safe-area-inset-bottom, 0px))',
-
   // For pages without tab bar (fullscreen views)
   paddingBottomNoTabs: 'calc(20px + env(safe-area-inset-bottom, 0px))',
 
@@ -61,8 +58,7 @@ export const mobileStyles = {
   } as CSSProperties,
 
   fullHeight: {
-    minHeight: '100vh',
-    maxHeight: '100vh',
+    height: '100%',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden'

@@ -175,8 +175,7 @@ function CalendarPageMobile() {
         background: colors.bgSecondary,
         paddingLeft: mobileSpacing.paddingX,
         paddingRight: mobileSpacing.paddingX,
-        paddingTop: mobileSpacing.paddingTopSafe,
-        paddingBottom: mobileSpacing.paddingBottomWithTabs
+        paddingTop: mobileSpacing.paddingTopSafe
       }}>
         {activeTab === 'calendar' && <CalendarMobileWrapper />}
         {activeTab === 'chat' && (
@@ -185,10 +184,7 @@ function CalendarPageMobile() {
             display: 'flex',
             flexDirection: 'column',
             minHeight: 0,
-            overflow: 'hidden',
-            // Extend chat to the edge of the tab bar
-            marginBottom: `calc(-1 * ${mobileSpacing.paddingBottomWithTabs})`,
-            paddingBottom: mobileSpacing.paddingBottomWithTabs
+            overflow: 'hidden'
           }}>
             {renderHeader()}
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
@@ -219,10 +215,7 @@ function CalendarPageMobile() {
 
       {/* Bottom tabs navigation */}
       <div style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        flexShrink: 0,
         minHeight: '60px',
         background: colors.bgSecondary,
         borderTop: `1px solid ${colors.border}`,
@@ -230,8 +223,7 @@ function CalendarPageMobile() {
         justifyContent: 'space-around',
         alignItems: 'center',
         paddingTop: '4px',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 4px)',
-        zIndex: 1000
+        paddingBottom: 'max(env(safe-area-inset-bottom), 4px)'
       }}>
         {tabs.map(tab => (
           <button

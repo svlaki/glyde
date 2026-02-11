@@ -2,14 +2,6 @@ import { User } from '@supabase/supabase-js'
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-// Gender options for Section 1
-export const GENDER_OPTIONS = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'non-binary', label: 'Non-binary' },
-  { value: 'prefer-not-to-say', label: 'Prefer not to say' }
-]
-
 // Calendar options for Section 2
 // Only Google has OAuth import - others can use ICS file upload
 export const CALENDAR_OPTIONS = [
@@ -24,33 +16,17 @@ export const CALENDAR_OPTIONS = [
 // Default life aspects for Section 3
 export const DEFAULT_ASPECTS = ['Work/School', 'Health', 'Personal']
 
-// Habit/personality options for Section 3
-export const HABIT_OPTIONS = [
-  { id: 'deadlines', label: 'I struggle to stay on top of deadlines' },
-  { id: 'task-switching', label: 'I find it difficult to switch tasks quickly' },
-  { id: 'procrastinator', label: 'I am a huge procrastinator' },
-  { id: 'easily-distracted', label: 'I get easily distracted' },
-  { id: 'poor-time-estimation', label: 'I often underestimate how long tasks take' },
-  { id: 'overcommit', label: 'I tend to overcommit myself' },
-  { id: 'forget-tasks', label: 'I frequently forget tasks or appointments' },
-  { id: 'work-life-balance', label: 'I struggle with work-life balance' },
-  { id: 'perfectionist', label: 'I spend too much time perfecting things' },
-  { id: 'energy-management', label: 'I have trouble managing my energy throughout the day' }
-]
-
 // V2 Onboarding data interface
 export interface OnboardingDataV2 {
   fullName: string
   preferredName: string
   birthday: string
-  gender: string
   selectedCalendars: string[]
   otherCalendar?: string
   occupation: string
   fieldOfStudy?: string
-  aspects: Array<{ name: string; description?: string }> | string[]
-  goals: Array<{ title: string; description?: string }> | string[]
-  habits: string[]
+  aspects: string[]
+  goals: string[]
   timezone: string
 }
 

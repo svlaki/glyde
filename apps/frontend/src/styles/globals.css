@@ -409,15 +409,9 @@ input::placeholder, textarea::placeholder {
 
 /* iOS-specific fixes */
 @supports (-webkit-touch-callout: none) {
-  /* Fix for iOS Safari address bar */
-  body {
-    min-height: -webkit-fill-available;
-  }
-
-  /* Ensure safe area insets are respected */
+  /* Let body height (set by Capacitor keyboard resize) propagate through */
   #root {
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
+    min-height: 100%;
   }
 }
 

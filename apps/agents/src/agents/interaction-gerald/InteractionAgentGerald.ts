@@ -442,12 +442,6 @@ export class InteractionAgentGerald extends BaseAgent {
       parts.push(`Occupation: ${occ}`);
     }
 
-    // Habits/Challenges - map IDs to human-readable labels
-    if (profile.habits?.length) {
-      const habitLabels = this.mapHabitIds(profile.habits);
-      parts.push(`Known challenges: ${habitLabels.join(', ')}`);
-    }
-
     // Life aspects
     const aspects = profile.context_data?.life_aspects;
     if (aspects?.length) {
@@ -463,26 +457,8 @@ export class InteractionAgentGerald extends BaseAgent {
   }
 
   /**
-   * Map habit IDs to human-readable labels
-   */
-  private mapHabitIds(habitIds: string[]): string[] {
-    const HABIT_LABELS: Record<string, string> = {
-      'deadlines': 'struggles with deadlines',
-      'task-switching': 'difficulty switching tasks',
-      'procrastinator': 'tends to procrastinate',
-      'easily-distracted': 'gets easily distracted',
-      'poor-time-estimation': 'underestimates task duration',
-      'overcommit': 'tends to overcommit',
-      'forget-tasks': 'forgets tasks/appointments',
-      'work-life-balance': 'work-life balance challenges',
-      'perfectionist': 'perfectionist tendencies',
-      'energy-management': 'energy management challenges'
-    };
-    return habitIds.map(id => HABIT_LABELS[id] || id);
-  }
-
-  /**
-   * Build recent interaction context to help Gerald avoid repetition
+   * Build category context for the prompt
+   * Includes category IDs so Gerald can specify them when creating events/tasks/goals
    */
   private buildRecentInteractionContext(interactions: any[]): string {
     if (!interactions || interactions.length === 0) {

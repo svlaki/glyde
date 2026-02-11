@@ -44,14 +44,12 @@ export interface OnboardingDataV2 {
   fullName: string;
   preferredName?: string;
   birthday: string;
-  gender: string;
   selectedCalendars: string[];
   otherCalendar?: string;
   occupation: string;
   fieldOfStudy?: string;
-  aspects: AspectItem[] | string[];
-  goals: GoalItem[] | string[];
-  habits: string[];
+  aspects: string[];
+  goals: string[];
   timezone: string;
 }
 
@@ -126,7 +124,7 @@ export class OnboardingService {
   }
 
   /**
-   * Complete V2 onboarding (new structure with birthday, gender, habits)
+   * Complete V2 onboarding (new structure with birthday)
    * Wipes previous onboarding data and starts fresh
    */
   static async completeOnboardingV2(userId: string, data: OnboardingDataV2): Promise<void> {
@@ -166,10 +164,8 @@ export class OnboardingService {
         display_name: data.preferredName || data.fullName,
         preferred_name: data.preferredName || null,
         birthday: data.birthday,
-        gender: data.gender,
         occupation: data.occupation,
         field_of_study: data.fieldOfStudy || null,
-        habits: data.habits,
         timezone: data.timezone,
         goals_summary: goals_summary,
         context_data: context_data
@@ -222,10 +218,8 @@ export class OnboardingService {
         display_name: null,
         preferred_name: null,
         birthday: null,
-        gender: null,
         occupation: null,
         field_of_study: null,
-        habits: [],
         goals_summary: null,
         context_data: {},
         preferences: {},

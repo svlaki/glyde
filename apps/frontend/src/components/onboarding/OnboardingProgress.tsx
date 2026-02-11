@@ -8,7 +8,7 @@ interface OnboardingProgressProps {
 const sections = [
   { id: 1, label: 'About You' },
   { id: 2, label: 'Calendars' },
-  { id: 3, label: 'Goals & Habits' }
+  { id: 3, label: 'Goals' }
 ]
 
 export function OnboardingProgress({ currentSection }: OnboardingProgressProps) {
