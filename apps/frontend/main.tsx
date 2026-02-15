@@ -94,7 +94,13 @@ function App() {
                 />
                 <Route
                   path="/connections"
-                  element={<Navigate to="/profile" replace />}
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <ConnectionsPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
                 />
                 <Route
                   path="/plan"

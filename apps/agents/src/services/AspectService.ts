@@ -359,6 +359,40 @@ export class AspectService {
         throw new Error('Invalid aspect ID');
       }
 
+      // Nullify aspect_id on events that reference this aspect
+      const { error: eventsError } = await this.supabase
+        .from('events')
+        .update({ aspect_id: null })
+        .eq('aspect_id', aspectId)
+        .eq('user_id', userId);
+
+      if (eventsError) {
+        logger.warn('[AspectService] Error clearing aspect from events:', eventsError);
+      }
+
+      // Nullify aspect_id on calendar mappings that reference this aspect
+      const { error: mappingsError } = await this.supabase
+        .from('user_calendar_mappings')
+        .update({ aspect_id: null })
+        .eq('aspect_id', aspectId)
+        .eq('user_id', userId);
+
+      if (mappingsError) {
+        logger.warn('[AspectService] Error clearing aspect from calendar mappings:', mappingsError);
+      }
+
+      // Nullify aspect_id on tasks that reference this aspect
+      const { error: tasksError } = await this.supabase
+        .from('tasks')
+        .update({ aspect_id: null })
+        .eq('aspect_id', aspectId)
+        .eq('user_id', userId);
+
+      if (tasksError) {
+        logger.warn('[AspectService] Error clearing aspect from tasks:', tasksError);
+      }
+
+      // Now safe to delete the aspect
       const { error } = await this.supabase
         .from('aspects')
         .delete()

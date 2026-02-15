@@ -50,6 +50,7 @@ export interface ProfileData {
   profile: UserProfile | null
   connections: Connection[]
   refreshProfile: () => void
+  refreshConnections: () => Promise<void>
 }
 
 const emptyTaskInsights: TaskInsights = {
@@ -143,6 +144,16 @@ export function useProfileData(): ProfileData {
       setProfile(profileResult.profile || null)
     } catch {
       // refresh is best-effort, profile data remains stale on failure
+    }
+  }, [user, session])
+
+  const refreshConnections = useCallback(async () => {
+    if (!user || !session) return
+    try {
+      const result = await fetchConnections(user, session.access_token)
+      setConnections(result.connections || [])
+    } catch {
+      // refresh is best-effort
     }
   }, [user, session])
 
@@ -275,5 +286,6 @@ export function useProfileData(): ProfileData {
     profile,
     connections,
     refreshProfile,
+    refreshConnections,
   }
 }

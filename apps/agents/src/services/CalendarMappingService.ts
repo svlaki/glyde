@@ -469,14 +469,14 @@ export class CalendarMappingService {
 
   /**
    * Auto-map calendars to aspects based on name matching
-   * Creates new aspects if no match found
+   * Only maps synced calendars, skips non-user calendars (holidays, birthdays, etc.)
    */
   async autoMapCalendarsToAspects(connection: UserConnection): Promise<void> {
     logger.info('[CalendarMappingService] Auto-mapping calendars to aspects for:', connection.id);
 
     try {
-      // Get all calendars and existing aspects
-      const mappings = await this.getMappingsForConnection(connection.id);
+      // Only process calendars that are actually being synced
+      const mappings = await this.getSyncedMappings(connection.id);
       let existingAspects = await aspectService.getAspects(connection.user_id);
       const usedColors = new Set<string>(
         existingAspects
@@ -487,6 +487,12 @@ export class CalendarMappingService {
       for (const mapping of mappings) {
         // Skip if already has an aspect assigned
         if (mapping.aspect_id) continue;
+
+        // Skip non-user calendars (holidays, birthdays, contacts, etc.)
+        if (this.isNonUserCalendar(mapping.google_calendar_id)) {
+          logger.info(`[CalendarMappingService] Skipping non-user calendar: ${mapping.google_calendar_name}`);
+          continue;
+        }
 
         const calendarName = mapping.google_calendar_name || 'Calendar';
 
@@ -519,6 +525,27 @@ export class CalendarMappingService {
       logger.error('[CalendarMappingService] Error auto-mapping calendars:', error);
       // Don't throw - mapping is optional, sync can still work
     }
+  }
+
+  /**
+   * Check if a Google Calendar ID belongs to a non-user calendar (holidays, birthdays, contacts)
+   */
+  private isNonUserCalendar(calendarId: string): boolean {
+    const nonUserPatterns = [
+      '#holiday@group.v.calendar.google.com',
+      '#contacts@group.v.calendar.google.com',
+      '#other@group.v.calendar.google.com',
+      '#weather@group.v.calendar.google.com',
+      'addressbook#contacts@group.v.calendar.google.com',
+      'en.usa#holiday@group.v.calendar.google.com',
+    ];
+
+    const id = calendarId.toLowerCase();
+    return nonUserPatterns.some(pattern => id.includes(pattern.toLowerCase())) ||
+      id.includes('#holiday@') ||
+      id.includes('#contacts@') ||
+      id.includes('#weather@') ||
+      id.endsWith('@group.v.calendar.google.com') && id.includes('#');
   }
 
   /**
