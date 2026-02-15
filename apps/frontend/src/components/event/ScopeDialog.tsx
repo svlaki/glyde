@@ -1,4 +1,4 @@
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { fontSize, fontWeight } from '../../styles/typography'
 import { Modal } from '../Modal'
@@ -18,8 +18,8 @@ export function ScopeDialog({
   isInstance,
   onConfirm
 }: ScopeDialogProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   const actionWord = action === 'delete' ? 'delete' : 'update'
 

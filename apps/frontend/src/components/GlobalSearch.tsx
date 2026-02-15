@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import {
@@ -31,8 +31,8 @@ export function GlobalSearch({
   onClose
 }: GlobalSearchProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   const [isOpen, setIsOpen] = useState(inline)
   const [query, setQuery] = useState('')

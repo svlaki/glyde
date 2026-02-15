@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useDarkMode } from '../../../lib/darkModeContext'
+import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { usePlatform } from '../../../hooks/usePlatform'
 import { ChatBot } from '../../ChatBot'
@@ -10,8 +10,8 @@ interface Section4OnboardingChatProps {
 }
 
 export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { isMobile } = usePlatform()
   const chatRef = useRef<ChatBotHandle>(null)
   const [showContinue, setShowContinue] = useState(false)

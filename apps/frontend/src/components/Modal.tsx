@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
 
@@ -15,8 +15,8 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, headerContent, children, maxWidth = '500px', preventAutoFocus = false }: ModalProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false)
 
   return (

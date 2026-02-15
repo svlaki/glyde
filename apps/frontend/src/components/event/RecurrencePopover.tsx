@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { fontSize, fontWeight } from '../../styles/typography'
 import { RecurrenceState } from './useEventFormState'
@@ -21,8 +21,8 @@ export function RecurrencePopover({
   onChange,
   preview
 }: RecurrencePopoverProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const popoverRef = useRef<HTMLDivElement>(null)
 
   // Click-outside to close

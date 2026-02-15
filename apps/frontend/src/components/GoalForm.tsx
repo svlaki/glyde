@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { createUserAspect } from '../lib/aspectService'
 import type { Aspect } from '../lib/aspectService'
@@ -47,8 +47,8 @@ interface GoalFormProps {
 
 export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { aspects, refreshAspects, getAspectColor } = useAspects()
   const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')

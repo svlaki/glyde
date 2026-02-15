@@ -58,7 +58,7 @@ interface UseEventFormStateOptions {
   isOpen: boolean
 }
 
-export type EventVisibility = 'private' | 'friends' | 'public'
+export type EventVisibility = 'private' | 'public' | 'friends' | 'shared'
 
 export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const [title, setTitle] = useState('')

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './src/lib/authContext'
 import { AspectProvider } from './src/lib/aspectContext'
-import { DarkModeProvider } from './src/lib/darkModeContext'
+import { ThemeProvider } from './src/lib/themeContext'
 import { RuleProvider } from './src/lib/ruleContext'
 import { ConnectionProvider } from './src/lib/connectionContext'
 import { Auth } from './src/components/Auth'
@@ -24,7 +24,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <DarkModeProvider>
+        <ThemeProvider>
           <RuleProvider>
             <ConnectionProvider>
             <AspectProvider>
@@ -120,7 +120,7 @@ function App() {
             </AspectProvider>
             </ConnectionProvider>
           </RuleProvider>
-        </DarkModeProvider>
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   )

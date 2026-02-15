@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../lib/authContext'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { createRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
 import type { CalendarEvent } from '../../lib/calendarService'
 import { buildRRuleFromForm, formatRRuleForDisplay } from '../../lib/recurrenceUtils'
@@ -15,6 +15,7 @@ import { useEventFormState, pickerValueToDate } from './useEventFormState'
 import { AspectDropdown } from './AspectDropdown'
 import { RecurrencePopover } from './RecurrencePopover'
 import { ScopeDialog } from './ScopeDialog'
+import { EventShareModal } from './EventShareModal'
 
 interface EventFormUnifiedProps {
   event?: CalendarEvent | null
@@ -40,9 +41,9 @@ export function EventFormUnified({
   isViewerOnly = false
 }: EventFormUnifiedProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const form = useEventFormState({ event: event ?? null, isOpen })
@@ -54,6 +55,7 @@ export function EventFormUnified({
   const [scopeDialogAction, setScopeDialogAction] = useState<'save' | 'delete' | null>(null)
   const [pendingSaveData, setPendingSaveData] = useState<Partial<CalendarEvent> | null>(null)
   const [pendingRRule, setPendingRRule] = useState<string | undefined>(undefined)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   // Build rrule from current recurrence state
   const buildCurrentRRule = () => {
@@ -719,14 +721,14 @@ export function EventFormUnified({
               onChange={form.setAspect}
             />
 
-            {/* Visibility */}
+            {/* Visibility + Invite */}
             <div>
               <FormLabel>Who can see this</FormLabel>
               <div style={{
                 display: 'flex',
                 gap: '8px'
               }}>
-                {(['private', 'friends', 'public'] as const).map((option) => (
+                {(['private', 'public'] as const).map((option) => (
                   <button
                     key={option}
                     type="button"
@@ -744,9 +746,40 @@ export function EventFormUnified({
                       transition: 'all 0.15s'
                     }}
                   >
-                    {option === 'private' ? 'Only me' : option === 'friends' ? 'Friends' : 'Public'}
+                    {option === 'private' ? 'Only me' : 'Public'}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.setVisibility('shared')
+                    setShowShareModal(true)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    fontSize: '14px',
+                    fontFamily: fontFamily.sans,
+                    background: form.visibility === 'shared' ? colors.accent : colors.bgTertiary,
+                    color: form.visibility === 'shared' ? '#fff' : colors.textSecondary,
+                    border: `1px solid ${form.visibility === 'shared' ? colors.accent : colors.border}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="8.5" cy="7" r="4"/>
+                    <line x1="20" y1="8" x2="20" y2="14"/>
+                    <line x1="23" y1="11" x2="17" y2="11"/>
+                  </svg>
+                  Invite
+                </button>
               </div>
               <div style={{
                 marginTop: '6px',
@@ -754,8 +787,8 @@ export function EventFormUnified({
                 color: colors.textTertiary
               }}>
                 {form.visibility === 'private' && 'Only you can see this event'}
-                {form.visibility === 'friends' && 'Friends you\'ve added can see this event'}
-                {form.visibility === 'public' && 'All friends can see this event on their calendar'}
+                {form.visibility === 'public' && 'All your friends can see this event'}
+                {form.visibility === 'shared' && 'Invited friends can view or edit this event'}
               </div>
             </div>
 
@@ -867,6 +900,14 @@ export function EventFormUnified({
           onConfirm={handleScopeConfirm}
         />
       )}
+
+      {/* Share/Invite modal */}
+      <EventShareModal
+        eventId={event?.id}
+        eventTitle={form.title}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </>
   )
 }

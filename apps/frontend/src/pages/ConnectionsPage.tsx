@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
@@ -83,8 +83,8 @@ function FileIcon({ color }: { color: string }) {
 }
 
 function ConnectionsPageDesktop() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false)
 
   return (
@@ -184,8 +184,8 @@ function ConnectionsPageDesktop() {
 }
 
 function ConnectionsPageMobile() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   return (
     <div style={mobileStyles.fullHeight}>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardR
 import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
@@ -84,6 +84,7 @@ const XIcon = ({ size = 14, color = 'currentColor' }: { size?: number; color?: s
 
 // Format timestamp
 const formatTime = (date: Date): string => {
+  if (!date || isNaN(date.getTime())) return ''
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
@@ -101,10 +102,10 @@ const SUGGESTIONS = [
 
 export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false, currentPageOverride, autoSendMessage }, ref) {
   const { user, session, preferredName } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { refreshAspects } = useAspects()
   const location = useLocation()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
 
   // Derive current page from pathname (or use override for embedded contexts)
@@ -149,7 +150,13 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const [isLoading, setIsLoading] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
   const [streamingMessage, setStreamingMessage] = useState<string>('')
+  const [queueCount, setQueueCount] = useState(0)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Message queue for sending while agent is processing
+  const messageQueueRef = useRef<Array<{ text: string; image: { base64: string; name: string } | null; messageId: string }>>([])
+  const isProcessingRef = useRef(false)
+  const messagesRef = useRef<Message[]>([])
 
   // Expose handle for external control (e.g., header integration, interaction chat replies)
   useImperativeHandle(ref, () => ({
@@ -187,7 +194,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
           id: msg.id,
           text: msg.text,
           sender: msg.sender === 'assistant' ? 'bot' : msg.sender,
-          timestamp: new Date(msg.timestamp)
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
         }))
       } catch (e) {
         console.error('Failed to parse saved messages:', e)
@@ -300,6 +307,11 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     }
   }, [messages, user?.id, isLoading, isInitializing, saveToLocalStorage])
 
+  // Keep messagesRef in sync for queue processing
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
   // Auto-scroll to bottom when new messages arrive or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -326,9 +338,19 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
 
   // Clear chat handler
   const handleClearChat = async () => {
+    // Clear queue and stop processing
+    messageQueueRef.current = []
+    setQueueCount(0)
+    isProcessingRef.current = false
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+
     const welcomeMessage = createWelcomeMessage()
     setMessages([welcomeMessage])
     setStreamingMessage('')
+    setIsLoading(false)
 
     if (user?.id) {
       // Clear localStorage cache
@@ -356,6 +378,11 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
 
   // Stop streaming handler
   const handleStop = () => {
+    // Clear the queue - user wants to interrupt
+    messageQueueRef.current = []
+    setQueueCount(0)
+    isProcessingRef.current = false
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
@@ -417,43 +444,34 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     setSelectedImage(null)
   }
 
-  // Send message with native fetch streaming
-  const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const trimmedInput = input.trim()
-    // Allow sending with just an image (no text required)
-    if ((!trimmedInput && !selectedImage) || isLoading || !user || !session) return
+  // Process a single message through the agent stream
+  // messageId: when processing a queued message, this is its ID in the messages array
+  //   so we can build history up to (but not including) this message to avoid duplication
+  const processMessage = async (
+    trimmedInput: string,
+    imageToSend: { base64: string; name: string } | null,
+    messageId?: string
+  ) => {
+    if (!user || !session) return
 
-    // Capture and clear image before async operations
-    const imageToSend = selectedImage
-    setSelectedImage(null)
-
-    // Add user message to chat
-    const userMessage: Message = {
-      id: `msg_${Date.now()}`,
-      text: trimmedInput,
-      sender: 'user',
-      timestamp: new Date(),
-      hasImage: !!imageToSend,
-      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {})  // Store for context window
-    }
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
+    isProcessingRef.current = true
     setIsLoading(true)
     setStreamingMessage('')
 
-    // Save user message to API (fire and forget)
-    saveMessageToAPI(userMessage)
-
-    // Reset textarea height
-    if (inputRef.current) {
-      inputRef.current.style.height = '36px'
-    }
-
-    // Build conversation history (exclude welcome message)
-    // Keep images in context for the last 5 messages
+    // Build conversation history from ref (always current)
     const IMAGE_CONTEXT_WINDOW = 5
-    const filteredMessages = messages.filter(msg => msg.id !== 'welcome' && msg.id !== '1')
+    const currentMessages = messagesRef.current
+
+    // For queued messages, only include history up to (not including) this message
+    // to avoid sending the same user message twice
+    let historySource: Message[]
+    if (messageId) {
+      const msgIndex = currentMessages.findIndex(m => m.id === messageId)
+      historySource = msgIndex >= 0 ? currentMessages.slice(0, msgIndex) : currentMessages
+    } else {
+      historySource = currentMessages
+    }
+    const filteredMessages = historySource.filter(msg => msg.id !== 'welcome' && msg.id !== '1')
     const recentMessageCount = filteredMessages.length
 
     const conversationHistory = filteredMessages.map((msg, index) => {
@@ -461,7 +479,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       const includeImage = msg.imageData && messagesFromEnd <= IMAGE_CONTEXT_WINDOW
 
       if (includeImage && msg.sender === 'user') {
-        // Include image in content array for recent messages
         return {
           role: 'user' as const,
           content: [
@@ -488,7 +505,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     }
 
     try {
-      // Create abort controller for cancellation
       abortControllerRef.current = new AbortController()
 
       const response = await fetch(`${AGENT_SERVICE_URL}/api/agent/stream`, {
@@ -517,7 +533,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Read the stream
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('No reader available')
@@ -532,33 +547,26 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
 
         const chunk = decoder.decode(value, { stream: true })
 
-        // Parse status updates from the stream
-        // Format: [STATUS:message] - extract and show in toolStatus
         const statusMatch = chunk.match(/\[STATUS:([^\]]+)\]/g)
         if (statusMatch && statusMatch.length > 0) {
-          // Extract the last status message
           const lastStatus = statusMatch[statusMatch.length - 1]!
           const statusContent = lastStatus.replace(/\[STATUS:|\]/g, '')
           setToolStatus(statusContent)
 
-          // Remove status markers from the text content
           const cleanChunk = chunk.replace(/\[STATUS:[^\]]+\]/g, '')
           if (cleanChunk) {
             fullText += cleanChunk
             setStreamingMessage(fullText)
           }
         } else {
-          // No status markers, just regular text
           fullText += chunk
           setStreamingMessage(fullText)
-          // Clear status once we start getting actual text
           if (fullText.length > 0) {
             setToolStatus(null)
           }
         }
       }
 
-      // Add the complete bot message
       const botMessage: Message = {
         id: `msg_${Date.now()}`,
         text: fullText,
@@ -569,18 +577,14 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       setStreamingMessage('')
       setToolStatus(null)
 
-      // Save bot message to API (fire and forget)
       saveMessageToAPI(botMessage)
-
-      // Refresh aspects in case agent created/modified any
       refreshAspects()
 
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
-        console.log('Stream was aborted')
+        // Stream was aborted - don't process queue
+        return
       } else {
-        console.error('Streaming error:', error)
-        // Add error message
         const errorMessage: Message = {
           id: `msg_${Date.now()}`,
           text: 'Sorry, I encountered an error. Please try again.',
@@ -591,10 +595,59 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
         setStreamingMessage('')
       }
     } finally {
-      setIsLoading(false)
       setToolStatus(null)
       abortControllerRef.current = null
+
+      // Process next queued message if any
+      if (messageQueueRef.current.length > 0) {
+        const next = messageQueueRef.current[0]!
+        messageQueueRef.current = messageQueueRef.current.slice(1)
+        setQueueCount(messageQueueRef.current.length)
+        // Small delay to let React flush state updates (so messagesRef is current)
+        await new Promise(resolve => setTimeout(resolve, 50))
+        await processMessage(next.text, next.image, next.messageId)
+      } else {
+        isProcessingRef.current = false
+        setIsLoading(false)
+        setQueueCount(0)
+      }
     }
+  }
+
+  // Send message - adds to chat immediately, queues if agent is busy
+  const handleSend = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const trimmedInput = input.trim()
+    if ((!trimmedInput && !selectedImage) || !user || !session) return
+
+    const imageToSend = selectedImage
+    setSelectedImage(null)
+
+    const userMessage: Message = {
+      id: `msg_${Date.now()}`,
+      text: trimmedInput,
+      sender: 'user',
+      timestamp: new Date(),
+      hasImage: !!imageToSend,
+      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {})
+    }
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
+
+    saveMessageToAPI(userMessage)
+
+    if (inputRef.current) {
+      inputRef.current.style.height = mobileEmbedded ? '32px' : '36px'
+    }
+
+    // If already processing, queue for later
+    if (isProcessingRef.current) {
+      messageQueueRef.current = [...messageQueueRef.current, { text: trimmedInput, image: imageToSend, messageId: userMessage.id }]
+      setQueueCount(messageQueueRef.current.length)
+      return
+    }
+
+    await processMessage(trimmedInput, imageToSend)
   }
 
   // Determine if we should show timestamp for a message
@@ -1029,6 +1082,15 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 />
               ))}
             </div>
+            {queueCount > 0 && (
+              <span style={{
+                fontSize: fontSize.xs,
+                color: colors.textTertiary,
+                marginLeft: '4px',
+              }}>
+                +{queueCount} queued
+              </span>
+            )}
           </div>
         )}
 
@@ -1218,7 +1280,6 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 }
               }}
               placeholder="Ask me anything..."
-              disabled={isLoading}
               rows={1}
               style={{
                 flex: 1,
@@ -1245,11 +1306,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
               }}
             />
             {/* Image upload button */}
-            {!isLoading && (
-              <button
-                type="button"
-                onClick={handleImageClick}
-                title="Upload image"
+            <button
+              type="button"
+              onClick={handleImageClick}
+              title="Upload image"
                 style={{
                   width: mobileEmbedded ? '30px' : '36px',
                   height: mobileEmbedded ? '30px' : '36px',
@@ -1275,9 +1335,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                 }}
               >
                 <ImageIcon size={mobileEmbedded ? 16 : 18} />
-              </button>
-            )}
-            {isLoading ? (
+            </button>
+            {isLoading && !(input ?? '').trim() && !selectedImage ? (
               <button
                 type="button"
                 onClick={handleStop}

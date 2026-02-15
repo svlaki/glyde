@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useAspects } from '../../lib/aspectContext'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
 import { supabase } from '../../lib/supabase'
 import { getColors, hexToRgba } from '../../styles/colors'
@@ -37,8 +37,8 @@ interface MobileCalendarProps {
 export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateChange, hideMonthDayHeaders = false, scrollToDate }: MobileCalendarProps) {
   const { user, session } = useAuth()
   const { getAspectColor } = useAspects()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(true) // Mobile context
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())

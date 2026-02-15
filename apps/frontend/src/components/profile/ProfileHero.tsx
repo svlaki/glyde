@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useAuth } from '../../lib/authContext'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { fontFamily } from '../../styles/typography'
@@ -37,9 +37,9 @@ function formatMemberSince(dateStr: string | undefined): string {
 
 export function ProfileHero() {
   const { user, preferredName, avatarUrl, updateAvatarUrl, signOut } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { uploading, error: uploadError, handleFileSelect } = useAvatarUpload()

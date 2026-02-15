@@ -1,6 +1,6 @@
 import { CSSProperties, ElementType, forwardRef, ReactNode } from 'react'
 import { usePlatform } from '@/hooks/usePlatform'
-import { useDarkMode } from '@/lib/darkModeContext'
+import { useTheme } from '@/lib/themeContext'
 import { getTypography } from '@/styles/typography'
 import { getColors } from '@/styles/colors'
 
@@ -89,7 +89,7 @@ interface TextProps {
  * Features:
  * - Renders appropriate HTML element based on variant (or use `as` to override)
  * - Responsive typography via usePlatform()
- * - Dark mode aware via useDarkMode()
+ * - Dark mode aware via useTheme()
  * - Semantic color props
  *
  * @example
@@ -112,10 +112,10 @@ export const Text = forwardRef<HTMLElement, TextProps>(
     ref
   ) => {
     const { isMobile } = usePlatform()
-    const { isDarkMode } = useDarkMode()
+    const { theme, isDarkMode } = useTheme()
 
     const typography = getTypography(isMobile)
-    const colors = getColors(isDarkMode)
+    const colors = getColors(theme)
 
     const Component = as || variantElementMap[variant]
 

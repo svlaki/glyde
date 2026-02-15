@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useRules } from '../lib/ruleContext'
 import { Rule } from '../lib/ruleService'
 import { RuleCard } from './RuleCard'
@@ -11,9 +11,9 @@ import { usePlatform } from '../hooks/usePlatform'
 import { NewButton, EditButton, DeleteButton } from './ui/IconButtons'
 
 export function RulesSection() {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const { rules, isLoading, error, createRule, updateRule, deleteRule, toggleRule } = useRules()
 

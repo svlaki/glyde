@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import type { Goal } from '../lib/goalService'
 import { getColors, hexToRgba } from '../styles/colors'
@@ -12,9 +12,9 @@ interface GoalCardProps {
 }
 
 export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const { getAspectColor } = useAspects()
 

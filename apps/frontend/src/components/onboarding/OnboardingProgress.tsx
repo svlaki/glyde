@@ -1,4 +1,4 @@
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 
 interface OnboardingProgressProps {
@@ -12,8 +12,8 @@ const sections = [
 ]
 
 export function OnboardingProgress({ currentSection }: OnboardingProgressProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   return (
     <div style={{

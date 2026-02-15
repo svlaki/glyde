@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { Calendar } from '../components/Calendar'
 import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
 import { AgentInteractions } from '../components/AgentInteractions'
@@ -22,8 +22,8 @@ export function CalendarPage() {
 }
 
 function CalendarPageMobile() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const chatBotRef = useRef<ChatBotHandle>(null)
@@ -254,8 +254,8 @@ function CalendarPageMobile() {
 }
 
 function CalendarPageDesktop() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const chatBotRef = useRef<ChatBotHandle>(null)
 
   const handleChatReply = useCallback((message: string) => {

@@ -1,11 +1,11 @@
 import { FriendsSection } from '../components/FriendsSection'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 
 export function FriendsPage() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   return (
     <div style={{ display: 'flex' }}>

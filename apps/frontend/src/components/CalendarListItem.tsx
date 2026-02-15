@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
@@ -17,8 +17,8 @@ export function CalendarListItem({
   onSetAspect,
   isUpdating = false
 }: CalendarListItemProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { aspects } = useAspects()
 
   const selectedAspect = mapping.aspect_id

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../lib/authContext'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -37,9 +37,9 @@ function formatLastSynced(dateStr: string | null): string {
 
 function ConnectionRow({ connection }: { connection: Connection }) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const [syncing, setSyncing] = useState(false)
 
@@ -111,9 +111,9 @@ function ConnectionRow({ connection }: { connection: Connection }) {
 
 export function ConnectionsStatusCard({ connections }: ConnectionsStatusCardProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const [connecting, setConnecting] = useState(false)
 

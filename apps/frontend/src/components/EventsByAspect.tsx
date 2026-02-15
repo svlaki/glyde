@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fetchUserEvents, CalendarEvent } from '../lib/calendarService'
 import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
@@ -100,7 +100,7 @@ function EventCard({ event, aspectColor, isDarkMode }: { event: CalendarEvent, a
 
 export function EventsByAspect({ aspect }: EventsByAspectProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
 

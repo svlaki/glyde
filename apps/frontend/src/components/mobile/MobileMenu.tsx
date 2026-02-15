@@ -1,7 +1,8 @@
 import { Drawer } from 'vaul'
 import { useAuth } from '../../lib/authContext'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
+import { ThemePicker } from '../ui/ThemePicker'
 import { getTypography } from '../../styles/typography'
 
 interface MobileMenuProps {
@@ -11,8 +12,8 @@ interface MobileMenuProps {
 
 export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   const { signOut, preferredName, user } = useAuth()
-  const { isDarkMode, toggleDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(true) // Mobile context
   const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
@@ -113,15 +114,19 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               margin: '20px 0'
             }} />
 
-            <button
-              onClick={() => {
-                toggleDarkMode()
-                onClose()
-              }}
-              style={menuItemStyle}
-            >
-              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            </button>
+            <div style={{ padding: '4px 0' }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: colors.textTertiary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '4px',
+              }}>
+                Theme
+              </div>
+              <ThemePicker inline onSelect={onClose} />
+            </div>
 
             <button onClick={handleSignOut} style={menuItemStyle}>
               Sign Out

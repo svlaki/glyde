@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { GoalsSection } from '../components/GoalsSection'
 import { RulesSection } from '../components/RulesSection'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
@@ -25,8 +25,8 @@ export function ProfilePage() {
 }
 
 function ProfilePageMobile() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(true)
   const data = useProfileData()
 
@@ -80,8 +80,8 @@ function ProfilePageMobile() {
 }
 
 function ProfilePageDesktop() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false)
   const data = useProfileData()
 

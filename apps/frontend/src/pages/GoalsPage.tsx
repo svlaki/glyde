@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
@@ -13,8 +13,8 @@ import { supabase } from '../lib/supabase'
 
 export function GoalsPage() {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

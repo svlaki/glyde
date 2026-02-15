@@ -1,6 +1,6 @@
 import * as React from "react"
 import * as ProgressPrimitive from "@radix-ui/react-progress"
-import { useDarkMode } from "../../lib/darkModeContext"
+import { useTheme } from "../../lib/themeContext"
 
 export interface ProgressProps extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> {
   value?: number
@@ -10,7 +10,7 @@ const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
 >(({ value, ...props }, ref) => {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
 
   return (
     <ProgressPrimitive.Root

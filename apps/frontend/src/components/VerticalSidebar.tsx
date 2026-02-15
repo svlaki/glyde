@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { usePlatform } from '../hooks/usePlatform'
 import { getColors } from '../styles/colors'
+import { ThemePicker } from './ui/ThemePicker'
 import { getTypography } from '../styles/typography'
 import { GlobalSearch } from './GlobalSearch'
 
@@ -139,9 +140,9 @@ export function VerticalSidebar({
 }: VerticalSidebarProps) {
   const location = useLocation()
   const { signOut } = useAuth()
-  const { isDarkMode, toggleDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(false)
 
   // Don't render on mobile
@@ -404,36 +405,10 @@ export function VerticalSidebar({
           flexDirection: 'column',
           gap: '4px',
         }}>
-          {/* Dark mode toggle */}
-          <button
-            onClick={toggleDarkMode}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: isExpanded ? '10px 16px' : '10px 8px',
-              borderRadius: '8px',
-              background: 'transparent',
-              border: 'none',
-              color: colors.textSecondary,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              width: '100%',
-              justifyContent: isExpanded ? 'flex-start' : 'center',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-            title={isExpanded ? undefined : (isDarkMode ? 'Light Mode' : 'Dark Mode')}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px' }}>
-              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-            </span>
-            {isExpanded && (
-              <span style={{ ...typography.bodyMd }}>
-                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-              </span>
-            )}
-          </button>
+          {/* Theme picker */}
+          <div style={{ padding: isExpanded ? '4px 8px' : '4px 0', display: 'flex', justifyContent: isExpanded ? 'flex-start' : 'center' }}>
+            <ThemePicker />
+          </div>
 
           {/* Sign out */}
           <button

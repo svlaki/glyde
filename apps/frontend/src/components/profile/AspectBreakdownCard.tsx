@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useState, useEffect, useMemo } from 'react'
+import { useTheme } from '../../lib/themeContext'
 import { useAspects } from '../../lib/aspectContext'
 import { useAuth } from '../../lib/authContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { AspectBreakdown } from '../../hooks/useProfileData'
+import type { AspectBreakdown } from '../../hooks/useProfileData'
 import { archiveUserAspect, unarchiveUserAspect, fetchArchivedAspects } from '../../lib/aspectService'
 import type { Aspect } from '../../lib/aspectService'
 
@@ -35,120 +35,124 @@ const ChevronIcon = ({ size = 14, color = 'currentColor', expanded }: { size?: n
   </svg>
 )
 
-function AspectRow({
-  item,
-  maxActivity,
-  onArchive,
-  archiving,
-}: {
-  item: AspectBreakdown
-  maxActivity: number
-  onArchive: (id: string) => void
-  archiving: string | null
-}) {
-  const { isDarkMode } = useDarkMode()
-  const { isMobile } = usePlatform()
-  const { getAspectColor } = useAspects()
-  const colors = getColors(isDarkMode)
-  const typography = getTypography(isMobile)
-  const [hovered, setHovered] = useState(false)
+interface SliceData {
+  id: string
+  name: string
+  activity: number
+  color: string
+  eventCount: number
+  taskCount: number
+  goalCount: number
+}
 
-  const activity = item.eventCount + item.taskCount + item.goalCount
-  const barWidth = maxActivity > 0 ? (activity / maxActivity) * 100 : 0
-  const aspectColor = getAspectColor(item.categoryName)
-  const barBg = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
-  const isArchiving = archiving === item.categoryId
+function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+  const startRad = ((startAngle - 90) * Math.PI) / 180
+  const endRad = ((endAngle - 90) * Math.PI) / 180
+  const x1 = cx + r * Math.cos(startRad)
+  const y1 = cy + r * Math.sin(startRad)
+  const x2 = cx + r * Math.cos(endRad)
+  const y2 = cy + r * Math.sin(endRad)
+  const largeArc = endAngle - startAngle > 180 ? 1 : 0
+  return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`
+}
+
+function PieChart({
+  slices,
+  size,
+  hoveredSlice,
+  onHoverSlice,
+}: {
+  slices: SliceData[]
+  size: number
+  hoveredSlice: string | null
+  onHoverSlice: (id: string | null) => void
+}) {
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
+  const cx = size / 2
+  const cy = size / 2
+  const r = size / 2 - 2
+
+  const totalActivity = slices.reduce((sum, s) => sum + s.activity, 0)
+
+  if (totalActivity === 0) {
+    const emptyColor = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={cx} cy={cy} r={r} fill={emptyColor} />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+          fill={colors.textTertiary} fontSize="11">
+          No activity
+        </text>
+      </svg>
+    )
+  }
+
+  let currentAngle = 0
+  const paths = slices
+    .filter(s => s.activity > 0)
+    .map(slice => {
+      const sweepAngle = (slice.activity / totalActivity) * 360
+      const startAngle = currentAngle
+      const endAngle = currentAngle + sweepAngle
+      currentAngle = endAngle
+
+      const isHovered = hoveredSlice === slice.id
+      const scale = isHovered ? 'scale(1.03)' : 'scale(1)'
+
+      // For a single full-circle slice, draw a circle instead of arc
+      if (sweepAngle >= 359.99) {
+        return (
+          <circle
+            key={slice.id}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill={slice.color}
+            opacity={hoveredSlice && !isHovered ? 0.5 : 0.85}
+            style={{
+              transition: 'opacity 0.2s ease, transform 0.2s ease',
+              transform: scale,
+              transformOrigin: `${cx}px ${cy}px`,
+              cursor: 'pointer',
+            }}
+            onMouseEnter={() => onHoverSlice(slice.id)}
+            onMouseLeave={() => onHoverSlice(null)}
+          />
+        )
+      }
+
+      return (
+        <path
+          key={slice.id}
+          d={describeArc(cx, cy, r, startAngle, endAngle)}
+          fill={slice.color}
+          opacity={hoveredSlice && !isHovered ? 0.5 : 0.85}
+          style={{
+            transition: 'opacity 0.2s ease, transform 0.2s ease',
+            transform: scale,
+            transformOrigin: `${cx}px ${cy}px`,
+            cursor: 'pointer',
+          }}
+          onMouseEnter={() => onHoverSlice(slice.id)}
+          onMouseLeave={() => onHoverSlice(null)}
+        />
+      )
+    })
 
   return (
-    <div
-      style={{ padding: '6px 0' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '5px',
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '2px',
-            background: aspectColor,
-            flexShrink: 0,
-          }} />
-          <span style={{ ...typography.bodySm, color: colors.textPrimary }}>
-            {item.categoryName}
-          </span>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <div style={{
-            ...typography.labelMd,
-            color: colors.textTertiary,
-            display: 'flex',
-            gap: '8px',
-          }}>
-            {item.eventCount > 0 && <span>{item.eventCount} event{item.eventCount !== 1 ? 's' : ''}</span>}
-            {item.taskCount > 0 && <span>{item.taskCount} task{item.taskCount !== 1 ? 's' : ''}</span>}
-            {item.goalCount > 0 && <span>{item.goalCount} goal{item.goalCount !== 1 ? 's' : ''}</span>}
-            {activity === 0 && <span>No activity</span>}
-          </div>
-          {hovered && (
-            <button
-              onClick={() => onArchive(item.categoryId)}
-              disabled={isArchiving}
-              title="Archive aspect"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: isArchiving ? 'default' : 'pointer',
-                padding: '2px',
-                opacity: isArchiving ? 0.4 : 0.5,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <ArchiveIcon size={14} color={colors.textTertiary} />
-            </button>
-          )}
-        </div>
-      </div>
-      <div style={{
-        height: '4px',
-        borderRadius: '2px',
-        background: barBg,
-      }}>
-        {barWidth > 0 && (
-          <div style={{
-            height: '100%',
-            borderRadius: '2px',
-            background: aspectColor,
-            width: `${barWidth}%`,
-            opacity: 0.7,
-            transition: 'width 0.3s ease',
-          }} />
-        )}
-      </div>
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      {paths}
+    </svg>
   )
 }
 
 export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
   const { user, session } = useAuth()
-  const { refreshAspects } = useAspects()
-  const colors = getColors(isDarkMode)
+  const { refreshAspects, getAspectColor } = useAspects()
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const [archiving, setArchiving] = useState<string | null>(null)
@@ -156,9 +160,24 @@ export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [loadingArchived, setLoadingArchived] = useState(false)
   const [restoring, setRestoring] = useState<string | null>(null)
+  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null)
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const maxActivity = Math.max(...breakdown.map(b => b.eventCount + b.taskCount + b.goalCount), 1)
+
+  const slices = useMemo<SliceData[]>(() =>
+    breakdown.map(item => ({
+      id: item.categoryId,
+      name: item.categoryName,
+      activity: item.eventCount + item.taskCount + item.goalCount,
+      color: getAspectColor(item.categoryName),
+      eventCount: item.eventCount,
+      taskCount: item.taskCount,
+      goalCount: item.goalCount,
+    })),
+    [breakdown, getAspectColor]
+  )
+
+  const chartSize = isMobile ? 160 : 200
 
   const loadArchivedAspects = async () => {
     if (!user) return
@@ -230,16 +249,40 @@ export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
             No aspects configured yet
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {breakdown.map(item => (
-              <AspectRow
-                key={item.categoryId}
-                item={item}
-                maxActivity={maxActivity}
-                onArchive={handleArchive}
-                archiving={archiving}
+          <div style={{
+            display: 'flex',
+            gap: isMobile ? '16px' : '24px',
+            alignItems: 'flex-start',
+          }}>
+            {/* Pie Chart */}
+            <div style={{ flexShrink: 0 }}>
+              <PieChart
+                slices={slices}
+                size={chartSize}
+                hoveredSlice={hoveredSlice}
+                onHoverSlice={setHoveredSlice}
               />
-            ))}
+            </div>
+
+            {/* Legend */}
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              minWidth: 0,
+            }}>
+              {slices.map(slice => (
+                  <LegendItem
+                    key={slice.id}
+                    slice={slice}
+                    isHovered={hoveredSlice === slice.id}
+                    onHover={setHoveredSlice}
+                    onArchive={handleArchive}
+                    archiving={archiving}
+                  />
+              ))}
+            </div>
           </div>
         )}
 
@@ -312,6 +355,98 @@ export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
               </div>
             )}
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function LegendItem({
+  slice,
+  isHovered,
+  onHover,
+  onArchive,
+  archiving,
+}: {
+  slice: SliceData
+  isHovered: boolean
+  onHover: (id: string | null) => void
+  onArchive: (id: string) => void
+  archiving: string | null
+}) {
+  const { theme, isDarkMode } = useTheme()
+  const { isMobile } = usePlatform()
+  const colors = getColors(theme)
+  const typography = getTypography(isMobile)
+  const [rowHovered, setRowHovered] = useState(false)
+
+  const isArchiving = archiving === slice.id
+  const highlightBg = isHovered
+    ? isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+    : 'transparent'
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '4px 6px',
+        borderRadius: '4px',
+        background: highlightBg,
+        transition: 'background 0.15s ease',
+      }}
+      onMouseEnter={() => { onHover(slice.id); setRowHovered(true) }}
+      onMouseLeave={() => { onHover(null); setRowHovered(false) }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        <div style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: slice.color,
+          flexShrink: 0,
+          opacity: 0.85,
+        }} />
+        <span style={{
+          ...typography.bodySm,
+          color: colors.textPrimary,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {slice.name}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        <div style={{
+          ...typography.labelMd,
+          color: colors.textTertiary,
+          display: 'flex',
+          gap: '6px',
+        }}>
+          {slice.eventCount > 0 && <span>{slice.eventCount} event{slice.eventCount !== 1 ? 's' : ''}</span>}
+          {slice.taskCount > 0 && <span>{slice.taskCount} task{slice.taskCount !== 1 ? 's' : ''}</span>}
+          {slice.goalCount > 0 && <span>{slice.goalCount} goal{slice.goalCount !== 1 ? 's' : ''}</span>}
+          {slice.activity === 0 && <span>No activity</span>}
+        </div>
+        {rowHovered && (
+          <button
+            onClick={() => onArchive(slice.id)}
+            disabled={isArchiving}
+            title="Archive aspect"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: isArchiving ? 'default' : 'pointer',
+              padding: '2px',
+              opacity: isArchiving ? 0.4 : 0.5,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <ArchiveIcon size={14} color={colors.textTertiary} />
+          </button>
         )}
       </div>
     </div>

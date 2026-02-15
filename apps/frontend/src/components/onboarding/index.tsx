@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { useAuth } from '../../lib/authContext'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -19,8 +19,8 @@ import { TimezoneConfirm } from './components/TimezoneConfirm'
 
 function OnboardingContent() {
   const navigate = useNavigate()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { user, session } = useAuth()
   const { isMobile } = usePlatform()
   const {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDarkMode } from '../../../lib/darkModeContext'
+import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
 
@@ -28,8 +28,8 @@ interface TimezoneConfirmProps {
 }
 
 export function TimezoneConfirm({ onConfirm }: TimezoneConfirmProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { state, updateField } = useOnboarding()
   const [showDropdown, setShowDropdown] = useState(false)
 

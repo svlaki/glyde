@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
-import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask } from '../lib/taskService'
+import { fetchUserTasks, createUserTask, completeUserTask, updateUserTask, deleteUserTask } from '../lib/taskService'
 import type { Task } from '../lib/taskService'
 import { TaskForm } from './TaskForm'
 import { getColors, hexToRgba } from '../styles/colors'
@@ -21,8 +21,8 @@ interface TodoListProps {
 
 export function TodoList({ hideHeader = false }: TodoListProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
   const { aspects } = useAspects()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -104,6 +104,12 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
     })
     await loadTasks()
     setEditingTask(null)
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user || !session) return
+    await deleteUserTask(user, session.access_token, taskId)
+    setTasks(prev => prev.filter(t => t.id !== taskId))
   }
 
   const getTaskColor = (task: Task): string => {
@@ -244,9 +250,13 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = hexToRgba(taskColor, 0.25)
+                    const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
+                    if (deleteBtn) deleteBtn.style.opacity = '0.5'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = hexToRgba(taskColor, 0.15)
+                    const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
+                    if (deleteBtn) { deleteBtn.style.opacity = '0'; deleteBtn.style.color = colors.textTertiary }
                   }}
                   onClick={(e) => {
                     // Don't open modal if clicking checkbox
@@ -298,6 +308,30 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                       )}
                     </div>
                   </div>
+                  <button
+                    data-delete-btn
+                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: colors.textTertiary,
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      opacity: 0,
+                      transition: 'opacity 0.15s, color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.error }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = colors.textTertiary }}
+                    title="Delete task"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
                 </div>
               )
             })}

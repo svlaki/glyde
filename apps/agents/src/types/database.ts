@@ -23,7 +23,11 @@ export interface DatabaseEvent {
   is_recurring?: boolean;  // Quick flag for recurring events
   is_instance?: boolean;  // Flag for event instances of a recurring series
   instance_date?: string;  // YYYY-MM-DD date for this specific instance
-  visibility?: 'private' | 'friends' | 'public';  // Event visibility setting
+  visibility?: 'private' | 'friends' | 'public' | 'shared';  // Event visibility setting
+
+  // Shared event metadata (populated when user is a member)
+  user_role?: 'owner' | 'editor' | 'viewer';
+  member_count?: number;
 
   // Post-event metadata
   reflection?: string;  // User's reflection on what happened during the event

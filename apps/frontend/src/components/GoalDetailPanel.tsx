@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { useAuth } from '../lib/authContext'
 import { updateUserGoal } from '../lib/goalService'
@@ -16,8 +16,8 @@ interface GoalDetailPanelProps {
 }
 
 export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetailPanelProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { getAspectColor } = useAspects()
   const { user, session } = useAuth()
 

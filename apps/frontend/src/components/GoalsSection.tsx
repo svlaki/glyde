@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fetchUserGoals, createUserGoal, updateUserGoal, deleteUserGoal } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
 import { GoalCard } from './GoalCard'
@@ -15,9 +15,9 @@ import { NewButton } from './ui/IconButtons'
 
 export function GoalsSection() {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAuth } from '../lib/authContext'
 import { useAspects } from '../lib/aspectContext'
 import { getColors } from '../styles/colors'
@@ -33,6 +33,7 @@ interface PlanTimelineProps {
   goals: Goal[]
   onMilestoneUpdate: () => void
   hideTitle?: boolean
+  onChatReply?: (message: string) => void
 }
 
 const ITEM_TYPE = 'TIMELINE_ITEM'
@@ -264,12 +265,70 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
   )
 }
 
-function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTimelineProps) {
-  const { isDarkMode } = useDarkMode()
+function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false, onChatReply }: PlanTimelineProps) {
+  const { theme, isDarkMode } = useTheme()
   const { user, accessToken } = useAuth()
   const { getAspectColor } = useAspects()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [dismissedOverdue, setDismissedOverdue] = useState<Set<string>>(new Set())
+
+  // Detect overdue milestones (past due, not completed)
+  const overdueMilestones = useMemo(() => {
+    const now = new Date()
+    const overdue: Array<{
+      key: string
+      goalId: string
+      goalTitle: string
+      milestoneIndex: number
+      milestoneTitle: string
+      dueDate: string
+      color: string
+    }> = []
+
+    goals.forEach(goal => {
+      const goalColor = goal.aspect ? getAspectColor(goal.aspect) : ACCENT_COLORS.primary
+      goal.milestones?.forEach((ms, idx) => {
+        if (!ms.completed && ms.due_date && new Date(ms.due_date) < now) {
+          overdue.push({
+            key: `${goal.id}-${idx}`,
+            goalId: goal.id,
+            goalTitle: goal.title,
+            milestoneIndex: idx,
+            milestoneTitle: ms.title,
+            dueDate: ms.due_date,
+            color: goalColor
+          })
+        }
+      })
+    })
+    return overdue
+  }, [goals, getAspectColor])
+
+  const visibleOverdue = overdueMilestones.filter(m => !dismissedOverdue.has(m.key))
+
+  // Mark a milestone as complete
+  const handleMilestoneComplete = async (goalId: string, milestoneIndex: number, key: string) => {
+    if (!user || !accessToken) return
+    const goal = goals.find(g => g.id === goalId)
+    if (!goal?.milestones) return
+
+    const updatedMilestones = goal.milestones.map((ms, idx) =>
+      idx === milestoneIndex ? { ...ms, completed: true } : ms
+    )
+
+    const result = await updateUserGoal(user, accessToken, goalId, { milestones: updatedMilestones })
+    if (!result.error) {
+      setDismissedOverdue(prev => new Set([...prev, key]))
+      onMilestoneUpdate()
+    }
+  }
+
+  // Send to chat for discussion
+  const handleMilestoneNotComplete = (goalTitle: string, milestoneTitle: string, key: string) => {
+    setDismissedOverdue(prev => new Set([...prev, key]))
+    onChatReply?.(`I didn't complete the milestone "${milestoneTitle}" for my goal "${goalTitle}". Can we discuss re-adjusting the timeline?`)
+  }
 
   // Build timeline items from goals and milestones
   const { timelineItems, isDateBased } = useMemo(() => {
@@ -317,10 +376,10 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
           } else if (isOrderedType || !milestone.due_date) {
             // Non-dated milestone - calculate equal spacing
             hasNonDateBasedItems = true
-            // Space items evenly: first at ~10%, last at ~90%
+            // Space items evenly: first at ~5%, last at ~95%
             const position = totalMilestones === 1
               ? 50
-              : 10 + (index / (totalMilestones - 1)) * 80
+              : 5 + (index / (totalMilestones - 1)) * 90
 
             items.push({
               id: `milestone-${goal.id}-${index}`,
@@ -370,9 +429,11 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
     const minDate = new Date(Math.min(...datedItems.map(i => i.date!.getTime())))
     const maxDate = new Date(Math.max(...datedItems.map(i => i.date!.getTime())))
 
-    // Add padding
-    const start = new Date(Math.min(minDate.getTime(), now.getTime()) - 30 * 24 * 60 * 60 * 1000)
-    const end = new Date(Math.max(maxDate.getTime(), now.getTime()) + 60 * 24 * 60 * 60 * 1000)
+    // Range based purely on milestone dates so first/last sit at edges
+    const rangeMs = Math.max(maxDate.getTime() - minDate.getTime(), 7 * 24 * 60 * 60 * 1000)
+    const paddingMs = rangeMs * 0.05
+    const start = new Date(minDate.getTime() - paddingMs)
+    const end = new Date(maxDate.getTime() + paddingMs)
 
     return { timelineStart: start, timelineEnd: end }
   }, [timelineItems])
@@ -474,6 +535,77 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
     )
   }
 
+  // Overdue milestone prompt cards
+  const overdueCards = visibleOverdue.length > 0 ? (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      marginBottom: hideTitle ? '8px' : '12px'
+    }}>
+      {visibleOverdue.map(m => (
+        <div key={m.key} style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: hideTitle ? '8px 10px' : '10px 14px',
+          background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+          borderLeft: `3px solid ${m.color}`,
+          borderRadius: '6px'
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: fontSize.sm,
+              fontWeight: fontWeight.medium,
+              color: colors.textPrimary
+            }}>
+              Did you complete: {m.milestoneTitle}?
+            </div>
+            <div style={{
+              fontSize: fontSize.xs,
+              color: colors.textTertiary,
+              marginTop: '2px'
+            }}>
+              Due {new Date(m.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => handleMilestoneComplete(m.goalId, m.milestoneIndex, m.key)}
+              style={{
+                padding: '5px 12px',
+                fontSize: fontSize.xs,
+                fontWeight: fontWeight.medium,
+                background: ACCENT_COLORS.success,
+                color: '#fff',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => handleMilestoneNotComplete(m.goalTitle, m.milestoneTitle, m.key)}
+              style={{
+                padding: '5px 12px',
+                fontSize: fontSize.xs,
+                fontWeight: fontWeight.medium,
+                background: 'transparent',
+                color: colors.textSecondary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              No
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : null
+
   // For non-date-based timeline, render a simpler view
   if (!isDateBased) {
     return (
@@ -494,6 +626,8 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
             Progress
           </h3>
         )}
+
+        {overdueCards}
 
         {/* Simple timeline container */}
         <div style={{
@@ -595,6 +729,8 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false }: PlanTi
           Timeline
         </h3>
       )}
+
+      {overdueCards}
 
       {/* Timeline container */}
       <div

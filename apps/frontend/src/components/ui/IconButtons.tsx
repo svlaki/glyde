@@ -1,6 +1,6 @@
 // Icon button components for New, Edit, Delete, and Save actions
 
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 
 // Size configurations: desktop = 36px, mobile = 32px
@@ -77,8 +77,8 @@ interface IconButtonProps {
 }
 
 export function NewButton({ onClick, disabled, title = 'New', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -121,8 +121,8 @@ export function NewButton({ onClick, disabled, title = 'New', mobile = false }: 
 }
 
 export function EditButton({ onClick, disabled, title = 'Edit', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -165,8 +165,8 @@ export function EditButton({ onClick, disabled, title = 'Edit', mobile = false }
 }
 
 export function DeleteButton({ onClick, disabled, title = 'Delete', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -209,8 +209,8 @@ export function DeleteButton({ onClick, disabled, title = 'Delete', mobile = fal
 }
 
 export function SaveButton({ onClick, disabled, title = 'Save', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -253,8 +253,8 @@ export function SaveButton({ onClick, disabled, title = 'Save', mobile = false }
 }
 
 export function RefreshButton({ onClick, disabled, title = 'Refresh', mobile = false }: IconButtonProps & { spinning?: boolean }) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -297,8 +297,8 @@ export function RefreshButton({ onClick, disabled, title = 'Refresh', mobile = f
 }
 
 export function ShareButton({ onClick, disabled, title = 'Share', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -341,8 +341,8 @@ export function ShareButton({ onClick, disabled, title = 'Share', mobile = false
 }
 
 export function ClearButton({ onClick, disabled, title = 'Clear', mobile = false }: IconButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const size = mobile ? SIZES.mobile : SIZES.desktop
 
   return (
@@ -405,8 +405,8 @@ export function TextButton({
   type = 'button',
   variant = 'default'
 }: TextButtonProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const height = mobile ? '32px' : '36px'
   const fontSize = mobile ? '12px' : '13px'
 

@@ -57,6 +57,7 @@ import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
 import friendshipRouter from './friendships.js';
 import sharedAspectsRouter from './shared-aspects.js';
+import sharedEventsRouter from './shared-events.js';
 import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { authenticateRequest } from './middleware/auth.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
@@ -363,6 +364,9 @@ app.post('/api/friends/:friendId/visibility', toggleFriendEventVisibility);
 
 // Shared aspects endpoints
 app.use('/api/shared-aspects', sharedAspectsRouter);
+
+// Shared events endpoints
+app.use('/api/shared-events', sharedEventsRouter);
 
 // Connections endpoints (for calendar sync)
 app.post('/api/connections', getConnections);

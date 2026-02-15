@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import type { Aspect } from '../lib/aspectService'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontWeight, fontSize, lineHeight } from '../styles/typography'
@@ -13,11 +13,12 @@ interface AspectCardProps {
 }
 
 export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: AspectCardProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
+  const aspectColor = aspect.color || '#999'
   const isShared = aspect.visibility === 'shared'
   const isSharedWithMe = aspect.member_role && aspect.member_role !== 'owner'
 
@@ -26,21 +27,23 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
       onClick={onClick}
       style={{
         padding: '16px',
-        background: isSelected ? colors.bgHover : colors.bgSecondary,
-        border: `1px solid ${colors.border}`,
+        background: isSelected
+          ? hexToRgba(aspectColor, 0.22)
+          : hexToRgba(aspectColor, 0.12),
+        border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
         transition: 'all 0.2s',
-        borderLeft: `4px solid ${aspect.color || '#999'}`
+        borderLeft: `4px solid ${aspectColor}`
       }}
       onMouseEnter={(e) => {
         if (!isSelected) {
-          e.currentTarget.style.background = colors.bgHover
+          e.currentTarget.style.background = hexToRgba(aspectColor, 0.18)
         }
       }}
       onMouseLeave={(e) => {
         if (!isSelected) {
-          e.currentTarget.style.background = colors.bgSecondary
+          e.currentTarget.style.background = hexToRgba(aspectColor, 0.12)
         }
       }}
     >

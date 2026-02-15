@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography, fontFamily } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -27,9 +27,9 @@ function FieldEditor({
   value: any
   onSave: (fieldKey: string, value: any) => Promise<void>
 }) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const [editValue, setEditValue] = useState(() => {
@@ -175,9 +175,9 @@ function FieldEditor({
 }
 
 export function ProfileSectionEditor({ sectionKey, sectionData, onSave, onCancel }: ProfileSectionEditorProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const [newKey, setNewKey] = useState('')

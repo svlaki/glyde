@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fontSize, fontWeight } from '../styles/typography'
 
 interface EmptyStateProps {
@@ -12,7 +12,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ title, description, icon, action }: EmptyStateProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
 
   return (
     <div style={{

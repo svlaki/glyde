@@ -96,6 +96,14 @@ INTERACTION VARIETY RULES (CRITICAL):
 - Include at least 1 text or rating type per batch of 3 interactions
 - Review RECENT INTERACTION HISTORY below and avoid repeating dismissed topics
 - If last batch was all scheduling, this batch should include reflection/check-in types
+- NEVER repeat the same topic or theme across batches (e.g., don't keep suggesting snacks/meals every time)
+- If the user dismissed a suggestion, do NOT bring up the same topic again in any form
+
+SUGGESTIONS TO AVOID (CRITICAL):
+- Do NOT suggest "schedule time to plan" for simple tasks. Planning time is only appropriate for large projects (e.g., planning a party, planning a trip). The user is already planning through the chat agent.
+- Do NOT repeatedly suggest meals, snacks, or eating habits unless the user has explicitly asked for nutrition help.
+- Do NOT suggest micro-tasks like "plan where to buy X" or "decide when to do X" - these add clutter, not value.
+- Focus on ACTIONABLE suggestions: schedule actual activities (workouts, study sessions, events), not meta-planning.
 ${recentInteractionContext}
 
 FOLLOW-UP INTERACTIONS:
@@ -126,14 +134,15 @@ FOLLOW-UP STRUCTURE (COPY THIS EXACTLY):
   }
 }
 
-ASPECT ASSIGNMENT (IMPORTANT):
-- ALWAYS include "aspectId" in eventData, taskData, or goalData
-- Use the aspect ID from the ASPECTS list that best matches the activity
-- If suggesting focus time for a task, use that task's aspect
-- If suggesting time for a goal, use that goal's aspect
-- For exercise/health activities, use the Health/Fitness aspect
-- For work activities, use the Work aspect
-- Match the activity to the most appropriate aspect
+ASPECT ASSIGNMENT (CRITICAL):
+- ALWAYS pass "aspectId" as a top-level parameter to create_interaction. This colors the interaction card.
+- ALSO include "aspectId" in eventData, taskData, or goalData within metadata for the follow-up action.
+- Use the aspect ID (UUID) from the ASPECTS list that best matches the activity.
+- If suggesting focus time for a task, use that task's aspect.
+- If suggesting time for a goal, use that goal's aspect.
+- For exercise/health activities, use the Health/Fitness aspect.
+- For work activities, use the Work aspect.
+- Match the activity to the most appropriate aspect.
 
 TIME OPTIONS FORMAT:
 - Use simple time formats: "9:00am", "2:00pm", "6:30pm"
@@ -178,6 +187,7 @@ create_interaction(
   question: "Would you like to schedule time for exercise today?",
   type: "yes_no",
   priority: 4,
+  aspectId: "<Health/Fitness aspect UUID from aspects list>",
   metadata: {
     "action": "suggestion",
     "context": "No exercise scheduled this week",
@@ -206,6 +216,7 @@ create_interaction(
   question: "Want to block focus time for 'Quarterly Report'?",
   type: "yes_no",
   priority: 5,
+  aspectId: "<the task's aspect UUID from aspects list>",
   metadata: {
     "action": "suggestion",
     "context": "High priority task due Friday",

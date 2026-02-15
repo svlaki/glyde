@@ -1,6 +1,6 @@
 import { CSSProperties, ReactNode } from 'react'
 import { Text } from './Text'
-import { useDarkMode } from '@/lib/darkModeContext'
+import { useTheme } from '@/lib/themeContext'
 import { getColors } from '@/styles/colors'
 
 interface FormFieldProps {
@@ -46,8 +46,8 @@ export function FormField({
   htmlFor,
   className,
 }: FormFieldProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   return (
     <div

@@ -1,4 +1,4 @@
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography, fontFamily } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -16,9 +16,9 @@ interface StatCellProps {
 }
 
 function StatCell({ label, value, detail, warning }: StatCellProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   return (
@@ -53,9 +53,9 @@ function StatCell({ label, value, detail, warning }: StatCellProps) {
 }
 
 function CompletionRateCell({ rate, taskInsights }: { rate: number; taskInsights: TaskInsights }) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const barBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
@@ -104,9 +104,9 @@ function CompletionRateCell({ rate, taskInsights }: { rate: number; taskInsights
 }
 
 export function ActivityInsightsCard({ taskInsights }: ActivityInsightsCardProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { RefreshButton } from './ui/IconButtons'
@@ -13,7 +13,7 @@ interface Interaction {
   interaction_type: 'yes_no' | 'choice' | 'multiple_choice' | 'text' | 'rating' | 'time_suggestion'
   options?: string[]
   priority: number
-  category?: {
+  aspect?: {
     id: string
     name: string
     color: string
@@ -32,8 +32,8 @@ const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://loca
 
 export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInteractionsProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
 
   const [interactions, setInteractions] = useState<Interaction[]>([])
@@ -47,10 +47,27 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
   const [showChatReply, setShowChatReply] = useState<string | null>(null) // interaction ID showing chat reply input
   const [chatReplyInputs, setChatReplyInputs] = useState<Record<string, string>>({}) // chat reply text per interaction
 
-  // Dismiss an interaction without sending a response
-  const dismissInteraction = useCallback((interactionId: string) => {
+  // Dismiss an interaction - remove from UI and mark as dismissed in backend
+  const dismissInteraction = useCallback(async (interactionId: string) => {
     setInteractions(prev => prev.filter(i => i.id !== interactionId))
-  }, [])
+
+    if (!session) return
+    try {
+      await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          interaction_id: interactionId,
+          response: 'dismissed'
+        })
+      })
+    } catch (err) {
+      // Silently fail - interaction is already removed from UI
+    }
+  }, [session])
 
   // Fetch pending interactions
   const fetchInteractions = useCallback(async (showRefreshing = false) => {
@@ -875,15 +892,17 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
           </div>
         ) : (
           // Interaction cards
-          interactions.map((interaction) => (
+          interactions.map((interaction) => {
+            const cardColor = interaction.aspect?.color || getPriorityColor(interaction.priority)
+            return (
             <div
               key={interaction.id}
               style={{
-                background: colors.bgSecondary,
+                background: hexToRgba(cardColor, 0.12),
                 padding: '10px',
                 borderRadius: '8px',
-                border: `1px solid ${colors.border}`,
-                borderLeft: `2px solid ${interaction.category?.color || getPriorityColor(interaction.priority)}`,
+                border: 'none',
+                borderLeft: `3px solid ${cardColor}`,
                 position: 'relative',
                 transition: 'box-shadow 0.15s'
               }}
@@ -896,16 +915,16 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
                 marginBottom: '5px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {interaction.category && (
+                  {interaction.aspect && (
                     <span style={{
                       fontSize: '10px',
                       fontWeight: fontWeight.medium,
-                      color: interaction.category.color,
-                      background: hexToRgba(interaction.category.color, 0.15),
+                      color: interaction.aspect.color,
+                      background: hexToRgba(interaction.aspect.color, 0.15),
                       padding: '1px 6px',
                       borderRadius: '3px'
                     }}>
-                      {interaction.category.name}
+                      {interaction.aspect.name}
                     </span>
                   )}
                   <span style={{
@@ -1083,7 +1102,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
                 </div>
               )}
             </div>
-          ))
+          )})
         )}
       </div>
 

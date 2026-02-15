@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
@@ -73,8 +73,8 @@ function useProfileEdit() {
 }
 
 function ProfileEditMobile() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(true)
   const navigate = useNavigate()
   const { profile, loading, handleSave, getSectionData, getSectionCompleteness } = useProfileEdit()
@@ -195,8 +195,8 @@ function ProfileEditMobile() {
 }
 
 function ProfileEditDesktop() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false)
   const navigate = useNavigate()
   const { profile, loading, handleSave, getSectionData, getSectionCompleteness } = useProfileEdit()

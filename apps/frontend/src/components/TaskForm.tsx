@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Picker from 'react-mobile-picker'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { createUserAspect } from '../lib/aspectService'
 import type { Aspect } from '../lib/aspectService'
@@ -47,8 +47,8 @@ interface TaskFormProps {
 
 export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { aspects, refreshAspects } = useAspects()
   const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')

@@ -1,7 +1,8 @@
 import { ReactNode, useState } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
+import { ThemePicker } from './ui/ThemePicker'
 import { getTypography } from '../styles/typography'
 import { usePlatform } from '../hooks/usePlatform'
 import { DesktopMenu } from './DesktopMenu'
@@ -13,9 +14,9 @@ interface PageHeaderProps {
 
 export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps) {
   const { preferredName, user } = useAuth()
-  const { isDarkMode, toggleDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(false)
   const displayName = preferredName || user?.email?.split('@')[0] || 'there'
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -96,48 +97,7 @@ export function PageHeader({ showNav = true, searchComponent }: PageHeaderProps)
           }}>
             Hello, {displayName}
           </span>
-          <button
-            onClick={toggleDarkMode}
-            style={{
-              background: colors.bgTertiary,
-              color: colors.textSecondary,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '8px',
-              cursor: 'pointer',
-              padding: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = colors.bgHover
-              e.currentTarget.style.color = colors.textPrimary
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = colors.bgTertiary
-              e.currentTarget.style.color = colors.textSecondary
-            }}
-            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDarkMode ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
+          <ThemePicker />
         </div>
       </header>
 

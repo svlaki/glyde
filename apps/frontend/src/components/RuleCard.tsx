@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { Rule } from '../lib/ruleService'
@@ -11,8 +11,8 @@ interface RuleCardProps {
 }
 
 export function RuleCard({ rule, isSelected, onClick, onToggle }: RuleCardProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   const handleToggleClick = (e: React.MouseEvent) => {
     e.stopPropagation()

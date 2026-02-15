@@ -1,7 +1,8 @@
 import { Drawer } from 'vaul'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
+import { ThemePicker } from './ui/ThemePicker'
 import { getTypography } from '../styles/typography'
 
 interface DesktopMenuProps {
@@ -11,8 +12,8 @@ interface DesktopMenuProps {
 
 export function DesktopMenu({ isOpen, onClose }: DesktopMenuProps) {
   const { signOut, preferredName, user } = useAuth()
-  const { isDarkMode, toggleDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false) // Desktop context
   const displayName = preferredName || user?.email?.split('@')[0] || 'there'
 
@@ -185,17 +186,20 @@ export function DesktopMenu({ isOpen, onClose }: DesktopMenuProps) {
               margin: '16px 8px'
             }} />
 
-            <button
-              onClick={() => {
-                toggleDarkMode()
-                onClose()
-              }}
-              style={menuItemStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-            >
-              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            </button>
+            <div style={{ padding: '4px 8px' }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: colors.textTertiary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: '4px',
+                paddingLeft: '2px',
+              }}>
+                Theme
+              </div>
+              <ThemePicker inline onSelect={onClose} />
+            </div>
 
             <button
               onClick={handleSignOut}

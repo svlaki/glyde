@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useAspects } from '../lib/aspectContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fetchExpandedEvents, fetchFriendsEvents, updateEvent, deleteEvent, createEvent, updateRecurringEvent, deleteRecurringEvent } from '../lib/calendarService'
 import type { CalendarEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
@@ -15,8 +15,8 @@ type ViewType = 'day' | 'week' | 'month'
 export function Calendar() {
   const { user, session } = useAuth()
   const { getAspectColor, getAspectById } = useAspects()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -100,6 +100,11 @@ export function Calendar() {
     }
     // Otherwise use event's color or default
     return event.color || '#3b82f6'
+  }
+
+  // Check if an event is a shared event (user is editor/viewer, not owner)
+  const isSharedEvent = (event: CalendarEvent): boolean => {
+    return event.is_shared === true && event.user_role !== 'owner' && !event.is_friend_event
   }
 
   // Check if an event is in the past
@@ -460,7 +465,7 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.aspect ? { category: eventData.aspect } : {}),
+            ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
             ...(eventData.visibility ? { visibility: eventData.visibility } : {})
           },
           session?.access_token
@@ -489,7 +494,7 @@ export function Calendar() {
             start_time: eventData.start_time!,
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
-            ...(eventData.aspect ? { category: eventData.aspect } : {}),
+            ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
             ...(eventData.visibility ? { visibility: eventData.visibility } : {})
           },
           session?.access_token
@@ -956,6 +961,7 @@ export function Calendar() {
                       {dayEvents.slice(0, 2).map((event) => {
                         const eventColor = getEventColor(event)
                         const isFriendEvent = event.is_friend_event
+                        const isShared = isSharedEvent(event)
                         return (
                           <div
                             key={event.id}
@@ -1010,6 +1016,23 @@ export function Calendar() {
                                 ) : (
                                   event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
                                 )}
+                              </span>
+                            )}
+                            {/* Shared event role badge in month view */}
+                            {isShared && (
+                              <span style={{
+                                fontSize: '6px',
+                                fontFamily: fontFamily.sans,
+                                fontWeight: fontWeight.semibold,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.3px',
+                                padding: '0px 3px',
+                                borderRadius: '2px',
+                                background: hexToRgba(eventColor, 0.2),
+                                color: eventColor,
+                                flexShrink: 0
+                              }}>
+                                {event.user_role === 'viewer' ? 'V' : 'E'}
                               </span>
                             )}
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>
@@ -1127,6 +1150,9 @@ export function Calendar() {
             {displayDates.map((date, dayIndex) => {
               const isToday = date.toDateString() === new Date().toDateString()
               const dayEvents = getEventsForDay(date)
+              const todayBg = isToday
+                ? (isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)')
+                : 'transparent'
 
               return (
                 <div
@@ -1134,7 +1160,8 @@ export function Calendar() {
                   style={{
                     flex: 1,
                     minWidth: view === 'day' ? '300px' : '100px',
-                    position: 'relative'
+                    position: 'relative',
+                    background: todayBg,
                   }}
                 >
                   {/* Day Header - Mobile style */}
@@ -1150,7 +1177,9 @@ export function Calendar() {
                     fontFamily: fontFamily.sans,
                     fontWeight: fontWeight.medium,
                     color: isToday ? colors.error : colors.textTertiary,
-                    background: colors.bgSecondary,
+                    background: isToday
+                      ? (isDarkMode ? 'rgba(30,30,30,0.97)' : 'rgba(248,248,248,0.97)')
+                      : colors.bgSecondary,
                     zIndex: 10,
                     textTransform: 'uppercase',
                     letterSpacing: '0.02em',
@@ -1245,12 +1274,14 @@ export function Calendar() {
                             hour12: true
                           })
                           const isFriendEvent = event.is_friend_event
+                          const isShared = isSharedEvent(event)
+                          const isViewerEvent = event.user_role === 'viewer'
 
                           return (
                             <div
                               key={event.id}
-                              draggable={!isFriendEvent}
-                              onDragStart={(e) => !isFriendEvent && handleDragStart(e, event)}
+                              draggable={!isFriendEvent && !isViewerEvent}
+                              onDragStart={(e) => !isFriendEvent && !isViewerEvent && handleDragStart(e, event)}
                               onDragEnd={handleDragEnd}
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -1271,7 +1302,7 @@ export function Calendar() {
                                 padding: '3px 8px',
                                 overflow: 'hidden',
                                 zIndex: layout.zIndex,
-                                cursor: isFriendEvent ? 'pointer' : (draggingEvent?.id === event.id ? 'grabbing' : 'grab'),
+                                cursor: (isFriendEvent || isViewerEvent) ? 'pointer' : (draggingEvent?.id === event.id ? 'grabbing' : 'grab'),
                                 transition: 'background 0.15s ease',
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -1318,10 +1349,27 @@ export function Calendar() {
                                     )}
                                   </span>
                                 )}
+                                {/* Shared event role badge */}
+                                {isShared && (
+                                  <span style={{
+                                    fontSize: '7px',
+                                    fontFamily: fontFamily.sans,
+                                    fontWeight: fontWeight.semibold,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.3px',
+                                    padding: '1px 4px',
+                                    borderRadius: '3px',
+                                    background: hexToRgba(eventColor, 0.2),
+                                    color: eventColor,
+                                    flexShrink: 0
+                                  }}>
+                                    {event.user_role === 'viewer' ? 'View' : 'Edit'}
+                                  </span>
+                                )}
                                 <span>{event.title}</span>
                               </div>
                               {/* Missed button - absolute, below title line, right side */}
-                              {!isFriendEvent && isEventPast(event) && (
+                              {!isFriendEvent && !isShared && isEventPast(event) && (
                                 <button
                                   onClick={(e) => handleToggleMissed(e, event)}
                                   title={event.is_missed ? 'Click to mark as attended' : 'Mark as missed'}
@@ -1455,7 +1503,8 @@ export function Calendar() {
       {/* Unified Event Form */}
       {(() => {
         const selectedAspect = selectedEvent?.aspect_id ? getAspectById(selectedEvent.aspect_id) : null
-        const isViewerOnly = selectedAspect?.member_role === 'viewer'
+        // Viewer-only if shared aspect viewer OR shared event viewer
+        const isViewerOnly = selectedAspect?.member_role === 'viewer' || selectedEvent?.user_role === 'viewer'
         return (
       <EventFormUnified
         event={selectedEvent}

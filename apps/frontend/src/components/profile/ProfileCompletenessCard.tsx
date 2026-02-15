@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
@@ -19,10 +19,10 @@ interface OverviewField {
 }
 
 export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProps) {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
   const { user } = useAuth()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const navigate = useNavigate()
 

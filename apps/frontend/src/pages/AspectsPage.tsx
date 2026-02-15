@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { createUserAspect, updateUserAspect, deleteUserAspect } from '../lib/aspectService'
 import type { Aspect } from '../lib/aspectService'
@@ -28,8 +28,8 @@ export function AspectsPage() {
 
 function AspectsPageMobile() {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { aspects, loading, error, refreshAspects } = useAspects()
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -205,8 +205,8 @@ function AspectsPageMobile() {
 
 function AspectsPageDesktop() {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(false)
   const { aspects, loading, error, refreshAspects } = useAspects()
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { fetchUserGoals } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
 import { fetchUserEvents } from '../lib/calendarService'
 import type { CalendarEvent } from '../lib/calendarService'
-import { fetchUserTasks } from '../lib/taskService'
+import { fetchUserTasks, updateUserTask, completeUserTask, deleteUserTask } from '../lib/taskService'
 import type { Task } from '../lib/taskService'
 import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
@@ -63,8 +63,8 @@ interface GoalsByAspectProps {
 
 export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspectProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const [goals, setGoals] = useState<Goal[]>([])
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
@@ -123,6 +123,36 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
 
     loadAspectData()
   }, [user, session, aspect])
+
+  const reloadTasks = async () => {
+    if (!user || !session || !aspect) return
+    const { tasks: allTasks } = await fetchUserTasks(user, session.access_token, {})
+    const filteredTasks = allTasks.filter(task =>
+      task.aspect === aspect.name ||
+      task.aspect === aspect.id ||
+      task.aspect === aspect.id?.toString() ||
+      task.aspect_name === aspect.name ||
+      task.aspect_id === aspect.id ||
+      task.aspect_id === aspect.id?.toString()
+    )
+    setTasks(filteredTasks)
+  }
+
+  const handleToggleTaskComplete = async (task: Task) => {
+    if (!user || !session) return
+    if (task.status === 'completed') {
+      await updateUserTask(user, session.access_token, task.id, { status: 'pending' })
+    } else {
+      await completeUserTask(user, session.access_token, task.id)
+    }
+    await reloadTasks()
+  }
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user || !session) return
+    await deleteUserTask(user, session.access_token, taskId)
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+  }
 
   if (!aspect) {
     return (
@@ -398,31 +428,62 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
                   gap: '8px',
                   marginBottom: '4px'
                 }}>
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() => handleToggleTaskComplete(task)}
+                    style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: aspect.color || colors.accent, flexShrink: 0 }}
+                    title="Mark as complete"
+                  />
                   <div style={{
                     fontSize: fontSize.base,
                     fontWeight: fontWeight.semibold,
-                    color: colors.textPrimary
+                    color: colors.textPrimary,
+                    flex: 1
                   }}>
                     {task.title}
                   </div>
-                  {task.status && (
+                  {task.status && task.status !== 'pending' && (
                     <span style={{
                       fontSize: fontSize.xs,
                       padding: '2px 8px',
                       borderRadius: '12px',
-                      background: task.status === 'completed' ? '#4ade80' :
-                                 task.status === 'in_progress' ? '#fbbf24' : colors.bgTertiary,
-                      color: task.status === 'completed' || task.status === 'in_progress' ? '#000' : colors.textSecondary,
+                      background: task.status === 'in_progress' ? '#fbbf24' : colors.bgTertiary,
+                      color: task.status === 'in_progress' ? '#000' : colors.textSecondary,
                       fontWeight: fontWeight.medium
                     }}>
                       {task.status.replace('_', ' ')}
                     </span>
                   )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: colors.textTertiary,
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      opacity: 0.5,
+                      transition: 'opacity 0.15s, color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.error }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = colors.textTertiary }}
+                    title="Delete task"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
                 </div>
                 {task.due_date && (
                   <div style={{
                     fontSize: fontSize.xs,
-                    color: colors.textSecondary
+                    color: colors.textSecondary,
+                    marginLeft: '24px'
                   }}>
                     Due: {new Date(task.due_date).toLocaleDateString('en-US', {
                       month: 'short',
@@ -436,6 +497,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
                     fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
+                    marginLeft: '24px',
                     lineHeight: lineHeight.tight
                   }}>
                     {task.description}
@@ -548,28 +610,51 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
                   gap: '8px',
                   marginBottom: '4px'
                 }}>
+                  <input
+                    type="checkbox"
+                    checked={true}
+                    onChange={() => handleToggleTaskComplete(task)}
+                    style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: aspect.color || colors.accent, flexShrink: 0 }}
+                    title="Mark as incomplete"
+                  />
                   <div style={{
                     fontSize: fontSize.base,
                     fontWeight: fontWeight.semibold,
-                    color: colors.textPrimary
+                    color: colors.textSecondary,
+                    textDecoration: 'line-through',
+                    flex: 1
                   }}>
                     {task.title}
                   </div>
-                  <span style={{
-                    fontSize: fontSize.xs,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    background: '#4ade80',
-                    color: '#000',
-                    fontWeight: fontWeight.medium
-                  }}>
-                    completed
-                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: colors.textTertiary,
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      opacity: 0.5,
+                      transition: 'opacity 0.15s, color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.error }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = colors.textTertiary }}
+                    title="Delete task"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
                 </div>
                 {task.due_date && (
                   <div style={{
                     fontSize: fontSize.xs,
-                    color: colors.textSecondary
+                    color: colors.textSecondary,
+                    marginLeft: '24px'
                   }}>
                     Due: {new Date(task.due_date).toLocaleDateString('en-US', {
                       month: 'short',
@@ -583,6 +668,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
                     fontSize: fontSize.sm,
                     color: colors.textSecondary,
                     marginTop: '6px',
+                    marginLeft: '24px',
                     lineHeight: lineHeight.tight
                   }}>
                     {task.description}

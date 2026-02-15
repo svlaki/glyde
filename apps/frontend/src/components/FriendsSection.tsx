@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import {
   sendFriendRequest,
@@ -19,9 +19,9 @@ import { getTypography, fontWeight } from '../styles/typography'
 
 export function FriendsSection() {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { aspects } = useAspects()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(false)
 
   const [friends, setFriends] = useState<Friend[]>([])

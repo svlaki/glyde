@@ -332,7 +332,8 @@ export class SupabaseService {
         visibility: event.visibility || 'private',
         is_shared: event.is_shared || false,
         reflection: event.reflection || null,
-        is_missed: event.is_missed || false
+        is_missed: event.is_missed || false,
+        user_role: event.user_role || 'owner'
       }));
 
       return transformedEvents;
@@ -549,12 +550,38 @@ export class SupabaseService {
       }
 
       // Fetch old event for change tracking
-      const { data: oldEvent } = await this.client
+      // First try as owner, then check if user is an editor via event_members
+      let oldEvent: any = null;
+      const { data: ownEvent } = await this.client
         .from('events')
         .select('*')
         .eq('id', eventId)
         .eq('user_id', userId)
         .single();
+
+      if (ownEvent) {
+        oldEvent = ownEvent;
+      } else {
+        // Check if user is an editor on this shared event
+        const { data: membership } = await this.client
+          .from('event_members')
+          .select('role')
+          .eq('event_id', eventId)
+          .eq('user_id', userId)
+          .single();
+
+        if (membership?.role === 'editor' || membership?.role === 'owner') {
+          const { data: sharedEvent } = await this.client
+            .from('events')
+            .select('*')
+            .eq('id', eventId)
+            .single();
+          oldEvent = sharedEvent;
+        } else {
+          console.error('[SUPABASE SERVICE] User has no edit access to event:', eventId);
+          return null;
+        }
+      }
 
       // Build update object with only provided fields
       // Note: start_time and end_time must already be in UTC format from caller
@@ -575,18 +602,26 @@ export class SupabaseService {
       if (updates.reflection !== undefined) updateData.reflection = updates.reflection;
       if (updates.is_missed !== undefined) updateData.is_missed = updates.is_missed;
 
-      // Handle aspect using helper method
+      // Handle aspect using helper method (use event owner for aspect resolution)
+      const aspectOwnerId = oldEvent?.user_id || userId;
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
-        updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
+        updateData.aspect_id = await this.resolveAspectId(aspectOwnerId, updates.aspect, updates.aspect_id);
         if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
-      // Update in public schema (RLS handles user filtering)
-      const { data, error } = await this.client
+      // Update in public schema
+      // If user is owner, filter by user_id; if editor via event_members, just filter by id
+      const isOwner = oldEvent?.user_id === userId;
+      let query = this.client
         .from('events')
         .update(updateData)
-        .eq('id', eventId)
-        .eq('user_id', userId)
+        .eq('id', eventId);
+
+      if (isOwner) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query
         .select()
         .single();
 

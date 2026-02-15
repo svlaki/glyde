@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useDarkMode } from '../../../lib/darkModeContext'
+import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
 import { useAuth } from '../../../lib/authContext'
@@ -11,8 +11,8 @@ interface GoogleCalendarPickerProps {
 }
 
 export function GoogleCalendarPicker({ loading }: GoogleCalendarPickerProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const { state, dispatch } = useOnboarding()
   const { user, session } = useAuth()
 

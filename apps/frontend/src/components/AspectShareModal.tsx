@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
@@ -25,8 +25,8 @@ interface AspectShareModalProps {
 
 export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: AspectShareModalProps) {
   const { user, session } = useAuth()
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const accessToken = session?.access_token
 
   const [members, setMembers] = useState<SharedAspectMember[]>([])

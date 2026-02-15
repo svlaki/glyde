@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useDarkMode } from '../../../lib/darkModeContext'
+import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
 import { DEFAULT_ASPECTS } from '../../../lib/onboardingService'
 
 export function Section3HabitsGoals() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const {
     state,
     updateField,

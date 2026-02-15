@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createInteractionTool = tool(
-  async ({ question, type, options, priority, metadata }, config) => {
+  async ({ question, type, options, priority, metadata, aspectId }, config) => {
     console.log('🔧 [CREATE-INTERACTION] Tool invoked!');
     console.log('🔧 [CREATE-INTERACTION] Config:', JSON.stringify(config, null, 2));
     console.log('🔧 [CREATE-INTERACTION] Args:', JSON.stringify({ question, type, options, priority, metadata }, null, 2));
@@ -35,6 +35,7 @@ export const createInteractionTool = tool(
         interactionType: type,
         options: options || undefined,
         priority: priority || 3,
+        aspectId: aspectId || undefined,
         metadata: metadata || undefined,
       });
 
@@ -65,6 +66,7 @@ export const createInteractionTool = tool(
       options: z.array(z.string()).optional().nullable().describe("Array of options for the user to choose from (e.g., ['Yes', 'No'], ['Tomorrow', 'Next Week', 'Next Month'])"),
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority level (1-5, where 5 is highest). Defaults to 3"),
       metadata: z.record(z.any()).optional().nullable().describe("IMPORTANT for yes_no type! Should contain: { action: string, context: string, followUp: { question: string, type: 'multiple_choice', options: ['9:00am', '12:00pm', '6:00pm'], metadata: { directAction: { type: 'create_event', eventData: {...} } } } }. Without followUp, clicking 'yes' won't do anything."),
+      aspectId: z.string().uuid().optional().nullable().describe("The aspect UUID to associate this interaction with. Use the aspect ID from the aspects list that best matches the topic of this interaction (e.g., a fitness suggestion should use the Health/Fitness aspect ID). This colors the interaction card on the frontend."),
     }),
   }
 );

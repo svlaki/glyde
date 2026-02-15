@@ -27,7 +27,10 @@ export interface CalendarEvent {
   is_instance?: boolean
   instance_date?: string
   // Visibility settings
-  visibility?: 'private' | 'friends' | 'public'
+  visibility?: 'private' | 'friends' | 'public' | 'shared'
+  // Shared event metadata
+  user_role?: 'owner' | 'editor' | 'viewer'
+  member_count?: number
   // Post-event metadata
   reflection?: string
   is_missed?: boolean

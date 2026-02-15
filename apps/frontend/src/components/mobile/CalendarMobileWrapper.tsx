@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useDarkMode } from '../../lib/darkModeContext'
+import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { mobileHeaderStyles } from '../../styles/mobileStyles'
@@ -7,8 +7,8 @@ import { MobileCalendar } from './MobileCalendar'
 import { MobileMenu } from './MobileMenu'
 
 export function CalendarMobileWrapper() {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const typography = getTypography(true) // Mobile context
   const [currentDate, setCurrentDate] = useState(new Date())
   const [displayDate, setDisplayDate] = useState(new Date())  // For header display during scroll

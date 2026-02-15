@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { Rule } from '../lib/ruleService'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
@@ -14,8 +14,8 @@ interface RuleFormProps {
 }
 
 export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
   const [ruleText, setRuleText] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState(5)

@@ -1,4 +1,4 @@
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import type { Connection } from '../lib/connectionService'
@@ -11,8 +11,8 @@ interface ConnectionCardProps {
 }
 
 export function ConnectionCard({ connection, onSync, onDisconnect, isSyncing }: ConnectionCardProps) {
-  const { isDarkMode } = useDarkMode()
-  const colors = getColors(isDarkMode)
+  const { theme, isDarkMode } = useTheme()
+  const colors = getColors(theme)
 
   const providerLabels: Record<string, string> = {
     google: 'Google Calendar',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useDarkMode } from '../lib/darkModeContext'
+import { useTheme } from '../lib/themeContext'
 import { useAuth } from '../lib/authContext'
 import { PlanTimeline } from '../components/PlanTimeline'
 import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
@@ -26,9 +26,9 @@ export function PlanPage() {
 }
 
 function PlanPageDesktop() {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { user, session } = useAuth()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
   const typography = getTypography(false)
 
   const [plan, setPlan] = useState<LifePlan | null>(null)
@@ -39,6 +39,9 @@ function PlanPageDesktop() {
   const [editContent, setEditContent] = useState('')
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const chatBotRef = useRef<ChatBotHandle>(null)
+  const isEditingRef = useRef(false)
+  const initialLoadDone = useRef(false)
 
   // Resizable panel state
   const [leftWidth, setLeftWidth] = useState(() => {
@@ -103,10 +106,12 @@ function PlanPageDesktop() {
     let isSubscribed = true
     let refreshTimer: NodeJS.Timeout | null = null
 
-    const loadData = async () => {
+    const loadData = async (isBackground = false) => {
       if (!isSubscribed) return
 
-      setIsLoading(true)
+      if (!isBackground) {
+        setIsLoading(true)
+      }
       setError(null)
 
       try {
@@ -124,9 +129,12 @@ function PlanPageDesktop() {
           console.error('Error loading goals:', goalsResult.error)
         }
 
-        setPlan(planResult.plan)
+        // Only update plan content if not currently editing
+        if (!isEditingRef.current) {
+          setPlan(planResult.plan)
+          setEditContent(planResult.plan?.content || '')
+        }
         setGoals(goalsResult.goals)
-        setEditContent(planResult.plan?.content || '')
       } catch (err) {
         if (isSubscribed) {
           setError('Failed to load data')
@@ -135,11 +143,12 @@ function PlanPageDesktop() {
       } finally {
         if (isSubscribed) {
           setIsLoading(false)
+          initialLoadDone.current = true
         }
       }
     }
 
-    loadData()
+    loadData(initialLoadDone.current)
 
     // Realtime subscriptions
     const goalsChannel = supabase
@@ -154,7 +163,7 @@ function PlanPageDesktop() {
         },
         () => {
           if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(), 500)
+          refreshTimer = setTimeout(() => loadData(true), 500)
         }
       )
       .subscribe()
@@ -170,8 +179,10 @@ function PlanPageDesktop() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
+          // Skip realtime refresh while user is editing
+          if (isEditingRef.current) return
           if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(), 500)
+          refreshTimer = setTimeout(() => loadData(true), 500)
         }
       )
       .subscribe()
@@ -205,6 +216,7 @@ function PlanPageDesktop() {
   // Auto-save plan content with debounce
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
+    isEditingRef.current = true
 
     // Clear existing timeout
     if (saveTimeoutRef.current) {
@@ -228,6 +240,7 @@ function PlanPageDesktop() {
   // Save on blur
   const handleBlur = async () => {
     setIsEditing(false)
+    isEditingRef.current = false
 
     // Clear any pending timeout and save immediately
     if (saveTimeoutRef.current) {
@@ -515,6 +528,7 @@ function PlanPageDesktop() {
                       <PlanTimeline
                         goals={[goal]}
                         onMilestoneUpdate={handleMilestoneUpdate}
+                        onChatReply={(msg) => chatBotRef.current?.sendMessage(msg)}
                         hideTitle
                       />
                     </div>
@@ -557,7 +571,7 @@ function PlanPageDesktop() {
             border: `1px solid ${colors.border}`,
             overflow: 'hidden'
           }}>
-            <ChatBot hideHeader compact />
+            <ChatBot ref={chatBotRef} hideHeader compact />
           </div>
         </div>
       </div>
@@ -621,9 +635,9 @@ function ExpandableCard({ title, preview, onExpand, colors }: ExpandableCardProp
 type ExpandedView = 'none' | 'plan' | 'timelines' | 'chat'
 
 function PlanPageMobile() {
-  const { isDarkMode } = useDarkMode()
+  const { theme, isDarkMode } = useTheme()
   const { user, session } = useAuth()
-  const colors = getColors(isDarkMode)
+  const colors = getColors(theme)
 
   const [plan, setPlan] = useState<LifePlan | null>(null)
   const [goals, setGoals] = useState<Goal[]>([])
@@ -633,6 +647,8 @@ function PlanPageMobile() {
   const [editContent, setEditContent] = useState('')
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const isEditingRef = useRef(false)
+  const initialLoadDone = useRef(false)
 
   // Which view is currently expanded to fullscreen
   const [expandedView, setExpandedView] = useState<ExpandedView>('none')
@@ -659,10 +675,12 @@ function PlanPageMobile() {
     let isSubscribed = true
     let refreshTimer: NodeJS.Timeout | null = null
 
-    const loadData = async () => {
+    const loadData = async (isBackground = false) => {
       if (!isSubscribed) return
 
-      setIsLoading(true)
+      if (!isBackground) {
+        setIsLoading(true)
+      }
       setError(null)
 
       try {
@@ -680,9 +698,11 @@ function PlanPageMobile() {
           console.error('Error loading goals:', goalsResult.error)
         }
 
-        setPlan(planResult.plan)
+        if (!isEditingRef.current) {
+          setPlan(planResult.plan)
+          setEditContent(planResult.plan?.content || '')
+        }
         setGoals(goalsResult.goals)
-        setEditContent(planResult.plan?.content || '')
       } catch (err) {
         if (isSubscribed) {
           setError('Failed to load data')
@@ -691,11 +711,12 @@ function PlanPageMobile() {
       } finally {
         if (isSubscribed) {
           setIsLoading(false)
+          initialLoadDone.current = true
         }
       }
     }
 
-    loadData()
+    loadData(initialLoadDone.current)
 
     // Realtime subscriptions
     const goalsChannel = supabase
@@ -710,7 +731,7 @@ function PlanPageMobile() {
         },
         () => {
           if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(), 500)
+          refreshTimer = setTimeout(() => loadData(true), 500)
         }
       )
       .subscribe()
@@ -726,8 +747,9 @@ function PlanPageMobile() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
+          if (isEditingRef.current) return
           if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(), 500)
+          refreshTimer = setTimeout(() => loadData(true), 500)
         }
       )
       .subscribe()
@@ -761,6 +783,7 @@ function PlanPageMobile() {
   // Auto-save plan content with debounce
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
+    isEditingRef.current = true
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
@@ -782,6 +805,7 @@ function PlanPageMobile() {
   // Save on blur
   const handleBlur = async () => {
     setIsEditing(false)
+    isEditingRef.current = false
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
@@ -981,6 +1005,10 @@ function PlanPageMobile() {
                     <PlanTimeline
                       goals={[goal]}
                       onMilestoneUpdate={handleMilestoneUpdate}
+                      onChatReply={(msg) => {
+                        chatBotRef.current?.sendMessage(msg)
+                        setExpandedView('chat')
+                      }}
                       hideTitle
                     />
                   </div>
