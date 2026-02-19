@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createTaskTool = tool(
-  async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration, parentGoalId, status, contextRequired, recurringPattern }, config) => {
+  async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration, parentGoalId, status, contextRequired, recurringPattern, projectId }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -24,6 +24,7 @@ export const createTaskTool = tool(
         status: status || 'pending',
         contextRequired: contextRequired || undefined,
         recurringPattern: recurringPattern || undefined,
+        projectId: projectId || undefined,
       }, { source: 'agent', agentType: 'conversation' });
 
       if (!task) {
@@ -52,6 +53,7 @@ export const createTaskTool = tool(
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Initial task status. Defaults to 'pending'."),
       contextRequired: z.record(z.any()).optional().nullable().describe("Context needed for this task (e.g., tools, location, prerequisites)"),
       recurringPattern: z.record(z.any()).optional().nullable().describe("Recurring pattern config (e.g., { frequency: 'daily', interval: 1 })"),
+      projectId: z.string().optional().nullable().describe("UUID of a project to link this task to. Use list_projects to find project IDs."),
     }),
   }
 );

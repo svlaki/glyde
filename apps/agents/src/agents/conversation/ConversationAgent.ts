@@ -5,6 +5,7 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService, ActivityLogEntry } from '../../services/SupabaseService.js';
+import projectService from '../../services/ProjectService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse, ImageContent } from '../../types/agents.js';
@@ -36,6 +37,10 @@ const ConversationState = Annotation.Root({
     default: () => [],
   }),
   userAspects: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
+  userProjects: Annotation<any[]>({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
@@ -80,12 +85,13 @@ export class ConversationAgent extends BaseAgent {
       const supabaseService = new SupabaseService();
 
       // Parallel data fetching for better performance
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, recentUserActivity, recentAgentActivity] = await Promise.all([
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
+        projectService.getProjects(context.userId),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5), // Last 5 agent actions
       ]);
@@ -162,6 +168,7 @@ export class ConversationAgent extends BaseAgent {
         userTasks: userTasks || [],
         userGoals: userGoals || [],
         userAspects: userAspects || [],
+        userProjects: userProjects || [],
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
@@ -239,13 +246,14 @@ IMPORTANT INSTRUCTIONS:
 
       // Parallel data fetching - run all async operations concurrently
       // This significantly reduces time-to-first-token
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, recentUserActivity, recentAgentActivity] = await Promise.all([
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
+        projectService.getProjects(context.userId),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
       ]);
@@ -321,6 +329,7 @@ IMPORTANT INSTRUCTIONS:
         userTasks: userTasks || [],
         userGoals: userGoals || [],
         userAspects: userAspects || [],
+        userProjects: userProjects || [],
         userProfile: userProfile || null,
         recentUserActivity: recentUserActivity || [],
         recentAgentActivity: recentAgentActivity || [],
@@ -539,6 +548,7 @@ IMPORTANT INSTRUCTIONS:
         zepGraphContext: zepThreadContext, // Use Zep's built-in context block
         rulesContext, // User's custom rules
         userAspects: state.userAspects, // Available aspects with IDs
+        userProjects: state.userProjects, // Active projects with IDs
         userProfile: state.userProfile, // User profile with preferences
         recentUserActivity: state.recentUserActivity, // Recent manual changes
         recentAgentActivity: state.recentAgentActivity, // Recent agent actions

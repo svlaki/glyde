@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
 import { ImageContent } from '../types/agents.js';
+import pdfParse from 'pdf-parse';
 
 // Get the shared agent registry instance
 const agentRegistry = AgentRegistry.getInstance();
@@ -81,6 +82,14 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         images = lastUserMessage.parts
           .filter((p: any) => p.type === 'image_url')
           .map((p: any) => ({ type: 'image_url' as const, image_url: p.image_url }));
+        // Extract PDF files from parts
+        const fileParts = lastUserMessage.parts.filter((p: any) => p.type === 'file');
+        for (const filePart of fileParts) {
+          const pdfText = await extractPdfText(filePart.file?.data, filePart.file?.name);
+          if (pdfText) {
+            message = `[Content from uploaded PDF "${filePart.file?.name || 'document.pdf'}"]\n\n${pdfText}\n\n[End of PDF content]\n\n${message}`;
+          }
+        }
       } else if (Array.isArray(lastUserMessage.content)) {
         // Handle content as array of parts
         const textPart = lastUserMessage.content.find((p: any) => p.type === 'text');
@@ -89,6 +98,14 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         images = lastUserMessage.content
           .filter((p: any) => p.type === 'image_url')
           .map((p: any) => ({ type: 'image_url' as const, image_url: p.image_url }));
+        // Extract PDF files from content array
+        const fileParts = lastUserMessage.content.filter((p: any) => p.type === 'file');
+        for (const filePart of fileParts) {
+          const pdfText = await extractPdfText(filePart.file?.data, filePart.file?.name);
+          if (pdfText) {
+            message = `[Content from uploaded PDF "${filePart.file?.name || 'document.pdf'}"]\n\n${pdfText}\n\n[End of PDF content]\n\n${message}`;
+          }
+        }
       } else {
         message = '';
       }
@@ -255,4 +272,37 @@ function formatToolName(toolName: string): string {
   };
 
   return toolDisplayNames[toolName] || `Running ${toolName.replace(/_/g, ' ')}...`;
+}
+
+/**
+ * Extract text content from a base64-encoded PDF
+ */
+async function extractPdfText(base64Data: string | undefined, fileName: string | undefined): Promise<string | null> {
+  if (!base64Data) return null;
+
+  try {
+    // Remove data URL prefix if present (e.g., "data:application/pdf;base64,")
+    const base64Content = base64Data.includes(',') ? base64Data.split(',')[1]! : base64Data;
+    const buffer = Buffer.from(base64Content, 'base64');
+    const result = await pdfParse(buffer);
+    const text = result.text?.trim();
+
+    if (!text) {
+      console.warn(`[STREAM] PDF "${fileName}" contained no extractable text`);
+      return null;
+    }
+
+    // Truncate very large PDFs to avoid context window issues (roughly 100k chars)
+    const MAX_PDF_CHARS = 100000;
+    if (text.length > MAX_PDF_CHARS) {
+      console.log(`[STREAM] PDF "${fileName}" truncated from ${text.length} to ${MAX_PDF_CHARS} chars`);
+      return text.slice(0, MAX_PDF_CHARS) + '\n\n[... PDF content truncated due to length ...]';
+    }
+
+    console.log(`[STREAM] Extracted ${text.length} chars from PDF "${fileName}"`);
+    return text;
+  } catch (error) {
+    console.error(`[STREAM] Failed to parse PDF "${fileName}":`, error);
+    return null;
+  }
 }

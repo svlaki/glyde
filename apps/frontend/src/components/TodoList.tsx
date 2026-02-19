@@ -250,13 +250,13 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = hexToRgba(taskColor, 0.25)
-                    const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
-                    if (deleteBtn) deleteBtn.style.opacity = '0.5'
+                    const actionBtns = e.currentTarget.querySelectorAll('[data-action-btn]') as NodeListOf<HTMLElement>
+                    actionBtns.forEach(btn => { btn.style.opacity = '0.5' })
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = hexToRgba(taskColor, 0.15)
-                    const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
-                    if (deleteBtn) { deleteBtn.style.opacity = '0'; deleteBtn.style.color = colors.textTertiary }
+                    const actionBtns = e.currentTarget.querySelectorAll('[data-action-btn]') as NodeListOf<HTMLElement>
+                    actionBtns.forEach(btn => { btn.style.opacity = '0'; btn.style.color = colors.textTertiary })
                   }}
                   onClick={(e) => {
                     // Don't open modal if clicking checkbox
@@ -309,7 +309,31 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
                     </div>
                   </div>
                   <button
-                    data-delete-btn
+                    data-action-btn
+                    onClick={(e) => { e.stopPropagation(); setEditingTask(task) }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: colors.textTertiary,
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      opacity: 0,
+                      transition: 'opacity 0.15s, color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.textPrimary }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = colors.textTertiary }}
+                    title="Edit task"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                  </button>
+                  <button
+                    data-action-btn
                     onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
                     style={{
                       background: 'none',

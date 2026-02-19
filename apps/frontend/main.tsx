@@ -16,6 +16,8 @@ import { ConnectionsPage } from './src/pages/ConnectionsPage'
 import { PlanPage } from './src/pages/PlanPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { FriendsPage } from './src/pages/FriendsPage'
+import { ProjectsPage } from './src/pages/ProjectsPage'
+import { ProjectProvider } from './src/lib/projectContext'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
@@ -28,6 +30,7 @@ function App() {
           <RuleProvider>
             <ConnectionProvider>
             <AspectProvider>
+            <ProjectProvider>
               <Routes>
                 <Route path="/" element={<Auth />} />
                 <Route
@@ -79,6 +82,16 @@ function App() {
                   }
                 />
                 <Route
+                  path="/projects"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <ProjectsPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/friends"
                   element={
                     <ProtectedRoute>
@@ -123,6 +136,7 @@ function App() {
                 <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+            </ProjectProvider>
             </AspectProvider>
             </ConnectionProvider>
           </RuleProvider>

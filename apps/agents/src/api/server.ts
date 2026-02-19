@@ -38,6 +38,7 @@ import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCh
 import { getUserPlan, createUserPlan, updateUserPlan, deleteUserPlan } from './plans.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
 import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor, archiveUserAspect, unarchiveUserAspect, getArchivedAspects } from './aspects.js';
+import { getUserProjects, createUserProject, updateUserProject, deleteUserProject, archiveUserProject, unarchiveUserProject, getArchivedProjects as getArchivedUserProjects, getProjectDetail, tagEntityToProject } from './projects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
@@ -331,6 +332,17 @@ app.post('/api/aspects/archive', archiveUserAspect);
 app.post('/api/aspects/unarchive', unarchiveUserAspect);
 app.post('/api/aspects/archived', getArchivedAspects);
 app.post('/api/aspects/color', getAspectColor);
+
+// Projects endpoints
+app.post('/api/projects', getUserProjects);
+app.post('/api/projects/create', createUserProject);
+app.post('/api/projects/update', updateUserProject);
+app.post('/api/projects/delete', deleteUserProject);
+app.post('/api/projects/archive', archiveUserProject);
+app.post('/api/projects/unarchive', unarchiveUserProject);
+app.post('/api/projects/archived', getArchivedUserProjects);
+app.post('/api/projects/detail', getProjectDetail);
+app.post('/api/projects/tag', tagEntityToProject);
 
 // Onboarding endpoints
 app.post('/api/onboarding/complete', completeOnboarding);

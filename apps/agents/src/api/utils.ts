@@ -63,6 +63,40 @@ export const aspectColorSchema = z.object({
 });
 
 /**
+ * Project schemas
+ */
+export const createProjectSchema = z.object({
+  user_id: uuidSchema,
+  name: z.string().min(1, 'Project name is required').max(200),
+  aspect_id: uuidSchema,
+  description: z.string().max(2000).optional(),
+  deadline: z.string().refine(val => !isNaN(Date.parse(val)), 'Invalid date format').optional(),
+  details: z.record(z.unknown()).optional()
+});
+
+export const updateProjectSchema = z.object({
+  user_id: uuidSchema,
+  project_id: uuidSchema,
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  deadline: z.string().refine(val => !isNaN(Date.parse(val)), 'Invalid date format').optional().nullable(),
+  details: z.record(z.unknown()).optional(),
+  aspect_id: uuidSchema.optional()
+});
+
+export const projectIdSchema = z.object({
+  user_id: uuidSchema,
+  project_id: uuidSchema
+});
+
+export const tagProjectSchema = z.object({
+  user_id: uuidSchema,
+  entity_type: z.enum(['task', 'event']),
+  entity_id: uuidSchema,
+  project_id: uuidSchema.nullable()
+});
+
+/**
  * Event schemas
  */
 export const createEventSchema = z.object({
