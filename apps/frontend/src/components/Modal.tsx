@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
+import { useKeyboard } from '../hooks/useKeyboard'
 
 interface ModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export function Modal({ isOpen, onClose, title, headerContent, children, maxWidt
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const typography = getTypography(false)
+  const { isKeyboardOpen, keyboardHeight } = useKeyboard()
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -35,12 +37,14 @@ export function Modal({ isOpen, onClose, title, headerContent, children, maxWidt
           onOpenAutoFocus={preventAutoFocus ? (e) => e.preventDefault() : undefined}
           style={{
             position: 'fixed',
-            top: '50%',
+            top: isKeyboardOpen ? '10%' : '50%',
             left: '50%',
-            transform: 'translate(-50%, -50%)',
+            transform: isKeyboardOpen ? 'translateX(-50%)' : 'translate(-50%, -50%)',
             width: 'min(90vw, 100%)',
             maxWidth,
-            maxHeight: '85vh',
+            maxHeight: isKeyboardOpen
+              ? `calc(90vh - ${keyboardHeight}px)`
+              : '85vh',
             background: colors.bgPrimary,
             borderRadius: '16px',
             border: `1px solid ${colors.border}`,

@@ -7,6 +7,7 @@ import { TodoList } from '../components/TodoList'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { usePlatform } from '../hooks/usePlatform'
+import { useKeyboard } from '../hooks/useKeyboard'
 import { mobileStyles, mobileSpacing, mobileHeaderStyles } from '../styles/mobileStyles'
 import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
 import { MobileMenu } from '../components/mobile/MobileMenu'
@@ -24,6 +25,7 @@ export function CalendarPage() {
 function CalendarPageMobile() {
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
+  const { isKeyboardOpen } = useKeyboard()
   const [activeTab, setActiveTab] = useState<'calendar' | 'chat' | 'todos' | 'agents'>('calendar')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const chatBotRef = useRef<ChatBotHandle>(null)
@@ -213,42 +215,44 @@ function CalendarPageMobile() {
       {/* Mobile Menu */}
       <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
 
-      {/* Bottom tabs navigation */}
-      <div style={{
-        flexShrink: 0,
-        minHeight: '60px',
-        background: colors.bgSecondary,
-        borderTop: `1px solid ${colors.border}`,
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        paddingTop: '4px',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 4px)'
-      }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '12px 8px',
-              background: 'transparent',
-              border: 'none',
-              color: activeTab === tab.id ? colors.textPrimary : colors.textSecondary,
-              fontSize: '12px',
-              fontWeight: activeTab === tab.id ? '600' : '400',
-              cursor: 'pointer',
-              minHeight: '44px',
-              transition: 'color 0.2s'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Bottom tabs navigation — hidden when keyboard is open */}
+      {!isKeyboardOpen && (
+        <div style={{
+          flexShrink: 0,
+          minHeight: '60px',
+          background: colors.bgSecondary,
+          borderTop: `1px solid ${colors.border}`,
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          paddingTop: '4px',
+          paddingBottom: 'max(env(safe-area-inset-bottom), 4px)'
+        }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '12px 8px',
+                background: 'transparent',
+                border: 'none',
+                color: activeTab === tab.id ? colors.textPrimary : colors.textSecondary,
+                fontSize: '12px',
+                fontWeight: activeTab === tab.id ? '600' : '400',
+                cursor: 'pointer',
+                minHeight: '44px',
+                transition: 'color 0.2s'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
