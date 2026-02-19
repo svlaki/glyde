@@ -19,9 +19,11 @@ import { FriendsPage } from './src/pages/FriendsPage'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
+import { KeyboardProvider } from './src/hooks/useKeyboard'
 
 function App() {
   return (
+    <KeyboardProvider>
     <BrowserRouter>
       <AuthProvider>
         <ThemeProvider>
@@ -129,6 +131,7 @@ function App() {
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
+    </KeyboardProvider>
   )
 }
 
