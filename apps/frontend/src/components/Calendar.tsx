@@ -1523,7 +1523,7 @@ export function Calendar() {
             if (eventData.start_time) updates.start_time = eventData.start_time
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
-            if (eventData.aspect) updates.category = eventData.aspect
+            if (eventData.aspect) updates.aspect = eventData.aspect
             if (eventData.visibility) updates.visibility = eventData.visibility
 
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
