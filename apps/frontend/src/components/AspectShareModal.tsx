@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
+import { usePlatform } from '../hooks/usePlatform'
 import { getColors, hexToRgba } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
@@ -26,6 +27,7 @@ interface AspectShareModalProps {
 export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: AspectShareModalProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
+  const { isMobile } = usePlatform()
   const colors = getColors(theme)
   const accessToken = session?.access_token
 
@@ -151,12 +153,13 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
 
   const inputStyle = {
     padding: '8px 12px',
-    fontSize: fontSize.sm,
+    fontSize: isMobile ? '16px' : fontSize.sm,
     background: colors.bgPrimary,
     color: colors.textPrimary,
     border: `1px solid ${colors.border}`,
     borderRadius: '6px',
-    outline: 'none'
+    outline: 'none',
+    minHeight: isMobile ? '44px' : 'auto'
   }
 
   return (
@@ -218,7 +221,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                 }}>
                   Add a friend
                 </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexDirection: isMobile ? 'column' : 'row' }}>
                   <select
                     value={selectedFriendId}
                     onChange={(e) => setSelectedFriendId(e.target.value)}
@@ -234,31 +237,34 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                         </option>
                       ))}
                   </select>
-                  <select
-                    value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
-                    style={{ ...inputStyle, width: '100px' }}
-                  >
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                  <button
-                    type="submit"
-                    disabled={loading || !selectedFriendId}
-                    style={{
-                      padding: '8px 14px',
-                      fontSize: fontSize.sm,
-                      fontWeight: fontWeight.medium,
-                      background: colors.accent,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      opacity: loading || !selectedFriendId ? 0.5 : 1
-                    }}
-                  >
-                    Add
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <select
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
+                      style={{ ...inputStyle, width: isMobile ? undefined : '100px', flex: isMobile ? 1 : undefined }}
+                    >
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={loading || !selectedFriendId}
+                      style={{
+                        padding: '8px 14px',
+                        fontSize: fontSize.sm,
+                        fontWeight: fontWeight.medium,
+                        background: colors.accent,
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        opacity: loading || !selectedFriendId ? 0.5 : 1,
+                        minHeight: isMobile ? '44px' : 'auto'
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               </form>
             )}

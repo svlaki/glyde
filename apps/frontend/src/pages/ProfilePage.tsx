@@ -32,7 +32,7 @@ function ProfilePageMobile() {
 
   return (
     <div style={mobileStyles.fullHeight}>
-      <MobileHeader title="Profile" showMenu={true} />
+      <MobileHeader title="Profile" showMenu={true} showSearch={true} />
 
       <div style={{
         ...mobileStyles.scrollContainer,

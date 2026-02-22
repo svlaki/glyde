@@ -189,7 +189,7 @@ function ConnectionsPageMobile() {
 
   return (
     <div style={mobileStyles.fullHeight}>
-      <MobileHeader title="Connections" showMenu={true} />
+      <MobileHeader title="Connections" showMenu={true} showSearch={true} />
 
       <div style={{
         ...mobileStyles.scrollContainer,

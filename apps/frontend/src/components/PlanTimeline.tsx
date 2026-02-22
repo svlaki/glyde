@@ -9,6 +9,8 @@ import { updateUserGoal } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
 import { DndProvider, useDrag, useDrop } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
+import { TouchBackend } from 'react-dnd-touch-backend'
+import { usePlatform } from '../hooks/usePlatform'
 
 // Accent colors not in theme
 const ACCENT_COLORS = {
@@ -45,40 +47,46 @@ interface DraggableItemProps {
   timelineStart: Date
   timelineEnd: Date
   containerWidth: number
+  isMobile?: boolean
 }
 
 interface SimpleTimelineItemProps {
   item: TimelineItem
   colors: ReturnType<typeof getColors>
   isDateBased: boolean
+  isMobile?: boolean
 }
 
-function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemProps) {
+function SimpleTimelineItem({ item, colors, isDateBased, isMobile = false }: SimpleTimelineItemProps) {
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const [tapped, setTapped] = useState(false)
   const isGoal = item.type === 'goal'
 
   // Use pre-calculated position for non-dated items, or calculate from date
   const position = item.position ?? 50
 
+  const showTooltip = isMobile ? tapped : !!hoverPos
+
   return (
     <div
-      onMouseEnter={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
-      onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
-      onMouseLeave={() => setHoverPos(null)}
+      onMouseEnter={isMobile ? undefined : (e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseMove={isMobile ? undefined : (e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={isMobile ? undefined : () => setHoverPos(null)}
+      onClick={isMobile ? () => setTapped(prev => !prev) : undefined}
       style={{
         position: 'absolute',
         left: `${position}%`,
         transform: 'translateX(-50%)',
-        cursor: 'default',
-        zIndex: hoverPos ? 50 : 1
+        cursor: isMobile ? 'pointer' : 'default',
+        zIndex: showTooltip ? 50 : 1
       }}
     >
-      {/* Hover tooltip */}
-      {hoverPos && createPortal(
+      {/* Tooltip */}
+      {showTooltip && (isMobile ? (
         <div style={{
-          position: 'fixed',
-          top: hoverPos.y + 20,
-          left: hoverPos.x,
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
           transform: 'translateX(-50%)',
           padding: '8px 12px',
           background: colors.bgPrimary,
@@ -87,7 +95,7 @@ function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemPro
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           whiteSpace: 'nowrap',
           zIndex: 9999,
-          pointerEvents: 'none'
+          marginBottom: '8px'
         }}>
           <div style={{
             fontSize: fontSize.xs,
@@ -105,14 +113,48 @@ function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemPro
               {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
           )}
-        </div>,
-        document.body
-      )}
+        </div>
+      ) : (
+        hoverPos && createPortal(
+          <div style={{
+            position: 'fixed',
+            top: hoverPos.y + 20,
+            left: hoverPos.x,
+            transform: 'translateX(-50%)',
+            padding: '8px 12px',
+            background: colors.bgPrimary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}>
+            <div style={{
+              fontSize: fontSize.xs,
+              fontWeight: fontWeight.medium,
+              color: colors.textPrimary
+            }}>
+              {item.title}
+            </div>
+            {item.date && (
+              <div style={{
+                fontSize: fontSize.xs,
+                color: colors.textSecondary,
+                marginTop: '2px'
+              }}>
+                {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </div>
+            )}
+          </div>,
+          document.body
+        )
+      ))}
 
       {/* Marker */}
       <div style={{
-        width: isGoal ? '16px' : '12px',
-        height: isGoal ? '16px' : '12px',
+        width: isGoal ? (isMobile ? '24px' : '16px') : (isMobile ? '20px' : '12px'),
+        height: isGoal ? (isMobile ? '24px' : '16px') : (isMobile ? '20px' : '12px'),
         borderRadius: '50%',
         background: item.completed ? ACCENT_COLORS.success : (item.color || ACCENT_COLORS.primary),
         border: `2px solid ${colors.bgPrimary}`,
@@ -153,8 +195,9 @@ function SimpleTimelineItem({ item, colors, isDateBased }: SimpleTimelineItemPro
   )
 }
 
-function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, containerWidth }: DraggableItemProps) {
+function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, containerWidth, isMobile = false }: DraggableItemProps) {
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const [tapped, setTapped] = useState(false)
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
     item: { ...item },
@@ -169,28 +212,32 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
   const position = item.position ?? Math.max(0, Math.min(100, (daysFromStart / totalDays) * 100))
 
   const isGoal = item.type === 'goal'
+  const showTooltip = isMobile ? tapped : !!hoverPos
 
   return (
     <div
       ref={drag}
-      onMouseEnter={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
-      onMouseMove={(e) => setHoverPos({ x: e.clientX, y: e.clientY })}
-      onMouseLeave={() => setHoverPos(null)}
+      onMouseEnter={isMobile ? undefined : (e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseMove={isMobile ? undefined : (e) => setHoverPos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={isMobile ? undefined : () => setHoverPos(null)}
+      onClick={isMobile ? () => setTapped(prev => !prev) : undefined}
       style={{
         position: 'absolute',
         left: `${position}%`,
         transform: 'translateX(-50%)',
-        cursor: item.type === 'milestone' ? 'grab' : 'default',
+        cursor: item.type === 'milestone' ? 'grab' : (isMobile ? 'pointer' : 'default'),
         opacity: isDragging ? 0.5 : 1,
-        zIndex: hoverPos ? 50 : (isDragging ? 100 : 1)
+        zIndex: showTooltip ? 50 : (isDragging ? 100 : 1),
+        padding: isMobile ? '8px' : 0,
+        margin: isMobile ? '-8px' : 0
       }}
     >
-      {/* Hover tooltip - rendered via portal to escape overflow:hidden */}
-      {hoverPos && createPortal(
+      {/* Tooltip */}
+      {showTooltip && (isMobile ? (
         <div style={{
-          position: 'fixed',
-          top: hoverPos.y + 20,
-          left: hoverPos.x,
+          position: 'absolute',
+          bottom: '100%',
+          left: '50%',
           transform: 'translateX(-50%)',
           padding: '8px 12px',
           background: colors.bgPrimary,
@@ -199,7 +246,7 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
           boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           whiteSpace: 'nowrap',
           zIndex: 9999,
-          pointerEvents: 'none'
+          marginBottom: '8px'
         }}>
           <div style={{
             fontSize: fontSize.xs,
@@ -217,14 +264,48 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
               {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </div>
           )}
-        </div>,
-        document.body
-      )}
+        </div>
+      ) : (
+        hoverPos && createPortal(
+          <div style={{
+            position: 'fixed',
+            top: hoverPos.y + 20,
+            left: hoverPos.x,
+            transform: 'translateX(-50%)',
+            padding: '8px 12px',
+            background: colors.bgPrimary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}>
+            <div style={{
+              fontSize: fontSize.xs,
+              fontWeight: fontWeight.medium,
+              color: colors.textPrimary
+            }}>
+              {item.title}
+            </div>
+            {item.date && (
+              <div style={{
+                fontSize: fontSize.xs,
+                color: colors.textSecondary,
+                marginTop: '2px'
+              }}>
+                {item.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </div>
+            )}
+          </div>,
+          document.body
+        )
+      ))}
 
       {/* Marker */}
       <div style={{
-        width: isGoal ? '16px' : '12px',
-        height: isGoal ? '16px' : '12px',
+        width: isGoal ? (isMobile ? '24px' : '16px') : (isMobile ? '20px' : '12px'),
+        height: isGoal ? (isMobile ? '24px' : '16px') : (isMobile ? '20px' : '12px'),
         borderRadius: '50%',
         background: item.completed ? ACCENT_COLORS.success : (item.color || ACCENT_COLORS.primary),
         border: `2px solid ${colors.bgPrimary}`,
@@ -235,7 +316,7 @@ function DraggableTimelineItem({ item, colors, timelineStart, timelineEnd, conta
       {/* Label + Date combined */}
       <div style={{
         position: 'absolute',
-        top: '18px',
+        top: isMobile ? '28px' : '18px',
         left: '50%',
         transform: 'translateX(-50%)',
         textAlign: 'center',
@@ -269,6 +350,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false, onChatRe
   const { theme, isDarkMode } = useTheme()
   const { user, accessToken } = useAuth()
   const { getAspectColor } = useAspects()
+  const { isMobile } = usePlatform()
   const colors = getColors(theme)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dismissedOverdue, setDismissedOverdue] = useState<Set<string>>(new Set())
@@ -674,6 +756,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false, onChatRe
               item={item}
               colors={colors}
               isDateBased={false}
+              isMobile={isMobile}
             />
           ))}
         </div>
@@ -789,6 +872,7 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false, onChatRe
             timelineStart={timelineStart}
             timelineEnd={timelineEnd}
             containerWidth={containerRef.current?.clientWidth || 800}
+            isMobile={isMobile}
           />
         ))}
       </div>
@@ -827,8 +911,12 @@ function TimelineContent({ goals, onMilestoneUpdate, hideTitle = false, onChatRe
 }
 
 export function PlanTimeline(props: PlanTimelineProps) {
+  const { isMobile } = usePlatform()
+  const backend = isMobile ? TouchBackend : HTML5Backend
+  const options = isMobile ? { enableMouseEvents: true } : undefined
+
   return (
-    <DndProvider backend={HTML5Backend}>
+    <DndProvider backend={backend} options={options}>
       <TimelineContent {...props} />
     </DndProvider>
   )

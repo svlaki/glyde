@@ -832,7 +832,7 @@ function PlanPageMobile() {
   if (isLoading) {
     return (
       <div style={mobileStyles.fullHeight}>
-        <MobileHeader title="Plan" showMenu={true} />
+        <MobileHeader title="Plan" showMenu={true} showSearch={true} />
         <div style={{
           flex: 1,
           display: 'flex',
@@ -1131,7 +1131,7 @@ function PlanPageMobile() {
   // ============ DEFAULT: Overview with all sections ============
   return (
     <div style={mobileStyles.fullHeight}>
-      <MobileHeader title="Plan" showMenu={true} />
+      <MobileHeader title="Plan" showMenu={true} showSearch={true} />
 
       <div style={{
         ...mobileStyles.scrollContainer,
