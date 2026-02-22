@@ -60,6 +60,12 @@ const AspectsIcon = () => (
   </svg>
 )
 
+const ProjectsIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
 const ConnectionsIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -122,6 +128,7 @@ const navItems: NavItem[] = [
   { path: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
   { path: '/plan', label: 'Plan', icon: <PlanIcon /> },
   { path: '/aspects', label: 'Aspects', icon: <AspectsIcon /> },
+  { path: '/projects', label: 'Projects', icon: <ProjectsIcon /> },
   { path: '/friends', label: 'Friends', icon: <FriendsIcon /> },
 
   { path: '/profile', label: 'Profile', icon: <ProfileIcon /> },

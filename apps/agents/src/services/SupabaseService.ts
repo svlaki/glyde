@@ -3,7 +3,7 @@ import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult
 import { AgentType } from '../types/agents.js';
 
 // Activity log types
-export type ActivityEntityType = 'event' | 'task' | 'goal' | 'aspect' | 'profile' | 'rule';
+export type ActivityEntityType = 'event' | 'task' | 'goal' | 'aspect' | 'profile' | 'rule' | 'project';
 export type ActivityOperation = 'create' | 'update' | 'delete' | 'complete' | 'uncomplete' | 'archive';
 export type ActivitySource = 'user' | 'agent';
 
@@ -333,7 +333,9 @@ export class SupabaseService {
         is_shared: event.is_shared || false,
         reflection: event.reflection || null,
         is_missed: event.is_missed || false,
-        user_role: event.user_role || 'owner'
+        user_role: event.user_role || 'owner',
+        project_id: event.project_id || null,
+        project_name: event.project_name || null
       }));
 
       return transformedEvents;
@@ -501,7 +503,8 @@ export class SupabaseService {
           description: description,
           category: event.aspect || 'Personal', // Deprecated text column for backward compatibility
           aspect_id: aspectId,
-          visibility: event.visibility || 'private' // Default to private for privacy
+          visibility: event.visibility || 'private', // Default to private for privacy
+          project_id: event.project_id || null
         })
         .select()
         .single();
@@ -601,6 +604,7 @@ export class SupabaseService {
       if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
       if (updates.reflection !== undefined) updateData.reflection = updates.reflection;
       if (updates.is_missed !== undefined) updateData.is_missed = updates.is_missed;
+      if (updates.project_id !== undefined) updateData.project_id = updates.project_id;
 
       // Handle aspect using helper method (use event owner for aspect resolution)
       const aspectOwnerId = oldEvent?.user_id || userId;
@@ -1178,6 +1182,7 @@ export class SupabaseService {
       estimatedDuration?: number;
       contextRequired?: Record<string, any>;
       recurringPattern?: Record<string, any>;
+      projectId?: string;
     },
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<any> {
@@ -1201,7 +1206,8 @@ export class SupabaseService {
           energy_required: taskData.energyRequired,
           estimated_duration: taskData.estimatedDuration,
           context_required: taskData.contextRequired || {},
-          recurring_pattern: taskData.recurringPattern || {}
+          recurring_pattern: taskData.recurringPattern || {},
+          project_id: taskData.projectId || null
         })
         .select()
         .single();
@@ -1319,7 +1325,7 @@ export class SupabaseService {
         aspect_id: interaction.aspectId ?? null,
         entity_id: interaction.entityId ?? null,
         metadata: interaction.metadata ?? null,
-        expires_at: interaction.expiresAt ?? null,
+        expires_at: interaction.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         status: 'pending',
         created_at: new Date().toISOString(),
       };

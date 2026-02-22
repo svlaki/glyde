@@ -23,6 +23,8 @@ export interface Task {
   completion_notes?: string
   recurring_pattern?: Record<string, any>
   is_shared?: boolean
+  project_id?: string
+  project_name?: string
 }
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'

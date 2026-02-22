@@ -35,6 +35,10 @@ export interface DatabaseEvent {
 
   // Shared aspect flag
   is_shared?: boolean;  // True if item comes from a shared aspect (not owned by this user)
+
+  // Project fields
+  project_id?: string;
+  project_name?: string;
 }
 
 export interface DatabaseAspect {
@@ -90,6 +94,22 @@ export interface DatabaseSettings {
 export interface VectorSearchResult<T> {
   data: T;
   similarity: number;
+}
+
+export interface DatabaseProject {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  deadline?: string;
+  details?: Record<string, any>;
+  aspect_id?: string;
+  aspect_name?: string;
+  aspect_color?: string;
+  aspect_icon?: string;
+  archived_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserSchema {

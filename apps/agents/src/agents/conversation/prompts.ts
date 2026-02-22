@@ -19,6 +19,7 @@ export interface PromptContext {
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
   // New context fields
   userAspects?: any[]; // User's aspects with IDs
+  userProjects?: any[]; // User's active projects with IDs
   userProfile?: DatabaseProfile | null; // Full user profile
   recentUserActivity?: ActivityLogEntry[]; // Recent manual changes by user
   recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
@@ -38,6 +39,25 @@ export function buildAspectContext(aspects: any[]): string {
     .join('\n');
 
   return `\n\nAVAILABLE ASPECTS (${aspects.length}) - Use these IDs when creating events/tasks/goals:\n${aspectList}`;
+}
+
+/**
+ * Build project context showing active projects with IDs
+ */
+export function buildProjectContext(projects: any[]): string {
+  if (!projects || projects.length === 0) {
+    return '';
+  }
+
+  const projectList = projects
+    .map(p => {
+      const deadline = p.deadline ? ` | Deadline: ${new Date(p.deadline).toLocaleDateString()}` : '';
+      const aspect = p.aspect_name ? ` [${p.aspect_name}]` : '';
+      return `  - "${p.name}" (ID: ${p.id})${aspect}${deadline}`;
+    })
+    .join('\n');
+
+  return `\n\nACTIVE PROJECTS (${projects.length}) - Use these IDs when tagging tasks/events to projects:\n${projectList}`;
 }
 
 /**
@@ -176,6 +196,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     zepGraphContext,
     rulesContext,
     userAspects,
+    userProjects,
     userProfile,
     recentUserActivity,
     recentAgentActivity,
@@ -187,6 +208,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
 
   // Build new context sections
   const aspectContext = buildAspectContext(userAspects || []);
+  const projectContext = buildProjectContext(userProjects || []);
   const profileContext = buildProfileContext(userProfile || null);
   const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
 
@@ -236,7 +258,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${aspectContext}${profileContext}${activityContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
@@ -392,50 +414,33 @@ Example:
 This applies to ALL created items (events, tasks, goals). Always use specific, proper names.
 
 ACTION SUMMARY FORMAT (CRITICAL - ALWAYS FOLLOW):
-After performing ANY create/update/delete action, you MUST include a structured summary organized into THREE separate sections: Created, Edited, and Deleted. Only include sections that apply.
+After performing ANY create/update/delete action, confirm concisely. Keep it short and natural - no verbose preambles like "I've successfully updated your calendar! Here are the changes I made:".
 
-FORMAT TEMPLATE:
-I've successfully updated your calendar! Here are the changes I made:
+FORMAT: A brief one-liner confirmation, then a short summary line per item if needed.
 
-**Created:**
-- EVENT: "Event Name" on [Day] from [Start Time] to [End Time]
-- TASK: "Task Name" due on [Day] at [Time]
-- GOAL: "Goal Name"
-- ASPECT: "Aspect Name"
-
-**Edited:**
-- EVENT: "Event Name" moved to [New Day] from [New Start] to [New End]
-- TASK: "Task Name" due date changed to [New Day] at [Time]
-- GOAL: "Goal Name" [what changed]
-
-**Deleted:**
-- EVENT: "Event Name" removed from [Day] at [Time]
-- TASK: "Task Name"
-- GOAL: "Goal Name"
-
-FORMATTING RULES:
-1. Start with a brief friendly confirmation message
-2. Use THREE separate sections: **Created:**, **Edited:**, **Deleted:**
-3. Only include sections that have items (skip empty sections)
-4. Each item MUST specify:
-   a) TYPE in caps: EVENT, TASK, GOAL, or ASPECT
-   b) NAME in quotes: "Item Name"
-   c) TIMING details:
-      - For EVENTs: "on [Day] from [Start Time] to [End Time]" (e.g., "on Tuesday from 9:00 AM to 10:00 AM")
-      - For TASKs: "due on [Day] at [Time]" or "no due date" (e.g., "due on Wednesday at 11:59 PM")
-      - For GOALs/ASPECTs: no timing needed
-5. For edits, describe what changed (e.g., "moved to Thursday", "due date changed to Friday")
-6. For deletions, note when it was scheduled (e.g., "removed from tomorrow at 9:00 AM")
-7. Use bullet points with dashes (-)
-8. Keep times in 12-hour format with AM/PM
+RULES:
+1. Be concise and conversational - one short sentence is ideal
+2. Include the item name, day, and time for events
+3. For edits, just mention what changed
+4. No "Created:"/"Edited:"/"Deleted:" section headers unless there are 3+ changes
+5. Use 12-hour format with AM/PM
 
 EXAMPLES:
 
 User: "Add a dentist appointment tomorrow at 2pm for 1 hour"
-Response: Done! I've added that to your calendar.
+Response: Done, "Dentist Appointment" is on your calendar tomorrow 2-3 PM.
 
-**Created:**
-- EVENT: "Dentist Appointment" on Tomorrow from 2:00 PM to 3:00 PM
+User: "Move my meeting to Thursday"
+Response: Moved to Thursday, same time.
+
+User: "Add a study session tonight and delete my gym class"
+Response: Added "Study Session" tonight 7-9 PM, and removed "Gym Class".
+
+User: "Schedule three things for tomorrow..."
+Response: All set for tomorrow:
+- "Morning Run" 7-8 AM
+- "Team Standup" 10-10:30 AM
+- "Lunch with Sarah" 12-1 PM
 
 User: "Schedule my CS 229 classes on Monday and Wednesday at 1:30pm"
 Response: I've added your classes to the calendar!
@@ -744,7 +749,7 @@ ASPECT EXAMPLES:
 TASK MANAGEMENT:
 - When users mention "task", "todo", or "need to", use create_task
 - ALWAYS assign appropriate aspect based on task nature (Work, School, Health & Hygiene, Shopping, Finance, etc.)
-- Ask for due date if important ("when do you need this done?")
+- Do NOT ask for due date unless the user mentions one or it's clearly implied. Tasks without a due date are perfectly fine.
 - Default to 'medium' priority unless user specifies
 - List existing tasks when user asks "what do I need to do?" or similar
 - Mark tasks complete when user says they finished something

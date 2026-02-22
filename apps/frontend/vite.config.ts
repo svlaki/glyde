@@ -13,4 +13,16 @@ export default defineConfig({
       "@": resolve(__dirname, 'src'),
     },
   },
+  server: {
+    host: '0.0.0.0',
+    watch: {
+      usePolling: true,
+      interval: 1000,
+    },
+    hmr: {
+      host: 'localhost',
+      port: 5173,
+      clientPort: 3000,
+    },
+  },
 })

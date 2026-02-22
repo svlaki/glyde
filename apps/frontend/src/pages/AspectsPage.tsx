@@ -79,6 +79,13 @@ function AspectsPageMobile() {
     }
   }
 
+  const handleDescriptionUpdate = async (aspectToUpdate: Aspect, description: string) => {
+    if (!user || !session) return
+    await updateUserAspect(user, aspectToUpdate.id, { description }, session.access_token)
+    await refreshAspects()
+    setSelectedAspect(prev => prev?.id === aspectToUpdate.id ? { ...prev, description } : prev)
+  }
+
   // Detail view - showing goals for selected aspect
   if (selectedAspect) {
     return (
@@ -97,6 +104,7 @@ function AspectsPageMobile() {
             aspect={selectedAspect}
             onEdit={selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
             onDelete={selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
+            onDescriptionUpdate={selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
           />
         </div>
 
@@ -267,6 +275,13 @@ function AspectsPageDesktop() {
     }
   }
 
+  const handleDescriptionUpdate = async (aspectToUpdate: Aspect, description: string) => {
+    if (!user || !session) return
+    await updateUserAspect(user, aspectToUpdate.id, { description }, session.access_token)
+    await refreshAspects()
+    setSelectedAspect(prev => prev?.id === aspectToUpdate.id ? { ...prev, description } : prev)
+  }
+
   return (
     <div style={{
       height: '100vh',
@@ -398,6 +413,7 @@ function AspectsPageDesktop() {
             onEdit={selectedAspect && selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
             onDelete={selectedAspect && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
             onShare={selectedAspect && selectedAspect.member_role === 'owner' ? () => setSharingAspect(selectedAspect) : undefined}
+            onDescriptionUpdate={selectedAspect && selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
           />
         </div>
       </div>

@@ -11,12 +11,14 @@ export interface GeraldPromptContext {
   goalContext: string;
   profileContext: string;
   aspectContext: string;
+  todayDayName: string;
   todayFormatted: string;
   tomorrowFormatted: string;
   tomorrowDayName: string;
   currentHour: number;
   toolCount?: number;
   rulesContext?: string; // Optional: User's custom rules that guide agent behavior
+  projectContext?: string; // Optional: Active projects context
   recentInteractionContext: string; // Recent interaction history to avoid repetition
 }
 
@@ -37,12 +39,14 @@ export function buildGeraldSystemPrompt(context: GeraldPromptContext): SystemMes
     goalContext,
     profileContext,
     aspectContext,
+    todayDayName,
     todayFormatted,
     tomorrowFormatted,
     tomorrowDayName,
     currentHour,
     toolCount,
     rulesContext,
+    projectContext,
     recentInteractionContext
   } = context;
 
@@ -62,14 +66,15 @@ IMPORTANT: These rules take precedence over general behavior. If a rule conflict
   return new SystemMessage(`You are Gerald, an intelligent life assistant who helps users optimize their time, achieve their goals, and maintain balance across all areas of life.${rulesSection}
 
 CURRENT TIME & DATE:
-- Now: ${getCurrentTimeInTimezone(timezone)} on ${todayFormatted}
+- Now: ${getCurrentTimeInTimezone(timezone)}
+- Today: ${todayDayName}, ${todayFormatted}
 - Tomorrow: ${tomorrowDayName}, ${tomorrowFormatted}
 - User timezone: ${timezone}
 - Time of day: ${timeOfDayContext.period} (${timeOfDayContext.suggestion})
 
 USER CONTEXT:
 ${profileContext}
-${aspectContext}
+${aspectContext}${projectContext ? '\n' + projectContext : ''}
 ${eventContext}
 ${taskContext}
 ${goalContext}

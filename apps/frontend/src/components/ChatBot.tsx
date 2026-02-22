@@ -16,6 +16,9 @@ interface Message {
   timestamp: Date
   hasImage?: boolean
   imageData?: string  // base64 image data, kept for context
+  hasFile?: boolean
+  fileName?: string
+  fileData?: string  // base64 PDF data
 }
 
 // Expose ChatBot ref handle for external control
@@ -82,6 +85,24 @@ const XIcon = ({ size = 14, color = 'currentColor' }: { size?: number; color?: s
   </svg>
 )
 
+// Paperclip icon for file upload
+const FileIcon = ({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+  </svg>
+)
+
+// PDF document icon for file preview
+const PdfDocIcon = ({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+)
+
 // Format timestamp
 const formatTime = (date: Date): string => {
   if (!date || isNaN(date.getTime())) return ''
@@ -142,6 +163,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   // Image state for vision support
   const [selectedImage, setSelectedImage] = useState<{ base64: string; name: string } | null>(null)
 
+  // File (PDF) state
+  const pdfFileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<{ base64: string; name: string; size: number } | null>(null)
+
   // Input state - managed locally since AI SDK v5 doesn't manage input internally
   const [input, setInput] = useState('')
 
@@ -154,7 +179,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Message queue for sending while agent is processing
-  const messageQueueRef = useRef<Array<{ text: string; image: { base64: string; name: string } | null; messageId: string }>>([])
+  const messageQueueRef = useRef<Array<{ text: string; image: { base64: string; name: string } | null; file: { base64: string; name: string; size: number } | null; messageId: string }>>([])
   const isProcessingRef = useRef(false)
   const messagesRef = useRef<Message[]>([])
 
@@ -351,6 +376,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     setMessages([welcomeMessage])
     setStreamingMessage('')
     setIsLoading(false)
+    setSelectedImage(null)
+    setSelectedFile(null)
 
     if (user?.id) {
       // Clear localStorage cache
@@ -444,12 +471,48 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     setSelectedImage(null)
   }
 
+  // PDF file upload handlers
+  const handleFileClick = () => {
+    pdfFileInputRef.current?.click()
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      return
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return
+    }
+
+    // Convert to base64
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      setSelectedFile({ base64, name: file.name, size: file.size })
+    }
+    reader.readAsDataURL(file)
+
+    // Clear the input so the same file can be selected again
+    e.target.value = ''
+  }
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null)
+  }
+
   // Process a single message through the agent stream
   // messageId: when processing a queued message, this is its ID in the messages array
   //   so we can build history up to (but not including) this message to avoid duplication
   const processMessage = async (
     trimmedInput: string,
     imageToSend: { base64: string; name: string } | null,
+    fileToSend?: { base64: string; name: string; size: number } | null,
     messageId?: string
   ) => {
     if (!user || !session) return
@@ -493,13 +556,19 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       }
     })
 
-    // Build current message content (with image if present)
-    let currentMessageContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
-    if (imageToSend) {
-      currentMessageContent = [
-        { type: 'text', text: trimmedInput || 'What is in this image?' },
-        { type: 'image_url', image_url: { url: imageToSend.base64 } }
+    // Build current message content (with image/file if present)
+    let currentMessageContent: string | Array<Record<string, any>>
+    if (imageToSend || fileToSend) {
+      const parts: Array<Record<string, any>> = [
+        { type: 'text', text: trimmedInput || (imageToSend ? 'What is in this image?' : 'Please analyze this PDF.') }
       ]
+      if (imageToSend) {
+        parts.push({ type: 'image_url', image_url: { url: imageToSend.base64 } })
+      }
+      if (fileToSend) {
+        parts.push({ type: 'file', file: { data: fileToSend.base64, name: fileToSend.name } })
+      }
+      currentMessageContent = parts
     } else {
       currentMessageContent = trimmedInput
     }
@@ -605,7 +674,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
         setQueueCount(messageQueueRef.current.length)
         // Small delay to let React flush state updates (so messagesRef is current)
         await new Promise(resolve => setTimeout(resolve, 50))
-        await processMessage(next.text, next.image, next.messageId)
+        await processMessage(next.text, next.image, next.file, next.messageId)
       } else {
         isProcessingRef.current = false
         setIsLoading(false)
@@ -618,10 +687,12 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault()
     const trimmedInput = input.trim()
-    if ((!trimmedInput && !selectedImage) || !user || !session) return
+    if ((!trimmedInput && !selectedImage && !selectedFile) || !user || !session) return
 
     const imageToSend = selectedImage
+    const fileToSend = selectedFile
     setSelectedImage(null)
+    setSelectedFile(null)
 
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
@@ -629,7 +700,9 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       sender: 'user',
       timestamp: new Date(),
       hasImage: !!imageToSend,
-      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {})
+      ...(imageToSend?.base64 ? { imageData: imageToSend.base64 } : {}),
+      hasFile: !!fileToSend,
+      ...(fileToSend ? { fileName: fileToSend.name, fileData: fileToSend.base64 } : {})
     }
     setMessages(prev => [...prev, userMessage])
     setInput('')
@@ -642,12 +715,12 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
 
     // If already processing, queue for later
     if (isProcessingRef.current) {
-      messageQueueRef.current = [...messageQueueRef.current, { text: trimmedInput, image: imageToSend, messageId: userMessage.id }]
+      messageQueueRef.current = [...messageQueueRef.current, { text: trimmedInput, image: imageToSend, file: fileToSend, messageId: userMessage.id }]
       setQueueCount(messageQueueRef.current.length)
       return
     }
 
-    await processMessage(trimmedInput, imageToSend)
+    await processMessage(trimmedInput, imageToSend, fileToSend)
   }
 
   // Determine if we should show timestamp for a message
@@ -899,7 +972,22 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                             <ImageIcon size={12} color="currentColor" />
                           </div>
                         )}
-                        <span>{message.text || 'Sent an image'}</span>
+                        {message.hasFile && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '4px',
+                            background: 'rgba(255,255,255,0.2)',
+                            flexShrink: 0,
+                            marginTop: '1px',
+                          }}>
+                            <FileIcon size={12} color="currentColor" />
+                          </div>
+                        )}
+                        <span>{message.text || (message.hasFile ? `Sent ${message.fileName || 'a PDF'}` : 'Sent an image')}</span>
                       </div>
                     </div>
                     {/* Timestamp on hover */}
@@ -1194,6 +1282,14 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
           onChange={handleImageSelect}
           style={{ display: 'none' }}
         />
+        {/* Hidden file input for PDF upload */}
+        <input
+          ref={pdfFileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
 
         {/* Image preview */}
         {selectedImage && (
@@ -1230,6 +1326,81 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             <button
               type="button"
               onClick={handleRemoveImage}
+              style={{
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                background: colors.bgTertiary,
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: colors.textTertiary,
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#ef4444'
+                e.currentTarget.style.color = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = colors.bgTertiary
+                e.currentTarget.style.color = colors.textTertiary
+              }}
+            >
+              <XIcon size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* PDF file preview */}
+        {selectedFile && (
+          <div style={{
+            marginBottom: '8px',
+            padding: '8px',
+            background: colors.bgSecondary,
+            border: `1px solid ${colors.border}`,
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: colors.bgTertiary,
+              borderRadius: '8px',
+              flexShrink: 0,
+            }}>
+              <PdfDocIcon size={24} color={colors.textSecondary} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                display: 'block',
+                fontSize: fontSize.sm,
+                color: colors.textSecondary,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {selectedFile.name}
+              </span>
+              <span style={{
+                fontSize: fontSize.xs,
+                color: colors.textTertiary,
+              }}>
+                {selectedFile.size < 1024 * 1024
+                  ? `${Math.round(selectedFile.size / 1024)} KB`
+                  : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRemoveFile}
               style={{
                 width: '24px',
                 height: '24px',
@@ -1336,7 +1507,38 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
               >
                 <ImageIcon size={mobileEmbedded ? 16 : 18} />
             </button>
-            {isLoading && !(input ?? '').trim() && !selectedImage ? (
+            {/* PDF upload button */}
+            <button
+              type="button"
+              onClick={handleFileClick}
+              title="Upload PDF"
+                style={{
+                  width: mobileEmbedded ? '30px' : '36px',
+                  height: mobileEmbedded ? '30px' : '36px',
+                  padding: 0,
+                  background: selectedFile ? hexToRgba(colors.textSecondary, 0.15) : 'transparent',
+                  color: selectedFile ? colors.textPrimary : colors.textTertiary,
+                  border: 'none',
+                  borderRadius: mobileEmbedded ? '8px' : '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = colors.bgTertiary
+                  e.currentTarget.style.color = colors.textSecondary
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = selectedFile ? hexToRgba(colors.textSecondary, 0.15) : 'transparent'
+                  e.currentTarget.style.color = selectedFile ? colors.textPrimary : colors.textTertiary
+                }}
+              >
+                <FileIcon size={mobileEmbedded ? 16 : 18} />
+            </button>
+            {isLoading && !(input ?? '').trim() && !selectedImage && !selectedFile ? (
               <button
                 type="button"
                 onClick={handleStop}
@@ -1368,20 +1570,20 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             ) : (
               <button
                 type="submit"
-                disabled={!(input ?? '').trim() && !selectedImage}
+                disabled={!(input ?? '').trim() && !selectedImage && !selectedFile}
                 style={{
                   width: mobileEmbedded ? '30px' : '36px',
                   height: mobileEmbedded ? '30px' : '36px',
                   padding: 0,
-                  background: (!(input ?? '').trim() && !selectedImage)
+                  background: (!(input ?? '').trim() && !selectedImage && !selectedFile)
                     ? colors.bgTertiary
                     : accent.userBubble,
-                  color: (!(input ?? '').trim() && !selectedImage)
+                  color: (!(input ?? '').trim() && !selectedImage && !selectedFile)
                     ? colors.textTertiary
                     : accent.userText,
                   border: 'none',
                   borderRadius: mobileEmbedded ? '8px' : '10px',
-                  cursor: (!(input ?? '').trim() && !selectedImage) ? 'not-allowed' : 'pointer',
+                  cursor: (!(input ?? '').trim() && !selectedImage && !selectedFile) ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1389,7 +1591,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if ((input ?? '').trim() || selectedImage) {
+                  if ((input ?? '').trim() || selectedImage || selectedFile) {
                     e.currentTarget.style.transform = 'scale(1.05)'
                   }
                 }}

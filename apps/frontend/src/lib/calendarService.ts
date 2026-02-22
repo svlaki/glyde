@@ -34,6 +34,9 @@ export interface CalendarEvent {
   // Post-event metadata
   reflection?: string
   is_missed?: boolean
+  // Project fields
+  project_id?: string
+  project_name?: string
   // Shared aspect flag
   is_shared?: boolean
   // Friend event fields (when viewing friend's event)

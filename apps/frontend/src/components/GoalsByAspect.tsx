@@ -59,9 +59,10 @@ interface GoalsByAspectProps {
   onEdit?: (() => void) | undefined
   onDelete?: (() => void) | undefined
   onShare?: (() => void) | undefined
+  onDescriptionUpdate?: (description: string) => Promise<void>
 }
 
-export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspectProps) {
+export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescriptionUpdate }: GoalsByAspectProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
@@ -69,6 +70,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
+
+  // Reset editing state when aspect changes
+  useEffect(() => {
+    setEditingDescription(false)
+    setDescriptionDraft('')
+  }, [aspect?.id])
 
   useEffect(() => {
     async function loadAspectData() {
@@ -211,8 +221,101 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
       flexDirection: 'column',
       gap: '24px'
     }}>
-      {/* Aspect Description */}
-        {aspect.description && (
+      {/* Aspect Description - Click to Edit */}
+      {onDescriptionUpdate ? (
+        editingDescription ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <textarea
+              autoFocus
+              value={descriptionDraft}
+              onChange={(e) => setDescriptionDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setEditingDescription(false)
+                  setDescriptionDraft(aspect.description || '')
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  const trimmed = descriptionDraft.trim()
+                  if (trimmed !== (aspect.description || '')) {
+                    setSavingDescription(true)
+                    onDescriptionUpdate(trimmed).finally(() => {
+                      setSavingDescription(false)
+                      setEditingDescription(false)
+                    })
+                  } else {
+                    setEditingDescription(false)
+                  }
+                }
+              }}
+              onBlur={() => {
+                const trimmed = descriptionDraft.trim()
+                if (trimmed !== (aspect.description || '')) {
+                  setSavingDescription(true)
+                  onDescriptionUpdate(trimmed).finally(() => {
+                    setSavingDescription(false)
+                    setEditingDescription(false)
+                  })
+                } else {
+                  setEditingDescription(false)
+                }
+              }}
+              placeholder="Describe this aspect..."
+              style={{
+                padding: '12px',
+                background: colors.bgSecondary,
+                border: `1px solid ${aspect.color || colors.accent}`,
+                borderRadius: '6px',
+                fontSize: fontSize.sm,
+                color: colors.textPrimary,
+                lineHeight: lineHeight.normal,
+                resize: 'vertical',
+                minHeight: '60px',
+                outline: 'none',
+                fontFamily: 'inherit'
+              }}
+              disabled={savingDescription}
+            />
+            <div style={{
+              fontSize: fontSize.xs,
+              color: colors.textTertiary
+            }}>
+              {savingDescription ? 'Saving...' : 'Enter to save, Shift+Enter for new line, Esc to cancel'}
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => {
+              setDescriptionDraft(aspect.description || '')
+              setEditingDescription(true)
+            }}
+            style={{
+              padding: '12px',
+              background: colors.bgHover,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '6px',
+              fontSize: fontSize.sm,
+              color: aspect.description ? colors.textPrimary : colors.textTertiary,
+              lineHeight: lineHeight.normal,
+              cursor: 'pointer',
+              transition: 'border-color 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = aspect.color || colors.accent
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = colors.border
+            }}
+          >
+            {aspect.description || 'Click to add a description...'}
+          </div>
+        )
+      ) : (
+        aspect.description && (
           <div style={{
             padding: '12px',
             background: colors.bgHover,
@@ -224,7 +327,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare }: GoalsByAspe
           }}>
             {aspect.description}
           </div>
-        )}
+        )
+      )}
       {/* Stats */}
       <div style={{
         paddingBottom: '16px',

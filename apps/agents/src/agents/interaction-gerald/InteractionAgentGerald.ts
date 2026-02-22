@@ -234,6 +234,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
       // Calculate temporal context
       const nowUtc = new Date();
+      const todayDayName = formatInTimeZone(nowUtc, state.timezone, 'EEEE');
       const todayFormatted = formatInTimeZone(nowUtc, state.timezone, 'yyyy-MM-dd');
       const tomorrowDayName = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'EEEE');
       const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
@@ -262,6 +263,7 @@ export class InteractionAgentGerald extends BaseAgent {
         goalContext,
         profileContext,
         aspectContext,
+        todayDayName,
         todayFormatted,
         tomorrowFormatted,
         tomorrowDayName,
