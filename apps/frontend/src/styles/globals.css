@@ -99,6 +99,8 @@ body {
   text-size-adjust: 100%;
   /* Disable tap highlight on mobile */
   -webkit-tap-highlight-color: transparent;
+  /* Smooth height transition when iOS keyboard opens/closes via Capacitor resize */
+  transition: height 0.28s ease-out;
 }
 
 /* ============================================

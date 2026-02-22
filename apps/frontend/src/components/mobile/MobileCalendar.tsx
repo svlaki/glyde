@@ -3,25 +3,12 @@ import { useAuth } from '../../lib/authContext'
 import { useAspects } from '../../lib/aspectContext'
 import { useTheme } from '../../lib/themeContext'
 import { fetchExpandedEvents, updateEvent, deleteEvent, createEvent, deleteRecurringEvent, updateRecurringEvent } from '../../lib/calendarService'
+import type { CalendarEvent } from '../../lib/calendarService'
 import { supabase } from '../../lib/supabase'
 import { getColors, hexToRgba } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { EventFormUnified } from '../event'
 import { getRecurrenceBadge } from '../../lib/recurrenceUtils'
-
-interface CalendarEvent {
-  id: string
-  title: string
-  start_time: string
-  end_time: string
-  description?: string
-  aspect?: string
-  color?: string
-  recurrence_rule?: string
-  parent_event_id?: string
-  is_recurring?: boolean
-  is_instance?: boolean
-}
 
 type MobileViewType = 'day' | '3day' | 'month'
 
@@ -32,11 +19,13 @@ interface MobileCalendarProps {
   onDisplayDateChange?: (date: Date) => void  // Updates header without affecting buffer
   hideMonthDayHeaders?: boolean
   scrollToDate?: Date | null  // Scroll to this date within buffer without re-centering
+  friendsEvents?: CalendarEvent[]
+  showFriendsEvents?: boolean
 }
 
-export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateChange, hideMonthDayHeaders = false, scrollToDate }: MobileCalendarProps) {
+export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateChange, hideMonthDayHeaders = false, scrollToDate, friendsEvents = [], showFriendsEvents = false }: MobileCalendarProps) {
   const { user, session } = useAuth()
-  const { getAspectColor } = useAspects()
+  const { getAspectColor, getAspectById } = useAspects()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const typography = getTypography(true) // Mobile context
@@ -151,9 +140,17 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     return dates
   }
 
+  // Combine user events and friends events for display
+  const allEvents = showFriendsEvents ? [...events, ...friendsEvents] : events
+
+  // Check if an event is a shared event (user is editor/viewer, not owner)
+  const isSharedEvent = (event: CalendarEvent): boolean => {
+    return event.is_shared === true && event.user_role !== 'owner' && !event.is_friend_event
+  }
+
   const getEventsForDate = (date: Date) => {
     const dateStr = date.toDateString()
-    return events.filter(event => {
+    return allEvents.filter(event => {
       const eventDate = new Date(event.start_time)
       return eventDate.toDateString() === dateStr
     })
@@ -429,12 +426,25 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     return () => {
       stopMomentum()
       if (gesture.rafId) cancelAnimationFrame(gesture.rafId)
+      // Reset gesture state fully so re-attached handlers start clean
+      gesture.phase = 'idle'
+      gesture.direction = null
+      gesture.velocityX = 0
+      gesture.velocityY = 0
       container.removeEventListener('touchstart', handleTouchStart)
       container.removeEventListener('touchmove', handleTouchMove)
       container.removeEventListener('touchend', handleTouchEnd)
       container.removeEventListener('touchcancel', handleTouchCancel)
       container.removeEventListener('wheel', handleWheel)
     }
+  }, [view])
+
+  // Reset stale touch/drag refs when view changes
+  useEffect(() => {
+    touchedEventRef.current = null
+    isDraggingRef.current = false
+    isInEditModeRef.current = false
+    draggingEventRef.current = null
   }, [view])
 
   // Safety net: document-level touchend to catch cases where the event element's
@@ -588,6 +598,21 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   useEffect(() => {
     if (!scrollToDate || view !== '3day' || !scrollContainerRef.current) return
 
+    // Stop momentum and reset gesture state before repositioning
+    const gesture = scrollGestureRef.current
+    if (gesture.momentumRafId) {
+      cancelAnimationFrame(gesture.momentumRafId)
+      gesture.momentumRafId = null
+    }
+    if (gesture.rafId) {
+      cancelAnimationFrame(gesture.rafId)
+      gesture.rafId = null
+    }
+    gesture.phase = 'idle'
+    gesture.direction = null
+    gesture.velocityX = 0
+    gesture.velocityY = 0
+
     // Calculate days difference from buffer center (currentDate is at index 31)
     const scrollToTime = new Date(scrollToDate).setHours(0, 0, 0, 0)
     const currentTime = new Date(currentDate).setHours(0, 0, 0, 0)
@@ -714,6 +739,12 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   // Quick tap = open event
   // Hold 400ms = enter edit mode (can drag while holding)
   const handleEventTouchStart = (event: CalendarEvent, clientY: number, clientX: number, dayIndex?: number) => {
+    // Don't allow drag for friend events
+    if (event.is_friend_event) {
+      setSelectedEvent(event)
+      setIsFormOpen(true)
+      return
+    }
     if (eventTouchTimer) clearTimeout(eventTouchTimer)
 
     touchedEventRef.current = event
@@ -1017,6 +1048,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   }}>
                     {dayEvents.slice(0, 2).map((event) => {
                       const eventColor = getEventColor(event)
+                      const isFriendEvent = event.is_friend_event
+                      const isShared = isSharedEvent(event)
                       return (
                         <div
                           key={event.id}
@@ -1037,11 +1070,43 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
-                            fontWeight: 500
+                            fontWeight: 500,
+                            opacity: isFriendEvent ? 0.7 : 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
                           }}
                         >
-                          {event.title}
+                          {isFriendEvent && (
+                            <span style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              background: colors.bgTertiary,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '6px',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                              overflow: 'hidden'
+                            }}>
+                              {event.owner_avatar_url ? (
+                                <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
+                              )}
+                            </span>
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {event.title}
+                          </span>
                           {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', fontSize: '8px', opacity: 0.7 }}>R</span>}
+                          {isShared && (
+                            <span style={{ marginLeft: '2px', fontSize: '7px', opacity: 0.7, fontWeight: 700 }}>
+                              {event.user_role === 'viewer' ? 'V' : 'E'}
+                            </span>
+                          )}
                         </div>
                       )
                     })}
@@ -1288,6 +1353,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
                     const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
                     const eventColor = getEventColor(event)
+                    const isFriendEvent = event.is_friend_event
+                    const isShared = isSharedEvent(event)
                     const isBeingDragged = isDragging && draggingEvent?.id === event.id
 
                     // Calculate drag offset (vertical and horizontal)
@@ -1368,7 +1435,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           cursor: isDragging ? 'grabbing' : 'pointer',
                           overflow: 'hidden',
                           zIndex: isBeingDragged ? 100 : 5,
-                          opacity: !showInThisColumn ? 0 : (isBeingDragged ? 0.8 : 1),
+                          opacity: !showInThisColumn ? 0 : (isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1)),
                           transition: isBeingDragged ? 'none' : 'all 0.2s',
                           touchAction: 'none',
                           // Keep pointer events active even when invisible — touchEnd must fire
@@ -1392,10 +1459,41 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           color: eventColor,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px'
                         }}>
-                          {event.title}
+                          {isFriendEvent && (
+                            <span style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              background: colors.bgTertiary,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '7px',
+                              fontWeight: 700,
+                              flexShrink: 0,
+                              overflow: 'hidden'
+                            }}>
+                              {event.owner_avatar_url ? (
+                                <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
+                              )}
+                            </span>
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {event.title}
+                          </span>
                           {getRecurrenceBadge(event) && <span style={{ marginLeft: '2px', opacity: 0.7 }}>R</span>}
+                          {isShared && (
+                            <span style={{ marginLeft: '2px', fontSize: '8px', opacity: 0.7, fontWeight: 700 }}>
+                              {event.user_role === 'viewer' ? 'V' : 'E'}
+                            </span>
+                          )}
                         </div>
                         {duration >= 30 && (
                           <div style={{
@@ -1405,7 +1503,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                             opacity: 0.8,
                             marginTop: '1px'
                           }}>
-                            {startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            {isFriendEvent
+                              ? event.owner_display_name || 'Friend'
+                              : startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                           </div>
                         )}
                       </div>
@@ -1553,6 +1653,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
               const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
               const eventColor = getEventColor(event)
+              const isFriendEvent = event.is_friend_event
+              const isShared = isSharedEvent(event)
               const isBeingDragged = isDragging && draggingEvent?.id === event.id
 
               let dragOffset = 0
@@ -1607,7 +1709,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     cursor: isDragging ? 'grabbing' : 'pointer',
                     overflow: 'hidden',
                     zIndex: isBeingDragged ? 100 : 5,
-                    opacity: isBeingDragged ? 0.8 : 1,
+                    opacity: isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1),
                     transition: isBeingDragged ? 'none' : 'all 0.2s',
                     touchAction: 'none',
                     ...(touchedEvent?.id === event.id && isInEditMode && {
@@ -1626,10 +1728,41 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     color: eventColor,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}>
-                    {event.title}
+                    {isFriendEvent && (
+                      <span style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        background: colors.bgTertiary,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        flexShrink: 0,
+                        overflow: 'hidden'
+                      }}>
+                        {event.owner_avatar_url ? (
+                          <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
+                        )}
+                      </span>
+                    )}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {event.title}
+                    </span>
                     {getRecurrenceBadge(event) && <span style={{ marginLeft: '4px', opacity: 0.7 }}>R</span>}
+                    {isShared && (
+                      <span style={{ marginLeft: '2px', fontSize: '10px', opacity: 0.7, fontWeight: 700 }}>
+                        {event.user_role === 'viewer' ? 'V' : 'E'}
+                      </span>
+                    )}
                   </div>
                   <div style={{
                     ...typography.labelMd,
@@ -1637,7 +1770,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     opacity: 0.8,
                     marginTop: '2px'
                   }}>
-                    {startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    {isFriendEvent
+                      ? `${event.owner_display_name || 'Friend'} · ${startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                      : `${startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
                   </div>
                 </div>
               )
@@ -1647,50 +1782,60 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
       )}
 
       {/* Unified Event Form */}
-      <EventFormUnified
-        event={selectedEvent}
-        isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false)
-          setSelectedEvent(null)
-        }}
-        onSave={async (eventData) => {
-          if (selectedEvent?.id) {
-            await handleUpdateEvent(selectedEvent.id, eventData)
-          } else {
-            await handleCreateEvent(eventData)
-          }
-          setIsFormOpen(false)
-          setSelectedEvent(null)
-        }}
-        onSaveRecurring={async (eventData, scope, recurrenceRule) => {
-          if (!user || !session) return
-          if (eventData.id) {
-            const updates: Record<string, string> = {}
-            if (eventData.title) updates.title = eventData.title
-            if (eventData.start_time) updates.start_time = eventData.start_time
-            if (eventData.end_time) updates.end_time = eventData.end_time
-            if (eventData.description) updates.description = eventData.description
-            if (eventData.aspect) updates.aspect = eventData.aspect
-            if (recurrenceRule) updates.recurrence_rule = recurrenceRule
-            await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
-          }
-          const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
-          setEvents(refreshed || [])
-          setIsFormOpen(false)
-          setSelectedEvent(null)
-        }}
-        onDelete={async (scope) => {
-          if (!selectedEvent?.id || !user) return
-          if (scope) {
-            await handleDeleteRecurringEvent(selectedEvent, scope)
-          } else {
-            await handleDeleteEvent(selectedEvent.id)
-          }
-          setIsFormOpen(false)
-          setSelectedEvent(null)
-        }}
-      />
+      {(() => {
+        const selectedAspect = selectedEvent?.aspect_id ? getAspectById(selectedEvent.aspect_id) : null
+        const isViewerOnly = selectedAspect?.member_role === 'viewer' || selectedEvent?.user_role === 'viewer'
+        return (
+          <EventFormUnified
+            event={selectedEvent}
+            isOpen={isFormOpen}
+            onClose={() => {
+              setIsFormOpen(false)
+              setSelectedEvent(null)
+            }}
+            isViewerOnly={isViewerOnly}
+            onSave={isViewerOnly ? async () => {} : async (eventData) => {
+              if (selectedEvent?.id) {
+                await handleUpdateEvent(selectedEvent.id, eventData)
+              } else {
+                await handleCreateEvent(eventData)
+              }
+              setIsFormOpen(false)
+              setSelectedEvent(null)
+            }}
+            onSaveRecurring={isViewerOnly ? undefined : async (eventData, scope, recurrenceRule) => {
+              if (!user || !session) return
+              if (eventData.id) {
+                const updates: Record<string, string> = {}
+                if (eventData.title) updates.title = eventData.title
+                if (eventData.start_time) updates.start_time = eventData.start_time
+                if (eventData.end_time) updates.end_time = eventData.end_time
+                if (eventData.description) updates.description = eventData.description
+                if (eventData.aspect) updates.aspect = eventData.aspect
+                if (recurrenceRule) updates.recurrence_rule = recurrenceRule
+                if (scope === 'this_instance' && selectedEvent?.instance_date) {
+                  updates.instance_date = selectedEvent.instance_date
+                }
+                await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
+              }
+              const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+              setEvents(refreshed || [])
+              setIsFormOpen(false)
+              setSelectedEvent(null)
+            }}
+            onDelete={isViewerOnly ? undefined : async (scope) => {
+              if (!selectedEvent?.id || !user) return
+              if (scope) {
+                await handleDeleteRecurringEvent(selectedEvent, scope)
+              } else {
+                await handleDeleteEvent(selectedEvent.id)
+              }
+              setIsFormOpen(false)
+              setSelectedEvent(null)
+            }}
+          />
+        )
+      })()}
     </div>
   )
 }

@@ -22,12 +22,12 @@ interface EventFormUnifiedProps {
   isOpen: boolean
   onClose: () => void
   onSave: (event: Partial<CalendarEvent>) => Promise<void>
-  onSaveRecurring?: (
+  onSaveRecurring?: ((
     event: Partial<CalendarEvent>,
     scope: 'this_instance' | 'entire_series',
     recurrenceRule?: string
-  ) => Promise<void>
-  onDelete?: (scope?: 'this_instance' | 'entire_series') => Promise<void>
+  ) => Promise<void>) | undefined
+  onDelete?: ((scope?: 'this_instance' | 'entire_series') => Promise<void>) | undefined
   isViewerOnly?: boolean
 }
 
@@ -530,6 +530,7 @@ export function EventFormUnified({
             flexDirection: 'column',
             gap: '16px',
             overflowY: 'auto',
+            overflowX: 'hidden',
             flex: 1,
             minHeight: 0
           }}>

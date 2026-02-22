@@ -6,6 +6,8 @@ import { themeFamilies, resolveTheme, getColors, themes } from '../../styles/col
 interface ThemePickerProps {
   onSelect?: () => void
   inline?: boolean
+  forceClose?: boolean
+  layout?: 'vertical' | 'horizontal'
 }
 
 // SVG icons for each theme family - viewBox padded to avoid stroke clipping
@@ -97,11 +99,35 @@ const familyIcons: Record<ThemeFamily, (size: number) => JSX.Element> = {
   ),
 }
 
-export function ThemePicker({ onSelect, inline = false }: ThemePickerProps) {
+// Theme family display names
+const familyNames: Record<ThemeFamily, string> = {
+  classic: 'Classic',
+  nord: 'Nord',
+  tokyo: 'Tokyo Night',
+  ember: 'Ember',
+  ocean: 'Ocean',
+  solar: 'Solar',
+  midnight: 'Midnight',
+  forest: 'Forest',
+  sakura: 'Sakura',
+  cyber: 'Cyber',
+  dune: 'Dune',
+}
+
+export function ThemePicker({ onSelect, inline = false, forceClose, layout = 'vertical' }: ThemePickerProps) {
   const { theme, family, isDarkMode, setFamily, toggleDarkMode } = useTheme()
   const colors = getColors(theme)
   const [isOpen, setIsOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
+
+  // Close on forceClose prop change
+  useEffect(() => {
+    if (forceClose) {
+      setIsOpen(false)
+    }
+  }, [forceClose])
 
   useEffect(() => {
     if (!isOpen) return
@@ -122,6 +148,18 @@ export function ThemePicker({ onSelect, inline = false }: ThemePickerProps) {
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [isOpen])
+
+  // Calculate fixed position when opening
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setPopoverPos({
+        top: rect.top - 8,
+        left: rect.right + 8,
+      })
+    }
+    setIsOpen(!isOpen)
+  }
 
   const handleSelectFamily = (f: ThemeFamily) => {
     setFamily(f)
@@ -179,7 +217,60 @@ export function ThemePicker({ onSelect, inline = false }: ThemePickerProps) {
     </button>
   )
 
-  // Inline mode: render theme icon grid directly (for drawer menus)
+  // Vertical list of theme families
+  const themeList = (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '2px',
+    }}>
+      {themeFamilies.map(f => {
+        const isSelected = f === family
+        const palette = themes[resolveTheme(f, 'dark')]
+        const iconColor = isSelected ? palette.accent : colors.textSecondary
+        return (
+          <button
+            key={f}
+            onClick={() => handleSelectFamily(f)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '7px 12px',
+              borderRadius: '6px',
+              background: isSelected ? colors.bgTertiary : 'transparent',
+              border: 'none',
+              color: isSelected ? colors.textPrimary : colors.textSecondary,
+              cursor: 'pointer',
+              transition: 'all 0.12s',
+              width: '100%',
+              textAlign: 'left',
+              fontSize: '13px',
+              fontWeight: isSelected ? 500 : 400,
+            }}
+            onMouseEnter={(e) => {
+              if (!isSelected) e.currentTarget.style.background = colors.bgHover
+            }}
+            onMouseLeave={(e) => {
+              if (!isSelected) e.currentTarget.style.background = 'transparent'
+            }}
+          >
+            <span style={{ color: iconColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              {familyIcons[f](16)}
+            </span>
+            <span style={{ flex: 1 }}>{familyNames[f]}</span>
+            {isSelected && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: palette.accent }}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  // Inline mode: render theme list directly (for drawer menus)
   if (inline) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -198,107 +289,16 @@ export function ThemePicker({ onSelect, inline = false }: ThemePickerProps) {
           </span>
           {modeToggle}
         </div>
-        <div style={{
-          display: 'flex',
-          gap: '4px',
-          flexWrap: 'wrap',
-        }}>
-          {themeFamilies.map(f => (
-            <FamilyIconButton
-              key={f}
-              family={f}
-              isSelected={f === family}
-              currentColors={colors}
-              onSelect={handleSelectFamily}
-            />
-          ))}
-        </div>
+        {themeList}
       </div>
     )
   }
 
-  // Popover mode: mode toggle above theme icon button
-  return (
-    <div ref={pickerRef} style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          {modeToggle}
-        </div>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: colors.bgTertiary,
-            border: `1px solid ${colors.border}`,
-            color: colors.textSecondary,
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = colors.bgHover
-            e.currentTarget.style.color = colors.textPrimary
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = colors.bgTertiary
-            e.currentTarget.style.color = colors.textSecondary
-          }}
-          title="Change theme"
-        >
-          {familyIcons[family](14)}
-        </button>
-      </div>
-
-      {isOpen && (
-        <div style={{
-          position: 'absolute',
-          bottom: '100%',
-          left: 0,
-          marginBottom: '8px',
-          background: colors.bgSecondary,
-          border: `1px solid ${colors.border}`,
-          borderRadius: '12px',
-          padding: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-          zIndex: 1000,
-          display: 'flex',
-          gap: '4px',
-          flexWrap: 'wrap',
-          width: 'max-content',
-        }}>
-          {themeFamilies.map(f => (
-            <FamilyIconButton
-              key={f}
-              family={f}
-              isSelected={f === family}
-              currentColors={colors}
-              onSelect={handleSelectFamily}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface FamilyIconButtonProps {
-  family: ThemeFamily
-  isSelected: boolean
-  currentColors: ReturnType<typeof getColors>
-  onSelect: (f: ThemeFamily) => void
-}
-
-function FamilyIconButton({ family, isSelected, currentColors, onSelect }: FamilyIconButtonProps) {
-  const palette = themes[resolveTheme(family, 'dark')]
-  const iconColor = isSelected ? palette.accent : currentColors.textSecondary
-
-  return (
+  // Popover mode: mode toggle + theme icon button
+  const themeButton = (
     <button
-      onClick={() => onSelect(family)}
+      ref={buttonRef}
+      onClick={handleToggle}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -306,22 +306,58 @@ function FamilyIconButton({ family, isSelected, currentColors, onSelect }: Famil
         width: '32px',
         height: '32px',
         borderRadius: '8px',
-        background: isSelected ? currentColors.bgTertiary : 'transparent',
-        border: isSelected ? `1px solid ${currentColors.border}` : '1px solid transparent',
-        color: iconColor,
+        background: colors.bgTertiary,
+        border: `1px solid ${colors.border}`,
+        color: colors.textSecondary,
         cursor: 'pointer',
-        transition: 'all 0.12s',
-        overflow: 'visible',
+        transition: 'all 0.15s',
       }}
       onMouseEnter={(e) => {
-        if (!isSelected) e.currentTarget.style.background = currentColors.bgHover
+        e.currentTarget.style.background = colors.bgHover
+        e.currentTarget.style.color = colors.textPrimary
       }}
       onMouseLeave={(e) => {
-        if (!isSelected) e.currentTarget.style.background = isSelected ? currentColors.bgTertiary : 'transparent'
+        e.currentTarget.style.background = colors.bgTertiary
+        e.currentTarget.style.color = colors.textSecondary
       }}
-      title={family.charAt(0).toUpperCase() + family.slice(1).replace(/([A-Z])/g, ' $1')}
+      title="Change theme"
     >
-      {familyIcons[family](16)}
+      {familyIcons[family](14)}
     </button>
+  )
+
+  return (
+    <div ref={pickerRef} style={{ position: 'relative' }}>
+      {layout === 'horizontal' ? (
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {modeToggle}
+          {themeButton}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+          {modeToggle}
+          {themeButton}
+        </div>
+      )}
+
+      {isOpen && popoverPos && (
+        <div style={{
+          position: 'fixed',
+          bottom: `${window.innerHeight - popoverPos.top}px`,
+          left: `${popoverPos.left}px`,
+          background: colors.bgSecondary,
+          border: `1px solid ${colors.border}`,
+          borderRadius: '10px',
+          padding: '6px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          width: '180px',
+          maxHeight: '360px',
+          overflowY: 'auto',
+        }}>
+          {themeList}
+        </div>
+      )}
+    </div>
   )
 }

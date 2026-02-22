@@ -139,8 +139,9 @@ FOLLOW-UP STRUCTURE (COPY THIS EXACTLY):
   }
 }
 
-ASPECT ASSIGNMENT (CRITICAL):
-- ALWAYS pass "aspectId" as a top-level parameter to create_interaction. This colors the interaction card.
+ASPECT ASSIGNMENT (CRITICAL - MUST NOT SKIP):
+WARNING: If you omit aspectId, the interaction card will have NO color and display incorrectly to the user!
+- ALWAYS pass "aspectId" as a top-level parameter to create_interaction. This is REQUIRED for correct display.
 - ALSO include "aspectId" in eventData, taskData, or goalData within metadata for the follow-up action.
 - Use the aspect ID (UUID) from the ASPECTS list that best matches the activity.
 - If suggesting focus time for a task, use that task's aspect.
@@ -148,6 +149,7 @@ ASPECT ASSIGNMENT (CRITICAL):
 - For exercise/health activities, use the Health/Fitness aspect.
 - For work activities, use the Work aspect.
 - Match the activity to the most appropriate aspect.
+- NEVER create an interaction without aspectId - pick the closest matching aspect even if uncertain.
 
 TIME OPTIONS FORMAT:
 - Use simple time formats: "9:00am", "2:00pm", "6:30pm"

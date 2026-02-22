@@ -2,6 +2,14 @@ import { User } from '@supabase/supabase-js'
 
 export interface UserProfile {
   user_id: string
+  display_name?: string
+  preferred_name?: string
+  birthday?: string
+  gender?: string
+  occupation?: string
+  field_of_study?: string
+  timezone?: string
+  habits?: string[]
   values?: Record<string, any>
   preferences?: Record<string, any>
   work_patterns?: Record<string, any>

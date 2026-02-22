@@ -115,7 +115,7 @@ export function Modal({ isOpen, onClose, title, headerContent, children, maxWidt
           )}
 
           {/* Children (form content) */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' }}>
             {children}
           </div>
         </Dialog.Content>

@@ -121,6 +121,7 @@ export function AspectDropdown({ value, onChange }: AspectDropdownProps) {
               right: 0,
               maxHeight: '250px',
               overflowY: 'auto',
+              overflowX: 'hidden',
               border: `1px solid ${colors.border}`,
               borderRadius: '8px',
               background: colors.bgSecondary,

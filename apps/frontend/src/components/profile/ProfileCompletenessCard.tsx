@@ -18,6 +18,12 @@ interface OverviewField {
   value: string | undefined
 }
 
+function formatBirthday(raw: string | undefined): string | undefined {
+  if (!raw) return undefined
+  const date = new Date(raw + 'T00:00:00')
+  return date.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })
+}
+
 export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProps) {
   const { theme, isDarkMode } = useTheme()
   const { isMobile } = usePlatform()
@@ -36,7 +42,7 @@ export function ProfileCompletenessCard({ profile }: ProfileCompletenessCardProp
     { label: 'Occupation', value: profileAny?.occupation },
     { label: 'Field of Study', value: profileAny?.field_of_study },
     { label: 'Timezone', value: profileAny?.timezone },
-    { label: 'Birthday', value: profileAny?.birthday },
+    { label: 'Birthday', value: formatBirthday(profileAny?.birthday) },
   ]
 
   const filledFields = fields.filter(f => f.value)

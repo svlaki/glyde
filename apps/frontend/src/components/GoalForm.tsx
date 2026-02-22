@@ -174,11 +174,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
       const goalData: any = {
         id: goal?.id,
         title: title.trim(),
-        description: description.trim() || undefined,
-        aspect: category || undefined
-      }
-      if (hasDueDate && dueDate) {
-        goalData.due_date = dueDate.toISOString()
+        description: description.trim() || null,
+        aspect: category || null,
+        due_date: (hasDueDate && dueDate) ? dueDate.toISOString() : null,
       }
       if (milestones.length > 0) {
         // Clear due_dates for ordered milestones to avoid confusion
@@ -190,6 +188,9 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
           )
         goalData.milestones = processedMilestones
         goalData.milestone_type = milestoneType
+      } else {
+        goalData.milestones = []
+        goalData.milestone_type = null
       }
       await onSave(goalData)
       onClose()

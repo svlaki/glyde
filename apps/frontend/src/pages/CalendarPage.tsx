@@ -522,7 +522,7 @@ function CalendarPageDesktop() {
           borderLeft: `1px solid ${colors.border}`,
           background: colors.bgSecondary,
           flexShrink: 0,
-          overflow: 'hidden',
+          overflow: 'visible',
           position: 'relative',
           transition: 'width 0.2s ease'
         }}>
@@ -560,7 +560,17 @@ function CalendarPageDesktop() {
             </div>
           ) : (
             <>
-              <ChatBot ref={chatBotRef} />
+              {/* Inner container with overflow hidden for chat content */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                overflow: 'hidden'
+              }}>
+                <ChatBot ref={chatBotRef} />
+              </div>
 
               {/* Resize handle */}
               <div

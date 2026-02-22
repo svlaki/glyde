@@ -96,6 +96,12 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         console.log(`[INTERACTION RESPONSE] Creating follow-up interaction`);
         try {
           const followUp = metadata.followUp;
+          const resolvedAspectId =
+            followUp.aspectId ||
+            followUp.metadata?.aspectId ||
+            followUp.metadata?.directAction?.eventData?.aspectId ||
+            interaction.aspect_id ||
+            null;
           const followUpInteraction = await supabaseService.createUserInteraction(userId, {
             agentId: 'interaction',
             question: followUp.question,
@@ -103,6 +109,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
             options: followUp.options || null,
             priority: followUp.priority || 4,
             metadata: followUp.metadata || null,
+            aspectId: resolvedAspectId,
           });
 
           // Mark original interaction as completed

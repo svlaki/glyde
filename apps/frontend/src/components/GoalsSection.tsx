@@ -147,9 +147,10 @@ export function GoalsSection() {
           title: goalData.title,
           description: goalData.description,
           aspect: goalData.aspect,
+          due_date: (goalData as any).due_date,
           milestones: goalData.milestones,
           milestone_type: goalData.milestone_type
-        })
+        } as any)
       }
 
       // Realtime will refresh the list
@@ -313,11 +314,14 @@ export function GoalsSection() {
       background: colors.bgPrimary,
       border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
       borderRadius: '6px',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       {/* Section Header */}
       <div style={{
-        padding: '20px',
+        padding: '16px 20px',
         borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
         background: colors.bgPrimary,
         display: 'flex',
@@ -340,12 +344,12 @@ export function GoalsSection() {
       {/* Goals Content */}
       <div style={{
         display: 'flex',
-        minHeight: '400px',
-        maxHeight: '600px'
+        flex: 1,
+        minHeight: 0,
       }}>
         {/* Left - Goals List */}
         <div style={{
-          width: '350px',
+          width: '300px',
           borderRight: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           background: colors.bgPrimary,
           display: 'flex',
