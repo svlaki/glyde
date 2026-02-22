@@ -59,7 +59,7 @@ BEGIN
     e.parent_event_id,
     e.is_recurring,
     e.visibility,
-    COALESCE(e.is_shared, FALSE) as is_shared,
+    FALSE as is_shared,
     e.reflection,
     COALESCE(e.is_missed, FALSE) as is_missed,
     e.project_id
