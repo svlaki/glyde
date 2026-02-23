@@ -25,6 +25,9 @@ export interface DatabaseEvent {
   is_recurring?: boolean;
   is_instance?: boolean;
   instance_date?: string;
+  // Google Calendar sync fields
+  google_event_id?: string;
+  local_notes?: string;
 }
 
 /**

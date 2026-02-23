@@ -446,6 +446,23 @@ export function EventFormUnified({
             </div>
           )}
 
+          {/* Glyde Notes (for Google-synced events) */}
+          {event.local_notes && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px'
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: '2px', flexShrink: 0 }}>
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <div style={{ fontSize: '14px' }}>
+                <div style={{ color: colors.textTertiary, fontSize: '11px', fontWeight: 500, marginBottom: '2px' }}>Glyde Notes</div>
+                <span style={{ color: colors.textPrimary }}>{event.local_notes}</span>
+              </div>
+            </div>
+          )}
+
           {/* Aspect */}
           {(event.aspect_name || event.aspect) && (
             <div style={{

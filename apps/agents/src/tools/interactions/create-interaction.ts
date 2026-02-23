@@ -15,15 +15,16 @@ export const createInteractionTool = tool(
     }
     console.log('🔧 [CREATE-INTERACTION] userId:', userId);
 
-    // Log warnings for missing metadata (but still create the interaction)
+    // Reject yes_no interactions without proper followUp metadata
     if (type === "yes_no" && (!metadata || !metadata.followUp)) {
-      console.warn('⚠️ [create-interaction] YES_NO interaction created WITHOUT followUp - clicking "yes" will do nothing!');
-      console.warn('⚠️ [create-interaction] Metadata received:', JSON.stringify(metadata, null, 2));
+      console.error('[create-interaction] YES_NO interaction rejected - missing metadata.followUp');
+      return "Error: yes_no interactions MUST include metadata.followUp so clicking 'yes' triggers a follow-up question. Add a followUp object with question, type, options, and metadata.directAction.";
     }
 
-    // Log warning if directAction is missing in followUp
+    // Reject followUp without directAction (would create dead-end time selection)
     if (metadata?.followUp && (!metadata.followUp.metadata?.directAction)) {
-      console.warn('⚠️ [create-interaction] followUp is missing directAction - picking a time will do nothing!');
+      console.error('[create-interaction] followUp rejected - missing directAction');
+      return "Error: followUp metadata MUST include metadata.directAction so selecting an option triggers an action (e.g., create_event, create_task). Add directAction with type and data fields.";
     }
 
     try {

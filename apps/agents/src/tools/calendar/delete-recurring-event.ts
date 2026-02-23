@@ -57,9 +57,23 @@ export const deleteRecurringEventTool = tool(
 
       return `Deleted this instance of "${event.title}"`;
     } else if (scope === 'all_future') {
-      // Delete this and all future instances
-      console.log('[DELETE-RECURRING-EVENT TOOL] Deleting from this instance onwards');
-      throw new Error("Deleting future instances is not yet supported. You can delete the entire series or ask to modify the recurrence end date.");
+      // End the recurrence just before this instance
+      const parentId = event.parent_event_id || eventId;
+      const instanceDate = new Date(event.start_time);
+      // Set recurrence_end to one day before the instance
+      const recurrenceEnd = new Date(instanceDate.getTime() - 86400000).toISOString();
+
+      console.log('[DELETE-RECURRING-EVENT TOOL] Ending series before instance:', recurrenceEnd);
+
+      const updated = await supabaseService.updateRecurringEventSeries(userId, parentId, {
+        recurrence_end: recurrenceEnd,
+      });
+
+      if (!updated) {
+        throw new Error('Failed to update recurrence end date');
+      }
+
+      return `Deleted this and all future instances of "${event.title}". The series now ends before ${instanceDate.toLocaleDateString()}.`;
     } else {
       throw new Error(`Invalid scope: ${scope}. Use 'entire_series', 'this_instance', or 'all_future'`);
     }

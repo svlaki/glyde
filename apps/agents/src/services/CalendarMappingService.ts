@@ -528,6 +528,54 @@ export class CalendarMappingService {
   }
 
   /**
+   * Auto-map a single calendar mapping to an aspect.
+   * Used when a calendar is toggled ON outside of onboarding.
+   */
+  async autoMapSingleCalendar(userId: string, mapping: CalendarMapping): Promise<CalendarMapping> {
+    try {
+      if (mapping.aspect_id) return mapping;
+
+      if (this.isNonUserCalendar(mapping.google_calendar_id)) {
+        return mapping;
+      }
+
+      const existingAspects = await aspectService.getAspects(userId);
+      const usedColors = new Set<string>(
+        existingAspects
+          .map((a: { color?: string }) => a.color?.toLowerCase())
+          .filter((c): c is string => c !== undefined)
+      );
+
+      const calendarName = mapping.google_calendar_name || 'Calendar';
+      const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
+
+      if (matchedAspect) {
+        await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
+        logger.info(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
+        return { ...mapping, aspect_id: matchedAspect.id };
+      }
+
+      const newColor = this.getUnusedColor(usedColors);
+      const newAspect = await aspectService.createAspect(userId, {
+        name: this.cleanCalendarName(calendarName),
+        color: newColor,
+        description: `Auto-created from Google Calendar: ${calendarName}`
+      });
+
+      if (newAspect) {
+        await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
+        logger.info(`[CalendarMappingService] Created aspect "${newAspect.name}" for calendar "${calendarName}"`);
+        return { ...mapping, aspect_id: newAspect.id };
+      }
+
+      return mapping;
+    } catch (error) {
+      logger.error('[CalendarMappingService] Error auto-mapping single calendar:', error);
+      return mapping;
+    }
+  }
+
+  /**
    * Check if a Google Calendar ID belongs to a non-user calendar (holidays, birthdays, contacts)
    */
   private isNonUserCalendar(calendarId: string): boolean {

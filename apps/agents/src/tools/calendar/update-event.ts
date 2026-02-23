@@ -228,7 +228,7 @@ export const updateEventTool = tool(
       startTime: z.string().optional().nullable().describe("New start time in ISO format - leave empty to keep existing"),
       endTime: z.string().optional().nullable().describe("New end time in ISO format - leave empty to keep existing"),
       location: z.string().optional().nullable().describe("New event location - leave empty to keep existing"),
-      description: z.string().optional().nullable().describe("New event description - leave empty to keep existing"),
+      description: z.string().optional().nullable().describe("New event description or notes. For Google-synced events, this is saved as local Glyde notes that persist across syncs. Leave empty to keep existing."),
       aspect: z.string().optional().nullable().describe("Update event aspect (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing aspect."),
       reflection: z.string().optional().nullable().describe("Set or update the reflection for a past event - what happened, how it went, takeaways. Only for events that have already ended."),
       isMissed: z.boolean().optional().nullable().describe("Mark whether the user missed this event. Set to true when user says they didn't attend, false to clear."),

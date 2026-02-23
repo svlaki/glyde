@@ -4,7 +4,7 @@ import { AgentType } from '../types/agents.js';
 
 // Activity log types
 export type ActivityEntityType = 'event' | 'task' | 'goal' | 'aspect' | 'profile' | 'rule' | 'project';
-export type ActivityOperation = 'create' | 'update' | 'delete' | 'complete' | 'uncomplete' | 'archive';
+export type ActivityOperation = 'create' | 'update' | 'delete' | 'complete' | 'uncomplete' | 'archive' | 'check_in';
 export type ActivitySource = 'user' | 'agent';
 
 export interface ActivityChange {
@@ -75,7 +75,7 @@ export class SupabaseService {
       .from('aspects')
       .select('id')
       .eq('user_id', userId)
-      .eq('name', aspect)
+      .ilike('name', aspect)
       .single();
 
     return data?.id || null;
@@ -335,7 +335,9 @@ export class SupabaseService {
         is_missed: event.is_missed || false,
         user_role: event.user_role || 'owner',
         project_id: event.project_id || null,
-        project_name: event.project_name || null
+        project_name: event.project_name || null,
+        google_event_id: event.google_event_id || null,
+        local_notes: event.local_notes || null
       }));
 
       return transformedEvents;
@@ -600,7 +602,15 @@ export class SupabaseService {
         updateData.end_time = updates.end_time; // Must be UTC from caller
       }
       if (updates.location !== undefined) updateData.location = updates.location;
-      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.description !== undefined) {
+        // For Google-synced events, write agent descriptions to local_notes
+        // so they aren't overwritten by the next Google sync
+        if (oldEvent?.google_event_id) {
+          updateData.local_notes = updates.description;
+        } else {
+          updateData.description = updates.description;
+        }
+      }
       if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
       if (updates.reflection !== undefined) updateData.reflection = updates.reflection;
       if (updates.is_missed !== undefined) updateData.is_missed = updates.is_missed;
@@ -2296,6 +2306,24 @@ export class SupabaseService {
       }
 
       console.log('[SUPABASE SERVICE] Goal check-in added:', data.id);
+
+      // Log activity for audit trail
+      const { data: goal } = await this.client
+        .from('goals')
+        .select('title')
+        .eq('id', goalId)
+        .single();
+
+      await this.logActivity(
+        userId,
+        'goal',
+        goalId,
+        goal?.title || 'Unknown Goal',
+        'check_in',
+        null,
+        'user'
+      );
+
       return data;
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception adding goal check-in:', error);

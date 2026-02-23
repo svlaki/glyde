@@ -39,6 +39,10 @@ export interface DatabaseEvent {
   // Project fields
   project_id?: string;
   project_name?: string;
+
+  // Google Calendar sync fields
+  google_event_id?: string;
+  local_notes?: string;
 }
 
 export interface DatabaseAspect {

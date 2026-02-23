@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../lib/authContext'
 import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { triggerSync, getGoogleAuthUrl, handleGoogleCallback, disconnectConnection } from '../../lib/connectionService'
-import type { Connection } from '../../lib/connectionService'
+import { triggerSync, getGoogleAuthUrl, handleGoogleCallback, disconnectConnection, fetchDisconnectPreview, fetchCalendarMappings, updateCalendarMapping } from '../../lib/connectionService'
+import type { Connection, CalendarMapping } from '../../lib/connectionService'
+import { CalendarPicker } from './CalendarPicker'
 
 interface ConnectionsStatusCardProps {
   connections: Connection[]
@@ -44,9 +45,57 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
   const typography = getTypography(isMobile)
   const [syncing, setSyncing] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [disconnectConfirm, setDisconnectConfirm] = useState<{ eventCount: number } | null>(null)
+  const [calendarsExpanded, setCalendarsExpanded] = useState(false)
+  const [mappings, setMappings] = useState<CalendarMapping[]>([])
+  const [mappingsLoading, setMappingsLoading] = useState(false)
+  const mappingsLoadedRef = useRef(false)
 
   const statusColors = SYNC_STATUS_COLORS[connection.sync_status] || SYNC_STATUS_COLORS.pending
   const statusBg = isDarkMode ? statusColors.dark : statusColors.light
+  const isGoogle = connection.provider === 'google'
+
+  const loadMappings = useCallback(async () => {
+    if (!user || !session?.access_token || mappingsLoadedRef.current) return
+    setMappingsLoading(true)
+    try {
+      const result = await fetchCalendarMappings(user, connection.id, session.access_token)
+      if (!result.error) {
+        setMappings(result.mappings)
+        mappingsLoadedRef.current = true
+      }
+    } finally {
+      setMappingsLoading(false)
+    }
+  }, [user, session, connection.id])
+
+  const handleToggleCalendars = () => {
+    const next = !calendarsExpanded
+    setCalendarsExpanded(next)
+    if (next && !mappingsLoadedRef.current) {
+      loadMappings()
+    }
+  }
+
+  const handleToggleSync = useCallback(async (mapping: CalendarMapping) => {
+    if (!user || !session?.access_token) return
+    const newSynced = !mapping.is_synced
+
+    // Optimistic update
+    setMappings(prev => prev.map(m => m.id === mapping.id ? { ...m, is_synced: newSynced } : m))
+
+    const result = await updateCalendarMapping(
+      user,
+      mapping.id,
+      { is_synced: newSynced },
+      session.access_token
+    )
+
+    // Revert on failure
+    if (result.error) {
+      setMappings(prev => prev.map(m => m.id === mapping.id ? { ...m, is_synced: mapping.is_synced } : m))
+    }
+  }, [user, session])
 
   const handleSync = async () => {
     if (!user || !session || syncing) return
@@ -59,11 +108,20 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
     }
   }
 
-  const handleDisconnect = async () => {
+  const handleDisconnectClick = async () => {
     if (!user || !session || disconnecting) return
+    const preview = await fetchDisconnectPreview(user, connection.id, session.access_token)
+    if (!preview.error) {
+      setDisconnectConfirm({ eventCount: preview.eventCount })
+    }
+  }
+
+  const handleDisconnectConfirm = async (deleteEvents: boolean) => {
+    if (!user || !session) return
     setDisconnecting(true)
+    setDisconnectConfirm(null)
     try {
-      await disconnectConnection(user, connection.id, session.access_token)
+      await disconnectConnection(user, connection.id, session.access_token, deleteEvents)
       onConnectionChanged?.()
     } finally {
       setDisconnecting(false)
@@ -71,71 +129,197 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '8px 0',
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          ...typography.bodySm,
-          color: colors.textPrimary,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <span>{connection.calendar_name || 'Google Calendar'}</span>
-          <span style={{
-            padding: '2px 8px',
-            borderRadius: '10px',
-            background: statusBg,
-            fontSize: '11px',
-            fontWeight: 500,
-            color: colors.textSecondary,
+    <div style={{ padding: '8px 0' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            ...typography.bodySm,
+            color: colors.textPrimary,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}>
-            {connection.sync_status}
-          </span>
+            <span>{connection.calendar_name || 'Google Calendar'}</span>
+            <span style={{
+              padding: '2px 8px',
+              borderRadius: '10px',
+              background: statusBg,
+              fontSize: '11px',
+              fontWeight: 500,
+              color: colors.textSecondary,
+            }}>
+              {connection.sync_status}
+            </span>
+          </div>
+          <div style={{ ...typography.labelMd, color: colors.textTertiary, marginTop: '2px' }}>
+            Last synced: {formatLastSynced(connection.last_synced_at)}
+          </div>
         </div>
-        <div style={{ ...typography.labelMd, color: colors.textTertiary, marginTop: '2px' }}>
-          Last synced: {formatLastSynced(connection.last_synced_at)}
+
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          {isGoogle && (
+            <button
+              onClick={handleToggleCalendars}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                borderRadius: '4px',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                color: colors.textSecondary,
+                ...typography.labelMd,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              Calendars
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                style={{
+                  transition: 'transform 0.15s ease',
+                  transform: calendarsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+              borderRadius: '4px',
+              padding: '4px 10px',
+              cursor: syncing ? 'default' : 'pointer',
+              color: colors.textSecondary,
+              ...typography.labelMd,
+              opacity: syncing ? 0.5 : 1,
+            }}
+          >
+            {syncing ? 'Syncing...' : 'Sync'}
+          </button>
+          <button
+            onClick={handleDisconnectClick}
+            disabled={disconnecting}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+              borderRadius: '4px',
+              padding: '4px 10px',
+              cursor: disconnecting ? 'default' : 'pointer',
+              color: colors.textTertiary,
+              ...typography.labelMd,
+              opacity: disconnecting ? 0.5 : 1,
+            }}
+          >
+            {disconnecting ? '...' : 'Disconnect'}
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          style={{
-            background: 'transparent',
-            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-            borderRadius: '4px',
-            padding: '4px 10px',
-            cursor: syncing ? 'default' : 'pointer',
-            color: colors.textSecondary,
-            ...typography.labelMd,
-            opacity: syncing ? 0.5 : 1,
-          }}
-        >
-          {syncing ? 'Syncing...' : 'Sync'}
-        </button>
-        <button
-          onClick={handleDisconnect}
-          disabled={disconnecting}
-          style={{
-            background: 'transparent',
-            border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
-            borderRadius: '4px',
-            padding: '4px 10px',
-            cursor: disconnecting ? 'default' : 'pointer',
-            color: colors.textTertiary,
-            ...typography.labelMd,
-            opacity: disconnecting ? 0.5 : 1,
-          }}
-        >
-          {disconnecting ? '...' : 'Disconnect'}
-        </button>
-      </div>
+      {isGoogle && calendarsExpanded && (
+        <div style={{ marginTop: '8px', paddingLeft: '4px' }}>
+          <CalendarPicker
+            mappings={mappings}
+            onToggleSync={handleToggleSync}
+            loading={mappingsLoading}
+          />
+        </div>
+      )}
+
+      {disconnectConfirm && (
+        <div style={{
+          marginTop: '8px',
+          padding: '12px',
+          borderRadius: '6px',
+          border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)'}`,
+          backgroundColor: isDarkMode ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.04)',
+        }}>
+          <div style={{ ...typography.bodySm, color: colors.textPrimary, marginBottom: '8px' }}>
+            {disconnectConfirm.eventCount > 0
+              ? `This connection has ${disconnectConfirm.eventCount} synced event${disconnectConfirm.eventCount === 1 ? '' : 's'}. What would you like to do with them?`
+              : 'Disconnect this calendar?'}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {disconnectConfirm.eventCount > 0 && (
+              <>
+                <button
+                  onClick={() => handleDisconnectConfirm(false)}
+                  style={{
+                    background: colors.bgTertiary,
+                    border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                    borderRadius: '4px',
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                    color: colors.textPrimary,
+                    ...typography.labelMd,
+                    fontWeight: 500,
+                  }}
+                >
+                  Keep events
+                </button>
+                <button
+                  onClick={() => handleDisconnectConfirm(true)}
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.3)'}`,
+                    borderRadius: '4px',
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                    color: '#ef4444',
+                    ...typography.labelMd,
+                    fontWeight: 500,
+                  }}
+                >
+                  Delete events
+                </button>
+              </>
+            )}
+            {disconnectConfirm.eventCount === 0 && (
+              <button
+                onClick={() => handleDisconnectConfirm(false)}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.4)' : 'rgba(239,68,68,0.3)'}`,
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  color: '#ef4444',
+                  ...typography.labelMd,
+                  fontWeight: 500,
+                }}
+              >
+                Confirm
+              </button>
+            )}
+            <button
+              onClick={() => setDisconnectConfirm(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 12px',
+                cursor: 'pointer',
+                color: colors.textTertiary,
+                ...typography.labelMd,
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

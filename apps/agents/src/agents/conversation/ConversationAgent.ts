@@ -552,7 +552,8 @@ IMPORTANT INSTRUCTIONS:
         userProfile: state.userProfile, // User profile with preferences
         recentUserActivity: state.recentUserActivity, // Recent manual changes
         recentAgentActivity: state.recentAgentActivity, // Recent agent actions
-        currentPage: state.currentPage // Current page user is viewing
+        currentPage: state.currentPage, // Current page user is viewing
+        messageCount: state.messages.length // Conversation stage awareness
       });
 
 

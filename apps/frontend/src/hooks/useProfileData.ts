@@ -250,13 +250,13 @@ export function useProfileData(): ProfileData {
     }
 
     for (const task of tasks) {
+      if (task.status === 'completed' || task.status === 'cancelled') continue
       const aspId = task.aspect_id
       if (aspId && breakdownMap.has(aspId)) {
         const entry = breakdownMap.get(aspId)!
         breakdownMap.set(aspId, {
           ...entry,
           taskCount: entry.taskCount + 1,
-          completedCount: task.status === 'completed' ? entry.completedCount + 1 : entry.completedCount,
         })
       }
     }

@@ -46,6 +46,7 @@ import {
   getGoogleAuthUrl as getGoogleConnectionAuthUrl,
   handleGoogleCallback as handleGoogleConnectionCallback,
   triggerSync,
+  getDisconnectPreview,
   disconnectConnection,
   handleGoogleWebhook,
   getCalendarList,
@@ -385,6 +386,7 @@ app.post('/api/connections', getConnections);
 app.post('/api/connections/google/auth', getGoogleConnectionAuthUrl);
 app.post('/api/connections/google/callback', handleGoogleConnectionCallback);
 app.post('/api/connections/sync', triggerSync);
+app.post('/api/connections/disconnect/preview', getDisconnectPreview);
 app.post('/api/connections/disconnect', disconnectConnection);
 // Calendar mappings endpoints (multi-calendar support)
 app.post('/api/connections/calendars', getCalendarList);

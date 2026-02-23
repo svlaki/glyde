@@ -1,6 +1,6 @@
 {/* This file controls the agent interaction panel on the calendar page */}
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
@@ -29,6 +29,8 @@ export interface AgentInteractionsProps {
 }
 
 const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
+const MAX_PENDING_INTERACTIONS = 5
+const AUTO_GENERATE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
 
 export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInteractionsProps) {
   const { user, session } = useAuth()
@@ -46,6 +48,15 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
   const [customTimeInputs, setCustomTimeInputs] = useState<Record<string, string>>({}) // custom time values per interaction
   const [showChatReply, setShowChatReply] = useState<string | null>(null) // interaction ID showing chat reply input
   const [chatReplyInputs, setChatReplyInputs] = useState<Record<string, string>>({}) // chat reply text per interaction
+
+  // Track current pending count for auto-generation cap check
+  const interactionsRef = useRef(interactions)
+  useEffect(() => {
+    interactionsRef.current = interactions
+  }, [interactions])
+
+  // Guard against concurrent auto-generation requests
+  const isGeneratingRef = useRef(false)
 
   // Dismiss an interaction - remove from UI and mark as dismissed in backend
   const dismissInteraction = useCallback(async (interactionId: string) => {
@@ -69,9 +80,9 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
     }
   }, [session])
 
-  // Fetch pending interactions
-  const fetchInteractions = useCallback(async (showRefreshing = false) => {
-    if (!user || !session) return
+  // Fetch pending interactions, returns the count fetched
+  const fetchInteractions = useCallback(async (showRefreshing = false): Promise<number> => {
+    if (!user || !session) return 0
 
     if (showRefreshing) {
       setIsRefreshing(true)
@@ -95,20 +106,93 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
       }
 
       const data = await response.json()
-      setInteractions(data.interactions || [])
+      const fetched = data.interactions || []
+      setInteractions(fetched)
+      return fetched.length
     } catch (err) {
       console.error('Error fetching interactions:', err)
       setError(err instanceof Error ? err.message : 'Failed to load interactions')
+      return 0
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
   }, [user, session])
 
-  // Initial fetch
+  // Auto-generate interactions if under the pending cap
+  const generateIfNeeded = useCallback(async () => {
+    if (!user || !session) return
+    if (interactionsRef.current.length >= MAX_PENDING_INTERACTIONS) return
+    if (isGeneratingRef.current) return
+
+    isGeneratingRef.current = true
+    setIsRefreshing(true)
+    setError(null)
+
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const response = await fetch(`${AGENT_SERVICE_URL}/api/agent/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          context: {
+            userId: user.id,
+            sessionId: `interactions-${Date.now()}`,
+            timezone: timezone,
+            conversationHistory: []
+          },
+          message: 'Generate 2-3 proactive suggestions based on my calendar, tasks, and goals. Create interactive prompts that I can respond to.',
+          targetAgent: 'interaction',
+          isInternal: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate interactions: ${response.status}`)
+      }
+
+      await fetchInteractions()
+    } catch (err) {
+      console.error('Error auto-generating interactions:', err)
+    } finally {
+      isGeneratingRef.current = false
+      setIsRefreshing(false)
+    }
+  }, [user, session, fetchInteractions])
+
+  // Initial fetch, then auto-generate if under the pending cap
   useEffect(() => {
-    fetchInteractions()
+    let cancelled = false
+
+    async function initAndAutoGenerate() {
+      const pendingCount = await fetchInteractions()
+      if (cancelled) return
+
+      // Auto-generate if under the cap
+      if (pendingCount < MAX_PENDING_INTERACTIONS) {
+        await generateIfNeeded()
+      }
+    }
+
+    initAndAutoGenerate()
+
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchInteractions])
+
+  // Auto-generate new interactions every 5 minutes if under the cap
+  useEffect(() => {
+    if (!user || !session) return
+
+    const interval = setInterval(() => {
+      generateIfNeeded()
+    }, AUTO_GENERATE_INTERVAL_MS)
+
+    return () => clearInterval(interval)
+  }, [user, session, generateIfNeeded])
 
   // Respond to an interaction
   const handleRespond = async (interactionId: string, response: string) => {

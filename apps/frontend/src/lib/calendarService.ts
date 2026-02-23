@@ -34,6 +34,9 @@ export interface CalendarEvent {
   // Post-event metadata
   reflection?: string
   is_missed?: boolean
+  // Google sync fields
+  google_event_id?: string
+  local_notes?: string
   // Project fields
   project_id?: string
   project_name?: string

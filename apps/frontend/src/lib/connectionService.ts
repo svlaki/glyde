@@ -238,12 +238,60 @@ export async function triggerSync(
 }
 
 /**
+ * Get a preview of what disconnecting will affect (event count)
+ */
+export async function fetchDisconnectPreview(
+  user: User,
+  connectionId: string,
+  accessToken?: string
+): Promise<{ eventCount: number, connectionName: string, error: string | null }> {
+  try {
+    if (!user) {
+      return { eventCount: 0, connectionName: '', error: 'User not authenticated' }
+    }
+
+    const url = `${getApiUrl()}/api/connections/disconnect/preview`
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        connection_id: connectionId
+      })
+    })
+
+    if (!response.ok) {
+      return { eventCount: 0, connectionName: '', error: 'Failed to get preview' }
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      return { eventCount: data.eventCount, connectionName: data.connectionName, error: null }
+    }
+    return { eventCount: 0, connectionName: '', error: data.error || 'Unknown error' }
+  } catch (err: any) {
+    return { eventCount: 0, connectionName: '', error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+/**
  * Disconnect (delete) a connection
  */
 export async function disconnectConnection(
   user: User,
   connectionId: string,
-  accessToken?: string
+  accessToken?: string,
+  deleteEvents?: boolean
 ): Promise<{ success: boolean, error: string | null }> {
   try {
     if (!user) {
@@ -265,7 +313,8 @@ export async function disconnectConnection(
       headers,
       body: JSON.stringify({
         user_id: user.id,
-        connection_id: connectionId
+        connection_id: connectionId,
+        delete_events: deleteEvents
       })
     })
 

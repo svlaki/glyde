@@ -253,16 +253,15 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
 
     // Perform sync based on provider
     if (connection.provider === 'google') {
-      // Start sync in background
+      // Start sync in background - sync ALL enabled calendars, not just primary
       setImmediate(async () => {
         try {
-          if (connection.sync_token) {
-            await googleSyncService.performDeltaSync(connection);
-          } else {
-            await googleSyncService.performInitialSync(connection);
-          }
+          await googleSyncService.syncAllEnabledCalendars(connection);
+          await connectionService.updateSyncStatus(connection.id, 'synced');
         } catch (syncError) {
           logger.error('[connections] Sync failed:', syncError);
+          await connectionService.updateSyncStatus(connection.id, 'error',
+            syncError instanceof Error ? syncError.message : 'Sync failed');
         }
       });
     }
@@ -278,7 +277,45 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
 }
 
 /**
- * Disconnect (delete) a connection
+ * Get a preview of what will happen when disconnecting (event count)
+ */
+export async function getDisconnectPreview(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { connection_id } = req.body ?? {};
+
+    if (!connection_id) {
+      res.status(400).json({ error: 'connection_id is required' });
+      return;
+    }
+
+    const connection = await connectionService.getConnectionById(connection_id);
+
+    if (!connection || connection.user_id !== userId) {
+      res.status(404).json({ error: 'Connection not found' });
+      return;
+    }
+
+    const eventCount = await connectionService.getSyncedEventCount(connection_id);
+
+    res.json({
+      success: true,
+      eventCount,
+      connectionName: connection.calendar_name || 'Google Calendar'
+    });
+  } catch (error) {
+    logger.error('[connections] Error getting disconnect preview:', error);
+    res.status(500).json({ error: 'Failed to get disconnect preview' });
+  }
+}
+
+/**
+ * Disconnect (delete) a connection with optional event cleanup
  */
 export async function disconnectConnection(req: Request, res: Response): Promise<void> {
   try {
@@ -288,7 +325,7 @@ export async function disconnectConnection(req: Request, res: Response): Promise
       return;
     }
 
-    const { connection_id } = req.body ?? {};
+    const { connection_id, delete_events } = req.body ?? {};
 
     if (!connection_id) {
       res.status(400).json({ error: 'connection_id is required' });
@@ -308,7 +345,7 @@ export async function disconnectConnection(req: Request, res: Response): Promise
       return;
     }
 
-    logger.info('[connections] Disconnecting connection:', connection_id);
+    logger.info('[connections] Disconnecting connection:', { connection_id, delete_events });
 
     // Stop watch subscription if exists
     if (connection.provider === 'google' && connection.watch_channel_id) {
@@ -319,12 +356,17 @@ export async function disconnectConnection(req: Request, res: Response): Promise
       }
     }
 
+    // Clean up events and mappings before deleting connection
+    await connectionService.cleanupOnDisconnect(connection_id, userId, delete_events === true);
+
     // Delete connection
     await connectionService.deleteConnection(connection_id, userId);
 
     res.json({
       success: true,
-      message: 'Connection disconnected successfully'
+      message: delete_events
+        ? 'Connection and synced events removed'
+        : 'Connection removed, events kept as local'
     });
   } catch (error) {
     logger.error('[connections] Error disconnecting:', error);
@@ -376,13 +418,13 @@ export async function handleGoogleWebhook(req: Request, res: Response): Promise<
       return;
     }
 
-    // Queue delta sync (don't block webhook response)
+    // Queue sync for ALL enabled calendars (don't block webhook response)
     setImmediate(async () => {
       try {
-        logger.info('[connections] Starting delta sync for connection:', connection.id);
-        await googleSyncService.performDeltaSync(connection);
+        logger.info('[connections] Starting sync for all enabled calendars, connection:', connection.id);
+        await googleSyncService.syncAllEnabledCalendars(connection);
       } catch (syncError) {
-        logger.error('[connections] Delta sync failed:', syncError);
+        logger.error('[connections] Sync failed:', syncError);
       }
     });
   } catch (error) {
@@ -566,12 +608,18 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
     if (is_synced !== undefined) updates.is_synced = is_synced;
     if (is_visible !== undefined) updates.is_visible = is_visible;
 
-    const updated = await calendarMappingService.updateMapping(mapping_id, updates);
+    let updated = await calendarMappingService.updateMapping(mapping_id, updates);
 
     // If syncing was just enabled and this calendar hasn't been synced before, trigger initial sync
     if (is_synced === true && !mapping.is_synced && !mapping.sync_token) {
       const connection = await connectionService.getConnectionById(mapping.connection_id);
       if (connection) {
+        // Auto-map to an aspect if none assigned
+        if (!updated.aspect_id) {
+          updated = await calendarMappingService.autoMapSingleCalendar(userId, updated);
+        }
+
+        const aspectId = updated.aspect_id || undefined;
         setImmediate(async () => {
           try {
             logger.info('[connections] Triggering initial sync for newly enabled calendar:', mapping.google_calendar_id);
@@ -579,7 +627,7 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
               connection,
               mapping.google_calendar_id,
               mapping_id,
-              updated.aspect_id || undefined
+              aspectId
             );
           } catch (syncError) {
             logger.error('[connections] Initial sync failed for calendar:', syncError);

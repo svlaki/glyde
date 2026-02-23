@@ -82,15 +82,16 @@ export const updateTaskTool = tool(
 
       const updates: any = {};
 
-      // Title cannot be null (database constraint), so only update if it's a non-empty string
-      if (title !== undefined && title !== null && title.trim() !== '') updates.title = title;
-      if (description !== undefined) updates.description = description;
-      if (dueDate !== undefined) updates.dueDate = dueDate;
-      if (priority !== undefined) updates.priority = priority;
-      if (status !== undefined) updates.status = status;
-      if (aspect !== undefined) updates.aspect = aspect;
-      if (energyRequired !== undefined) updates.energyRequired = energyRequired;
-      if (estimatedDuration !== undefined) updates.estimatedDuration = estimatedDuration;
+      // Only include fields that were explicitly provided with real values.
+      // The LLM often sends null for fields it doesn't intend to change.
+      if (title != null && title.trim() !== '') updates.title = title;
+      if (description != null) updates.description = description;
+      if (dueDate !== undefined) updates.dueDate = dueDate; // null is valid here (clears due date)
+      if (priority != null) updates.priority = priority;
+      if (status != null) updates.status = status;
+      if (aspect != null) updates.aspect = aspect;
+      if (energyRequired != null) updates.energyRequired = energyRequired;
+      if (estimatedDuration != null) updates.estimatedDuration = estimatedDuration;
 
       const task = await supabaseService.updateTask(userId, targetTaskId, updates, { source: 'agent', agentType: 'conversation' });
 

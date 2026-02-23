@@ -270,6 +270,77 @@ export class ConnectionService {
   }
 
   /**
+   * Get count of synced events for a connection (for disconnect preview)
+   */
+  async getSyncedEventCount(connectionId: string): Promise<number> {
+    try {
+      const { count, error } = await this.supabase
+        .from('events')
+        .select('id', { count: 'exact', head: true })
+        .eq('connection_id', connectionId);
+
+      if (error) {
+        logger.error('[ConnectionService] Error counting synced events:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (error) {
+      logger.error('[ConnectionService] Exception counting synced events:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Clean up events and mappings when disconnecting.
+   * deleteEvents=true: removes all synced events
+   * deleteEvents=false: converts synced events to local events (nulls connection_id and google_event_id)
+   */
+  async cleanupOnDisconnect(connectionId: string, userId: string, deleteEvents: boolean): Promise<void> {
+    try {
+      if (deleteEvents) {
+        const { error } = await this.supabase
+          .from('events')
+          .delete()
+          .eq('connection_id', connectionId)
+          .eq('user_id', userId);
+
+        if (error) {
+          logger.error('[ConnectionService] Error deleting synced events:', error);
+        } else {
+          logger.info('[ConnectionService] Deleted synced events for connection:', connectionId);
+        }
+      } else {
+        const { error } = await this.supabase
+          .from('events')
+          .update({ connection_id: null, google_event_id: null, source: 'local' })
+          .eq('connection_id', connectionId)
+          .eq('user_id', userId);
+
+        if (error) {
+          logger.error('[ConnectionService] Error converting events to local:', error);
+        } else {
+          logger.info('[ConnectionService] Converted synced events to local for connection:', connectionId);
+        }
+      }
+
+      // Delete calendar mappings
+      const { error: mappingError } = await this.supabase
+        .from('user_calendar_mappings')
+        .delete()
+        .eq('connection_id', connectionId);
+
+      if (mappingError) {
+        logger.error('[ConnectionService] Error deleting calendar mappings:', mappingError);
+      } else {
+        logger.info('[ConnectionService] Deleted calendar mappings for connection:', connectionId);
+      }
+    } catch (error) {
+      logger.error('[ConnectionService] Exception in cleanup:', error);
+    }
+  }
+
+  /**
    * Find a connection by watch channel ID (for webhook processing)
    */
   async findByChannelId(channelId: string): Promise<UserConnection | null> {

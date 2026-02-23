@@ -118,27 +118,56 @@ export function Calendar() {
     if (!user || !session) return
 
     const newMissedStatus = !event.is_missed
+    // Use instance_date + start_time as a unique key for optimistic updates on recurring instances
+    const matchInstance = (ev: CalendarEvent) =>
+      event.is_instance && event.instance_date
+        ? ev.id === event.id && ev.instance_date === event.instance_date
+        : ev.id === event.id
+
     // Optimistic update
     setEvents(prev => prev.map(ev =>
-      ev.id === event.id ? { ...ev, is_missed: newMissedStatus } : ev
+      matchInstance(ev) ? { ...ev, is_missed: newMissedStatus } : ev
     ))
     try {
-      const { error } = await updateEvent(
-        user,
-        event.id,
-        { is_missed: newMissedStatus },
-        session.access_token
-      )
+      let error: string | null = null
+
+      if (event.is_instance && event.instance_date) {
+        // Recurring instance - use instance-specific update
+        const result = await updateRecurringEvent(
+          user,
+          event.parent_event_id || event.id,
+          'this_instance',
+          { is_missed: newMissedStatus, instance_date: event.instance_date } as any,
+          session.access_token
+        )
+        error = result.error
+      } else {
+        // Regular event
+        const result = await updateEvent(
+          user,
+          event.id,
+          { is_missed: newMissedStatus },
+          session.access_token
+        )
+        error = result.error
+      }
+
       if (error) {
         // Revert on error
         setEvents(prev => prev.map(ev =>
-          ev.id === event.id ? { ...ev, is_missed: !newMissedStatus } : ev
+          matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
         ))
+      } else {
+        // Refresh to get the new override event from the backend
+        if (event.is_instance) {
+          const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+          if (refreshed) setEvents(refreshed)
+        }
       }
     } catch (err) {
       console.error('Error toggling missed status:', err)
       setEvents(prev => prev.map(ev =>
-        ev.id === event.id ? { ...ev, is_missed: !newMissedStatus } : ev
+        matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
       ))
     }
   }
