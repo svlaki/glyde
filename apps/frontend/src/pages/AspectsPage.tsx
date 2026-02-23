@@ -124,6 +124,7 @@ function AspectsPageMobile() {
       <MobileHeader
         title="Aspects"
         showMenu={true}
+        showSearch={true}
         actions={
         <button
           onClick={handleCreateAspect}

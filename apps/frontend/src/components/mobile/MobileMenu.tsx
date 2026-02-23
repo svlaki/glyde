@@ -101,6 +101,9 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             <a href="/aspects" onClick={onClose} style={getActiveStyle('/aspects')}>
               Aspects
             </a>
+            <a href="/friends" onClick={onClose} style={getActiveStyle('/friends')}>
+              Friends
+            </a>
             <a href="/connections" onClick={onClose} style={getActiveStyle('/connections')}>
               Connections
             </a>
@@ -114,18 +117,22 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               margin: '20px 0'
             }} />
 
-            <div style={{ padding: '4px 0' }}>
-              <div style={{
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              padding: '12px 16px',
+            }}>
+              <span style={{
                 fontSize: '12px',
                 fontWeight: 600,
                 color: colors.textTertiary,
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                marginBottom: '4px',
               }}>
                 Theme
-              </div>
-              <ThemePicker inline onSelect={onClose} />
+              </span>
+              <ThemePicker layout="horizontal" />
             </div>
 
             <button onClick={handleSignOut} style={menuItemStyle}>

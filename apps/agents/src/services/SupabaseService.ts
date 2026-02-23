@@ -996,6 +996,11 @@ export class SupabaseService {
         ? new Date(updates.end_time)
         : new Date(instanceStartDate.getTime() + duration);
 
+      // Resolve aspect_id from aspect name if needed
+      const resolvedAspectId = (updates.aspect_id !== undefined || updates.aspect !== undefined)
+        ? await this.resolveAspectId(userId, updates.aspect, updates.aspect_id)
+        : parent.aspect_id;
+
       // Create override event for this instance
       const { data, error } = await this.client
         .from('events')
@@ -1006,8 +1011,8 @@ export class SupabaseService {
           end_time: instanceEndDate.toISOString(),
           location: updates.location !== undefined ? updates.location : parent.location,
           description: updates.description !== undefined ? updates.description : parent.description,
-          category: updates.aspect || parent.aspect,
-          aspect_id: updates.aspect_id || parent.aspect_id,
+          category: updates.aspect || parent.aspect, // Deprecated text column for backward compatibility
+          aspect_id: resolvedAspectId,
           visibility: updates.visibility !== undefined ? updates.visibility : parent.visibility,
           reflection: updates.reflection !== undefined ? updates.reflection : null,
           is_missed: updates.is_missed !== undefined ? updates.is_missed : false,
@@ -1122,8 +1127,10 @@ export class SupabaseService {
       if (updates.recurrence_rule) updateData.recurrence_rule = updates.recurrence_rule;
       if (updates.recurrence_end !== undefined) updateData.recurrence_end = updates.recurrence_end;
       if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
-      if (updates.aspect_id) updateData.aspect_id = updates.aspect_id;
-      if (updates.aspect) updateData.category = updates.aspect;
+      if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
+        updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
+        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
+      }
 
       const { data, error } = await this.client
         .from('events')

@@ -414,7 +414,7 @@ export function VerticalSidebar({
         }}>
           {/* Theme picker */}
           <div style={{ padding: isExpanded ? '4px 8px' : '4px 0', display: 'flex', justifyContent: isExpanded ? 'flex-start' : 'center' }}>
-            <ThemePicker />
+            <ThemePicker forceClose={!isExpanded} />
           </div>
 
           {/* Sign out */}

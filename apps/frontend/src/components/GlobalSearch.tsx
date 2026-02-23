@@ -21,6 +21,8 @@ interface GlobalSearchProps {
   inline?: boolean
   /** Called when the search is closed (useful in inline mode for parent to dismiss) */
   onClose?: () => void
+  /** Controlled open state — when provided, parent manages visibility */
+  controlledOpen?: boolean
 }
 
 export function GlobalSearch({
@@ -28,13 +30,18 @@ export function GlobalSearch({
   onSelectTask,
   onSelectGoal,
   inline = false,
-  onClose
+  onClose,
+  controlledOpen
 }: GlobalSearchProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
 
-  const [isOpen, setIsOpen] = useState(inline)
+  const [internalOpen, setInternalOpen] = useState(inline)
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setIsOpen = controlledOpen !== undefined
+    ? (val: boolean) => { if (!val) onClose?.() }
+    : setInternalOpen
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)

@@ -41,7 +41,8 @@ export function DatePickerMobile({ value, onChange, isOpen, onClose }: DatePicke
             padding: '16px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
             zIndex: 1201,
-            outline: 'none'
+            outline: 'none',
+            overflow: 'hidden'
           }}
         >
           <Dialog.Title className="sr-only">Select Date</Dialog.Title>

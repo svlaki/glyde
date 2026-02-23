@@ -4,7 +4,7 @@ import { useAuth } from '../lib/authContext'
 import { updateUserGoal } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
 import { EmptyState } from './EmptyState'
-import { getColors, hexToRgba } from '../styles/colors'
+import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { EditButton, DeleteButton } from './ui/IconButtons'
 
@@ -54,28 +54,53 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
       flexDirection: 'column',
       gap: '24px'
     }}>
-      {/* Header */}
+      {/* Header - title + actions inline */}
       <div style={{
         paddingBottom: '16px',
         borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
       }}>
-        <h2 style={{
-          fontSize: fontSize.lg,
-          fontWeight: fontWeight.normal,
-          color: colors.textPrimary,
-          margin: '0 0 16px 0',
-          lineHeight: lineHeight.tight
-        }}>
-          {goal.title}
-        </h2>
-
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
+          alignItems: 'flex-start',
+          gap: '12px',
         }}>
-          <EditButton onClick={onEdit} title="Edit goal" />
-          <DeleteButton onClick={onDelete} title="Delete goal" />
+          <div style={{ flex: 1 }}>
+            <h2 style={{
+              fontSize: fontSize.lg,
+              fontWeight: fontWeight.normal,
+              color: colors.textPrimary,
+              margin: 0,
+              lineHeight: lineHeight.tight
+            }}>
+              {goal.title}
+            </h2>
+            {goal.aspect && aspectColor && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '8px',
+              }}>
+                <div style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  background: aspectColor,
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: fontSize.sm,
+                  color: colors.textSecondary,
+                }}>
+                  {goal.aspect}
+                </span>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <EditButton onClick={onEdit} title="Edit goal" />
+            <DeleteButton onClick={onDelete} title="Delete goal" />
+          </div>
         </div>
       </div>
 
@@ -97,14 +122,27 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
           paddingTop: '16px',
           borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
         }}>
-          <h3 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.medium,
-            color: colors.textPrimary,
-            margin: '0 0 12px 0'
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '12px',
           }}>
-            {goal.milestone_type === 'ordered' ? 'Steps' : 'Milestones'}
-          </h3>
+            <h3 style={{
+              fontSize: fontSize.base,
+              fontWeight: fontWeight.medium,
+              color: colors.textPrimary,
+              margin: 0,
+            }}>
+              {goal.milestone_type === 'ordered' ? 'Steps' : 'Milestones'}
+            </h3>
+            <span style={{
+              fontSize: fontSize.sm,
+              color: colors.textTertiary,
+            }}>
+              {goal.milestones.filter(m => m.completed).length} of {goal.milestones.length} complete
+            </span>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {goal.milestones.map((milestone, index) => (
               <div

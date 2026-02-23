@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { useAuth } from '../lib/authContext'
 import { PlanTimeline } from '../components/PlanTimeline'
-import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
+import { GoalsSection } from '../components/GoalsSection'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
@@ -13,7 +13,7 @@ import type { Goal } from '../lib/goalService'
 import { supabase } from '../lib/supabase'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
-import { mobileStyles, mobileSpacing, mobileHeaderStyles } from '../styles/mobileStyles'
+import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
 
 export function PlanPage() {
   const { isMobile } = usePlatform()
@@ -39,7 +39,6 @@ function PlanPageDesktop() {
   const [editContent, setEditContent] = useState('')
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const chatBotRef = useRef<ChatBotHandle>(null)
   const isEditingRef = useRef(false)
   const initialLoadDone = useRef(false)
 
@@ -48,46 +47,29 @@ function PlanPageDesktop() {
     const saved = localStorage.getItem('plan-left-width')
     return saved ? parseInt(saved) : 450
   })
-  const [chatHeight, setChatHeight] = useState(() => {
-    const saved = localStorage.getItem('plan-chat-height')
-    return saved ? parseInt(saved) : 400 // Default twice as tall (was 200)
-  })
   const [isResizingLeft, setIsResizingLeft] = useState(false)
-  const [isResizingChat, setIsResizingChat] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const rightColumnRef = useRef<HTMLDivElement>(null)
 
   // Save to localStorage when sizes change
   useEffect(() => {
     localStorage.setItem('plan-left-width', leftWidth.toString())
   }, [leftWidth])
 
-  useEffect(() => {
-    localStorage.setItem('plan-chat-height', chatHeight.toString())
-  }, [chatHeight])
-
   // Handle mouse move for resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingLeft && containerRef.current) {
         const containerRect = containerRef.current.getBoundingClientRect()
-        const newWidth = e.clientX - containerRect.left - 16 // account for padding
+        const newWidth = e.clientX - containerRect.left - 16
         setLeftWidth(Math.min(Math.max(newWidth, 250), 700))
-      }
-
-      if (isResizingChat && rightColumnRef.current) {
-        const rightRect = rightColumnRef.current.getBoundingClientRect()
-        const newHeight = rightRect.bottom - e.clientY
-        setChatHeight(Math.min(Math.max(newHeight, 150), 600))
       }
     }
 
     const handleMouseUp = () => {
       setIsResizingLeft(false)
-      setIsResizingChat(false)
     }
 
-    if (isResizingLeft || isResizingChat) {
+    if (isResizingLeft) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
 
@@ -97,9 +79,9 @@ function PlanPageDesktop() {
       }
     }
     return undefined
-  }, [isResizingLeft, isResizingChat])
+  }, [isResizingLeft])
 
-  // Load data and realtime subscriptions - all in one effect like Calendar
+  // Load data and realtime subscriptions
   useEffect(() => {
     if (!user || !session?.access_token) return
 
@@ -129,7 +111,6 @@ function PlanPageDesktop() {
           console.error('Error loading goals:', goalsResult.error)
         }
 
-        // Only update plan content if not currently editing
         if (!isEditingRef.current) {
           setPlan(planResult.plan)
           setEditContent(planResult.plan?.content || '')
@@ -150,7 +131,6 @@ function PlanPageDesktop() {
 
     loadData(initialLoadDone.current)
 
-    // Realtime subscriptions
     const goalsChannel = supabase
       .channel(`plan-goals-${user.id}-${Date.now()}`)
       .on(
@@ -179,7 +159,6 @@ function PlanPageDesktop() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
-          // Skip realtime refresh while user is editing
           if (isEditingRef.current) return
           if (refreshTimer) clearTimeout(refreshTimer)
           refreshTimer = setTimeout(() => loadData(true), 500)
@@ -195,7 +174,6 @@ function PlanPageDesktop() {
     }
   }, [user, session, refreshKey])
 
-  // Create a new plan if none exists
   const handleCreatePlan = async () => {
     if (!user || !session?.access_token) return
 
@@ -213,17 +191,14 @@ function PlanPageDesktop() {
     }
   }
 
-  // Auto-save plan content with debounce
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
     isEditingRef.current = true
 
-    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
 
-    // Set new timeout for auto-save
     saveTimeoutRef.current = setTimeout(async () => {
       if (!user || !session?.access_token || !plan) return
 
@@ -234,21 +209,19 @@ function PlanPageDesktop() {
       if (result.plan) {
         setPlan(result.plan)
       }
-    }, 1000) // 1 second debounce
+    }, 1000)
   }
 
-  // Save on blur
   const handleBlur = async () => {
     setIsEditing(false)
     isEditingRef.current = false
 
-    // Clear any pending timeout and save immediately
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
 
     if (!user || !session?.access_token || !plan) return
-    if (editContent === plan.content) return // No changes
+    if (editContent === plan.content) return
 
     const result = await updateUserPlan(user, session.access_token, plan.id, {
       content: editContent
@@ -259,7 +232,6 @@ function PlanPageDesktop() {
     }
   }
 
-  // Refresh goals after milestone update
   const handleMilestoneUpdate = () => {
     setRefreshKey(k => k + 1)
   }
@@ -286,7 +258,6 @@ function PlanPageDesktop() {
     )
   }
 
-  // Get goals with milestones for individual timelines
   const goalsWithMilestones = goals.filter(g => g.milestones && g.milestones.length > 0)
 
   return (
@@ -296,10 +267,8 @@ function PlanPageDesktop() {
       overflow: 'hidden',
       background: colors.bgPrimary
     }}>
-      {/* Vertical Sidebar */}
       <VerticalSidebar />
 
-      {/* Main content area - Two columns, offset by sidebar */}
       <div
         ref={containerRef}
         style={{
@@ -309,7 +278,7 @@ function PlanPageDesktop() {
           padding: '16px',
           gap: '16px',
           marginLeft: `${SIDEBAR_WIDTH}px`,
-          userSelect: (isResizingLeft || isResizingChat) ? 'none' : 'auto'
+          userSelect: isResizingLeft ? 'none' : 'auto'
         }}
       >
         {/* LEFT COLUMN - Plan */}
@@ -467,28 +436,24 @@ function PlanPageDesktop() {
           />
         </div>
 
-        {/* RIGHT COLUMN - Timelines + Chat */}
-        <div
-          ref={rightColumnRef}
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0',
-            overflow: 'hidden',
-            minWidth: '300px'
-          }}
-        >
+        {/* RIGHT COLUMN - Timelines + Goals */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          overflow: 'hidden',
+          minWidth: '300px'
+        }}>
           {/* Goal Timelines (Top Right) */}
           <div style={{
             flex: 1,
+            minHeight: 0,
             background: colors.bgPrimary,
             borderRadius: '12px',
             border: `1px solid ${colors.border}`,
             overflow: 'auto',
             padding: '16px',
-            marginBottom: '8px',
-            minHeight: '150px'
           }}>
             <h3 style={{
               ...typography.headingMd,
@@ -528,7 +493,6 @@ function PlanPageDesktop() {
                       <PlanTimeline
                         goals={[goal]}
                         onMilestoneUpdate={handleMilestoneUpdate}
-                        onChatReply={(msg) => chatBotRef.current?.sendMessage(msg)}
                         hideTitle
                       />
                     </div>
@@ -538,40 +502,13 @@ function PlanPageDesktop() {
             )}
           </div>
 
-          {/* Resize handle for chat height */}
-          <div
-            onMouseDown={() => setIsResizingChat(true)}
-            style={{
-              height: '8px',
-              cursor: 'row-resize',
-              zIndex: 10,
-              background: isResizingChat ? colors.border : 'transparent',
-              borderRadius: '4px',
-              transition: 'background 0.15s',
-              marginBottom: '8px'
-            }}
-            onMouseEnter={(e) => {
-              if (!isResizingChat) {
-                e.currentTarget.style.background = colors.border
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizingChat) {
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
-          />
-
-          {/* Chat (Bottom Right) */}
+          {/* Goals Section (Bottom Right) */}
           <div style={{
-            height: `${chatHeight}px`,
-            flexShrink: 0,
-            background: colors.bgPrimary,
-            borderRadius: '12px',
-            border: `1px solid ${colors.border}`,
-            overflow: 'hidden'
+            flex: 1,
+            minHeight: 0,
+            overflow: 'auto',
           }}>
-            <ChatBot ref={chatBotRef} hideHeader compact />
+            <GoalsSection />
           </div>
         </div>
       </div>
@@ -632,7 +569,7 @@ function ExpandableCard({ title, preview, onExpand, colors }: ExpandableCardProp
   )
 }
 
-type ExpandedView = 'none' | 'plan' | 'timelines' | 'chat'
+type ExpandedView = 'none' | 'plan' | 'timelines' | 'goals'
 
 function PlanPageMobile() {
   const { theme, isDarkMode } = useTheme()
@@ -650,23 +587,7 @@ function PlanPageMobile() {
   const isEditingRef = useRef(false)
   const initialLoadDone = useRef(false)
 
-  // Which view is currently expanded to fullscreen
   const [expandedView, setExpandedView] = useState<ExpandedView>('none')
-
-  // ChatBot ref for external header control
-  const chatBotRef = useRef<ChatBotHandle>(null)
-  const [chatIsLoading, setChatIsLoading] = useState(false)
-
-  // Poll ChatBot loading state for header display
-  useEffect(() => {
-    if (expandedView !== 'chat') return
-    const interval = setInterval(() => {
-      if (chatBotRef.current) {
-        setChatIsLoading(chatBotRef.current.isLoading)
-      }
-    }, 100)
-    return () => clearInterval(interval)
-  }, [expandedView])
 
   // Load data and realtime subscriptions
   useEffect(() => {
@@ -718,7 +639,6 @@ function PlanPageMobile() {
 
     loadData(initialLoadDone.current)
 
-    // Realtime subscriptions
     const goalsChannel = supabase
       .channel(`plan-goals-mobile-${user.id}-${Date.now()}`)
       .on(
@@ -762,7 +682,6 @@ function PlanPageMobile() {
     }
   }, [user, session, refreshKey])
 
-  // Create a new plan if none exists
   const handleCreatePlan = async () => {
     if (!user || !session?.access_token) return
 
@@ -780,7 +699,6 @@ function PlanPageMobile() {
     }
   }
 
-  // Auto-save plan content with debounce
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
     isEditingRef.current = true
@@ -802,7 +720,6 @@ function PlanPageMobile() {
     }, 1000)
   }
 
-  // Save on blur
   const handleBlur = async () => {
     setIsEditing(false)
     isEditingRef.current = false
@@ -832,7 +749,7 @@ function PlanPageMobile() {
   if (isLoading) {
     return (
       <div style={mobileStyles.fullHeight}>
-        <MobileHeader title="Plan" showMenu={true} />
+        <MobileHeader title="Plan" showMenu={true} showSearch={true} />
         <div style={{
           flex: 1,
           display: 'flex',
@@ -854,7 +771,7 @@ function PlanPageMobile() {
         <MobileHeader
           title="My Life Plan"
           onBack={() => {
-            handleBlur() // Save before leaving
+            handleBlur()
             setExpandedView('none')
           }}
         />
@@ -1005,10 +922,6 @@ function PlanPageMobile() {
                     <PlanTimeline
                       goals={[goal]}
                       onMilestoneUpdate={handleMilestoneUpdate}
-                      onChatReply={(msg) => {
-                        chatBotRef.current?.sendMessage(msg)
-                        setExpandedView('chat')
-                      }}
                       hideTitle
                     />
                   </div>
@@ -1021,108 +934,24 @@ function PlanPageMobile() {
     )
   }
 
-  // ============ FULLSCREEN: Chat ============
-  if (expandedView === 'chat') {
+  // ============ FULLSCREEN: Goals ============
+  if (expandedView === 'goals') {
     return (
       <div style={mobileStyles.fullHeight}>
-        {/* Custom header with status and trash button */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: mobileHeaderStyles.gap,
-          padding: `0 ${mobileHeaderStyles.paddingX}`,
-          paddingTop: mobileHeaderStyles.paddingTop,
-          paddingBottom: mobileHeaderStyles.paddingBottom,
-          background: colors.bgSecondary,
-          flexShrink: 0
-        }}>
-          <button
-            onClick={() => setExpandedView('none')}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: colors.textPrimary,
-              fontSize: mobileHeaderStyles.buttonFontSize,
-              padding: mobileHeaderStyles.buttonPadding,
-              cursor: 'pointer',
-              minWidth: mobileHeaderStyles.buttonMinSize,
-              minHeight: mobileHeaderStyles.buttonMinSize,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            ←
-          </button>
-          <div style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: '8px',
-            flex: 1,
-          }}>
-            <h1 style={{
-              fontSize: mobileHeaderStyles.titleFontSize,
-              fontWeight: mobileHeaderStyles.titleFontWeight,
-              letterSpacing: mobileHeaderStyles.titleLetterSpacing,
-              margin: 0,
-              color: colors.textPrimary,
-              lineHeight: 1,
-            }}>
-              Chat
-            </h1>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-            }}>
-              <div style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: chatIsLoading ? '#fbbf24' : '#4ade80',
-                flexShrink: 0,
-                alignSelf: 'center',
-                transform: 'translateY(1px)',  // Visually align dot with text baseline
-              }} />
-              <span style={{
-                fontSize: '12px',
-                color: colors.textTertiary,
-                fontWeight: '500',
-                lineHeight: 1,
-              }}>
-                {chatIsLoading ? 'Typing...' : 'Online'}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => chatBotRef.current?.clearChat()}
-            title="Clear conversation"
-            style={{
-              padding: '4px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              color: colors.textTertiary,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: mobileHeaderStyles.buttonMinSize,
-              minHeight: mobileHeaderStyles.buttonMinSize,
-            }}
-          >
-            <ClearIcon size={14} />
-          </button>
-        </div>
+        <MobileHeader
+          title="Goals"
+          onBack={() => setExpandedView('none')}
+        />
         <div style={{
           flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'auto',
           background: colors.bgPrimary,
-          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))'
+          paddingLeft: mobileSpacing.paddingX,
+          paddingRight: mobileSpacing.paddingX,
+          paddingTop: mobileSpacing.paddingTop,
+          paddingBottom: mobileSpacing.paddingBottomNoTabs
         }}>
-          <ChatBot ref={chatBotRef} mobileEmbedded hideHeader />
+          <GoalsSection />
         </div>
       </div>
     )
@@ -1131,7 +960,7 @@ function PlanPageMobile() {
   // ============ DEFAULT: Overview with all sections ============
   return (
     <div style={mobileStyles.fullHeight}>
-      <MobileHeader title="Plan" showMenu={true} />
+      <MobileHeader title="Plan" showMenu={true} showSearch={true} />
 
       <div style={{
         ...mobileStyles.scrollContainer,
@@ -1237,20 +1066,49 @@ function PlanPageMobile() {
           {null}
         </ExpandableCard>
 
-        {/* Chat Card */}
+        {/* Goals Card */}
         <ExpandableCard
-          title="Chat"
-          onExpand={() => setExpandedView('chat')}
+          title="Goals"
+          onExpand={() => setExpandedView('goals')}
           colors={colors}
           preview={
-            <div style={{
-              padding: '20px',
-              textAlign: 'center',
-              color: colors.textSecondary,
-              fontSize: '13px'
-            }}>
-              Tap to chat with your AI assistant
-            </div>
+            goals.length === 0 ? (
+              <div style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: colors.textSecondary,
+                fontSize: '13px'
+              }}>
+                No goals yet. Tap to create your first goal.
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                {goals.slice(0, 3).map(goal => (
+                  <div key={goal.id} style={{
+                    padding: '10px 12px',
+                    background: colors.bgSecondary,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    color: colors.textSecondary
+                  }}>
+                    {goal.title}
+                  </div>
+                ))}
+                {goals.length > 3 && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: colors.textTertiary,
+                    textAlign: 'center'
+                  }}>
+                    +{goals.length - 3} more
+                  </div>
+                )}
+              </div>
+            )
           }
         >
           {null}

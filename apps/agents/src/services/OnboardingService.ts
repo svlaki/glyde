@@ -258,7 +258,7 @@ export class OnboardingService {
       try {
         await supabase.createGoal(userId, {
           title: goal.title,
-          description: goal.description || 'Goal created during onboarding',
+          description: goal.description,
           status: 'active',
           goalType: 'SMART',
           progress: 0,

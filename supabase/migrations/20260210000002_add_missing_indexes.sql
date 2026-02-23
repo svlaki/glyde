@@ -8,7 +8,11 @@ CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON public.tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_goals_user_id ON public.goals(user_id);
 
 -- Interactions: user_id lookup (used for pending interaction queries)
-CREATE INDEX IF NOT EXISTS idx_interactions_user_id ON public.interactions(user_id);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interactions') THEN
+    CREATE INDEX IF NOT EXISTS idx_interactions_user_id ON public.interactions(user_id);
+  END IF;
+END $$;
 
 -- Events: composite index for Google Calendar sync lookups (N+1 prevention)
 CREATE INDEX IF NOT EXISTS idx_events_user_google_event ON public.events(user_id, google_event_id);

@@ -19,12 +19,21 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
   const { getAspectColor } = useAspects()
 
   const aspectColor = goal.aspect ? getAspectColor(goal.aspect) : undefined
+  const goalAny = goal as any
+  const completedMilestones = goal.milestones?.filter(m => m.completed).length ?? 0
+  const totalMilestones = goal.milestones?.length ?? 0
+
+  const formatDueDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return `${months[date.getMonth()]} ${date.getDate()}`
+  }
 
   return (
     <div
       onClick={onClick}
       style={{
-        padding: '16px',
+        padding: '12px',
         background: aspectColor
           ? `linear-gradient(to right, ${hexToRgba(aspectColor, isDarkMode ? 0.15 : 0.08)}, ${colors.bgPrimary})`
           : colors.bgPrimary,
@@ -33,34 +42,57 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
           : `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
         borderRadius: '4px',
         cursor: 'pointer',
-        borderLeft: aspectColor ? `3px solid ${aspectColor}` : `3px solid transparent`
+        borderLeft: aspectColor ? `3px solid ${aspectColor}` : `3px solid transparent`,
+        transition: 'border-color 0.15s, background 0.15s',
       }}
     >
       {/* Goal Title */}
       <div style={{
         ...typography.bodyMd,
-        fontWeight: fontWeight.normal,
+        fontWeight: fontWeight.medium,
         color: colors.textPrimary,
         lineHeight: lineHeight.tight
       }}>
         {goal.title}
       </div>
 
-      {/* Goal Description Preview - Only show if selected */}
-      {isSelected && goal.description && (
+      {/* Meta row: aspect badge + milestone progress + due date */}
+      {(goal.aspect || totalMilestones > 0 || goalAny.due_date) && (
         <div style={{
-          ...typography.bodySm,
-          color: colors.textSecondary,
-          lineHeight: lineHeight.normal,
-          marginTop: '8px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          opacity: 0.6
+          display: 'flex',
+          gap: '8px',
+          marginTop: '6px',
+          alignItems: 'center',
+          flexWrap: 'wrap',
         }}>
-          {goal.description}
+          {goal.aspect && aspectColor && (
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '12px',
+              color: colors.textSecondary,
+            }}>
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: aspectColor,
+                flexShrink: 0,
+              }} />
+              {goal.aspect}
+            </span>
+          )}
+          {totalMilestones > 0 && (
+            <span style={{ fontSize: '12px', color: colors.textTertiary }}>
+              {completedMilestones}/{totalMilestones} {goal.milestone_type === 'ordered' ? 'steps' : 'milestones'}
+            </span>
+          )}
+          {goalAny.due_date && (
+            <span style={{ fontSize: '12px', color: colors.textTertiary }}>
+              Due {formatDueDate(goalAny.due_date)}
+            </span>
+          )}
         </div>
       )}
     </div>

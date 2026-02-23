@@ -172,52 +172,6 @@ export function Calendar() {
     }
   }
 
-  // Parse time string flexibly (supports "2:30pm", "14:30", "2pm", etc.)
-  const _parseTime = (timeStr: string): { hours: number; minutes: number } | null => {
-    const cleaned = timeStr.trim().toLowerCase()
-
-    // Try 24-hour format (14:30, 9:15)
-    const time24Match = cleaned.match(/^(\d{1,2}):(\d{2})$/)
-    if (time24Match && time24Match[1] && time24Match[2]) {
-      const hours = parseInt(time24Match[1])
-      const minutes = parseInt(time24Match[2])
-      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-        return { hours, minutes }
-      }
-    }
-
-    // Try 12-hour format with am/pm (2:30pm, 2:30 pm, 9am)
-    const time12Match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/)
-    if (time12Match && time12Match[1]) {
-      let hours = parseInt(time12Match[1])
-      const minutes = time12Match[2] ? parseInt(time12Match[2]) : 0
-      const meridiem = time12Match[3]
-
-      if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
-        return null
-      }
-
-      if (meridiem === 'pm' && hours !== 12) {
-        hours += 12
-      } else if (meridiem === 'am' && hours === 12) {
-        hours = 0
-      }
-
-      return { hours, minutes }
-    }
-
-    // Try just hour number (assume next upcoming time in 24h format)
-    const hourMatch = cleaned.match(/^(\d{1,2})$/)
-    if (hourMatch && hourMatch[1]) {
-      const hours = parseInt(hourMatch[1])
-      if (hours >= 0 && hours <= 23) {
-        return { hours, minutes: 0 }
-      }
-    }
-
-    return null
-  }
-
   const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getWeekDates(currentDate) : getMonthDates(currentDate)
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
@@ -364,14 +318,6 @@ export function Calendar() {
     const ampm = hour >= 12 ? 'PM' : 'AM'
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
     return `${displayHour}${ampm}`
-  }
-
-  const _formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  const _getDayName = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'short' })
   }
 
   // Get events for a specific date and hour
@@ -1438,25 +1384,7 @@ export function Calendar() {
                                   {isFriendEvent ? `${event.owner_display_name || 'Friend'} - ${startTime}` : startTime}
                                 </div>
                               )}
-                              {/* Aspect name - bottom left */}
-                              {(event.aspect_name || event.aspect) && height > 40 && (
-                                <span style={{
-                                  position: 'absolute',
-                                  bottom: 2,
-                                  left: 8,
-                                  fontSize: '8px',
-                                  fontFamily: fontFamily.sans,
-                                  fontWeight: fontWeight.medium,
-                                  color: eventColor,
-                                  opacity: 0.45,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  maxWidth: '60%'
-                                }}>
-                                  {event.aspect_name || event.aspect}
-                                </span>
-                              )}
+    
                               {getRecurrenceBadge(event) && (
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', bottom: 2, right: 4, opacity: 0.5, flexShrink: 0 }}>
                                   <path d="M21.5 2v6h-6" />
@@ -1552,7 +1480,7 @@ export function Calendar() {
             if (eventData.start_time) updates.start_time = eventData.start_time
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
-            if (eventData.aspect) updates.category = eventData.aspect
+            if (eventData.aspect) updates.aspect = eventData.aspect
             if (eventData.visibility) updates.visibility = eventData.visibility
 
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
@@ -1580,8 +1508,9 @@ export function Calendar() {
           setIsFormOpen(false)
         }}
       />
-        )
+      )
       })()}
     </div>
   )
-}
+}  
+

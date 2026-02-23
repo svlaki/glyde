@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import type { ThemeFamily, ThemeMode, ThemeName } from '../styles/colors'
-import { themeFamilies, resolveTheme } from '../styles/colors'
+import { themeFamilies, resolveTheme, getColors } from '../styles/colors'
 
 interface ThemeContextType {
   theme: ThemeName
@@ -51,6 +51,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     // Set color-scheme so browser-native scrollbars match the mode
     document.documentElement.style.colorScheme = mode
+
+    // Set html + body background so the area behind the iOS keyboard matches the theme
+    const colors = getColors(resolveTheme(family, mode))
+    document.documentElement.style.backgroundColor = colors.bgSecondary
+    document.body.style.backgroundColor = colors.bgSecondary
   }, [family, mode])
 
   const theme = resolveTheme(family, mode)

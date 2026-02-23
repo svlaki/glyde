@@ -1,12 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
+import { useAuth } from '../../lib/authContext'
 import { useTheme } from '../../lib/themeContext'
-import { getColors } from '../../styles/colors'
+import { fetchFriendsEvents } from '../../lib/calendarService'
+import type { CalendarEvent } from '../../lib/calendarService'
+import { getColors, hexToRgba } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { mobileHeaderStyles } from '../../styles/mobileStyles'
 import { MobileCalendar } from './MobileCalendar'
 import { MobileMenu } from './MobileMenu'
 
 export function CalendarMobileWrapper() {
+  const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const typography = getTypography(true) // Mobile context
@@ -15,6 +19,11 @@ export function CalendarMobileWrapper() {
   const [view, setView] = useState<'day' | '3day' | 'month'>('3day')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrollToDate, setScrollToDate] = useState<Date | null>(null)  // For scrolling within buffer
+  const [friendsEvents, setFriendsEvents] = useState<CalendarEvent[]>([])
+  const [showFriendsEvents, setShowFriendsEvents] = useState(() => {
+    const saved = localStorage.getItem('calendar-show-friends-events')
+    return saved !== 'false'
+  })
 
   // Refs for scroll containers
   const dayScrollRef = useRef<HTMLDivElement>(null)
@@ -22,26 +31,43 @@ export function CalendarMobileWrapper() {
   const lastScrollUpdateRef = useRef(0)
   const isSnappingRef = useRef(false)
 
-  // Restore saved state on mount
+  // Restore saved view on mount (always start with today's date)
   useEffect(() => {
     const savedView = localStorage.getItem('calendar-view')
-    const savedDate = localStorage.getItem('calendar-date')
     if (savedView === '3day' || savedView === 'month') {
       setView(savedView)
     }
-    if (savedDate) {
-      const date = new Date(savedDate)
-      if (!isNaN(date.getTime())) {
-        setCurrentDate(date)
-      }
-    }
   }, [])
 
-  // Save state when it changes
+  // Save view when it changes
   useEffect(() => {
     localStorage.setItem('calendar-view', view)
-    localStorage.setItem('calendar-date', currentDate.toISOString())
-  }, [view, currentDate])
+  }, [view])
+
+  // Persist friends events toggle
+  useEffect(() => {
+    localStorage.setItem('calendar-show-friends-events', showFriendsEvents.toString())
+  }, [showFriendsEvents])
+
+  // Fetch friends events
+  useEffect(() => {
+    if (!user || !session) return
+    let isSubscribed = true
+
+    async function loadFriendsEvents() {
+      try {
+        const { events: friendEvents } = await fetchFriendsEvents(user!, session?.access_token)
+        if (isSubscribed) {
+          setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
+        }
+      } catch (error) {
+        console.error('[CalendarMobileWrapper] Error loading friends events:', error)
+      }
+    }
+
+    loadFriendsEvents()
+    return () => { isSubscribed = false }
+  }, [user, session])
 
   // Sync displayDate when currentDate changes (e.g., re-centering or Today button)
   useEffect(() => {
@@ -260,6 +286,47 @@ export function CalendarMobileWrapper() {
           {getDateHeader()}
         </h2>
 
+        {/* Friends Events Toggle */}
+        <button
+          onClick={() => setShowFriendsEvents(!showFriendsEvents)}
+          title={showFriendsEvents ? "Hide friends' events" : "Show friends' events"}
+          style={{
+            padding: '4px 8px',
+            background: showFriendsEvents ? hexToRgba('#10b981', 0.15) : colors.bgSecondary,
+            color: showFriendsEvents ? '#10b981' : colors.textSecondary,
+            border: `1px solid ${showFriendsEvents ? hexToRgba('#10b981', 0.3) : colors.border}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            minHeight: '28px',
+            position: 'relative'
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          {friendsEvents.length > 0 && (
+            <span style={{
+              background: showFriendsEvents ? '#10b981' : colors.textTertiary,
+              color: '#fff',
+              fontSize: '9px',
+              fontWeight: 700,
+              padding: '0 4px',
+              borderRadius: '8px',
+              minWidth: '14px',
+              textAlign: 'center',
+              lineHeight: '14px'
+            }}>
+              {friendsEvents.length}
+            </span>
+          )}
+        </button>
+
         <div style={{
           display: 'flex',
           gap: '2px',
@@ -413,6 +480,8 @@ export function CalendarMobileWrapper() {
             onDateChange={(date) => setCurrentDate(date)}
             onDisplayDateChange={(date) => setDisplayDate(date)}
             scrollToDate={scrollToDate}
+            friendsEvents={friendsEvents}
+            showFriendsEvents={showFriendsEvents}
           />
         </div>
       ) : (
@@ -454,6 +523,8 @@ export function CalendarMobileWrapper() {
                   setCurrentDate(date)
                   setView('3day')
                 }}
+                friendsEvents={friendsEvents}
+                showFriendsEvents={showFriendsEvents}
               />
             </div>
           ))}

@@ -445,8 +445,8 @@ export class CalendarMappingService {
           });
           results.push(updated);
         } else {
-          // Create new mapping
-          const created = await this.createMapping(connection.user_id, {
+          // Create new mapping (upsert to handle concurrent syncs)
+          const created = await this.upsertMapping(connection.user_id, {
             connection_id: connection.id,
             google_calendar_id: gcal.id,
             google_calendar_name: gcal.summary,

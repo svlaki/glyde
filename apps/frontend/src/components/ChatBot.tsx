@@ -1270,7 +1270,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
         padding: mobileEmbedded
           ? '0'
           : 'clamp(8px, 1.5vh, 12px) clamp(8px, 2vw, 16px)',
-        paddingBottom: mobileEmbedded ? '0' : 'clamp(12px, 2vh, 16px)',
+        paddingBottom: mobileEmbedded ? '12px' : 'clamp(12px, 2vh, 16px)',
         background: mobileEmbedded ? 'transparent' : colors.bgSecondary,
         flexShrink: 0,
       }}>

@@ -27,6 +27,23 @@ export const createInteractionTool = tool(
       return "Error: followUp metadata MUST include metadata.directAction so selecting an option triggers an action (e.g., create_event, create_task). Add directAction with type and data fields.";
     }
 
+    // Resolve aspectId: use provided value, or extract from metadata as fallback
+    let resolvedAspectId = aspectId || null;
+    if (!resolvedAspectId && metadata) {
+      resolvedAspectId =
+        metadata.directAction?.eventData?.aspectId ||
+        metadata.directAction?.taskData?.aspectId ||
+        metadata.directAction?.goalData?.categoryId ||
+        metadata.followUp?.aspectId ||
+        metadata.followUp?.metadata?.aspectId ||
+        metadata.followUp?.metadata?.directAction?.eventData?.aspectId ||
+        null;
+    }
+
+    if (!resolvedAspectId) {
+      console.warn('⚠️ [create-interaction] No aspectId provided or found in metadata - interaction will have no aspect color');
+    }
+
     try {
       const supabaseService = getSupabaseService();
 
@@ -36,7 +53,7 @@ export const createInteractionTool = tool(
         interactionType: type,
         options: options || undefined,
         priority: priority || 3,
-        aspectId: aspectId || undefined,
+        aspectId: resolvedAspectId || undefined,
         metadata: metadata || undefined,
       });
 

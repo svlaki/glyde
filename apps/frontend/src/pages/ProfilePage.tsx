@@ -1,5 +1,4 @@
 import { useTheme } from '../lib/themeContext'
-import { GoalsSection } from '../components/GoalsSection'
 import { RulesSection } from '../components/RulesSection'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
@@ -32,7 +31,7 @@ function ProfilePageMobile() {
 
   return (
     <div style={mobileStyles.fullHeight}>
-      <MobileHeader title="Profile" showMenu={true} />
+      <MobileHeader title="Profile" showMenu={true} showSearch={true} />
 
       <div style={{
         ...mobileStyles.scrollContainer,
@@ -69,7 +68,6 @@ function ProfilePageMobile() {
               <AspectBreakdownCard breakdown={data.aspectBreakdown} />
               <ConnectionsStatusCard connections={data.connections} onConnectionChanged={data.refreshConnections} />
 
-              <GoalsSection />
               <RulesSection />
             </>
           )}
@@ -126,7 +124,6 @@ function ProfilePageDesktop() {
               }}>
                 <ProfileCompletenessCard summary={data.profileSummary} profile={data.profile} />
                 <ActivityInsightsCard taskInsights={data.taskInsights} />
-                <GoalsSection />
                 <AspectBreakdownCard breakdown={data.aspectBreakdown} />
                 <ConnectionsStatusCard connections={data.connections} onConnectionChanged={data.refreshConnections} />
                 <RulesSection />

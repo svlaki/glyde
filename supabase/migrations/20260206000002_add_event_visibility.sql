@@ -3,8 +3,13 @@
 
 -- Add visibility column to events table
 ALTER TABLE public.events
-ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private'
-CHECK (visibility IN ('private', 'friends', 'public'));
+ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private';
+
+ALTER TABLE public.events
+DROP CONSTRAINT IF EXISTS check_event_visibility;
+
+ALTER TABLE public.events
+ADD CONSTRAINT check_event_visibility CHECK (visibility IN ('private', 'friends', 'public'));
 
 -- Create index for efficient visibility queries
 CREATE INDEX IF NOT EXISTS idx_events_visibility ON public.events(visibility);
@@ -70,6 +75,7 @@ CREATE POLICY "Users can view friends public events" ON public.events
   );
 
 -- Helper function: Get friends' events for a user (respects visibility settings)
+DROP FUNCTION IF EXISTS get_friends_events(UUID, TIMESTAMPTZ, TIMESTAMPTZ);
 CREATE OR REPLACE FUNCTION get_friends_events(
   p_user_id UUID,
   p_start_date TIMESTAMPTZ DEFAULT NULL,
