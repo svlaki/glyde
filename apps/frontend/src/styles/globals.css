@@ -480,6 +480,30 @@ input::placeholder, textarea::placeholder {
   }
 }
 
+/* Themed scrollbars */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+* {
+  scrollbar-color: var(--color-border) var(--color-background);
+  scrollbar-width: thin;
+}
+
 /* Hide scrollbars for horizontal scroll containers on WebKit (Safari/iOS) */
 [data-horizontal-scroll]::-webkit-scrollbar,
 .mobile-day-scroll::-webkit-scrollbar,
