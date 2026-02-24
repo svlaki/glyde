@@ -1009,53 +1009,87 @@ export class SupabaseService {
         ? await this.resolveAspectId(userId, updates.aspect, updates.aspect_id)
         : parent.aspect_id;
 
-      // Create override event for this instance
-      const { data, error } = await this.client
-        .from('events')
-        .insert({
-          user_id: userId,
-          title: updates.title || parent.title,
-          start_time: instanceStartDate.toISOString(),
-          end_time: instanceEndDate.toISOString(),
-          location: updates.location !== undefined ? updates.location : parent.location,
-          description: updates.description !== undefined ? updates.description : parent.description,
-          category: updates.aspect || parent.aspect, // Deprecated text column for backward compatibility
-          aspect_id: resolvedAspectId,
-          visibility: updates.visibility !== undefined ? updates.visibility : parent.visibility,
-          reflection: updates.reflection !== undefined ? updates.reflection : null,
-          is_missed: updates.is_missed !== undefined ? updates.is_missed : false,
-          parent_event_id: parentEventId,
-          is_recurring: false
-        })
-        .select()
+      const exceptionDate = instanceDate.split('T')[0];
+
+      // Check if an override already exists for this instance date
+      const { data: existingException } = await this.client
+        .from('recurring_event_exceptions')
+        .select('override_event_id')
+        .eq('parent_event_id', parentEventId)
+        .eq('exception_date', exceptionDate)
+        .eq('exception_type', 'modified')
         .single();
 
-      if (error) {
-        console.error('[SupabaseService] Error creating instance override:', error);
-        return null;
-      }
+      const overrideFields = {
+        title: updates.title || parent.title,
+        start_time: instanceStartDate.toISOString(),
+        end_time: instanceEndDate.toISOString(),
+        location: updates.location !== undefined ? updates.location : parent.location,
+        description: updates.description !== undefined ? updates.description : parent.description,
+        category: updates.aspect || parent.aspect,
+        aspect_id: resolvedAspectId,
+        visibility: updates.visibility !== undefined ? updates.visibility : parent.visibility,
+        reflection: updates.reflection !== undefined ? updates.reflection : null,
+        is_missed: updates.is_missed !== undefined ? updates.is_missed : false,
+      };
 
-      // Create exception record so the original instance is suppressed
-      const exceptionDate = instanceDate.split('T')[0];
-      const { error: excError } = await this.client
-        .from('recurring_event_exceptions')
-        .upsert({
-          user_id: userId,
-          parent_event_id: parentEventId,
-          exception_date: exceptionDate,
-          exception_type: 'modified',
-          override_event_id: data.id
-        }, {
-          onConflict: 'parent_event_id,exception_date'
-        });
+      let overrideId: string;
 
-      if (excError) {
-        console.error('[SupabaseService] Error creating exception record:', excError);
+      if (existingException?.override_event_id) {
+        // Update the existing override event instead of creating a new one
+        const { data, error } = await this.client
+          .from('events')
+          .update(overrideFields)
+          .eq('id', existingException.override_event_id)
+          .eq('user_id', userId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[SupabaseService] Error updating existing instance override:', error);
+          return null;
+        }
+        overrideId = data.id;
+      } else {
+        // Create new override event for this instance
+        const { data, error } = await this.client
+          .from('events')
+          .insert({
+            user_id: userId,
+            ...overrideFields,
+            parent_event_id: parentEventId,
+            is_recurring: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[SupabaseService] Error creating instance override:', error);
+          return null;
+        }
+        overrideId = data.id;
+
+        // Create exception record so the original instance is suppressed
+        const { error: excError } = await this.client
+          .from('recurring_event_exceptions')
+          .upsert({
+            user_id: userId,
+            parent_event_id: parentEventId,
+            exception_date: exceptionDate,
+            exception_type: 'modified',
+            override_event_id: overrideId
+          }, {
+            onConflict: 'parent_event_id,exception_date'
+          });
+
+        if (excError) {
+          console.error('[SupabaseService] Error creating exception record:', excError);
+        }
       }
 
       // Fetch with aspect data
       const eventsWithCategories = await this.getEvents(userId, instanceStartDate.toISOString(), instanceEndDate.toISOString());
-      const createdInstance = eventsWithCategories.find(e => e.id === data.id);
+      const createdInstance = eventsWithCategories.find(e => e.id === overrideId);
 
       return createdInstance || null;
     } catch (error) {

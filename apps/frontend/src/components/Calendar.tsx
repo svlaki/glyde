@@ -180,39 +180,13 @@ export function Calendar() {
     let isSubscribed = true
     let refreshTimer: NodeJS.Timeout | null = null
 
-    async function loadEvents(forceRefresh = false) {
+    async function loadEvents() {
       if (!user) return
-      console.log('[Calendar] Loading events for user:', user.id, forceRefresh ? '(FORCED REFRESH)' : '')
 
       try {
-        // DIAGNOSTIC: Also fetch directly from Supabase to compare
-        const { data: directEvents, error: directError } = await supabase
-          .from('events')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('start_time', { ascending: true })
-
-        console.log('[Calendar] DIRECT Supabase query result:', {
-          count: directEvents?.length,
-          error: directError,
-          events: directEvents
-        })
-
-        // Fetch through backend API with recurring events expanded
         const { events: userEvents } = await fetchExpandedEvents(user, session?.access_token)
-        console.log('[Calendar] Backend API result (with expanded recurring events):', {
-          count: userEvents?.length,
-          events: userEvents
-        })
-
-        // Fetch friends' events
         const { events: friendEvents } = await fetchFriendsEvents(user, session?.access_token)
-        console.log('[Calendar] Friends events result:', {
-          count: friendEvents?.length,
-          events: friendEvents
-        })
 
-        // Only update if still subscribed (component not unmounted)
         if (isSubscribed) {
           setEvents(userEvents || [])
           setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
@@ -224,67 +198,37 @@ export function Calendar() {
 
     loadEvents()
 
+    // Periodic refresh to catch Google Calendar synced events
+    const syncInterval = setInterval(() => {
+      if (isSubscribed) loadEvents()
+    }, 60000)
+
     // Set up real-time subscription for events
     if (!user) return
 
-    console.log('[Calendar] Setting up real-time subscription for user:', user.id)
-
     const channel = supabase
-      .channel(`calendar-events-${user.id}-${Date.now()}`) // Unique channel name
+      .channel(`calendar-events-${user.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'events',
-          filter: `user_id=eq.${user.id}` // Only listen to events for this user
+          filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-          console.log('[Calendar] REALTIME EVENT RECEIVED!')
-          console.log('Event Type:', payload.eventType)
-          console.log('Table:', payload.table)
-          console.log('Schema:', payload.schema)
-          console.log('New Data:', payload.new)
-          console.log('Old Data:', payload.old)
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-          // Clear any existing refresh timer
+        () => {
           if (refreshTimer) {
             clearTimeout(refreshTimer)
           }
-
-          // Force reload events with a delay to ensure DB is fully updated
-          refreshTimer = setTimeout(() => {
-            console.log('[Calendar] Triggering refresh from real-time event...')
-            loadEvents(true)
-          }, 500) // Increased delay to 500ms
+          refreshTimer = setTimeout(() => loadEvents(), 500)
         }
       )
-      .subscribe((status, err) => {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        console.log('[Calendar] Subscription Status Change:', status)
-        if (status === 'SUBSCRIBED') {
-          console.log('[Calendar] Successfully subscribed to real-time updates!')
-          console.log('Listening for events on table: events')
-          console.log('Filter: user_id =', user.id)
-        }
-        if (status === 'CHANNEL_ERROR') {
-          console.error('[Calendar] Channel error:', err)
-        }
-        if (status === 'TIMED_OUT') {
-          console.error('[Calendar] Subscription timed out - may need to check Supabase realtime settings')
-        }
-        if (status === 'CLOSED') {
-          console.log('[Calendar] Channel closed')
-        }
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-      })
+      .subscribe()
 
     // Cleanup subscription on unmount
     return () => {
-      console.log('[Calendar] Cleaning up real-time subscription')
       isSubscribed = false
+      clearInterval(syncInterval)
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
