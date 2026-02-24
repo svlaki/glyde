@@ -2,14 +2,12 @@ import { useState } from 'react'
 import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
-import { usePlatform } from '../../../hooks/usePlatform'
 import { DatePickerMobile } from '../../mobile/DatePickerMobile'
 
 export function Section1BasicInfo() {
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const { state, updateField } = useOnboarding()
-  const { isMobile } = usePlatform()
   const [isBirthdayPickerOpen, setIsBirthdayPickerOpen] = useState(false)
 
   const inputStyle: React.CSSProperties = {
@@ -96,45 +94,33 @@ export function Section1BasicInfo() {
         <label style={labelStyle}>
           Birthday <span style={{ color: '#ef4444' }}>*</span>
         </label>
-        {isMobile ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setIsBirthdayPickerOpen(true)}
-              style={{
-                ...inputStyle,
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: state.birthday ? colors.textPrimary : colors.textTertiary
-              }}
-            >
-              {state.birthday
-                ? new Date(state.birthday + 'T00:00:00').toLocaleDateString('en-US', {
-                    month: 'long', day: 'numeric', year: 'numeric'
-                  })
-                : 'Select your birthday'}
-            </button>
-            <DatePickerMobile
-              value={state.birthday ? new Date(state.birthday + 'T00:00:00') : new Date(2000, 0, 1)}
-              onChange={(date) => {
-                const yyyy = date.getFullYear()
-                const mm = String(date.getMonth() + 1).padStart(2, '0')
-                const dd = String(date.getDate()).padStart(2, '0')
-                updateField('birthday', `${yyyy}-${mm}-${dd}`)
-              }}
-              isOpen={isBirthdayPickerOpen}
-              onClose={() => setIsBirthdayPickerOpen(false)}
-            />
-          </>
-        ) : (
-          <input
-            type="date"
-            value={state.birthday}
-            onChange={(e) => updateField('birthday', e.target.value)}
-            style={inputStyle}
-            max={new Date().toISOString().split('T')[0]}
-          />
-        )}
+        <button
+          type="button"
+          onClick={() => setIsBirthdayPickerOpen(true)}
+          style={{
+            ...inputStyle,
+            textAlign: 'left',
+            cursor: 'pointer',
+            color: state.birthday ? colors.textPrimary : colors.textTertiary
+          }}
+        >
+          {state.birthday
+            ? new Date(state.birthday + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'long', day: 'numeric', year: 'numeric'
+              })
+            : 'Select your birthday'}
+        </button>
+        <DatePickerMobile
+          value={state.birthday ? new Date(state.birthday + 'T00:00:00') : new Date(2000, 0, 1)}
+          onChange={(date) => {
+            const yyyy = date.getFullYear()
+            const mm = String(date.getMonth() + 1).padStart(2, '0')
+            const dd = String(date.getDate()).padStart(2, '0')
+            updateField('birthday', `${yyyy}-${mm}-${dd}`)
+          }}
+          isOpen={isBirthdayPickerOpen}
+          onClose={() => setIsBirthdayPickerOpen(false)}
+        />
         <p style={{
           fontSize: '12px',
           color: colors.textTertiary,

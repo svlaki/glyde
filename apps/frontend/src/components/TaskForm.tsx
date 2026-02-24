@@ -11,8 +11,7 @@ import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
-import { usePlatform } from '../hooks/usePlatform'
-import { SaveTextButton } from './ui/IconButtons'
+import { SaveTextButton, DeleteTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -43,14 +42,14 @@ interface TaskFormProps {
   isOpen: boolean
   onClose: () => void
   onSave: (task: Partial<Task>) => Promise<void>
+  onDelete?: (() => Promise<void>) | undefined
 }
 
-export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
+export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const { aspects, refreshAspects } = useAspects()
-  const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
@@ -444,7 +443,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
               <>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div
-                  onClick={() => isMobile && setShowDatePicker(true)}
+                  onClick={() => setShowDatePicker(true)}
                   style={{
                     flex: 1,
                     padding: '10px 12px',
@@ -453,7 +452,7 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -461,33 +460,10 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                   }}
                 >
                   <span>Due</span>
-                  {isMobile ? (
-                    formatDate(dueDate)
-                  ) : (
-                    <input
-                      type="date"
-                      value={dueDate.toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        const newDate = new Date(dueDate)
-                        const parts = e.target.value.split('-').map(Number)
-                        const year = parts[0] ?? 0
-                        const month = parts[1] ?? 1
-                        const day = parts[2] ?? 1
-                        newDate.setFullYear(year, month - 1, day)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
+                  {formatDate(dueDate)}
                 </div>
                 <div
-                  onClick={() => isMobile && setShowTimePicker(!showTimePicker)}
+                  onClick={() => setShowTimePicker(!showTimePicker)}
                   style={{
                     flex: 1,
                     padding: '10px 12px',
@@ -496,40 +472,18 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {isMobile ? (
-                    formatTime(dueDate)
-                  ) : (
-                    <input
-                      type="time"
-                      value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
-                      onChange={(e) => {
-                        const timeParts = e.target.value.split(':').map(Number)
-                        const hours = timeParts[0] ?? 0
-                        const minutes = timeParts[1] ?? 0
-                        const newDate = new Date(dueDate)
-                        newDate.setHours(hours, minutes)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
+                  {formatTime(dueDate)}
                 </div>
               </div>
 
-              {/* Inline Time Picker for Mobile */}
-              {isMobile && showTimePicker && (
+              {/* Inline Time Picker */}
+              {showTimePicker && (
                 <div style={{
                   marginTop: '8px',
                   background: colors.bgPrimary,
@@ -634,9 +588,20 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
             gap: '12px',
             marginTop: '8px',
             justifyContent: 'flex-end',
+            alignItems: 'center',
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
+            {task && onDelete && (
+              <DeleteTextButton
+                onClick={async (e) => {
+                  e.preventDefault()
+                  await onDelete()
+                  onClose()
+                }}
+              />
+            )}
+            <div style={{ flex: 1 }} />
             <SaveTextButton
               onClick={(e) => handleSubmit(e)}
               disabled={!title.trim()}
@@ -652,8 +617,8 @@ export function TaskForm({ task, isOpen, onClose, onSave }: TaskFormProps) {
         onSave={handleCreateAspect}
       />
 
-      {/* Mobile Date Picker */}
-      {isMobile && dueDate && (
+      {/* Date Picker */}
+      {dueDate && (
         <DatePickerMobile
           value={dueDate}
           onChange={setDueDate}

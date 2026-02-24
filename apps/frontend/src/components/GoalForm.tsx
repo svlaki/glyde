@@ -11,8 +11,7 @@ import { fontSize, fontWeight } from '../styles/typography'
 import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
-import { usePlatform } from '../hooks/usePlatform'
-import { SaveTextButton } from './ui/IconButtons'
+import { SaveTextButton, DeleteTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -43,14 +42,14 @@ interface GoalFormProps {
   isOpen: boolean
   onClose: () => void
   onSave: (goal: Partial<Goal>) => Promise<void>
+  onDelete?: (() => Promise<void>) | undefined
 }
 
-export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
+export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const { aspects, refreshAspects, getAspectColor } = useAspects()
-  const { isMobile } = usePlatform()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
@@ -64,6 +63,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [milestoneDatePickerIndex, setMilestoneDatePickerIndex] = useState<number | null>(null)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -446,7 +446,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
               <>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div
-                  onClick={() => isMobile && setShowDatePicker(true)}
+                  onClick={() => setShowDatePicker(true)}
                   style={{
                     flex: 1,
                     padding: '10px 12px',
@@ -455,7 +455,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -463,33 +463,10 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                   }}
                 >
                   <span>Due</span>
-                  {isMobile ? (
-                    formatDate(dueDate)
-                  ) : (
-                    <input
-                      type="date"
-                      value={dueDate.toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        const newDate = new Date(dueDate)
-                        const parts = e.target.value.split('-').map(Number)
-                        const year = parts[0] ?? 0
-                        const month = parts[1] ?? 1
-                        const day = parts[2] ?? 1
-                        newDate.setFullYear(year, month - 1, day)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
+                  {formatDate(dueDate)}
                 </div>
                 <div
-                  onClick={() => isMobile && setShowTimePicker(!showTimePicker)}
+                  onClick={() => setShowTimePicker(!showTimePicker)}
                   style={{
                     flex: 1,
                     padding: '10px 12px',
@@ -498,40 +475,18 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                     border: `1px solid ${colors.border}`,
                     borderRadius: '6px',
                     color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {isMobile ? (
-                    formatTime(dueDate)
-                  ) : (
-                    <input
-                      type="time"
-                      value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
-                      onChange={(e) => {
-                        const timeParts = e.target.value.split(':').map(Number)
-                        const hours = timeParts[0] ?? 0
-                        const minutes = timeParts[1] ?? 0
-                        const newDate = new Date(dueDate)
-                        newDate.setHours(hours, minutes)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
+                  {formatTime(dueDate)}
                 </div>
               </div>
 
-              {/* Inline Time Picker for Mobile */}
-              {isMobile && showTimePicker && (
+              {/* Inline Time Picker */}
+              {showTimePicker && (
                 <div style={{
                   marginTop: '8px',
                   background: colors.bgPrimary,
@@ -741,20 +696,38 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       }}
                     />
                     {milestoneType === 'dated' && (
-                      <input
-                        type="date"
-                        value={milestone.due_date || ''}
-                        onChange={(e) => updateMilestone(index, 'due_date', e.target.value)}
-                        style={{
-                          padding: '8px 10px',
-                          fontSize: fontSize.sm,
-                          background: colors.bgPrimary,
-                          color: colors.textPrimary,
-                          border: `1px solid ${colors.border}`,
-                          borderRadius: '4px',
-                          width: '140px'
-                        }}
-                      />
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setMilestoneDatePickerIndex(index)}
+                          style={{
+                            padding: '8px 10px',
+                            fontSize: fontSize.sm,
+                            background: colors.bgPrimary,
+                            color: milestone.due_date ? colors.textPrimary : colors.textTertiary,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: '4px',
+                            width: '140px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {milestone.due_date
+                            ? new Date(milestone.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                            : 'Set date'}
+                        </button>
+                        <DatePickerMobile
+                          value={milestone.due_date ? new Date(milestone.due_date + 'T00:00:00') : new Date()}
+                          onChange={(date) => {
+                            const yyyy = date.getFullYear()
+                            const mm = String(date.getMonth() + 1).padStart(2, '0')
+                            const dd = String(date.getDate()).padStart(2, '0')
+                            updateMilestone(index, 'due_date', `${yyyy}-${mm}-${dd}`)
+                          }}
+                          isOpen={milestoneDatePickerIndex === index}
+                          onClose={() => setMilestoneDatePickerIndex(null)}
+                        />
+                      </>
                     )}
                     <button
                       type="button"
@@ -799,10 +772,20 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             gap: '12px',
             marginTop: '8px',
             justifyContent: 'flex-end',
+            alignItems: 'center',
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            
+            {goal && onDelete && (
+              <DeleteTextButton
+                onClick={async (e) => {
+                  e.preventDefault()
+                  await onDelete()
+                  onClose()
+                }}
+              />
+            )}
+            <div style={{ flex: 1 }} />
             <SaveTextButton
               onClick={(e) => handleSubmit(e)}
               disabled={!title.trim()}
@@ -819,8 +802,8 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         onSave={handleCreateAspect}
       />
 
-      {/* Mobile Date Picker */}
-      {isMobile && dueDate && (
+      {/* Date Picker */}
+      {dueDate && (
         <DatePickerMobile
           value={dueDate}
           onChange={setDueDate}

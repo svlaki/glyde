@@ -598,7 +598,21 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   useEffect(() => {
     if (!scrollToDate || view !== '3day' || !scrollContainerRef.current) return
 
-    // Stop momentum and reset gesture state before repositioning
+    const scrollToTime = new Date(scrollToDate).setHours(0, 0, 0, 0)
+    const currentTime = new Date(currentDate).setHours(0, 0, 0, 0)
+    const daysDiff = Math.round((scrollToTime - currentTime) / (1000 * 60 * 60 * 24))
+
+    if (Math.abs(daysDiff) > 31) return // Out of buffer range
+
+    const targetIndex = 31 + daysDiff
+    const containerWidth = scrollContainerRef.current.clientWidth
+    const colWidth = (containerWidth - 40) / 3
+    const targetScrollLeft = targetIndex * colWidth
+
+    // Skip if already at the target position (prevents stale re-fires from disrupting gestures)
+    if (Math.abs(scrollContainerRef.current.scrollLeft - targetScrollLeft) < colWidth * 0.5) return
+
+    // Only reset gesture state when we're actually going to move the scroll
     const gesture = scrollGestureRef.current
     if (gesture.momentumRafId) {
       cancelAnimationFrame(gesture.momentumRafId)
@@ -613,30 +627,13 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     gesture.velocityX = 0
     gesture.velocityY = 0
 
-    // Calculate days difference from buffer center (currentDate is at index 31)
-    const scrollToTime = new Date(scrollToDate).setHours(0, 0, 0, 0)
-    const currentTime = new Date(currentDate).setHours(0, 0, 0, 0)
-    const daysDiff = Math.round((scrollToTime - currentTime) / (1000 * 60 * 60 * 24))
-
-    // Check if the target date is within the buffer (±31 days)
-    if (Math.abs(daysDiff) <= 31) {
-      // Target date index = 31 (center) + daysDiff
-      const targetIndex = 31 + daysDiff
-
-      requestAnimationFrame(() => {
-        if (!scrollContainerRef.current) return
-        const containerWidth = scrollContainerRef.current.clientWidth
-        const colWidth = (containerWidth - 40) / 3
-
-        // Instant scroll to position this date at the left-most column
-        scrollContainerRef.current.scrollLeft = targetIndex * colWidth
-
-        // Update display date
-        if (onDisplayDateChange) {
-          onDisplayDateChange(scrollToDate)
-        }
-      })
-    }
+    requestAnimationFrame(() => {
+      if (!scrollContainerRef.current) return
+      scrollContainerRef.current.scrollLeft = targetScrollLeft
+      if (onDisplayDateChange) {
+        onDisplayDateChange(scrollToDate)
+      }
+    })
   }, [scrollToDate, view, currentDate, onDisplayDateChange])
 
   const handleDayClick = (date: Date) => {

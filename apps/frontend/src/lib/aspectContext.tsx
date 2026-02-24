@@ -8,6 +8,7 @@ interface AspectContextType {
   loading: boolean
   error: string | null
   refreshAspects: () => Promise<void>
+  setAspectsLocal: (aspects: Aspect[]) => void
   getAspectById: (id: string) => Aspect | undefined
   getAspectByName: (name: string) => Aspect | undefined
   getAspectColor: (nameOrId: string) => string
@@ -131,6 +132,7 @@ export function AspectProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     refreshAspects: loadAspects,
+    setAspectsLocal: setAspects,
     getAspectById,
     getAspectByName,
     getAspectColor

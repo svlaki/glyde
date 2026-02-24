@@ -9,6 +9,7 @@ import { fetchUserProfile, updateProfileField, UserProfile } from '../lib/profil
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { MobileHeader } from '../components/mobile/MobileHeader'
 import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
+import { DatePickerMobile } from '../components/mobile/DatePickerMobile'
 
 export function ProfileEditPage() {
   const { isMobile } = usePlatform()
@@ -69,6 +70,7 @@ function EditableField({ label, value, field, onSave, type = 'text', colors, typ
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -107,7 +109,22 @@ function EditableField({ label, value, field, onSave, type = 'text', colors, typ
     }
   }
 
+  const handleDateSave = async (dateStr: string) => {
+    setSaving(true)
+    try {
+      await onSave(field, dateStr || null)
+    } catch (err) {
+      // revert on error
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+
+  const displayValue = type === 'date' && value
+    ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : value
 
   return (
     <div style={{
@@ -126,7 +143,43 @@ function EditableField({ label, value, field, onSave, type = 'text', colors, typ
       }}>
         {label}
       </span>
-      {isEditing ? (
+      {type === 'date' ? (
+        <>
+          <button
+            onClick={() => setShowDatePicker(true)}
+            disabled={saving}
+            style={{
+              flex: 1,
+              padding: '6px 10px',
+              background: 'transparent',
+              color: value ? colors.textPrimary : colors.textTertiary,
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              textAlign: 'right',
+              borderRadius: '6px',
+              transition: 'background 0.15s',
+              maxWidth: '220px',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = colors.bgHover }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            {displayValue || 'Tap to add'}
+          </button>
+          <DatePickerMobile
+            value={value ? new Date(value + 'T00:00:00') : new Date(2000, 0, 1)}
+            onChange={(date) => {
+              const yyyy = date.getFullYear()
+              const mm = String(date.getMonth() + 1).padStart(2, '0')
+              const dd = String(date.getDate()).padStart(2, '0')
+              handleDateSave(`${yyyy}-${mm}-${dd}`)
+            }}
+            isOpen={showDatePicker}
+            onClose={() => setShowDatePicker(false)}
+          />
+        </>
+      ) : isEditing ? (
         <input
           ref={inputRef}
           type={type}

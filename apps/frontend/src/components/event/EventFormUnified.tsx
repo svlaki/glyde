@@ -562,122 +562,93 @@ export function EventFormUnified({
             {/* Date */}
             <div>
               <FormLabel>Date *</FormLabel>
-              {isMobile ? (
-                <div
-                  onClick={() => form.setShowDatePicker(true)}
-                  style={{
-                    ...inputStyle,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  {form.formatDateDisplay(form.startDate)}
-                </div>
-              ) : (
-                <input
-                  type="date"
-                  value={form.formatDateForInput(form.startDate)}
-                  required
-                  onChange={(e) => form.handleDateChange(e.target.value, true)}
-                  style={inputStyle}
-                />
-              )}
+              <div
+                onClick={() => form.setShowDatePicker(true)}
+                style={{
+                  ...inputStyle,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                {form.formatDateDisplay(form.startDate)}
+              </div>
             </div>
 
             {/* Time: Start -> End */}
             <div>
               <FormLabel>Time *</FormLabel>
-              {isMobile ? (
-                <div>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <div
-                      onClick={() => {
-                        form.setShowStartTimePicker(!form.showStartTimePicker)
-                        form.setShowEndTimePicker(false)
-                      }}
-                      style={{
-                        ...inputStyle,
-                        flex: 1,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        background: form.showStartTimePicker ? colors.bgHover : colors.bgTertiary
-                      }}
-                    >
-                      {form.formatTimeDisplay(form.startDate)}
-                    </div>
-                    <span style={{ color: colors.textTertiary, fontSize: fontSize.base, flexShrink: 0 }}>to</span>
-                    <div
-                      onClick={() => {
-                        form.setShowEndTimePicker(!form.showEndTimePicker)
-                        form.setShowStartTimePicker(false)
-                      }}
-                      style={{
-                        ...inputStyle,
-                        flex: 1,
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        background: form.showEndTimePicker ? colors.bgHover : colors.bgTertiary
-                      }}
-                    >
-                      {form.formatTimeDisplay(form.endDate)}
-                    </div>
-                  </div>
-
-                  {form.showStartTimePicker && (
-                    <div style={{ marginTop: '8px' }}>
-                      <TimePickerSlider
-                        value={form.startTimeValue}
-                        onChange={(val) => {
-                          form.setStartTimeValue(val)
-                          form.setStartDate(pickerValueToDate(val, form.startDate))
-                        }}
-                        height={150}
-                        itemHeight={36}
-                        backgroundColor={colors.bgPrimary}
-                        borderColor={colors.border}
-                        textColor={colors.textSecondary}
-                        selectedTextColor={colors.textPrimary}
-                      />
-                    </div>
-                  )}
-
-                  {form.showEndTimePicker && (
-                    <div style={{ marginTop: '8px' }}>
-                      <TimePickerSlider
-                        value={form.endTimeValue}
-                        onChange={(val) => {
-                          form.setEndTimeValue(val)
-                          form.setEndDate(pickerValueToDate(val, form.endDate))
-                        }}
-                        height={150}
-                        itemHeight={36}
-                        backgroundColor={colors.bgPrimary}
-                        borderColor={colors.border}
-                        textColor={colors.textSecondary}
-                        selectedTextColor={colors.textPrimary}
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
+              <div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input
-                    type="time"
-                    value={form.formatTimeForInput(form.startDate)}
-                    onChange={(e) => form.handleTimeChange(e.target.value, true)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
+                  <div
+                    onClick={() => {
+                      form.setShowStartTimePicker(!form.showStartTimePicker)
+                      form.setShowEndTimePicker(false)
+                    }}
+                    style={{
+                      ...inputStyle,
+                      flex: 1,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: form.showStartTimePicker ? colors.bgHover : colors.bgTertiary
+                    }}
+                  >
+                    {form.formatTimeDisplay(form.startDate)}
+                  </div>
                   <span style={{ color: colors.textTertiary, fontSize: fontSize.base, flexShrink: 0 }}>to</span>
-                  <input
-                    type="time"
-                    value={form.formatTimeForInput(form.endDate)}
-                    onChange={(e) => form.handleTimeChange(e.target.value, false)}
-                    style={{ ...inputStyle, flex: 1 }}
-                    required
-                  />
+                  <div
+                    onClick={() => {
+                      form.setShowEndTimePicker(!form.showEndTimePicker)
+                      form.setShowStartTimePicker(false)
+                    }}
+                    style={{
+                      ...inputStyle,
+                      flex: 1,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: form.showEndTimePicker ? colors.bgHover : colors.bgTertiary
+                    }}
+                  >
+                    {form.formatTimeDisplay(form.endDate)}
+                  </div>
                 </div>
-              )}
+
+                {form.showStartTimePicker && (
+                  <div style={{ marginTop: '8px' }}>
+                    <TimePickerSlider
+                      value={form.startTimeValue}
+                      onChange={(val) => {
+                        form.setStartTimeValue(val)
+                        form.setStartDate(pickerValueToDate(val, form.startDate))
+                      }}
+                      height={150}
+                      itemHeight={36}
+                      backgroundColor={colors.bgPrimary}
+                      borderColor={colors.border}
+                      textColor={colors.textSecondary}
+                      selectedTextColor={colors.textPrimary}
+                    />
+                  </div>
+                )}
+
+                {form.showEndTimePicker && (
+                  <div style={{ marginTop: '8px' }}>
+                    <TimePickerSlider
+                      value={form.endTimeValue}
+                      onChange={(val) => {
+                        form.setEndTimeValue(val)
+                        form.setEndDate(pickerValueToDate(val, form.endDate))
+                      }}
+                      height={150}
+                      itemHeight={36}
+                      backgroundColor={colors.bgPrimary}
+                      borderColor={colors.border}
+                      textColor={colors.textSecondary}
+                      selectedTextColor={colors.textPrimary}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Repeat */}
@@ -869,23 +840,21 @@ export function EventFormUnified({
         </form>
       </Modal>
 
-      {/* Mobile Date Picker */}
-      {isMobile && (
-        <DatePickerMobile
-          value={form.startDate}
-          onChange={(newDate) => {
-            const newStart = new Date(form.startDate)
-            newStart.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
-            form.setStartDate(newStart)
+      {/* Date Picker */}
+      <DatePickerMobile
+        value={form.startDate}
+        onChange={(newDate) => {
+          const newStart = new Date(form.startDate)
+          newStart.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+          form.setStartDate(newStart)
 
-            const newEnd = new Date(form.endDate)
-            newEnd.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
-            form.setEndDate(newEnd)
-          }}
-          isOpen={form.showDatePicker}
-          onClose={() => form.setShowDatePicker(false)}
-        />
-      )}
+          const newEnd = new Date(form.endDate)
+          newEnd.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+          form.setEndDate(newEnd)
+        }}
+        isOpen={form.showDatePicker}
+        onClose={() => form.setShowDatePicker(false)}
+      />
 
       {/* Scope Dialog for recurring events */}
       {scopeDialogAction && (

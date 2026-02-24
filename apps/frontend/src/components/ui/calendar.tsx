@@ -18,30 +18,26 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       fixedWeeks={fixedWeeks}
-      className={cn("p-4 w-full min-w-[280px]", className)}
+      className={cn("p-4 w-full min-w-[310px]", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4 relative",
-        month_caption: "flex justify-center items-center pt-1 mb-4 h-8",
-        caption_label: "text-sm font-medium",
-        nav: "absolute top-0 left-0 right-0 flex justify-between items-center",
-        button_previous: cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-0"
-        ),
-        button_next: cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border-0"
-        ),
+        month_caption: "flex justify-center items-center h-15 mb-2",
+        caption_label: "text-base font-semibold",
+        nav: "absolute top-0 left-0 right-0 flex justify-between items-center h-10 z-10",
+        button_previous:
+          "h-12 w-12 hover:bg-red-600 text-white p-0 border-0 rounded-full flex items-center justify-center overflow-visible",
+        button_next:
+          "h-12 w-12 hover:bg-red-600 text-white p-0 border-0 rounded-full flex items-center justify-center overflow-visible",
         month_grid: "w-full border-collapse",
         weekdays: "grid grid-cols-7 mb-1",
         weekday:
-          "text-muted-foreground font-normal text-[0.8rem] text-center py-1",
+          "text-muted-foreground font-medium text-sm text-center py-1.5",
         week: "grid grid-cols-7",
-        day: "relative p-0.5 text-center text-sm focus-within:relative focus-within:z-20",
+        day: "relative p-0.5 text-center text-base focus-within:relative focus-within:z-20",
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 mx-auto"
+          "h-10 w-10 p-0 font-normal text-base aria-selected:opacity-100 mx-auto"
         ),
         range_start: "day-range-start",
         range_end: "day-range-end",
@@ -59,9 +55,9 @@ function Calendar({
       components={{
         Chevron: ({ orientation }) => {
           if (orientation === "left") {
-            return <ChevronLeft className="h-5 w-5" />
+            return <ChevronLeft className="h-7 w-7 text-black" />
           }
-          return <ChevronRight className="h-5 w-5" />
+          return <ChevronRight className="h-7 w-7 text-black" />
         },
       }}
       {...props}
