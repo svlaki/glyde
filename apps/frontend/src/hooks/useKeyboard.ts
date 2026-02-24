@@ -1,4 +1,5 @@
 import { useState, useEffect, useContext, createContext, ReactNode, createElement } from 'react'
+import { Capacitor } from '@capacitor/core'
 
 interface KeyboardState {
   isKeyboardOpen: boolean
@@ -24,6 +25,9 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
   const isKeyboardOpen = keyboardHeight > 0
 
   useEffect(() => {
+    // Skip keyboard detection on web — no virtual keyboard
+    if (!Capacitor.isNativePlatform()) return
+
     // DEBUG: log to confirm the effect ran — check Safari Web Inspector console
     console.log('[useKeyboard] effect mounted, setting up listeners')
     console.log('[useKeyboard] ontouchstart:', 'ontouchstart' in window)

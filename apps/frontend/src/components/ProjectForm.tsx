@@ -7,6 +7,8 @@ import { Modal } from './Modal'
 import { useTheme } from '../lib/themeContext'
 import { SaveTextButton, CancelTextButton } from './ui/IconButtons'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
+import { DatePickerWeb } from './ui/date-time-picker-web'
+import { usePlatform } from '../hooks/usePlatform'
 
 interface ProjectFormProps {
   project?: Project | undefined
@@ -26,6 +28,7 @@ export interface ProjectFormData {
 export function ProjectForm({ project, isOpen, onClose, onSave }: ProjectFormProps) {
   const { theme } = useTheme()
   const colors = getColors(theme)
+  const { isMobile } = usePlatform()
   const { aspects } = useAspects()
   const [name, setName] = useState('')
   const [aspectId, setAspectId] = useState('')
@@ -183,36 +186,60 @@ export function ProjectForm({ project, isOpen, onClose, onSave }: ProjectFormPro
             }}>
               Deadline (optional)
             </label>
-            <button
-              type="button"
-              onClick={() => setShowDeadlinePicker(true)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                fontSize: fontSize.base,
-                background: colors.bgPrimary,
-                color: deadline ? colors.textPrimary : colors.textTertiary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                textAlign: 'left',
-                cursor: 'pointer',
-              }}
-            >
-              {deadline
-                ? new Date(deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                : 'Select deadline'}
-            </button>
-            <DatePickerMobile
-              value={deadline ? new Date(deadline + 'T00:00:00') : new Date()}
-              onChange={(date) => {
-                const yyyy = date.getFullYear()
-                const mm = String(date.getMonth() + 1).padStart(2, '0')
-                const dd = String(date.getDate()).padStart(2, '0')
-                setDeadline(`${yyyy}-${mm}-${dd}`)
-              }}
-              isOpen={showDeadlinePicker}
-              onClose={() => setShowDeadlinePicker(false)}
-            />
+            {isMobile ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowDeadlinePicker(true)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: fontSize.base,
+                    background: colors.bgPrimary,
+                    color: deadline ? colors.textPrimary : colors.textTertiary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {deadline
+                    ? new Date(deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                    : 'Select deadline'}
+                </button>
+                <DatePickerMobile
+                  value={deadline ? new Date(deadline + 'T00:00:00') : new Date()}
+                  onChange={(date) => {
+                    const yyyy = date.getFullYear()
+                    const mm = String(date.getMonth() + 1).padStart(2, '0')
+                    const dd = String(date.getDate()).padStart(2, '0')
+                    setDeadline(`${yyyy}-${mm}-${dd}`)
+                  }}
+                  isOpen={showDeadlinePicker}
+                  onClose={() => setShowDeadlinePicker(false)}
+                />
+              </>
+            ) : (
+              <DatePickerWeb
+                value={deadline ? new Date(deadline + 'T00:00:00') : new Date()}
+                onChange={(date) => {
+                  const yyyy = date.getFullYear()
+                  const mm = String(date.getMonth() + 1).padStart(2, '0')
+                  const dd = String(date.getDate()).padStart(2, '0')
+                  setDeadline(`${yyyy}-${mm}-${dd}`)
+                }}
+                colors={colors}
+                inputStyle={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: fontSize.base,
+                  background: colors.bgPrimary,
+                  color: deadline ? colors.textPrimary : colors.textTertiary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                }}
+              />
+            )}
           </div>
         </div>
 

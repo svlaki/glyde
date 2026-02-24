@@ -56,6 +56,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const colors = getColors(resolveTheme(family, mode))
     document.documentElement.style.backgroundColor = colors.bgSecondary
     document.body.style.backgroundColor = colors.bgSecondary
+
+    // Sync key CSS variables so shadcn components (calendar, popover, etc.) match the theme
+    const root = document.documentElement
+    root.style.setProperty('--color-background', colors.bgPrimary)
+    root.style.setProperty('--color-foreground', colors.textPrimary)
+    root.style.setProperty('--color-muted', colors.bgTertiary)
+    root.style.setProperty('--color-muted-foreground', colors.textTertiary)
+    root.style.setProperty('--color-popover', colors.bgPrimary)
+    root.style.setProperty('--color-popover-foreground', colors.textPrimary)
+    root.style.setProperty('--color-border', colors.border)
+    root.style.setProperty('--color-input', colors.border)
+    root.style.setProperty('--color-primary', colors.accent)
+    root.style.setProperty('--color-primary-foreground', colors.bgPrimary)
+    root.style.setProperty('--color-accent', colors.bgHover)
+    root.style.setProperty('--color-accent-foreground', colors.textPrimary)
   }, [family, mode])
 
   const theme = resolveTheme(family, mode)

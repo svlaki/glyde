@@ -11,6 +11,8 @@ import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
+import { DatePickerWeb, TimeInputWeb } from './ui/date-time-picker-web'
+import { usePlatform } from '../hooks/usePlatform'
 import { SaveTextButton, DeleteTextButton } from './ui/IconButtons'
 
 // Time picker options
@@ -49,6 +51,7 @@ export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormPr
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
+  const { isMobile } = usePlatform()
   const { aspects, refreshAspects } = useAspects()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -440,116 +443,153 @@ export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormPr
             </div>
 
             {hasDueDate && dueDate && (
-              <>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div
-                  onClick={() => setShowDatePicker(true)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    fontSize: fontSize.base,
-                    background: colors.bgPrimary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    color: colors.textPrimary,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <span>Due</span>
-                  {formatDate(dueDate)}
-                </div>
-                <div
-                  onClick={() => setShowTimePicker(!showTimePicker)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    fontSize: fontSize.base,
-                    background: showTimePicker ? colors.bgHover : colors.bgPrimary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    color: colors.textPrimary,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {formatTime(dueDate)}
-                </div>
-              </div>
-
-              {/* Inline Time Picker */}
-              {showTimePicker && (
-                <div style={{
-                  marginTop: '8px',
-                  background: colors.bgPrimary,
-                  borderRadius: '8px',
-                  border: `1px solid ${colors.border}`,
-                  overflow: 'hidden'
-                }}>
-                  <Picker
-                    value={timePickerValue}
-                    onChange={(val) => {
-                      setTimePickerValue(val)
-                      setDueDate(pickerValueToDate(val, dueDate))
+              isMobile ? (
+                <>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div
+                    onClick={() => setShowDatePicker(true)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      fontSize: fontSize.base,
+                      background: colors.bgPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      color: colors.textPrimary,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
                     }}
-                    height={150}
-                    itemHeight={36}
-                    wheelMode="natural"
                   >
-                    <Picker.Column name="hour">
-                      {HOURS.map(h => (
-                        <Picker.Item key={h} value={h}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {h}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                    <Picker.Column name="minute">
-                      {MINUTES.map(m => (
-                        <Picker.Item key={m} value={m}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {m}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                    <Picker.Column name="period">
-                      {PERIODS.map(p => (
-                        <Picker.Item key={p} value={p}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {p}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                  </Picker>
+                    <span>Due</span>
+                    {formatDate(dueDate)}
+                  </div>
+                  <div
+                    onClick={() => setShowTimePicker(!showTimePicker)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      fontSize: fontSize.base,
+                      background: showTimePicker ? colors.bgHover : colors.bgPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      color: colors.textPrimary,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {formatTime(dueDate)}
+                  </div>
                 </div>
-              )}
-              </>
+
+                {/* Inline Time Picker */}
+                {showTimePicker && (
+                  <div style={{
+                    marginTop: '8px',
+                    background: colors.bgPrimary,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border}`,
+                    overflow: 'hidden'
+                  }}>
+                    <Picker
+                      value={timePickerValue}
+                      onChange={(val) => {
+                        setTimePickerValue(val)
+                        setDueDate(pickerValueToDate(val, dueDate))
+                      }}
+                      height={150}
+                      itemHeight={36}
+                      wheelMode="natural"
+                    >
+                      <Picker.Column name="hour">
+                        {HOURS.map(h => (
+                          <Picker.Item key={h} value={h}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {h}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                      <Picker.Column name="minute">
+                        {MINUTES.map(m => (
+                          <Picker.Item key={m} value={m}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {m}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                      <Picker.Column name="period">
+                        {PERIODS.map(p => (
+                          <Picker.Item key={p} value={p}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {p}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                    </Picker>
+                  </div>
+                )}
+                </>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <DatePickerWeb
+                      value={dueDate}
+                      onChange={setDueDate}
+                      colors={colors}
+                      inputStyle={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: fontSize.base,
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <TimeInputWeb
+                      value={dueDate}
+                      onChange={setDueDate}
+                      colors={colors}
+                      inputStyle={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: fontSize.base,
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </div>
+                </div>
+              )
             )}
           </div>
 
@@ -617,8 +657,8 @@ export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormPr
         onSave={handleCreateAspect}
       />
 
-      {/* Date Picker */}
-      {dueDate && (
+      {/* Date Picker (mobile only) */}
+      {isMobile && dueDate && (
         <DatePickerMobile
           value={dueDate}
           onChange={setDueDate}

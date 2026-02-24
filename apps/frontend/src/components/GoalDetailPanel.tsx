@@ -300,7 +300,7 @@ export function GoalDetailPanel({ goal, onEdit, onDelete, onUpdate }: GoalDetail
                       transition: 'all 0.15s ease',
                       fontSize: fontSize.xs,
                       fontWeight: fontWeight.semibold,
-                      color: milestone.completed ? '#fff' : colors.textSecondary
+                      color: milestone.completed ? colors.bgPrimary : colors.textSecondary
                     }}>
                       {milestone.completed ? (
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">

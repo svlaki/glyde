@@ -4,6 +4,8 @@ import { getColors } from '../../styles/colors'
 import { fontSize, fontWeight } from '../../styles/typography'
 import { RecurrenceState } from './useEventFormState'
 import { DatePickerMobile } from '../mobile/DatePickerMobile'
+import { DatePickerWeb } from '../ui/date-time-picker-web'
+import { usePlatform } from '../../hooks/usePlatform'
 
 interface RecurrencePopoverProps {
   isOpen: boolean
@@ -24,6 +26,7 @@ export function RecurrencePopover({
 }: RecurrencePopoverProps) {
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
+  const { isMobile } = usePlatform()
   const popoverRef = useRef<HTMLDivElement>(null)
   const [showUntilDatePicker, setShowUntilDatePicker] = useState(false)
 
@@ -207,22 +210,36 @@ export function RecurrencePopover({
           </>
         )}
         {value.endType === 'until' && (
-          <>
-            <button
-              type="button"
-              onClick={() => setShowUntilDatePicker(true)}
-              style={{
-                ...compactInput,
-                textAlign: 'left' as const,
-                cursor: 'pointer',
-                color: value.untilDate ? colors.textPrimary : colors.textTertiary,
-              }}
-            >
-              {value.untilDate
-                ? new Date(value.untilDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                : 'Select date'}
-            </button>
-            <DatePickerMobile
+          isMobile ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowUntilDatePicker(true)}
+                style={{
+                  ...compactInput,
+                  textAlign: 'left' as const,
+                  cursor: 'pointer',
+                  color: value.untilDate ? colors.textPrimary : colors.textTertiary,
+                }}
+              >
+                {value.untilDate
+                  ? new Date(value.untilDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Select date'}
+              </button>
+              <DatePickerMobile
+                value={value.untilDate ? new Date(value.untilDate + 'T00:00:00') : new Date()}
+                onChange={(date) => {
+                  const yyyy = date.getFullYear()
+                  const mm = String(date.getMonth() + 1).padStart(2, '0')
+                  const dd = String(date.getDate()).padStart(2, '0')
+                  update({ untilDate: `${yyyy}-${mm}-${dd}` })
+                }}
+                isOpen={showUntilDatePicker}
+                onClose={() => setShowUntilDatePicker(false)}
+              />
+            </>
+          ) : (
+            <DatePickerWeb
               value={value.untilDate ? new Date(value.untilDate + 'T00:00:00') : new Date()}
               onChange={(date) => {
                 const yyyy = date.getFullYear()
@@ -230,10 +247,15 @@ export function RecurrencePopover({
                 const dd = String(date.getDate()).padStart(2, '0')
                 update({ untilDate: `${yyyy}-${mm}-${dd}` })
               }}
-              isOpen={showUntilDatePicker}
-              onClose={() => setShowUntilDatePicker(false)}
+              colors={colors}
+              inputStyle={{
+                ...compactInput,
+                textAlign: 'left' as const,
+                cursor: 'pointer',
+                color: value.untilDate ? colors.textPrimary : colors.textTertiary,
+              }}
             />
-          </>
+          )
         )}
       </div>
 

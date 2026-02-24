@@ -26,9 +26,9 @@ function Calendar({
         caption_label: "text-base font-semibold",
         nav: "absolute top-0 left-0 right-0 flex justify-between items-center h-10 z-10",
         button_previous:
-          "h-12 w-12 hover:bg-red-600 text-white p-0 border-0 rounded-full flex items-center justify-center overflow-visible",
+          "h-12 w-12 p-0 border-0 rounded-full flex items-center justify-center overflow-visible hover:bg-accent hover:text-accent-foreground",
         button_next:
-          "h-12 w-12 hover:bg-red-600 text-white p-0 border-0 rounded-full flex items-center justify-center overflow-visible",
+          "h-12 w-12 p-0 border-0 rounded-full flex items-center justify-center overflow-visible hover:bg-accent hover:text-accent-foreground",
         month_grid: "w-full border-collapse",
         weekdays: "grid grid-cols-7 mb-1",
         weekday:
@@ -43,7 +43,7 @@ function Calendar({
         range_end: "day-range-end",
         selected:
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-full",
-        today: "bg-red-500 text-white rounded-full hover:bg-red-500 hover:text-white",
+        today: "bg-primary text-primary-foreground rounded-full hover:bg-primary hover:text-primary-foreground",
         outside:
           "day-outside text-muted-foreground aria-selected:bg-accent/50 aria-selected:text-muted-foreground opacity-50",
         disabled: "text-muted-foreground opacity-50",
@@ -55,9 +55,9 @@ function Calendar({
       components={{
         Chevron: ({ orientation }) => {
           if (orientation === "left") {
-            return <ChevronLeft className="h-7 w-7 text-black" />
+            return <ChevronLeft className="h-7 w-7 text-foreground" />
           }
-          return <ChevronRight className="h-7 w-7 text-black" />
+          return <ChevronRight className="h-7 w-7 text-foreground" />
         },
       }}
       {...props}
