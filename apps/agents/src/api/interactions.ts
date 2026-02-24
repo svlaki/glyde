@@ -57,6 +57,16 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       return res.json({ success: true, message: 'Interaction dismissed' });
     }
 
+    // DECLINE PATH: If user said no/skip/decline, cancel without routing to Gerald
+    // Gerald ignores "do nothing" instructions and creates things anyway, so we short-circuit here
+    const declinePatterns = /^(no|no thanks|nah|skip|not now|no,|nope|not today|pass|dismiss|cancel)/i;
+    if (declinePatterns.test(trimmedResponse)) {
+      console.log(`[INTERACTION RESPONSE] User declined interaction ${interactionId}: "${trimmedResponse}"`);
+      await supabaseService.saveInteractionResponse(userId, interactionId, trimmedResponse);
+      await supabaseService.updateInteractionStatus(interactionId, 'responded');
+      return res.json({ success: true, message: 'Response recorded' });
+    }
+
     // Save the response to database
     const saved = await supabaseService.saveInteractionResponse(userId, interactionId, trimmedResponse);
     if (!saved) {
