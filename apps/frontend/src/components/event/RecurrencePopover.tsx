@@ -1,8 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { fontSize, fontWeight } from '../../styles/typography'
 import { RecurrenceState } from './useEventFormState'
+import { DatePickerMobile } from '../mobile/DatePickerMobile'
+import { DatePickerWeb } from '../ui/date-time-picker-web'
+import { usePlatform } from '../../hooks/usePlatform'
 
 interface RecurrencePopoverProps {
   isOpen: boolean
@@ -23,7 +26,9 @@ export function RecurrencePopover({
 }: RecurrencePopoverProps) {
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
+  const { isMobile } = usePlatform()
   const popoverRef = useRef<HTMLDivElement>(null)
+  const [showUntilDatePicker, setShowUntilDatePicker] = useState(false)
 
   // Click-outside to close
   useEffect(() => {
@@ -127,30 +132,36 @@ export function RecurrencePopover({
 
       {/* Days of week (weekly only) — inline: label + day pills */}
       {value.pattern === 'weekly' && (
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <span style={inlineLabel}>On</span>
-          {dayOptions.map((day) => (
-            <button
-              key={day.value}
-              type="button"
-              onClick={() => toggleDay(day.value)}
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                border: `1px solid ${value.daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
-                background: value.daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
-                color: value.daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
-                fontSize: fontSize.xs,
-                fontWeight: fontWeight.semibold,
-                cursor: 'pointer',
-                padding: 0,
-                lineHeight: 1
-              }}
-            >
-              {day.label}
-            </button>
-          ))}
+          <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
+            {dayOptions.map((day) => (
+              <button
+                key={day.value}
+                type="button"
+                onClick={() => toggleDay(day.value)}
+                style={{
+                  width: '26px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  border: `1px solid ${value.daysOfWeek.includes(day.value) ? colors.textPrimary : colors.border}`,
+                  background: value.daysOfWeek.includes(day.value) ? colors.textPrimary : 'transparent',
+                  color: value.daysOfWeek.includes(day.value) ? colors.bgPrimary : colors.textSecondary,
+                  fontSize: '10px',
+                  fontWeight: fontWeight.semibold,
+                  cursor: 'pointer',
+                  padding: 0,
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -199,12 +210,52 @@ export function RecurrencePopover({
           </>
         )}
         {value.endType === 'until' && (
-          <input
-            type="date"
-            value={value.untilDate}
-            onChange={(e) => update({ untilDate: e.target.value })}
-            style={{ ...compactInput, textAlign: 'left' as const }}
-          />
+          isMobile ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowUntilDatePicker(true)}
+                style={{
+                  ...compactInput,
+                  textAlign: 'left' as const,
+                  cursor: 'pointer',
+                  color: value.untilDate ? colors.textPrimary : colors.textTertiary,
+                }}
+              >
+                {value.untilDate
+                  ? new Date(value.untilDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Select date'}
+              </button>
+              <DatePickerMobile
+                value={value.untilDate ? new Date(value.untilDate + 'T00:00:00') : new Date()}
+                onChange={(date) => {
+                  const yyyy = date.getFullYear()
+                  const mm = String(date.getMonth() + 1).padStart(2, '0')
+                  const dd = String(date.getDate()).padStart(2, '0')
+                  update({ untilDate: `${yyyy}-${mm}-${dd}` })
+                }}
+                isOpen={showUntilDatePicker}
+                onClose={() => setShowUntilDatePicker(false)}
+              />
+            </>
+          ) : (
+            <DatePickerWeb
+              value={value.untilDate ? new Date(value.untilDate + 'T00:00:00') : new Date()}
+              onChange={(date) => {
+                const yyyy = date.getFullYear()
+                const mm = String(date.getMonth() + 1).padStart(2, '0')
+                const dd = String(date.getDate()).padStart(2, '0')
+                update({ untilDate: `${yyyy}-${mm}-${dd}` })
+              }}
+              colors={colors}
+              inputStyle={{
+                ...compactInput,
+                textAlign: 'left' as const,
+                cursor: 'pointer',
+                color: value.untilDate ? colors.textPrimary : colors.textTertiary,
+              }}
+            />
+          )
         )}
       </div>
 

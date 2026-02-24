@@ -19,6 +19,14 @@ export function CalendarMobileWrapper() {
   const [view, setView] = useState<'day' | '3day' | 'month'>('3day')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrollToDate, setScrollToDate] = useState<Date | null>(null)  // For scrolling within buffer
+
+  // Auto-clear scrollToDate after consumption to prevent stale re-fires
+  useEffect(() => {
+    if (scrollToDate) {
+      const timer = setTimeout(() => setScrollToDate(null), 200)
+      return () => clearTimeout(timer)
+    }
+  }, [scrollToDate])
   const [friendsEvents, setFriendsEvents] = useState<CalendarEvent[]>([])
   const [showFriendsEvents, setShowFriendsEvents] = useState(() => {
     const saved = localStorage.getItem('calendar-show-friends-events')

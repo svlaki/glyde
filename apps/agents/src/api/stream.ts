@@ -172,7 +172,8 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
         ? context.conversationHistory : [],
       userProfile: context.userProfile,
       isInternal: false,
-      currentPage: context.currentPage || 'dashboard'
+      currentPage: context.currentPage || 'dashboard',
+      location: context.location || undefined,
     };
 
     // Get conversation agent
@@ -269,6 +270,8 @@ function formatToolName(toolName: string): string {
     'update_goal': 'Updating goal...',
     'delete_goal': 'Deleting goal...',
     'get_goals': 'Loading goals...',
+    'location_search': 'Searching location...',
+    'web_search': 'Searching the web...',
   };
 
   return toolDisplayNames[toolName] || `Running ${toolName.replace(/_/g, ' ')}...`;

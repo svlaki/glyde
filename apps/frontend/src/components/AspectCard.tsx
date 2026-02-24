@@ -34,7 +34,10 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
         borderRadius: '8px',
         cursor: 'pointer',
         transition: 'all 0.2s',
-        borderLeft: `4px solid ${aspectColor}`
+        borderLeft: `4px solid ${aspectColor}`,
+        boxShadow: isSelected
+          ? `0 4px 16px ${hexToRgba(aspectColor, 0.25)}, 0 0 0 1px ${hexToRgba(aspectColor, 0.15)}`
+          : 'none'
       }}
       onMouseEnter={(e) => {
         if (!isSelected) {

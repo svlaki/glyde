@@ -197,7 +197,7 @@ export function EventShareModal({
                       fontSize: fontSize.sm,
                       fontWeight: fontWeight.medium,
                       background: colors.accent,
-                      color: '#fff',
+                      color: colors.bgPrimary,
                       border: 'none',
                       borderRadius: '6px',
                       cursor: 'pointer',

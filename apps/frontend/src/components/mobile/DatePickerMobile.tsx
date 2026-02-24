@@ -36,7 +36,7 @@ export function DatePickerMobile({ value, onChange, isOpen, onClose }: DatePicke
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            background: '#ffffff',
+            background: 'white',
             borderRadius: '12px',
             padding: '16px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',

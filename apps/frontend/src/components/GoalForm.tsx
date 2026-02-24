@@ -11,8 +11,9 @@ import { fontSize, fontWeight } from '../styles/typography'
 import { AspectForm } from './AspectForm'
 import { Modal } from './Modal'
 import { DatePickerMobile } from './mobile/DatePickerMobile'
+import { DatePickerWeb, TimeInputWeb } from './ui/date-time-picker-web'
 import { usePlatform } from '../hooks/usePlatform'
-import { SaveTextButton } from './ui/IconButtons'
+import { SaveTextButton, DeleteTextButton } from './ui/IconButtons'
 
 // Time picker options
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1))
@@ -43,14 +44,15 @@ interface GoalFormProps {
   isOpen: boolean
   onClose: () => void
   onSave: (goal: Partial<Goal>) => Promise<void>
+  onDelete?: (() => Promise<void>) | undefined
 }
 
-export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
+export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
-  const { aspects, refreshAspects, getAspectColor } = useAspects()
   const { isMobile } = usePlatform()
+  const { aspects, refreshAspects, getAspectColor } = useAspects()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
@@ -64,6 +66,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
+  const [milestoneDatePickerIndex, setMilestoneDatePickerIndex] = useState<number | null>(null)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -443,161 +446,153 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             </div>
 
             {hasDueDate && dueDate && (
-              <>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div
-                  onClick={() => isMobile && setShowDatePicker(true)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    fontSize: fontSize.base,
-                    background: colors.bgPrimary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px'
-                  }}
-                >
-                  <span>Due</span>
-                  {isMobile ? (
-                    formatDate(dueDate)
-                  ) : (
-                    <input
-                      type="date"
-                      value={dueDate.toISOString().split('T')[0]}
-                      onChange={(e) => {
-                        const newDate = new Date(dueDate)
-                        const parts = e.target.value.split('-').map(Number)
-                        const year = parts[0] ?? 0
-                        const month = parts[1] ?? 1
-                        const day = parts[2] ?? 1
-                        newDate.setFullYear(year, month - 1, day)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
-                </div>
-                <div
-                  onClick={() => isMobile && setShowTimePicker(!showTimePicker)}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    fontSize: fontSize.base,
-                    background: showTimePicker ? colors.bgHover : colors.bgPrimary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    color: colors.textPrimary,
-                    cursor: isMobile ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {isMobile ? (
-                    formatTime(dueDate)
-                  ) : (
-                    <input
-                      type="time"
-                      value={`${dueDate.getHours().toString().padStart(2, '0')}:${dueDate.getMinutes().toString().padStart(2, '0')}`}
-                      onChange={(e) => {
-                        const timeParts = e.target.value.split(':').map(Number)
-                        const hours = timeParts[0] ?? 0
-                        const minutes = timeParts[1] ?? 0
-                        const newDate = new Date(dueDate)
-                        newDate.setHours(hours, minutes)
-                        setDueDate(newDate)
-                      }}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: colors.textPrimary,
-                        fontSize: fontSize.base,
-                        cursor: 'pointer'
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Inline Time Picker for Mobile */}
-              {isMobile && showTimePicker && (
-                <div style={{
-                  marginTop: '8px',
-                  background: colors.bgPrimary,
-                  borderRadius: '8px',
-                  border: `1px solid ${colors.border}`,
-                  overflow: 'hidden'
-                }}>
-                  <Picker
-                    value={timePickerValue}
-                    onChange={(val) => {
-                      setTimePickerValue(val)
-                      setDueDate(pickerValueToDate(val, dueDate))
+              isMobile ? (
+                <>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div
+                    onClick={() => setShowDatePicker(true)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      fontSize: fontSize.base,
+                      background: colors.bgPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      color: colors.textPrimary,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
                     }}
-                    height={150}
-                    itemHeight={36}
-                    wheelMode="natural"
                   >
-                    <Picker.Column name="hour">
-                      {HOURS.map(h => (
-                        <Picker.Item key={h} value={h}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {h}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                    <Picker.Column name="minute">
-                      {MINUTES.map(m => (
-                        <Picker.Item key={m} value={m}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {m}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                    <Picker.Column name="period">
-                      {PERIODS.map(p => (
-                        <Picker.Item key={p} value={p}>
-                          {({ selected }) => (
-                            <div style={{
-                              fontSize: '18px',
-                              fontWeight: selected ? '600' : '400',
-                              color: selected ? colors.textPrimary : colors.textSecondary
-                            }}>
-                              {p}
-                            </div>
-                          )}
-                        </Picker.Item>
-                      ))}
-                    </Picker.Column>
-                  </Picker>
+                    <span>Due</span>
+                    {formatDate(dueDate)}
+                  </div>
+                  <div
+                    onClick={() => setShowTimePicker(!showTimePicker)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      fontSize: fontSize.base,
+                      background: showTimePicker ? colors.bgHover : colors.bgPrimary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      color: colors.textPrimary,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {formatTime(dueDate)}
+                  </div>
                 </div>
-              )}
-              </>
+
+                {/* Inline Time Picker */}
+                {showTimePicker && (
+                  <div style={{
+                    marginTop: '8px',
+                    background: colors.bgPrimary,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border}`,
+                    overflow: 'hidden'
+                  }}>
+                    <Picker
+                      value={timePickerValue}
+                      onChange={(val) => {
+                        setTimePickerValue(val)
+                        setDueDate(pickerValueToDate(val, dueDate))
+                      }}
+                      height={150}
+                      itemHeight={36}
+                      wheelMode="natural"
+                    >
+                      <Picker.Column name="hour">
+                        {HOURS.map(h => (
+                          <Picker.Item key={h} value={h}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {h}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                      <Picker.Column name="minute">
+                        {MINUTES.map(m => (
+                          <Picker.Item key={m} value={m}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {m}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                      <Picker.Column name="period">
+                        {PERIODS.map(p => (
+                          <Picker.Item key={p} value={p}>
+                            {({ selected }) => (
+                              <div style={{
+                                fontSize: '18px',
+                                fontWeight: selected ? '600' : '400',
+                                color: selected ? colors.textPrimary : colors.textSecondary
+                              }}>
+                                {p}
+                              </div>
+                            )}
+                          </Picker.Item>
+                        ))}
+                      </Picker.Column>
+                    </Picker>
+                  </div>
+                )}
+                </>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <DatePickerWeb
+                      value={dueDate}
+                      onChange={setDueDate}
+                      colors={colors}
+                      inputStyle={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: fontSize.base,
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <TimeInputWeb
+                      value={dueDate}
+                      onChange={setDueDate}
+                      colors={colors}
+                      inputStyle={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        fontSize: fontSize.base,
+                        background: colors.bgPrimary,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                      }}
+                    />
+                  </div>
+                </div>
+              )
             )}
           </div>
 
@@ -675,7 +670,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       padding: '8px 12px',
                       fontSize: fontSize.sm,
                       background: milestoneType === 'ordered' ? colors.accent : 'transparent',
-                      color: milestoneType === 'ordered' ? '#fff' : colors.textSecondary,
+                      color: milestoneType === 'ordered' ? colors.bgPrimary : colors.textSecondary,
                       border: `1px solid ${milestoneType === 'ordered' ? colors.accent : colors.border}`,
                       borderRadius: '4px',
                       cursor: 'pointer'
@@ -691,7 +686,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       padding: '8px 12px',
                       fontSize: fontSize.sm,
                       background: milestoneType === 'dated' ? colors.accent : 'transparent',
-                      color: milestoneType === 'dated' ? '#fff' : colors.textSecondary,
+                      color: milestoneType === 'dated' ? colors.bgPrimary : colors.textSecondary,
                       border: `1px solid ${milestoneType === 'dated' ? colors.accent : colors.border}`,
                       borderRadius: '4px',
                       cursor: 'pointer'
@@ -714,7 +709,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                         height: '24px',
                         borderRadius: '50%',
                         background: colors.accent,
-                        color: '#fff',
+                        color: colors.bgPrimary,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -741,20 +736,60 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
                       }}
                     />
                     {milestoneType === 'dated' && (
-                      <input
-                        type="date"
-                        value={milestone.due_date || ''}
-                        onChange={(e) => updateMilestone(index, 'due_date', e.target.value)}
-                        style={{
-                          padding: '8px 10px',
-                          fontSize: fontSize.sm,
-                          background: colors.bgPrimary,
-                          color: colors.textPrimary,
-                          border: `1px solid ${colors.border}`,
-                          borderRadius: '4px',
-                          width: '140px'
-                        }}
-                      />
+                      isMobile ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setMilestoneDatePickerIndex(index)}
+                            style={{
+                              padding: '8px 10px',
+                              fontSize: fontSize.sm,
+                              background: colors.bgPrimary,
+                              color: milestone.due_date ? colors.textPrimary : colors.textTertiary,
+                              border: `1px solid ${colors.border}`,
+                              borderRadius: '4px',
+                              width: '140px',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {milestone.due_date
+                              ? new Date(milestone.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                              : 'Set date'}
+                          </button>
+                          <DatePickerMobile
+                            value={milestone.due_date ? new Date(milestone.due_date + 'T00:00:00') : new Date()}
+                            onChange={(date) => {
+                              const yyyy = date.getFullYear()
+                              const mm = String(date.getMonth() + 1).padStart(2, '0')
+                              const dd = String(date.getDate()).padStart(2, '0')
+                              updateMilestone(index, 'due_date', `${yyyy}-${mm}-${dd}`)
+                            }}
+                            isOpen={milestoneDatePickerIndex === index}
+                            onClose={() => setMilestoneDatePickerIndex(null)}
+                          />
+                        </>
+                      ) : (
+                        <DatePickerWeb
+                          value={milestone.due_date ? new Date(milestone.due_date + 'T00:00:00') : new Date()}
+                          onChange={(date) => {
+                            const yyyy = date.getFullYear()
+                            const mm = String(date.getMonth() + 1).padStart(2, '0')
+                            const dd = String(date.getDate()).padStart(2, '0')
+                            updateMilestone(index, 'due_date', `${yyyy}-${mm}-${dd}`)
+                          }}
+                          colors={colors}
+                          inputStyle={{
+                            padding: '8px 10px',
+                            fontSize: fontSize.sm,
+                            background: colors.bgPrimary,
+                            color: milestone.due_date ? colors.textPrimary : colors.textTertiary,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: '4px',
+                            width: '140px',
+                          }}
+                        />
+                      )
                     )}
                     <button
                       type="button"
@@ -799,10 +834,20 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
             gap: '12px',
             marginTop: '8px',
             justifyContent: 'flex-end',
+            alignItems: 'center',
             paddingTop: '16px',
             borderTop: `1px solid ${colors.border}`
           }}>
-            
+            {goal && onDelete && (
+              <DeleteTextButton
+                onClick={async (e) => {
+                  e.preventDefault()
+                  await onDelete()
+                  onClose()
+                }}
+              />
+            )}
+            <div style={{ flex: 1 }} />
             <SaveTextButton
               onClick={(e) => handleSubmit(e)}
               disabled={!title.trim()}
@@ -819,7 +864,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave }: GoalFormProps) {
         onSave={handleCreateAspect}
       />
 
-      {/* Mobile Date Picker */}
+      {/* Date Picker (mobile only) */}
       {isMobile && dueDate && (
         <DatePickerMobile
           value={dueDate}

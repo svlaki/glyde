@@ -11,6 +11,7 @@ import { Modal } from '../Modal'
 import { DeleteButton, DeleteTextButton, SaveTextButton } from '../ui/IconButtons'
 import { DatePickerMobile } from '../mobile/DatePickerMobile'
 import { TimePickerSlider } from '../mobile/TimePickerSlider'
+import { DatePickerWeb, TimeInputWeb } from '../ui/date-time-picker-web'
 import { useEventFormState, pickerValueToDate } from './useEventFormState'
 import { AspectDropdown } from './AspectDropdown'
 import { RecurrencePopover } from './RecurrencePopover'
@@ -592,12 +593,19 @@ export function EventFormUnified({
                   {form.formatDateDisplay(form.startDate)}
                 </div>
               ) : (
-                <input
-                  type="date"
-                  value={form.formatDateForInput(form.startDate)}
-                  required
-                  onChange={(e) => form.handleDateChange(e.target.value, true)}
-                  style={inputStyle}
+                <DatePickerWeb
+                  value={form.startDate}
+                  onChange={(newDate) => {
+                    const newStart = new Date(form.startDate)
+                    newStart.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+                    form.setStartDate(newStart)
+
+                    const newEnd = new Date(form.endDate)
+                    newEnd.setFullYear(newDate.getFullYear(), newDate.getMonth(), newDate.getDate())
+                    form.setEndDate(newEnd)
+                  }}
+                  colors={colors}
+                  inputStyle={inputStyle}
                 />
               )}
             </div>
@@ -678,21 +686,25 @@ export function EventFormUnified({
                   )}
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <input
-                    type="time"
-                    value={form.formatTimeForInput(form.startDate)}
-                    onChange={(e) => form.handleTimeChange(e.target.value, true)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <span style={{ color: colors.textTertiary, fontSize: fontSize.base, flexShrink: 0 }}>to</span>
-                  <input
-                    type="time"
-                    value={form.formatTimeForInput(form.endDate)}
-                    onChange={(e) => form.handleTimeChange(e.target.value, false)}
-                    style={{ ...inputStyle, flex: 1 }}
-                    required
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: colors.textSecondary, marginBottom: '4px' }}>Start</label>
+                    <TimeInputWeb
+                      value={form.startDate}
+                      onChange={form.setStartDate}
+                      colors={colors}
+                      inputStyle={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: colors.textSecondary, marginBottom: '4px' }}>End</label>
+                    <TimeInputWeb
+                      value={form.endDate}
+                      onChange={form.setEndDate}
+                      colors={colors}
+                      inputStyle={inputStyle}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -757,7 +769,7 @@ export function EventFormUnified({
                       fontSize: '14px',
                       fontFamily: fontFamily.sans,
                       background: form.visibility === option ? colors.accent : colors.bgTertiary,
-                      color: form.visibility === option ? '#fff' : colors.textSecondary,
+                      color: form.visibility === option ? colors.bgPrimary : colors.textSecondary,
                       border: `1px solid ${form.visibility === option ? colors.accent : colors.border}`,
                       borderRadius: '8px',
                       cursor: 'pointer',
@@ -779,7 +791,7 @@ export function EventFormUnified({
                     fontSize: '14px',
                     fontFamily: fontFamily.sans,
                     background: form.visibility === 'shared' ? colors.accent : colors.bgTertiary,
-                    color: form.visibility === 'shared' ? '#fff' : colors.textSecondary,
+                    color: form.visibility === 'shared' ? colors.bgPrimary : colors.textSecondary,
                     border: `1px solid ${form.visibility === 'shared' ? colors.accent : colors.border}`,
                     borderRadius: '8px',
                     cursor: 'pointer',
@@ -886,7 +898,7 @@ export function EventFormUnified({
         </form>
       </Modal>
 
-      {/* Mobile Date Picker */}
+      {/* Date Picker (mobile only) */}
       {isMobile && (
         <DatePickerMobile
           value={form.startDate}

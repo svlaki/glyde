@@ -910,8 +910,8 @@ export function Calendar() {
                     <div style={{
                       ...typography.bodySm,
                       fontWeight: isToday ? 600 : 400,
-                      color: isToday ? (isDarkMode ? '#2a2a2a' : '#fff') : 'inherit',
-                      background: isToday ? (isDarkMode ? '#d0d0d0' : '#000') : 'transparent',
+                      color: isToday ? colors.bgPrimary : 'inherit',
+                      background: isToday ? colors.accent : 'transparent',
                       width: '26px',
                       height: '26px',
                       borderRadius: '50%',
@@ -1151,9 +1151,9 @@ export function Calendar() {
                     fontSize: fontSize.sm,
                     fontFamily: fontFamily.sans,
                     fontWeight: fontWeight.medium,
-                    color: isToday ? colors.error : colors.textTertiary,
+                    color: isToday ? colors.accent : colors.textTertiary,
                     background: isToday
-                      ? (isDarkMode ? 'rgba(30,30,30,0.97)' : 'rgba(248,248,248,0.97)')
+                      ? hexToRgba(colors.bgSecondary, 0.97)
                       : colors.bgSecondary,
                     zIndex: 10,
                     textTransform: 'uppercase',

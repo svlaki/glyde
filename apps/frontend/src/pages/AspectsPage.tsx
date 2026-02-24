@@ -1,13 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { createUserAspect, updateUserAspect, deleteUserAspect } from '../lib/aspectService'
 import type { Aspect } from '../lib/aspectService'
-import { AspectCard } from '../components/AspectCard'
+import { updateEvent, deleteEvent } from '../lib/calendarService'
+import type { CalendarEvent } from '../lib/calendarService'
+import { updateUserTask, deleteUserTask } from '../lib/taskService'
+import type { Task } from '../lib/taskService'
+import { updateUserGoal, deleteUserGoal } from '../lib/goalService'
+import type { Goal } from '../lib/goalService'
 import { AspectForm } from '../components/AspectForm'
 import { AspectShareModal } from '../components/AspectShareModal'
+import { EventFormUnified } from '../components/event/EventFormUnified'
+import { TaskForm } from '../components/TaskForm'
+import { GoalForm } from '../components/GoalForm'
 import { GoalsByAspect } from '../components/GoalsByAspect'
+import { DraggableAspectList } from '../components/DraggableAspectList'
 import { EmptyState } from '../components/EmptyState'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
@@ -30,11 +39,14 @@ function AspectsPageMobile() {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
-  const { aspects, loading, error, refreshAspects } = useAspects()
+  const { aspects, loading, error, refreshAspects, setAspectsLocal } = useAspects()
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
   const [sharingAspect, setSharingAspect] = useState<Aspect | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
@@ -79,11 +91,66 @@ function AspectsPageMobile() {
     }
   }
 
+  const handleReorderAspects = useCallback(async (reordered: Aspect[]) => {
+    if (!user || !session) return
+    // Optimistic update
+    setAspectsLocal(reordered)
+    // Persist display_order for each aspect
+    const updates = reordered.map((aspect, index) =>
+      updateUserAspect(user, aspect.id, { display_order: index }, session.access_token)
+    )
+    await Promise.all(updates)
+  }, [user, session, setAspectsLocal])
+
   const handleDescriptionUpdate = async (aspectToUpdate: Aspect, description: string) => {
     if (!user || !session) return
     await updateUserAspect(user, aspectToUpdate.id, { description }, session.access_token)
     await refreshAspects()
     setSelectedAspect(prev => prev?.id === aspectToUpdate.id ? { ...prev, description } : prev)
+  }
+
+  const handleSaveEvent = async (eventData: Partial<CalendarEvent>) => {
+    if (!user || !session || !eventData.id) return
+    await updateEvent(user, eventData.id, {
+      title: eventData.title!,
+      start_time: eventData.start_time!,
+      end_time: eventData.end_time!,
+      ...(eventData.description ? { description: eventData.description } : {}),
+      ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
+      ...(eventData.visibility ? { visibility: eventData.visibility } : {}),
+    }, session.access_token)
+    setEditingEvent(null)
+  }
+
+  const handleSaveTask = async (taskData: Partial<Task>) => {
+    if (!user || !session || !editingTask) return
+    await updateUserTask(user, session.access_token, editingTask.id, taskData)
+    setEditingTask(null)
+  }
+
+  const handleSaveGoal = async (goalData: Partial<Goal>) => {
+    if (!user || !session || !editingGoal) return
+    const { id, ...updates } = goalData
+    await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    setEditingGoal(null)
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!user || !session || !editingEvent) return
+    await deleteEvent(user, editingEvent.id, session.access_token)
+    setEditingEvent(null)
+  }
+
+  const handleDeleteTask = async () => {
+    if (!user || !session || !editingTask) return
+    await deleteUserTask(user, session.access_token, editingTask.id)
+    setEditingTask(null)
+  }
+
+  const handleDeleteGoal = async () => {
+    if (!user || !session || !editingGoal) return
+    await deleteUserGoal(user, session.access_token, editingGoal.id)
+    setEditingGoal(null)
   }
 
   // Detail view - showing goals for selected aspect
@@ -105,6 +172,9 @@ function AspectsPageMobile() {
             onEdit={selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
             onDelete={selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
             onDescriptionUpdate={selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
+            onEditEvent={(event) => setEditingEvent(event)}
+            onEditTask={(task) => setEditingTask(task)}
+            onEditGoal={(goal) => setEditingGoal(goal)}
           />
         </div>
 
@@ -113,6 +183,30 @@ function AspectsPageMobile() {
           isOpen={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           onSave={handleSaveAspect}
+        />
+
+        <EventFormUnified
+          event={editingEvent}
+          isOpen={!!editingEvent}
+          onClose={() => setEditingEvent(null)}
+          onSave={handleSaveEvent}
+          onDelete={handleDeleteEvent}
+        />
+
+        <TaskForm
+          task={editingTask || undefined}
+          isOpen={!!editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
+        />
+
+        <GoalForm
+          goal={editingGoal || undefined}
+          isOpen={!!editingGoal}
+          onClose={() => setEditingGoal(null)}
+          onSave={handleSaveGoal}
+          onDelete={handleDeleteGoal}
         />
       </div>
     )
@@ -176,22 +270,13 @@ function AspectsPageMobile() {
             description="Create your first aspect to get started"
           />
         ) : (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            {aspects.map(aspect => (
-              <AspectCard
-                key={aspect.id}
-                aspect={aspect}
-                isSelected={false}
-                onClick={() => setSelectedAspect(aspect)}
-                onEdit={aspect.member_role !== 'viewer' ? () => handleEditAspect(aspect) : undefined}
-                onDelete={aspect.member_role === 'owner' ? () => handleDeleteAspect(aspect) : undefined}
-              />
-            ))}
-          </div>
+          <DraggableAspectList
+            aspects={aspects}
+            onSelect={(aspect) => setSelectedAspect(aspect)}
+            onEdit={handleEditAspect}
+            onDelete={handleDeleteAspect}
+            onReorder={handleReorderAspects}
+          />
         )}
       </div>
 
@@ -217,11 +302,14 @@ function AspectsPageDesktop() {
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
   const typography = getTypography(false)
-  const { aspects, loading, error, refreshAspects } = useAspects()
+  const { aspects, loading, error, refreshAspects, setAspectsLocal } = useAspects()
   const [selectedAspect, setSelectedAspect] = useState<Aspect | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingAspect, setEditingAspect] = useState<Aspect | undefined>(undefined)
   const [sharingAspect, setSharingAspect] = useState<Aspect | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
 
   // Auto-select first aspect when aspects load
   useEffect(() => {
@@ -275,11 +363,64 @@ function AspectsPageDesktop() {
     }
   }
 
+  const handleReorderAspects = useCallback(async (reordered: Aspect[]) => {
+    if (!user || !session) return
+    setAspectsLocal(reordered)
+    const updates = reordered.map((aspect, index) =>
+      updateUserAspect(user, aspect.id, { display_order: index }, session.access_token)
+    )
+    await Promise.all(updates)
+  }, [user, session, setAspectsLocal])
+
   const handleDescriptionUpdate = async (aspectToUpdate: Aspect, description: string) => {
     if (!user || !session) return
     await updateUserAspect(user, aspectToUpdate.id, { description }, session.access_token)
     await refreshAspects()
     setSelectedAspect(prev => prev?.id === aspectToUpdate.id ? { ...prev, description } : prev)
+  }
+
+  const handleSaveEvent = async (eventData: Partial<CalendarEvent>) => {
+    if (!user || !session || !eventData.id) return
+    await updateEvent(user, eventData.id, {
+      title: eventData.title!,
+      start_time: eventData.start_time!,
+      end_time: eventData.end_time!,
+      ...(eventData.description ? { description: eventData.description } : {}),
+      ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
+      ...(eventData.visibility ? { visibility: eventData.visibility } : {}),
+    }, session.access_token)
+    setEditingEvent(null)
+  }
+
+  const handleSaveTask = async (taskData: Partial<Task>) => {
+    if (!user || !session || !editingTask) return
+    await updateUserTask(user, session.access_token, editingTask.id, taskData)
+    setEditingTask(null)
+  }
+
+  const handleSaveGoal = async (goalData: Partial<Goal>) => {
+    if (!user || !session || !editingGoal) return
+    const { id, ...updates } = goalData
+    await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    setEditingGoal(null)
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!user || !session || !editingEvent) return
+    await deleteEvent(user, editingEvent.id, session.access_token)
+    setEditingEvent(null)
+  }
+
+  const handleDeleteTask = async () => {
+    if (!user || !session || !editingTask) return
+    await deleteUserTask(user, session.access_token, editingTask.id)
+    setEditingTask(null)
+  }
+
+  const handleDeleteGoal = async () => {
+    if (!user || !session || !editingGoal) return
+    await deleteUserGoal(user, session.access_token, editingGoal.id)
+    setEditingGoal(null)
   }
 
   return (
@@ -388,16 +529,14 @@ function AspectsPageDesktop() {
                 description="Create your first aspect to get started"
               />
             ) : (
-              aspects.map(aspect => (
-                <AspectCard
-                  key={aspect.id}
-                  aspect={aspect}
-                  isSelected={selectedAspect?.id === aspect.id}
-                  onClick={() => setSelectedAspect(aspect)}
-                  onEdit={aspect.member_role !== 'viewer' ? () => handleEditAspect(aspect) : undefined}
-                  onDelete={aspect.member_role === 'owner' ? () => handleDeleteAspect(aspect) : undefined}
-                />
-              ))
+              <DraggableAspectList
+                aspects={aspects}
+                selectedAspect={selectedAspect}
+                onSelect={(aspect) => setSelectedAspect(aspect)}
+                onEdit={handleEditAspect}
+                onDelete={handleDeleteAspect}
+                onReorder={handleReorderAspects}
+              />
             )}
           </div>
         </div>
@@ -414,6 +553,9 @@ function AspectsPageDesktop() {
             onDelete={selectedAspect && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
             onShare={selectedAspect && selectedAspect.member_role === 'owner' ? () => setSharingAspect(selectedAspect) : undefined}
             onDescriptionUpdate={selectedAspect && selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
+            onEditEvent={(event) => setEditingEvent(event)}
+            onEditTask={(task) => setEditingTask(task)}
+            onEditGoal={(goal) => setEditingGoal(goal)}
           />
         </div>
       </div>
@@ -431,6 +573,30 @@ function AspectsPageDesktop() {
         isOpen={!!sharingAspect}
         onClose={() => setSharingAspect(null)}
         onAspectUpdated={refreshAspects}
+      />
+
+      <EventFormUnified
+        event={editingEvent}
+        isOpen={!!editingEvent}
+        onClose={() => setEditingEvent(null)}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+      />
+
+      <TaskForm
+        task={editingTask || undefined}
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleSaveTask}
+        onDelete={handleDeleteTask}
+      />
+
+      <GoalForm
+        goal={editingGoal || undefined}
+        isOpen={!!editingGoal}
+        onClose={() => setEditingGoal(null)}
+        onSave={handleSaveGoal}
+        onDelete={handleDeleteGoal}
       />
     </div>
   )

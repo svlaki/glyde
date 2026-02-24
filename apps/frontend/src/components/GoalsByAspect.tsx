@@ -12,7 +12,6 @@ import { EmptyState } from './EmptyState'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { EditButton, DeleteButton, ShareButton } from './ui/IconButtons'
-import { formatRRuleForDisplay } from '../lib/recurrenceUtils'
 
 /**
  * Deduplicate recurring event instances - keeps only one card per recurring series.
@@ -60,9 +59,12 @@ interface GoalsByAspectProps {
   onDelete?: (() => void) | undefined
   onShare?: (() => void) | undefined
   onDescriptionUpdate?: (description: string) => Promise<void>
+  onEditEvent?: (event: CalendarEvent) => void
+  onEditTask?: (task: Task) => void
+  onEditGoal?: (goal: Goal) => void
 }
 
-export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescriptionUpdate }: GoalsByAspectProps) {
+export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescriptionUpdate, onEditEvent, onEditTask, onEditGoal }: GoalsByAspectProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
@@ -73,6 +75,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
   const [editingDescription, setEditingDescription] = useState(false)
   const [descriptionDraft, setDescriptionDraft] = useState('')
   const [savingDescription, setSavingDescription] = useState(false)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   // Reset editing state when aspect changes
   useEffect(() => {
@@ -210,10 +213,61 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
   }
 
   const currentEvents = events.filter(event => !isPastEvent(event))
-  const pastEvents = events.filter(event => isPastEvent(event))
+  const pastEvents = events
+    .filter(event => isPastEvent(event))
+    .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
   const activeTasks = tasks.filter(task => task.status !== 'completed')
   const completedTasks = tasks.filter(task => task.status === 'completed')
   const totalItems = events.length + tasks.length + goals.length
+
+  const toggleSection = (key: string) => {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const SectionHeader = ({ sectionKey, label, count }: { sectionKey: string; label: string; count: number }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(sectionKey)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        width: '100%',
+        background: 'none',
+        border: 'none',
+        padding: '0 0 12px',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+    >
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={colors.textTertiary}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{
+          transform: collapsed[sectionKey] ? 'rotate(-90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s ease',
+          flexShrink: 0,
+        }}
+      >
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+      <span style={{
+        fontSize: fontSize.base,
+        fontWeight: fontWeight.semibold,
+        color: colors.textPrimary,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}>
+        {label} ({count})
+      </span>
+    </button>
+  )
 
   return (
     <div style={{
@@ -401,108 +455,102 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
       {/* Events Section */}
       {currentEvents.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Events ({currentEvents.length})
-          </h4>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            {currentEvents.map(event => (
-              <div
-                key={event.id}
-                style={{
-                  padding: '12px 16px',
-                  background: colors.bgSecondary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  borderLeft: `4px solid ${aspect.color || '#999'}`,
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = colors.bgHover
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = colors.bgSecondary
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '4px'
-                }}>
+          <SectionHeader sectionKey="events" label="Events" count={currentEvents.length} />
+          {!collapsed.events && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {currentEvents.map(event => (
+                <div
+                  key={event.id}
+                  onClick={() => onEditEvent?.(event)}
+                  style={{
+                    padding: '12px 16px',
+                    background: colors.bgSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    borderLeft: `4px solid ${aspect.color || '#999'}`,
+                    transition: 'all 0.2s',
+                    cursor: onEditEvent ? 'pointer' : 'default',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.bgHover
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgSecondary
+                  }}
+                >
                   <div style={{
-                    fontSize: fontSize.base,
-                    fontWeight: fontWeight.semibold,
-                    color: colors.textPrimary
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px',
+                    minWidth: 0,
                   }}>
-                    {event.title}
-                  </div>
-                  {event.is_recurring && event.recurrence_rule && (
-                    <span style={{
-                      fontSize: '10px',
-                      padding: '1px 6px',
-                      borderRadius: '3px',
-                      background: colors.bgTertiary,
-                      color: colors.textSecondary,
-                      fontWeight: fontWeight.medium,
-                      flexShrink: 0
+                    <div style={{
+                      fontSize: fontSize.base,
+                      fontWeight: fontWeight.semibold,
+                      color: colors.textPrimary,
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}>
-                      {formatRRuleForDisplay(event.recurrence_rule)}
-                    </span>
+                      {event.title}
+                    </div>
+                    {event.is_recurring && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '1px 6px',
+                        borderRadius: '3px',
+                        background: colors.bgTertiary,
+                        color: colors.textSecondary,
+                        fontWeight: fontWeight.medium,
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        Recurring
+                      </span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: fontSize.xs,
+                    color: colors.textSecondary
+                  }}>
+                    {event.is_recurring ? 'Next: ' : ''}
+                    {new Date(event.start_time).toLocaleString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {event.description && (
+                    <div style={{
+                      fontSize: fontSize.sm,
+                      color: colors.textSecondary,
+                      marginTop: '6px',
+                      lineHeight: lineHeight.tight
+                    }}>
+                      {event.description}
+                    </div>
                   )}
                 </div>
-                <div style={{
-                  fontSize: fontSize.xs,
-                  color: colors.textSecondary
-                }}>
-                  {event.is_recurring ? 'Next: ' : ''}
-                  {new Date(event.start_time).toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
-                </div>
-                {event.description && (
-                  <div style={{
-                    fontSize: fontSize.sm,
-                    color: colors.textSecondary,
-                    marginTop: '6px',
-                    lineHeight: lineHeight.tight
-                  }}>
-                    {event.description}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Tasks Section */}
       {activeTasks.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Tasks ({activeTasks.length})
-          </h4>
+          <SectionHeader sectionKey="tasks" label="Tasks" count={activeTasks.length} />
+          {!collapsed.tasks && (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -511,13 +559,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
             {activeTasks.map(task => (
               <div
                 key={task.id}
+                onClick={() => onEditTask?.(task)}
                 style={{
                   padding: '12px 16px',
                   background: colors.bgSecondary,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   borderLeft: `4px solid ${aspect.color || '#999'}`,
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  cursor: onEditTask ? 'pointer' : 'default',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = colors.bgHover
@@ -535,7 +585,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
                   <input
                     type="checkbox"
                     checked={false}
-                    onChange={() => handleToggleTaskComplete(task)}
+                    onChange={(e) => { e.stopPropagation(); handleToggleTaskComplete(task) }}
+                    onClick={(e) => e.stopPropagation()}
                     style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: aspect.color || colors.accent, flexShrink: 0 }}
                     title="Mark as complete"
                   />
@@ -610,81 +661,69 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
       {/* Goals Section */}
       {goals.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Goals ({goals.length})
-          </h4>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            {goals.map(goal => (
-              <div
-                key={goal.id}
-                style={{
-                  padding: '12px 16px',
-                  background: colors.bgSecondary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  borderLeft: `4px solid ${aspect.color || '#999'}`,
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = colors.bgHover
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = colors.bgSecondary
-                }}
-              >
-                <div style={{
-                  fontSize: fontSize.base,
-                  fontWeight: fontWeight.semibold,
-                  color: colors.textPrimary,
-                  marginBottom: '4px'
-                }}>
-                  {goal.title}
-                </div>
-                {goal.description && (
+          <SectionHeader sectionKey="goals" label="Goals" count={goals.length} />
+          {!collapsed.goals && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {goals.map(goal => (
+                <div
+                  key={goal.id}
+                  onClick={() => onEditGoal?.(goal)}
+                  style={{
+                    padding: '12px 16px',
+                    background: colors.bgSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    borderLeft: `4px solid ${aspect.color || '#999'}`,
+                    transition: 'all 0.2s',
+                    cursor: onEditGoal ? 'pointer' : 'default',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.bgHover
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgSecondary
+                  }}
+                >
                   <div style={{
-                    fontSize: fontSize.sm,
-                    color: colors.textSecondary,
-                    lineHeight: lineHeight.tight
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
+                    color: colors.textPrimary,
+                    marginBottom: '4px'
                   }}>
-                    {goal.description}
+                    {goal.title}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {goal.description && (
+                    <div style={{
+                      fontSize: fontSize.sm,
+                      color: colors.textSecondary,
+                      lineHeight: lineHeight.tight
+                    }}>
+                      {goal.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Completed Tasks Section */}
       {completedTasks.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Completed Tasks ({completedTasks.length})
-          </h4>
+          <SectionHeader sectionKey="completedTasks" label="Completed Tasks" count={completedTasks.length} />
+          {!collapsed.completedTasks && (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -693,13 +732,15 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
             {completedTasks.map(task => (
               <div
                 key={task.id}
+                onClick={() => onEditTask?.(task)}
                 style={{
                   padding: '12px 16px',
                   background: colors.bgSecondary,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   borderLeft: `4px solid ${aspect.color || '#999'}`,
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  cursor: onEditTask ? 'pointer' : 'default',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = colors.bgHover
@@ -717,7 +758,8 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
                   <input
                     type="checkbox"
                     checked={true}
-                    onChange={() => handleToggleTaskComplete(task)}
+                    onChange={(e) => { e.stopPropagation(); handleToggleTaskComplete(task) }}
+                    onClick={(e) => e.stopPropagation()}
                     style={{ width: '14px', height: '14px', cursor: 'pointer', accentColor: aspect.color || colors.accent, flexShrink: 0 }}
                     title="Mark as incomplete"
                   />
@@ -781,78 +823,74 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
       {/* Past Events Section */}
       {pastEvents.length > 0 && (
         <div>
-          <h4 style={{
-            fontSize: fontSize.base,
-            fontWeight: fontWeight.semibold,
-            color: colors.textPrimary,
-            marginBottom: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Past Events ({pastEvents.length})
-          </h4>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            {pastEvents.map(event => (
-              <div
-                key={event.id}
-                style={{
-                  padding: '12px 16px',
-                  background: colors.bgSecondary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  borderLeft: `4px solid ${aspect.color || '#999'}`,
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = colors.bgHover
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = colors.bgSecondary
-                }}
-              >
-                <div style={{
-                  fontSize: fontSize.base,
-                  fontWeight: fontWeight.semibold,
-                  color: colors.textPrimary,
-                  marginBottom: '4px'
-                }}>
-                  {event.title}
-                </div>
-                <div style={{
-                  fontSize: fontSize.xs,
-                  color: colors.textSecondary
-                }}>
-                  {new Date(event.start_time).toLocaleString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
-                </div>
-                {event.description && (
+          <SectionHeader sectionKey="pastEvents" label="Past Events" count={pastEvents.length} />
+          {!collapsed.pastEvents && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              {pastEvents.map(event => (
+                <div
+                  key={event.id}
+                  onClick={() => onEditEvent?.(event)}
+                  style={{
+                    padding: '12px 16px',
+                    background: colors.bgSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    borderLeft: `4px solid ${aspect.color || '#999'}`,
+                    transition: 'all 0.2s',
+                    cursor: onEditEvent ? 'pointer' : 'default',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.bgHover
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgSecondary
+                  }}
+                >
                   <div style={{
-                    fontSize: fontSize.sm,
-                    color: colors.textSecondary,
-                    marginTop: '6px',
-                    lineHeight: lineHeight.tight
+                    fontSize: fontSize.base,
+                    fontWeight: fontWeight.semibold,
+                    color: colors.textPrimary,
+                    marginBottom: '4px'
                   }}>
-                    {event.description}
+                    {event.title}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  <div style={{
+                    fontSize: fontSize.xs,
+                    color: colors.textSecondary
+                  }}>
+                    {new Date(event.start_time).toLocaleString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {event.description && (
+                    <div style={{
+                      fontSize: fontSize.sm,
+                      color: colors.textSecondary,
+                      marginTop: '6px',
+                      lineHeight: lineHeight.tight
+                    }}>
+                      {event.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

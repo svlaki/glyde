@@ -10,8 +10,8 @@ const WheelControls: KeenSliderPlugin = (slider) => {
   let wheelActive: boolean
 
   function dispatch(e: WheelEvent, name: string) {
-    // Smoother wheel sensitivity - reduce the delta for more controlled scrolling
-    const sensitivity = 2
+    // Reduced sensitivity for controlled desktop scrolling
+    const sensitivity = 0.5
     position.y -= e.deltaY * sensitivity
     slider.container.dispatchEvent(
       new CustomEvent(name, {

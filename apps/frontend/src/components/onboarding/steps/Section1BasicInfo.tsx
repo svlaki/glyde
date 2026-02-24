@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { useOnboarding } from '../OnboardingContext'
-import { usePlatform } from '../../../hooks/usePlatform'
 import { DatePickerMobile } from '../../mobile/DatePickerMobile'
+import { DatePickerWeb } from '../../ui/date-time-picker-web'
+import { usePlatform } from '../../../hooks/usePlatform'
 
 export function Section1BasicInfo() {
   const { theme, isDarkMode } = useTheme()
@@ -127,12 +128,21 @@ export function Section1BasicInfo() {
             />
           </>
         ) : (
-          <input
-            type="date"
-            value={state.birthday}
-            onChange={(e) => updateField('birthday', e.target.value)}
-            style={inputStyle}
-            max={new Date().toISOString().split('T')[0]}
+          <DatePickerWeb
+            value={state.birthday ? new Date(state.birthday + 'T00:00:00') : new Date(2000, 0, 1)}
+            onChange={(date) => {
+              const yyyy = date.getFullYear()
+              const mm = String(date.getMonth() + 1).padStart(2, '0')
+              const dd = String(date.getDate()).padStart(2, '0')
+              updateField('birthday', `${yyyy}-${mm}-${dd}`)
+            }}
+            colors={colors}
+            inputStyle={{
+              ...inputStyle,
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: state.birthday ? colors.textPrimary : colors.textTertiary,
+            }}
           />
         )}
         <p style={{
