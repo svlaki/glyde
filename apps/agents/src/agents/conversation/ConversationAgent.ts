@@ -69,6 +69,10 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update ?? _existing,
     default: () => null,
   }),
+  ratingSummary: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -98,7 +102,7 @@ export class ConversationAgent extends BaseAgent {
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress] = await Promise.all([
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
@@ -106,8 +110,9 @@ export class ConversationAgent extends BaseAgent {
         supabaseService.getAspects(context.userId),
         projectService.getProjects(context.userId),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
-        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5), // Last 5 agent actions
+        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
+        supabaseService.getRatingSummary(context.userId),
       ]);
 
       // Resolve timezone with validation
@@ -189,6 +194,7 @@ export class ConversationAgent extends BaseAgent {
         currentPage: (context as any).currentPage || 'dashboard',
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
+        ratingSummary: ratingSummary || [],
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -267,7 +273,7 @@ IMPORTANT INSTRUCTIONS:
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress] = await Promise.all([
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
@@ -278,6 +284,7 @@ IMPORTANT INSTRUCTIONS:
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
+        supabaseService.getRatingSummary(context.userId),
       ]);
 
       // Resolve timezone with validation
@@ -358,6 +365,7 @@ IMPORTANT INSTRUCTIONS:
         currentPage: (context as any).currentPage || 'dashboard',
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
+        ratingSummary: ratingSummary || [],
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
@@ -412,6 +420,21 @@ IMPORTANT INSTRUCTIONS:
         content: error instanceof Error ? error.message : 'Unknown streaming error'
       };
     }
+  }
+
+  private buildRatingContext(ratingSummary: any[]): string {
+    if (!ratingSummary || ratingSummary.length === 0) return '';
+
+    const lines = ratingSummary.map(r => {
+      const trendLabel = r.trend > 0 ? 'improving' : r.trend < 0 ? 'declining' : 'stable';
+      const daysSince = Math.round((Date.now() - new Date(r.lastAsked).getTime()) / 86400000);
+      const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince}d ago`;
+      return `  - "${r.topic}": ${r.latestScore}/5 (${trendLabel}, last: ${timeAgo}, ${r.totalEntries} entries)`;
+    });
+
+    return `\n\nUSER SELF-ASSESSMENT RATINGS:
+${lines.join('\n')}
+Use these scores to understand how the user feels about different areas of their life. If a score is declining, proactively suggest improvements.`;
   }
 
   private createGraph(): any {
@@ -588,6 +611,7 @@ IMPORTANT INSTRUCTIONS:
         currentPage: state.currentPage, // Current page user is viewing
         messageCount: state.messages.length, // Conversation stage awareness
         currentLocation: locationContext, // User's GPS coordinates
+        ratingContext: state.ratingSummary?.length ? this.buildRatingContext(state.ratingSummary) : undefined,
       });
 
 

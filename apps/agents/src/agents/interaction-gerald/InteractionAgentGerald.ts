@@ -43,6 +43,10 @@ const GeraldState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  ratingSummary: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type GeraldStateType = typeof GeraldState.State;
@@ -91,11 +95,12 @@ export class InteractionAgentGerald extends BaseAgent {
 
       // Fetch all user context in parallel for efficiency
       const now = new Date();
-      const [allEvents, userTasks, userGoals, userAspects] = await Promise.all([
+      const [allEvents, userTasks, userGoals, userAspects, ratingSummary] = await Promise.all([
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
-        supabaseService.getAspects(context.userId)
+        supabaseService.getAspects(context.userId),
+        supabaseService.getRatingSummary(context.userId)
       ]);
 
       // Filter to future/ongoing events
@@ -118,7 +123,8 @@ export class InteractionAgentGerald extends BaseAgent {
         - Tasks: ${activeTasks.length} active (filtered from ${userTasks?.length || 0})
         - Goals: ${activeGoals.length} active (filtered from ${userGoals?.length || 0})
         - Aspects: ${userAspects?.length || 0}
-        - Recent interactions: ${recentInteractions.length}`);
+        - Recent interactions: ${recentInteractions.length}
+        - Rating topics: ${ratingSummary.length}`);
 
       // Build conversation history
       const messages: BaseMessage[] = [];
@@ -148,6 +154,7 @@ export class InteractionAgentGerald extends BaseAgent {
         userProfile: userProfile || null,
         userAspects: userAspects || [],
         recentInteractions: recentInteractions || [],
+        ratingSummary: ratingSummary || [],
       }, {
         recursionLimit: 15 // Allow more steps for complex interactions with retries
       });
@@ -255,6 +262,9 @@ export class InteractionAgentGerald extends BaseAgent {
       // Build recent interaction context
       const recentInteractionContext = self.buildRecentInteractionContext(state.recentInteractions);
 
+      // Build rating context
+      const ratingContext = self.buildRatingContext(state.ratingSummary);
+
       // Build system prompt with full context
       const promptContext: GeraldPromptContext = {
         timezone: state.timezone,
@@ -271,6 +281,7 @@ export class InteractionAgentGerald extends BaseAgent {
         toolCount: tools.length,
         rulesContext,
         recentInteractionContext,
+        ratingContext,
       };
 
       const systemMessage = buildGeraldSystemPrompt(promptContext);
@@ -467,22 +478,66 @@ export class InteractionAgentGerald extends BaseAgent {
       return '\nRECENT INTERACTION HISTORY: No recent interactions.';
     }
 
-    const lines = interactions.slice(0, 15).map(i => {
+    const lines = interactions.slice(0, 20).map(i => {
       const status = i.status === 'responded' ? 'responded'
-        : i.status === 'dismissed' || i.status === 'expired' ? 'dismissed/ignored'
+        : i.status === 'dismissed' || i.status === 'expired' || i.status === 'cancelled' ? 'DISMISSED'
         : i.status === 'pending' || i.status === 'active' ? 'still pending'
         : i.status;
       const type = i.interaction_type || 'unknown';
-      return `  - [${type}] "${i.question}" -> ${status}`;
+      const age = i.created_at ? `${Math.round((Date.now() - new Date(i.created_at).getTime()) / 3600000)}h ago` : '';
+      const responseText = i.interaction_responses?.[0]?.response;
+      const responseSuffix = responseText ? ` [user answered: "${responseText}"]` : '';
+      return `  - [${type}] "${i.question}" -> ${status} (${age})${responseSuffix}`;
     });
+
+    // Extract dismissed topics for explicit avoidance
+    const dismissedTopics = interactions
+      .filter(i => ['dismissed', 'expired', 'cancelled'].includes(i.status))
+      .map(i => i.question)
+      .slice(0, 10);
+
+    const dismissedSection = dismissedTopics.length > 0
+      ? `\nDISMISSED TOPICS (NEVER revisit these in any form):\n${dismissedTopics.map(q => `  - "${q}"`).join('\n')}`
+      : '';
 
     return `\nRECENT INTERACTION HISTORY (last ${interactions.length}, newest first):
 ${lines.join('\n')}
-RULES:
-- Do NOT repeat questions that were dismissed (user clearly didn't want them)
-- Do NOT re-suggest topics that were recently responded to (unless context changed)
-- Use DIFFERENT interaction types than the last 2-3 interactions
-- Vary the CATEGORY (scheduling vs reflection vs check-in vs progress)`;
+${dismissedSection}
+DEDUPLICATION RULES (CRITICAL):
+- EVERY question above has ALREADY been asked. Do NOT rephrase or re-ask ANY of them.
+- Topics that were DISMISSED must NEVER be brought up again in ANY form.
+- If you already asked about exercise, do NOT ask about workouts, gym, fitness, etc.
+- If you already asked about studying, do NOT ask about focus time, homework, review, etc.
+- Generate COMPLETELY NEW topics not covered above.
+- Use DIFFERENT interaction types than the last 3 interactions.
+- Vary the CATEGORY (scheduling vs reflection vs check-in vs progress).`;
+  }
+
+  /**
+   * Build rating context showing tracked scores and trends
+   */
+  private buildRatingContext(ratingSummary: any[]): string {
+    if (!ratingSummary || ratingSummary.length === 0) {
+      return '\nRATING TRACKER: No ratings yet. Consider creating rating check-ins for areas the user cares about.';
+    }
+
+    const lines = ratingSummary.map(r => {
+      const trendIcon = r.trend > 0 ? '(improving)' : r.trend < 0 ? '(declining)' : '(stable)';
+      const lastAskedDate = new Date(r.lastAsked);
+      const daysSince = Math.round((Date.now() - lastAskedDate.getTime()) / 86400000);
+      const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince} days ago`;
+      return `  - "${r.topic}": ${r.latestScore}/5 ${trendIcon} (last asked: ${timeAgo}, ${r.totalEntries} entries)`;
+    });
+
+    return `\nRATING TRACKER (user's self-assessment scores):
+${lines.join('\n')}
+RATING RULES:
+- For ratings that are LOW (1-2): suggest actions to improve that area before re-asking
+- For ratings that are HIGH (4-5): acknowledge and focus on maintaining
+- For DECLINING ratings: prioritize addressing what's causing the drop
+- Re-ask ratings after at least 3-7 days to check for change
+- When creating a rating interaction, include metadata.ratingTopic with the topic name
+- Use interaction type "rating" with options ["1", "2", "3", "4", "5"]`;
   }
 
   /**

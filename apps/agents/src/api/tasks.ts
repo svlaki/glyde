@@ -3,14 +3,13 @@ import { getSupabaseService } from '../services/SupabaseService.js';
 
 export async function getUserTasks(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, status, aspect, priority, due_before, due_after } = req.body;
+    const { user_id, status, aspect, priority, due_before, due_after, completed_after } = req.body;
 
     if (!user_id) {
       res.status(400).json({ error: 'user_id is required' });
       return;
     }
 
-    console.log('Fetching tasks for user:', user_id);
     const userId = user_id;
 
     const filters: any = {};
@@ -19,6 +18,7 @@ export async function getUserTasks(req: Request, res: Response): Promise<void> {
     if (priority) filters.priority = priority;
     if (due_before) filters.dueBefore = due_before;
     if (due_after) filters.dueAfter = due_after;
+    if (completed_after) filters.completedAfter = completed_after;
 
     const tasks = await getSupabaseService().getTasks(userId, filters);
 

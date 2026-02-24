@@ -1306,6 +1306,7 @@ export class SupabaseService {
     parentGoalId?: string;
     dueBefore?: string;
     dueAfter?: string;
+    completedAfter?: string;
   }): Promise<any[]> {
     try {
       console.log('🔍 [SUPABASE SERVICE] Getting tasks for user:', userId);
@@ -1346,6 +1347,9 @@ export class SupabaseService {
       }
       if (filters?.dueAfter) {
         filteredTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date >= filters.dueAfter!);
+      }
+      if (filters?.completedAfter) {
+        filteredTasks = filteredTasks.filter((t: any) => t.completed_at && t.completed_at >= filters.completedAfter!);
       }
 
       console.log(`[SUPABASE SERVICE] Found ${filteredTasks.length} tasks with categories`);
@@ -1604,7 +1608,7 @@ export class SupabaseService {
 
       const { data, error } = await this.client
         .from('user_interactions')
-        .select('id, question, interaction_type, status, created_at, metadata')
+        .select('id, question, interaction_type, status, created_at, metadata, interaction_responses(response, created_at)')
         .eq('user_id', userId)
         .gte('created_at', cutoffTime)
         .order('created_at', { ascending: false })
@@ -1723,6 +1727,121 @@ export class SupabaseService {
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception saving interaction response:', error);
       throw error;
+    }
+  }
+
+  // ========== RATINGS ==========
+
+  /**
+   * Save a rating score for a topic
+   */
+  async createRating(userId: string, data: {
+    topic: string;
+    score: number;
+    description?: string;
+    aspectId?: string;
+    notes?: string;
+  }): Promise<any> {
+    try {
+      const { data: rating, error } = await this.client
+        .from('user_ratings')
+        .insert({
+          user_id: userId,
+          topic: data.topic,
+          score: data.score,
+          description: data.description || null,
+          aspect_id: data.aspectId || null,
+          notes: data.notes || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error creating rating:', error);
+        return null;
+      }
+      return rating;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception creating rating:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all ratings for a user, optionally filtered by topic
+   * Returns latest score per topic with history
+   */
+  async getRatings(userId: string, topic?: string): Promise<any[]> {
+    try {
+      let query = this.client
+        .from('user_ratings')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (topic) {
+        query = query.eq('topic', topic);
+      }
+
+      const { data, error } = await query.limit(100);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error fetching ratings:', error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception fetching ratings:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get a summary of all rating topics with latest score and trend
+   */
+  async getRatingSummary(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .from('user_ratings')
+        .select('topic, score, description, aspect_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error fetching rating summary:', error);
+        return [];
+      }
+
+      // Group by topic, compute latest score and trend
+      const topicMap = new Map<string, any[]>();
+      for (const r of (data || [])) {
+        const existing = topicMap.get(r.topic) || [];
+        existing.push(r);
+        topicMap.set(r.topic, existing);
+      }
+
+      const summaries: any[] = [];
+      for (const [topic, entries] of topicMap) {
+        const latest = entries[0];
+        const previous = entries.length > 1 ? entries[1] : null;
+        const trend = previous ? latest.score - previous.score : 0;
+        summaries.push({
+          topic,
+          description: latest.description,
+          latestScore: latest.score,
+          previousScore: previous?.score || null,
+          trend,
+          totalEntries: entries.length,
+          lastAsked: latest.created_at,
+          aspectId: latest.aspect_id,
+        });
+      }
+
+      return summaries;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception fetching rating summary:', error);
+      return [];
     }
   }
 
@@ -1860,6 +1979,8 @@ export class SupabaseService {
         updateData.status = updates.status;
         if (updates.status === 'completed') {
           updateData.completed_at = new Date().toISOString();
+        } else if (updates.status === 'pending') {
+          updateData.completed_at = null;
         }
       }
       if (updates.parentGoalId !== undefined) updateData.parent_goal_id = updates.parentGoalId;

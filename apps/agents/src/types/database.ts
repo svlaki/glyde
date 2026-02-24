@@ -116,6 +116,55 @@ export interface DatabaseProject {
   updated_at: string;
 }
 
+export type InteractionType = 'yes_no' | 'multiple_choice' | 'text' | 'rating' | 'time_suggestion';
+export type InteractionStatus = 'pending' | 'responded' | 'expired' | 'cancelled';
+
+export interface InteractionMetadata {
+  context?: string;
+  ratingTopic?: string;
+  ratingDescription?: string;
+  eventTitle?: string;
+  duration?: number;
+  eventId?: string;
+  taskId?: string;
+  targetAspectId?: string;
+  [key: string]: any;
+}
+
+export interface DatabaseInteraction {
+  id: string;
+  user_id: string;
+  agent_id: string;
+  interaction_type: InteractionType;
+  question: string;
+  options?: string[];
+  priority: number;
+  aspect_id?: string;
+  metadata?: InteractionMetadata;
+  expires_at?: string;
+  status: InteractionStatus;
+  created_at: string;
+}
+
+export interface DatabaseInteractionResponse {
+  id: string;
+  interaction_id: string;
+  user_id: string;
+  response: string;
+  responded_at: string;
+}
+
+export interface DatabaseRating {
+  id: string;
+  user_id: string;
+  topic: string;
+  score: number;
+  description?: string;
+  aspect_id?: string;
+  notes?: string;
+  created_at: string;
+}
+
 export interface UserSchema {
   userId: string;
   schemaName: string;

@@ -28,6 +28,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   const typography = getTypography(false) // Desktop-scaled mobile fonts
   const { aspects } = useAspects()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [completedTodayTasks, setCompletedTodayTasks] = useState<Task[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -70,8 +71,17 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   const loadTasks = async () => {
     if (!user || !session) return
     setLoading(true)
-    const { tasks: userTasks } = await fetchUserTasks(user, session.access_token, { status: 'pending' })
-    setTasks(userTasks || [])
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const [pendingResult, completedResult] = await Promise.all([
+      fetchUserTasks(user, session.access_token, { status: 'pending' }),
+      fetchUserTasks(user, session.access_token, { status: 'completed', completed_after: todayStart.toISOString() })
+    ])
+
+    setTasks(pendingResult.tasks || [])
+    setCompletedTodayTasks(completedResult.tasks || [])
     setLoading(false)
   }
 
@@ -91,6 +101,12 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   const handleCompleteTask = async (taskId: string) => {
     if (!user || !session) return
     await completeUserTask(user, session.access_token, taskId)
+    await loadTasks()
+  }
+
+  const handleUncompleteTask = async (taskId: string) => {
+    if (!user || !session) return
+    await updateUserTask(user, session.access_token, taskId, { status: 'pending', completed_at: null as any })
     await loadTasks()
   }
 
@@ -167,7 +183,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
               ...typography.labelMd,
               color: colors.textTertiary
             }}>
-              {tasks.length} pending
+              {tasks.length} pending{completedTodayTasks.length > 0 ? `, ${completedTodayTasks.length} done today` : ''}
             </span>
           </div>
           <NewButton
@@ -186,7 +202,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
           alignItems: 'center'
         }}>
           <span style={{ fontSize: fontSize.sm, color: colors.textSecondary }}>
-            {tasks.length} pending
+            {tasks.length} pending{completedTodayTasks.length > 0 ? `, ${completedTodayTasks.length} done today` : ''}
           </span>
           <NewButton
             onClick={() => setIsFormOpen(true)}
@@ -211,7 +227,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
           }}>
             Loading tasks...
           </div>
-        ) : tasks.length === 0 ? (
+        ) : tasks.length === 0 && completedTodayTasks.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: '40px 20px',
@@ -221,146 +237,230 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
             No pending tasks
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {tasks.map(task => {
-              const taskColor = getTaskColor(task)
-              return (
-                <div
-                  key={task.id}
-                  draggable={!isMobile}
-                  onDragStart={(e) => {
-                    if (isMobile) return
-                    // Store task data for calendar drop
-                    e.dataTransfer.setData('application/glyde-task', JSON.stringify(task))
-                    e.dataTransfer.effectAllowed = 'copy'
-                    // Add visual feedback
-                    e.currentTarget.style.opacity = '0.5'
-                  }}
-                  onDragEnd={(e) => {
-                    e.currentTarget.style.opacity = '1'
-                  }}
-                  style={{
-                    padding: isMobile ? '10px 12px' : '6px 8px',
-                    background: hexToRgba(taskColor, 0.15),
-                    borderRadius: '3px',
-                    border: 'none',
-                    borderLeft: `2px solid ${taskColor}`,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: isMobile ? '10px' : '7px',
-                    transition: 'all 0.15s',
-                    cursor: isMobile ? 'pointer' : 'grab',
-                    minHeight: isMobile ? '56px' : 'auto'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = hexToRgba(taskColor, 0.25)
-                    if (!isMobile) {
-                      const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
-                      if (deleteBtn) deleteBtn.style.opacity = '0.5'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = hexToRgba(taskColor, 0.15)
-                    if (!isMobile) {
-                      const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
-                      if (deleteBtn) { deleteBtn.style.opacity = '0'; deleteBtn.style.color = colors.textTertiary }
-                    }
-                  }}
-                  onClick={(e) => {
-                    // Don't open modal if clicking checkbox or delete
-                    const target = e.target as HTMLElement
-                    if (target.tagName !== 'INPUT' && !target.closest('[data-delete-btn]')) {
-                      setEditingTask(task)
-                    }
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: isMobile ? '44px' : 'auto',
-                    minHeight: isMobile ? '44px' : 'auto',
-                    margin: isMobile ? '-10px -6px -10px -10px' : 0,
-                    flexShrink: 0
-                  }}>
-                    <input
-                      type="checkbox"
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        handleCompleteTask(task.id)
+          <>
+            {/* Pending tasks */}
+            {tasks.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {tasks.map(task => {
+                  const taskColor = getTaskColor(task)
+                  return (
+                    <div
+                      key={task.id}
+                      draggable={!isMobile}
+                      onDragStart={(e) => {
+                        if (isMobile) return
+                        e.dataTransfer.setData('application/glyde-task', JSON.stringify(task))
+                        e.dataTransfer.effectAllowed = 'copy'
+                        e.currentTarget.style.opacity = '0.5'
+                      }}
+                      onDragEnd={(e) => {
+                        e.currentTarget.style.opacity = '1'
                       }}
                       style={{
-                        width: isMobile ? '20px' : '13px',
-                        height: isMobile ? '20px' : '13px',
-                        cursor: 'pointer',
-                        flexShrink: 0
+                        padding: isMobile ? '10px 12px' : '6px 8px',
+                        background: hexToRgba(taskColor, 0.15),
+                        borderRadius: '3px',
+                        border: 'none',
+                        borderLeft: `2px solid ${taskColor}`,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: isMobile ? '10px' : '7px',
+                        transition: 'all 0.15s',
+                        cursor: isMobile ? 'pointer' : 'grab',
+                        minHeight: isMobile ? '56px' : 'auto'
                       }}
-                    />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: isMobile ? fontSize.sm : fontSize.xs,
-                      fontWeight: fontWeight.medium,
-                      color: colors.textPrimary,
-                      marginBottom: task.due_date || task.priority ? '2px' : 0
-                    }}>
-                      {task.title}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      {task.due_date && (
-                        <div style={{ fontSize: '10px', color: colors.textSecondary }}>
-                          {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
-                      )}
-                      {task.priority && task.priority !== 'low' && (
-                        <span style={{
-                          fontSize: '10px',
-                          padding: '1px 4px',
-                          borderRadius: '2px',
-                          background: task.priority === 'urgent' ? '#fee' : task.priority === 'high' ? '#fef0e6' : '#fff9e6',
-                          color: task.priority === 'urgent' ? '#c00' : task.priority === 'high' ? '#c60' : '#880',
-                          fontWeight: fontWeight.medium
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = hexToRgba(taskColor, 0.25)
+                        if (!isMobile) {
+                          const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
+                          if (deleteBtn) deleteBtn.style.opacity = '0.5'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = hexToRgba(taskColor, 0.15)
+                        if (!isMobile) {
+                          const deleteBtn = e.currentTarget.querySelector('[data-delete-btn]') as HTMLElement
+                          if (deleteBtn) { deleteBtn.style.opacity = '0'; deleteBtn.style.color = colors.textTertiary }
+                        }
+                      }}
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement
+                        if (target.tagName !== 'INPUT' && !target.closest('[data-delete-btn]')) {
+                          setEditingTask(task)
+                        }
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: isMobile ? '44px' : 'auto',
+                        minHeight: isMobile ? '44px' : 'auto',
+                        margin: isMobile ? '-10px -6px -10px -10px' : 0,
+                        flexShrink: 0
+                      }}>
+                        <input
+                          type="checkbox"
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleCompleteTask(task.id)
+                          }}
+                          style={{
+                            width: isMobile ? '20px' : '13px',
+                            height: isMobile ? '20px' : '13px',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: isMobile ? fontSize.sm : fontSize.xs,
+                          fontWeight: fontWeight.medium,
+                          color: colors.textPrimary,
+                          marginBottom: task.due_date || task.priority ? '2px' : 0
                         }}>
-                          {task.priority}
-                        </span>
-                      )}
+                          {task.title}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          {task.due_date && (
+                            <div style={{ fontSize: '10px', color: colors.textSecondary }}>
+                              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
+                          )}
+                          {task.priority && task.priority !== 'low' && (
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '1px 4px',
+                              borderRadius: '2px',
+                              background: task.priority === 'urgent' ? '#fee' : task.priority === 'high' ? '#fef0e6' : '#fff9e6',
+                              color: task.priority === 'urgent' ? '#c00' : task.priority === 'high' ? '#c60' : '#880',
+                              fontWeight: fontWeight.medium
+                            }}>
+                              {task.priority}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        data-delete-btn
+                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: colors.textTertiary,
+                          padding: isMobile ? '8px' : '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          opacity: isMobile ? 0.5 : 0,
+                          transition: 'opacity 0.15s, color 0.15s',
+                          minWidth: isMobile ? '44px' : 'auto',
+                          minHeight: isMobile ? '44px' : 'auto',
+                          margin: isMobile ? '-8px -8px -8px 0' : 0
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.error }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = isMobile ? '0.5' : '0'
+                          e.currentTarget.style.color = colors.textTertiary
+                        }}
+                        title="Delete task"
+                      >
+                        <svg width={isMobile ? '16' : '12'} height={isMobile ? '16' : '12'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    data-delete-btn
-                    onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: colors.textTertiary,
-                      padding: isMobile ? '8px' : '2px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      opacity: isMobile ? 0.5 : 0,
-                      transition: 'opacity 0.15s, color 0.15s',
-                      minWidth: isMobile ? '44px' : 'auto',
-                      minHeight: isMobile ? '44px' : 'auto',
-                      margin: isMobile ? '-8px -8px -8px 0' : 0
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = colors.error }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = isMobile ? '0.5' : '0'
-                      e.currentTarget.style.color = colors.textTertiary
-                    }}
-                    title="Delete task"
-                  >
-                    <svg width={isMobile ? '16' : '12'} height={isMobile ? '16' : '12'} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Completed today */}
+            {completedTodayTasks.length > 0 && (
+              <>
+                <div style={{
+                  fontSize: '10px',
+                  fontWeight: fontWeight.semibold,
+                  color: colors.textTertiary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  padding: tasks.length > 0 ? '12px 0 6px' : '0 0 6px'
+                }}>
+                  Completed today
                 </div>
-              )
-            })}
-          </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {completedTodayTasks.map(task => {
+                    const taskColor = getTaskColor(task)
+                    return (
+                      <div
+                        key={task.id}
+                        style={{
+                          padding: isMobile ? '10px 12px' : '6px 8px',
+                          background: hexToRgba(taskColor, 0.08),
+                          borderRadius: '3px',
+                          border: 'none',
+                          borderLeft: `2px solid ${hexToRgba(taskColor, 0.4)}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: isMobile ? '10px' : '7px',
+                          transition: 'all 0.15s',
+                          cursor: 'pointer',
+                          opacity: 0.7
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7' }}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement
+                          if (target.tagName !== 'INPUT') {
+                            setEditingTask(task)
+                          }
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: isMobile ? '44px' : 'auto',
+                          minHeight: isMobile ? '44px' : 'auto',
+                          margin: isMobile ? '-10px -6px -10px -10px' : 0,
+                          flexShrink: 0
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleUncompleteTask(task.id)
+                            }}
+                            style={{
+                              width: isMobile ? '20px' : '13px',
+                              height: isMobile ? '20px' : '13px',
+                              cursor: 'pointer',
+                              flexShrink: 0
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: isMobile ? fontSize.sm : fontSize.xs,
+                            fontWeight: fontWeight.medium,
+                            color: colors.textTertiary,
+                            textDecoration: 'line-through'
+                          }}>
+                            {task.title}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </>
         )}
       </div>
 

@@ -38,6 +38,7 @@ export async function fetchUserTasks(
     priority?: string
     due_before?: string
     due_after?: string
+    completed_after?: string
   }
 ): Promise<{ tasks: Task[], error: string | null }> {
   try {

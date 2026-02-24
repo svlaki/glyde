@@ -40,6 +40,7 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor, archiveUserAspect, unarchiveUserAspect, getArchivedAspects } from './aspects.js';
 import { getUserProjects, createUserProject, updateUserProject, deleteUserProject, archiveUserProject, unarchiveUserProject, getArchivedProjects as getArchivedUserProjects, getProjectDetail, tagEntityToProject } from './projects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
+import { getUserRatings, getRatingSummary, createRating } from './ratings.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
   getConnections,
@@ -363,6 +364,11 @@ app.post('/api/interactions/clear', clearUserInteractions);
 // DISABLED: Automatic startup interaction generation removed
 // Interactions are now created directly by the agent via create_interaction tool
 // app.post('/api/interactions/generate-startup', generateStartupInteractions);
+
+// Rating endpoints
+app.post('/api/ratings', getUserRatings);
+app.post('/api/ratings/summary', getRatingSummary);
+app.post('/api/ratings/create', createRating);
 
 // Rules endpoints
 app.post('/api/rules', getUserRules);

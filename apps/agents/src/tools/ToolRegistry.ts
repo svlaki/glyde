@@ -128,7 +128,7 @@ export class ToolRegistry {
       profile: ['get_profile', 'update_profile'],
       memory: ['search_memory_unified', 'manage_patterns'],
       search: ['web_search', 'location_search'],
-      interactions: ['create_interaction'],
+      interactions: ['create_interaction', 'create_rating'],
       rules: ['create_rule', 'list_rules', 'delete_rule'],
       plans: ['get_plan', 'update_plan'],
       projects: ['create_project', 'list_projects', 'update_project', 'archive_project', 'tag_to_project']
@@ -141,25 +141,20 @@ export class ToolRegistry {
   // Get tools for InteractionAgentGerald
   // Gerald can create interactions AND directly create tasks/events/goals
   getGeraldAgentTools(): any[] {
-    // Include interaction tools
-    const tools = [...interactionTools];
+    // Gerald gets ALL tools (same as conversation agent) so it can act on user responses
+    // Plus interaction-specific tools for creating interactions
+    const allTools = this.getAllTools();
+    const toolNames = new Set(allTools.map(t => t.name));
 
-    // Add creation tools for tasks, events, goals
-    const creationToolNames = [
-      'create_task',
-      'create_event',
-      'create_goal',
-    ];
-
-    creationToolNames.forEach(name => {
-      const tool = this.tools.get(name);
-      if (tool) {
-        tools.push(tool);
+    // Add interaction tools if not already registered
+    for (const t of interactionTools) {
+      if (!toolNames.has(t.name)) {
+        allTools.push(t);
       }
-    });
+    }
 
-    console.log(`[GERALD TOOLS] Loaded ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
-    return tools;
+    console.log(`[GERALD TOOLS] Loaded ${allTools.length} tools (full toolset)`);
+    return allTools;
   }
 
   // Get tool names for a specific category

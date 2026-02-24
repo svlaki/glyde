@@ -26,6 +26,7 @@ export interface PromptContext {
   recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
   currentPage?: string; // Current page user is viewing (dashboard, plan, etc.)
   currentLocation?: string; // User's current GPS coordinates (e.g. "37.44, -122.14")
+  ratingContext?: string; // Rating tracker scores and trends
 }
 
 /**
@@ -215,7 +216,8 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     recentUserActivity,
     recentAgentActivity,
     currentPage,
-    currentLocation
+    currentLocation,
+    ratingContext
   } = context;
 
   // Optional: Add dynamic tool count to prompt
@@ -285,7 +287,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${locationSection}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${locationSection}${ratingContext || ''}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
