@@ -483,6 +483,12 @@ process.on('uncaughtException', (error) => {
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, () => {
     console.log(`Agent service running on port ${PORT}`);
+    console.log(`[SERVER] Google OAuth config:`, {
+      redirectUri: process.env.GOOGLE_REDIRECT_URI || '(not set)',
+      connectionCallbackUri: process.env.GOOGLE_CONNECTION_CALLBACK_URI || '(not set, using GOOGLE_REDIRECT_URI)',
+      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET
+    });
 
     // Start background jobs
     startWatchRenewalJob();

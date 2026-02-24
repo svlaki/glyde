@@ -19,5 +19,5 @@ export const AGENT_CONFIG = {
   /**
    * Recursion limit for LangGraph
    */
-  recursionLimit: 6,
+  recursionLimit: 10,
 };

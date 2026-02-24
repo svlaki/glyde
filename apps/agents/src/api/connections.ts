@@ -84,7 +84,12 @@ export async function getGoogleAuthUrl(req: Request, res: Response): Promise<voi
       state: JSON.stringify({ userId, flow: 'connection' })
     });
 
-    logger.info('[connections] Generated Google auth URL for user:', userId);
+    logger.info('[connections] Generated Google auth URL', {
+      userId,
+      redirectUri,
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret
+    });
 
     res.json({
       success: true,
@@ -129,16 +134,36 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
       return;
     }
 
-    logger.info('[connections] Processing Google callback for user:', userId);
+    const redirectUri = process.env.GOOGLE_CONNECTION_CALLBACK_URI || process.env.GOOGLE_REDIRECT_URI;
+    logger.info('[connections] Processing Google callback', {
+      userId,
+      redirectUri,
+      hasCode: !!code,
+      stateFlow: stateData.flow
+    });
 
     // Exchange code for tokens
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CONNECTION_CALLBACK_URI || process.env.GOOGLE_REDIRECT_URI
+      redirectUri
     );
 
-    const { tokens } = await oauth2Client.getToken(code);
+    let tokens;
+    try {
+      const result = await oauth2Client.getToken(code);
+      tokens = result.tokens;
+    } catch (tokenError: any) {
+      logger.error('[connections] Token exchange failed', {
+        error: tokenError.message,
+        code: tokenError.code,
+        redirectUri
+      });
+      res.status(400).json({
+        error: `Token exchange failed: ${tokenError.message || 'Unknown error'}`
+      });
+      return;
+    }
 
     if (!tokens.access_token) {
       res.status(400).json({ error: 'Failed to get access token from Google' });

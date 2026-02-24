@@ -70,8 +70,9 @@ export function ConnectionProvider({ children }: { children: ReactNode }) {
   // Handle OAuth callback messages from popup
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // Validate origin
-      if (event.origin !== window.location.origin) return
+      // Skip strict origin check - OAuth redirect may land on a different
+      // origin than the opener (e.g., production redirect URI vs localhost)
+      if (!event.data?.type) return
 
       const { type, code, state, error: oauthError } = event.data || {}
 

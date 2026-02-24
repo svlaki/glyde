@@ -331,6 +331,7 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
   const colors = getColors(theme)
   const typography = getTypography(isMobile)
   const [connecting, setConnecting] = useState(false)
+  const [connectError, setConnectError] = useState<string | null>(null)
   const popupRef = useRef<Window | null>(null)
   const onConnectionChangedRef = useRef(onConnectionChanged)
 
@@ -344,24 +345,32 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
   // Listen for OAuth callback postMessage from popup
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
+      // Only accept messages from our popup (source check is sufficient;
+      // origin check removed because the OAuth redirect URI may land on
+      // a different origin than the opener, e.g., production vs localhost)
       if (popupRef.current && event.source !== popupRef.current) return
 
       const { type, code, state, error } = event.data || {}
 
       if (type === 'GOOGLE_CONNECTION_CALLBACK') {
         if (error) {
-          console.error('[ConnectionsStatusCard] OAuth error:', error)
+          setConnectError(`OAuth error: ${error}`)
           setConnecting(false)
+          popupRef.current = null
           return
         }
 
         if (code && state && user && session) {
           try {
-            await handleGoogleCallback(user, code, state, session.access_token)
-            onConnectionChangedRef.current?.()
-          } catch (err) {
-            console.error('[ConnectionsStatusCard] Callback error:', err)
+            setConnectError(null)
+            const result = await handleGoogleCallback(user, code, state, session.access_token)
+            if (result.error) {
+              setConnectError(result.error)
+            } else {
+              onConnectionChangedRef.current?.()
+            }
+          } catch (err: any) {
+            setConnectError(err.message || 'Failed to connect calendar')
           }
         }
         popupRef.current = null
@@ -391,31 +400,34 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
   const handleConnect = async () => {
     if (!user || !session || connecting) return
     setConnecting(true)
+    setConnectError(null)
     try {
-      const { authUrl } = await getGoogleAuthUrl(user, session.access_token)
-      if (authUrl) {
-        const width = 500
-        const height = 600
-        const left = window.screenX + (window.outerWidth - width) / 2
-        const top = window.screenY + (window.outerHeight - height) / 2
-
-        const popup = window.open(
-          authUrl,
-          'google-oauth',
-          `width=${width},height=${height},left=${left},top=${top},popup=1`
-        )
-
-        if (!popup) {
-          console.error('[ConnectionsStatusCard] Popup blocked')
-          setConnecting(false)
-        } else {
-          popupRef.current = popup
-        }
-      } else {
+      const { authUrl, error: urlError } = await getGoogleAuthUrl(user, session.access_token)
+      if (urlError || !authUrl) {
+        setConnectError(urlError || 'Failed to get authorization URL')
         setConnecting(false)
+        return
       }
-    } catch (err) {
-      console.error('[ConnectionsStatusCard] Connection error:', err)
+
+      const width = 500
+      const height = 600
+      const left = window.screenX + (window.outerWidth - width) / 2
+      const top = window.screenY + (window.outerHeight - height) / 2
+
+      const popup = window.open(
+        authUrl,
+        'google-oauth',
+        `width=${width},height=${height},left=${left},top=${top},popup=1`
+      )
+
+      if (!popup) {
+        setConnectError('Popup blocked. Please allow popups for this site.')
+        setConnecting(false)
+      } else {
+        popupRef.current = popup
+      }
+    } catch (err: any) {
+      setConnectError(err.message || 'Failed to start connection')
       setConnecting(false)
     }
   }
@@ -442,6 +454,35 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
       </div>
 
       <div style={{ padding: isMobile ? '0 16px 14px' : '0 20px 16px' }}>
+        {connectError && (
+          <div style={{
+            padding: '8px 12px',
+            marginBottom: '8px',
+            borderRadius: '6px',
+            backgroundColor: isDarkMode ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.06)',
+            border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)'}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '8px',
+          }}>
+            <span style={{ ...typography.labelMd, color: '#ef4444' }}>{connectError}</span>
+            <button
+              onClick={() => setConnectError(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ef4444',
+                cursor: 'pointer',
+                padding: '0 4px',
+                fontSize: '16px',
+                lineHeight: 1,
+              }}
+            >
+              x
+            </button>
+          </div>
+        )}
         {connections.length === 0 ? (
           <div style={{ padding: '8px 0' }}>
             <div style={{ ...typography.bodySm, color: colors.textTertiary, marginBottom: '10px' }}>
@@ -470,6 +511,23 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
             {connections.map(conn => (
               <ConnectionRow key={conn.id} connection={conn} onConnectionChanged={onConnectionChanged} />
             ))}
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${borderColor}`,
+                borderRadius: '4px',
+                padding: '4px 12px',
+                cursor: connecting ? 'default' : 'pointer',
+                color: colors.textTertiary,
+                ...typography.labelMd,
+                marginTop: '6px',
+                opacity: connecting ? 0.5 : 1,
+              }}
+            >
+              {connecting ? 'Connecting...' : '+ Add Calendar'}
+            </button>
           </>
         )}
       </div>

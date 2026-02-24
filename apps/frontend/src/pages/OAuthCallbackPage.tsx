@@ -13,6 +13,15 @@ export function OAuthCallbackPage() {
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
       const state = params.get('state')
+      const error = params.get('error')
+
+      // Handle Google OAuth errors (user denied access, etc.)
+      if (error) {
+        setStatus('error')
+        setMessage(error === 'access_denied' ? 'Access denied' : error)
+        sendMessage({ type: 'CALENDAR_IMPORT_ERROR', error })
+        return
+      }
 
       if (!code || !state) {
         setStatus('error')
@@ -32,23 +41,8 @@ export function OAuthCallbackPage() {
         // State is just the userId string (legacy format)
       }
 
-      // Wait for auth to be ready
-      if (!user || !session?.access_token) {
-        // Give auth context a moment to initialize
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-
-      if (!user || !session?.access_token) {
-        setStatus('error')
-        setMessage('Authentication required')
-        sendMessage({ type: 'CALENDAR_IMPORT_ERROR', error: 'Authentication required' })
-        return
-      }
-
-      // Handle connection flow
+      // Connection flow: just relay code back to opener, no auth needed in popup
       if (flow === 'connection') {
-        setMessage('Connecting your calendar...')
-        // Send code back to parent window for connection flow
         setStatus('success')
         setMessage('Calendar connected!')
         sendMessage({
@@ -59,10 +53,20 @@ export function OAuthCallbackPage() {
         return
       }
 
-      // Handle onboarding/import flow
+      // Onboarding/import flow requires auth
+      if (!user || !session?.access_token) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+
+      if (!user || !session?.access_token) {
+        setStatus('error')
+        setMessage('Authentication required')
+        sendMessage({ type: 'CALENDAR_IMPORT_ERROR', error: 'Authentication required' })
+        return
+      }
+
       setMessage('Importing your calendar...')
       try {
-        // Import calendar events
         const result = await importGoogleCalendar(user, session.access_token, code, userId)
 
         if (result.success) {
@@ -93,10 +97,13 @@ export function OAuthCallbackPage() {
     handleCallback()
   }, [user, session])
 
-  function sendMessage(data: { type: string; eventCount?: number; error?: string }) {
-    // Send message to parent window
+  function sendMessage(data: { type: string; code?: string; state?: string; eventCount?: number; error?: string }) {
+    // Send message to parent/opener window
+    // Use '*' for target origin because the popup may land on a different origin
+    // than the opener (e.g., production redirect URI while running locally).
+    // The data only contains a one-time OAuth code, not sensitive credentials.
     if (window.opener) {
-      window.opener.postMessage(data, window.location.origin)
+      window.opener.postMessage(data, '*')
     }
 
     // Auto-close after a brief delay

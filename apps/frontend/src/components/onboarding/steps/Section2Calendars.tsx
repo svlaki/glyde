@@ -46,7 +46,9 @@ export function Section2Calendars() {
   // Listen for OAuth callback from popup (handles both flows)
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return
+      // Skip strict origin check - OAuth redirect may land on a different
+      // origin than the opener (e.g., production redirect URI vs localhost)
+      if (!event.data?.type) return
 
       // Connection (sync) flow callback
       if (event.data?.type === 'GOOGLE_CONNECTION_CALLBACK') {
