@@ -25,6 +25,7 @@ export interface AgentContext {
   conversationHistory: ConversationMessage[];
   userProfile?: UserProfile;
   isInternal?: boolean; // Flag for internal messages that shouldn't be persisted
+  location?: { latitude: number; longitude: number }; // Browser geolocation coords
 }
 
 export interface UserProfile {

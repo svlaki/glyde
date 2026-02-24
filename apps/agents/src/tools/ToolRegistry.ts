@@ -127,7 +127,7 @@ export class ToolRegistry {
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],
       memory: ['search_memory_unified', 'manage_patterns'],
-      search: ['web_search'],
+      search: ['web_search', 'location_search'],
       interactions: ['create_interaction'],
       rules: ['create_rule', 'list_rules', 'delete_rule'],
       plans: ['get_plan', 'update_plan'],
