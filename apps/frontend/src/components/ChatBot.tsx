@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
+import { useGeolocation } from '../hooks/useGeolocation'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
 import { mobileSpacing } from '../styles/mobileStyles'
@@ -125,6 +126,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
   const { user, session, preferredName } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const { refreshAspects } = useAspects()
+  const currentLocation = useGeolocation()
   const location = useLocation()
   const colors = getColors(theme)
   const typography = getTypography(false) // Desktop-scaled mobile fonts
@@ -592,7 +594,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             sessionId: 'default',
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             conversationHistory,
-            currentPage: getCurrentPage()
+            currentPage: getCurrentPage(),
+            location: currentLocation ?? undefined
           }
         }),
         signal: abortControllerRef.current.signal

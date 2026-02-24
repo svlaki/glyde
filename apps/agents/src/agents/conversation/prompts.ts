@@ -24,6 +24,7 @@ export interface PromptContext {
   recentUserActivity?: ActivityLogEntry[]; // Recent manual changes by user
   recentAgentActivity?: ActivityLogEntry[]; // Recent actions by agent
   currentPage?: string; // Current page user is viewing (dashboard, plan, etc.)
+  currentLocation?: string; // User's current GPS coordinates (e.g. "37.44, -122.14")
 }
 
 /**
@@ -95,6 +96,17 @@ export function buildProfileContext(profile: DatabaseProfile | null): string {
   }
   if (extendedProfile.communication_style) {
     parts.push(`Communication Style: ${extendedProfile.communication_style}`);
+  }
+
+  // Show saved location data from context_data (home, work addresses)
+  if (extendedProfile.context_data) {
+    const ctx = extendedProfile.context_data;
+    if (ctx.home_address) {
+      parts.push(`Home Address: ${ctx.home_address}`);
+    }
+    if (ctx.work_address) {
+      parts.push(`Work Address: ${ctx.work_address}`);
+    }
   }
 
   if (parts.length === 0) {
@@ -200,7 +212,8 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     userProfile,
     recentUserActivity,
     recentAgentActivity,
-    currentPage
+    currentPage,
+    currentLocation
   } = context;
 
   // Optional: Add dynamic tool count to prompt
@@ -211,6 +224,15 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
   const projectContext = buildProjectContext(userProjects || []);
   const profileContext = buildProfileContext(userProfile || null);
   const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
+
+  // Build location context section - include both readable address and raw coords
+  let locationSection = '';
+  if (currentLocation) {
+    // Extract raw coords from the location string (format: "Address (lat, lng)" or "lat, lng")
+    const coordsMatch = currentLocation.match(/([-\d.]+),\s*([-\d.]+)/);
+    const rawCoords = coordsMatch ? `${coordsMatch[1]},${coordsMatch[2]}` : currentLocation;
+    locationSection = `\n\nUSER'S CURRENT LOCATION: ${currentLocation}\nGPS COORDS FOR TOOLS: ${rawCoords}\nWhen calling location_search, ALWAYS use "${rawCoords}" as fromLocation (not a place name).`;
+  }
 
   // Build rules section if rules exist
   const rulesSection = rulesContext ? `
@@ -258,7 +280,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${locationSection}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
@@ -811,6 +833,28 @@ DO NOT use web_search for:
 - Tasks that don't need external information
 - Questions you can answer from user's calendar/tasks
 - General knowledge you already have
+
+LOCATION INTELLIGENCE (CRITICAL - READ CAREFULLY):
+You have the user's live GPS coordinates and a location_search tool powered by Google Maps.
+
+CRITICAL RULE FOR fromLocation: ALWAYS pass the RAW GPS COORDINATES from USER'S CURRENT LOCATION above.
+- CORRECT: fromLocation="37.4221,-122.1725"
+- WRONG: fromLocation="The Knoll" or fromLocation="Stanford" (place names are ambiguous and give wrong results!)
+- Extract the lat,lng numbers from the location context and pass them exactly as "lat,lng"
+
+USE location_search (NOT web_search) when:
+- Drive time: location_search(query="destination name", fromLocation="<lat>,<lng>", toLocation="destination name or address", infoType="drive_time")
+- Venue info: location_search(query="venue name city", infoType="venue_info")
+- Nearby places: location_search(query="coffee shops", fromLocation="<lat>,<lng>", infoType="general")
+- "Where am I?": location_search(query="<lat>,<lng>", infoType="reverse_geocode")
+
+LEARNING HOME/WORK ADDRESSES:
+- If user mentions "home" or "work" with a location, use update_profile to save in context_data (home_address, work_address)
+- Use saved addresses as default origins when GPS is unavailable
+
+DRIVE TIME ENRICHMENT:
+- When creating events at venues, proactively mention drive time if user location is known
+- Don't add drive time for virtual/online events
 
 MEMORY MANAGEMENT (CRITICAL):
 You have THREE memory tools for capturing and retrieving user insights:

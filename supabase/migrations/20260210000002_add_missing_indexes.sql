@@ -21,4 +21,8 @@ CREATE INDEX IF NOT EXISTS idx_events_user_google_event ON public.events(user_id
 CREATE INDEX IF NOT EXISTS idx_calendar_mappings_aspect_id ON public.user_calendar_mappings(aspect_id);
 
 -- Activity log: user_id + created_at for recent activity queries
-CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON public.activity_log(user_id, created_at DESC);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_activity_log') THEN
+    CREATE INDEX IF NOT EXISTS idx_activity_log_user_created ON public.user_activity_log(user_id, created_at DESC);
+  END IF;
+END $$;

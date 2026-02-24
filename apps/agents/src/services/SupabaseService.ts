@@ -769,13 +769,7 @@ export class SupabaseService {
       // Get events from visible friends
       let query = this.client
         .from('events')
-        .select(`
-          *,
-          profile:user_id (
-            display_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .in('visibility', ['friends', 'public'])
         .in('user_id', visibleFriendIds);
 
@@ -793,13 +787,27 @@ export class SupabaseService {
         return [];
       }
 
+      // Fetch profile data for the friend IDs that have events
+      const eventUserIds = [...new Set((data || []).map((e: any) => e.user_id))];
+      const { data: profiles } = eventUserIds.length > 0
+        ? await this.client
+            .from('profile')
+            .select('id, display_name, avatar_url')
+            .in('id', eventUserIds)
+        : { data: [] };
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
       // Map to include friend event flags
-      return (data || []).map((event: any) => ({
-        ...event,
-        is_friend_event: true,
-        owner_display_name: event.profile?.display_name || 'Friend',
-        owner_avatar_url: event.profile?.avatar_url
-      }));
+      return (data || []).map((event: any) => {
+        const profile = profileMap.get(event.user_id);
+        return {
+          ...event,
+          is_friend_event: true,
+          owner_display_name: profile?.display_name || 'Friend',
+          owner_avatar_url: profile?.avatar_url
+        };
+      });
     } catch (error) {
       console.error('Error in getFriendsEventsDirectQuery:', error);
       return [];
