@@ -38,7 +38,10 @@ export function buildAspectContext(aspects: any[]): string {
   }
 
   const aspectList = aspects
-    .map(a => `  - "${a.name}" (ID: ${a.id})${a.color ? ` [${a.color}]` : ''}`)
+    .map(a => {
+      const desc = a.description ? ` | Notes: ${a.description}` : '';
+      return `  - "${a.name}" (ID: ${a.id})${a.color ? ` [${a.color}]` : ''}${desc}`;
+    })
     .join('\n');
 
   return `\n\nAVAILABLE ASPECTS (${aspects.length}) - Use these IDs when creating events/tasks/goals:\n${aspectList}`;
@@ -663,6 +666,38 @@ When user says "move X to Y", "change X to Thursday", "I said the wrong day":
 - Always use update_event to change the date/time (updates in place, one event).
 - "move the bathhouse date to Thursday" → update_event(searchQuery="bathhouse", startTime="Thursday 9pm")
 - "I meant Thursday" → update the last created/discussed event, not create a new one.
+
+ASPECT NOTE-TAKING (IMPORTANT):
+Whenever the user shares useful information about an aspect, proactively save it to the aspect's description using update_aspect.
+- User mentions details about a class (professor, room, grading, schedule quirks) → append to that aspect's description
+- User shares context about a job (role, team, projects, manager) → append to that aspect's description
+- User reveals preferences tied to an aspect (best gym times, favorite study spot) → append to that aspect's description
+- User shares outcomes or reflections about an aspect ("I got promoted", "dropped this class") → append to description
+
+HOW TO APPEND (do NOT overwrite existing notes):
+1. Call list_aspects to get the current description for the aspect
+2. Combine existing description + new info into one updated description
+3. Call update_aspect(name="AspectName", description="existing notes + new notes")
+4. Do this silently in the background - no need to announce "I'm saving this to your aspect"
+
+EXAMPLES:
+- User: "My CS173A professor is Dr. Smith, class is in room 204" → update_aspect(name="CS173A", description="Professor: Dr. Smith. Room: 204.")
+- User: "I just got promoted to senior engineer at Ignite" → append "Promoted to Senior Engineer (Feb 2026)" to Ignite's description
+- User: "The gym is way less crowded before 7am" → append "Less crowded before 7am" to gym/fitness aspect description
+
+WHAT TO CAPTURE:
+- People (professors, managers, teammates, contacts)
+- Locations (room numbers, addresses, meeting spots)
+- Schedules/patterns (office hours, best times, recurring quirks)
+- Status changes (promotions, grades, milestones reached)
+- Preferences and insights the user shares about the aspect
+- Important dates or deadlines tied to the aspect
+
+WHAT NOT TO CAPTURE (already handled elsewhere):
+- Event details (saved in events)
+- Task items (saved in tasks)
+- Goal progress (saved in goals/milestones)
+- One-off scheduling info with no lasting relevance
 
 ASPECT WORKFLOW:
 1. ALWAYS call list_aspects FIRST before creating events/tasks/goals

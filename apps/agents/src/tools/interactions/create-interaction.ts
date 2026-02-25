@@ -30,6 +30,29 @@ export const createInteractionTool = tool(
         return `Skipped: A similar interaction is already pending. Choose a completely different topic.`;
       }
 
+      // Rating cooldown check: block rating interactions if the same topic was rated within 5 days
+      if (type === 'rating' && metadata?.ratingTopic) {
+        const ratingSummary = await supabaseService.getRatingSummary(userId);
+        const topicLower = (metadata.ratingTopic as string).toLowerCase();
+        const recentRating = ratingSummary.find((r: any) => {
+          const rTopicLower = (r.topic || '').toLowerCase();
+          // Check exact match or high similarity
+          return rTopicLower === topicLower
+            || rTopicLower.includes(topicLower)
+            || topicLower.includes(rTopicLower);
+        });
+
+        if (recentRating) {
+          const daysSince = Math.round(
+            (Date.now() - new Date(recentRating.lastAsked).getTime()) / 86400000
+          );
+          if (daysSince < 5) {
+            console.log(`[create-interaction] BLOCKED rating cooldown: "${metadata.ratingTopic}" was asked ${daysSince} days ago (minimum 5)`);
+            return `Skipped: Rating topic "${metadata.ratingTopic}" was last asked ${daysSince} day(s) ago. Minimum interval is 5 days. Choose a different topic.`;
+          }
+        }
+      }
+
       // Resolve aspectId from parameter or metadata
       let resolvedAspectId = aspectId || null;
       if (!resolvedAspectId && metadata) {

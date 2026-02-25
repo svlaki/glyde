@@ -5,7 +5,7 @@ import aspectService from './AspectService.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 
-const MAPPING_COLUMNS = 'id, user_id, connection_id, google_calendar_id, google_calendar_name, google_calendar_color, is_primary, aspect_id, is_synced, is_visible, sync_token, last_synced_at, created_at, updated_at';
+const MAPPING_COLUMNS = 'id, user_id, connection_id, provider_calendar_id, provider_calendar_name, provider_calendar_color, is_primary, aspect_id, is_synced, is_visible, sync_token, last_synced_at, created_at, updated_at';
 
 // Color palette for auto-created aspects (avoiding common colors that might be used)
 const ASPECT_COLOR_PALETTE = [
@@ -30,9 +30,9 @@ export interface CalendarMapping {
   id: string;
   user_id: string;
   connection_id: string;
-  google_calendar_id: string;
-  google_calendar_name: string | null;
-  google_calendar_color: string | null;
+  provider_calendar_id: string;
+  provider_calendar_name: string | null;
+  provider_calendar_color: string | null;
   is_primary: boolean;
   aspect_id: string | null;
   is_synced: boolean;
@@ -56,9 +56,9 @@ export interface GoogleCalendarInfo {
 
 export interface CreateCalendarMappingInput {
   connection_id: string;
-  google_calendar_id: string;
-  google_calendar_name?: string;
-  google_calendar_color?: string;
+  provider_calendar_id: string;
+  provider_calendar_name?: string;
+  provider_calendar_color?: string;
   is_primary?: boolean;
   aspect_id?: string;
   is_synced?: boolean;
@@ -66,8 +66,8 @@ export interface CreateCalendarMappingInput {
 }
 
 export interface UpdateCalendarMappingInput {
-  google_calendar_name?: string;
-  google_calendar_color?: string;
+  provider_calendar_name?: string;
+  provider_calendar_color?: string;
   aspect_id?: string | null;
   is_synced?: boolean;
   is_visible?: boolean;
@@ -132,7 +132,7 @@ export class CalendarMappingService {
         .select(MAPPING_COLUMNS)
         .eq('user_id', userId)
         .order('is_primary', { ascending: false })
-        .order('google_calendar_name', { ascending: true });
+        .order('provider_calendar_name', { ascending: true });
 
       if (error) {
         logger.error('[CalendarMappingService] Error fetching mappings:', error);
@@ -156,7 +156,7 @@ export class CalendarMappingService {
         .select(MAPPING_COLUMNS)
         .eq('connection_id', connectionId)
         .order('is_primary', { ascending: false })
-        .order('google_calendar_name', { ascending: true });
+        .order('provider_calendar_name', { ascending: true });
 
       if (error) {
         logger.error('[CalendarMappingService] Error fetching connection mappings:', error);
@@ -230,9 +230,9 @@ export class CalendarMappingService {
         .insert({
           user_id: userId,
           connection_id: input.connection_id,
-          google_calendar_id: input.google_calendar_id,
-          google_calendar_name: input.google_calendar_name || null,
-          google_calendar_color: input.google_calendar_color || null,
+          provider_calendar_id: input.provider_calendar_id,
+          provider_calendar_name: input.provider_calendar_name || null,
+          provider_calendar_color: input.provider_calendar_color || null,
           is_primary: input.is_primary || false,
           aspect_id: input.aspect_id || null,
           is_synced: input.is_synced ?? (input.is_primary || false), // Primary synced by default
@@ -264,16 +264,16 @@ export class CalendarMappingService {
         .upsert({
           user_id: userId,
           connection_id: input.connection_id,
-          google_calendar_id: input.google_calendar_id,
-          google_calendar_name: input.google_calendar_name || null,
-          google_calendar_color: input.google_calendar_color || null,
+          provider_calendar_id: input.provider_calendar_id,
+          provider_calendar_name: input.provider_calendar_name || null,
+          provider_calendar_color: input.provider_calendar_color || null,
           is_primary: input.is_primary || false,
           aspect_id: input.aspect_id || null,
           is_synced: input.is_synced ?? (input.is_primary || false),
           is_visible: input.is_visible ?? true,
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'connection_id,google_calendar_id'
+          onConflict: 'connection_id,provider_calendar_id'
         })
         .select()
         .single();
@@ -300,8 +300,8 @@ export class CalendarMappingService {
         updated_at: new Date().toISOString()
       };
 
-      if (updates.google_calendar_name !== undefined) updateData.google_calendar_name = updates.google_calendar_name;
-      if (updates.google_calendar_color !== undefined) updateData.google_calendar_color = updates.google_calendar_color;
+      if (updates.provider_calendar_name !== undefined) updateData.provider_calendar_name = updates.provider_calendar_name;
+      if (updates.provider_calendar_color !== undefined) updateData.provider_calendar_color = updates.provider_calendar_color;
       if (updates.aspect_id !== undefined) updateData.aspect_id = updates.aspect_id;
       if (updates.is_synced !== undefined) updateData.is_synced = updates.is_synced;
       if (updates.is_visible !== undefined) updateData.is_visible = updates.is_visible;
@@ -417,40 +417,77 @@ export class CalendarMappingService {
   }
 
   /**
-   * Sync calendar list from Google and create/update mappings
+   * Fetch all calendars from a user's Microsoft Outlook account
+   */
+  async fetchMicrosoftCalendarList(connection: UserConnection): Promise<GoogleCalendarInfo[]> {
+    try {
+      const accessToken = await this.connectionService.getValidAccessToken(connection);
+
+      const response = await fetch('https://graph.microsoft.com/v1.0/me/calendars', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Graph API error ${response.status}: ${errorBody}`);
+      }
+
+      const data = await response.json() as { value?: Array<{ id: string; name: string; hexColor?: string; isDefaultCalendar?: boolean; canEdit?: boolean }> };
+      const calendars = data.value || [];
+
+      return calendars.map((cal) => ({
+        id: cal.id,
+        summary: cal.name || 'Untitled Calendar',
+        description: null,
+        backgroundColor: cal.hexColor || null,
+        foregroundColor: null,
+        primary: cal.isDefaultCalendar === true,
+        accessRole: cal.canEdit ? 'writer' : 'reader',
+        timeZone: null
+      }));
+    } catch (error) {
+      logger.error('[CalendarMappingService] Error fetching Microsoft calendar list:', error);
+      throw new Error('Failed to fetch Microsoft calendars');
+    }
+  }
+
+  /**
+   * Sync calendar list from provider and create/update mappings
    * Called when a connection is first established or when refreshing calendars
    */
   async syncCalendarList(connection: UserConnection): Promise<CalendarMapping[]> {
     try {
-      // Fetch calendars from Google
-      const googleCalendars = await this.fetchGoogleCalendarList(connection);
+      // Fetch calendars from the appropriate provider
+      const calendars = connection.provider === 'microsoft'
+        ? await this.fetchMicrosoftCalendarList(connection)
+        : await this.fetchGoogleCalendarList(connection);
 
       // Get existing mappings
       const existingMappings = await this.getMappingsForConnection(connection.id);
       const existingByCalendarId = new Map(
-        existingMappings.map(m => [m.google_calendar_id, m])
+        existingMappings.map(m => [m.provider_calendar_id, m])
       );
 
       const results: CalendarMapping[] = [];
 
-      // Create or update mappings for each Google calendar
-      for (const gcal of googleCalendars) {
+      // Create or update mappings for each calendar
+      for (const gcal of calendars) {
         const existing = existingByCalendarId.get(gcal.id);
 
         if (existing) {
           // Update existing mapping with latest calendar info
           const updated = await this.updateMapping(existing.id, {
-            google_calendar_name: gcal.summary,
-            google_calendar_color: gcal.backgroundColor || undefined
+            provider_calendar_name: gcal.summary,
+            provider_calendar_color: gcal.backgroundColor || undefined
           });
           results.push(updated);
         } else {
           // Create new mapping (upsert to handle concurrent syncs)
           const created = await this.upsertMapping(connection.user_id, {
             connection_id: connection.id,
-            google_calendar_id: gcal.id,
-            google_calendar_name: gcal.summary,
-            google_calendar_color: gcal.backgroundColor || undefined,
+            provider_calendar_id: gcal.id,
+            provider_calendar_name: gcal.summary,
+            provider_calendar_color: gcal.backgroundColor || undefined,
             is_primary: gcal.primary,
             is_synced: gcal.primary, // Only sync primary by default
             is_visible: true
@@ -489,12 +526,13 @@ export class CalendarMappingService {
         if (mapping.aspect_id) continue;
 
         // Skip non-user calendars (holidays, birthdays, contacts, etc.)
-        if (this.isNonUserCalendar(mapping.google_calendar_id)) {
-          logger.info(`[CalendarMappingService] Skipping non-user calendar: ${mapping.google_calendar_name}`);
+        if (this.isNonUserCalendar(mapping.provider_calendar_id, connection.provider)) {
+          logger.info(`[CalendarMappingService] Skipping non-user calendar: ${mapping.provider_calendar_name}`);
           continue;
         }
 
-        const calendarName = mapping.google_calendar_name || 'Calendar';
+        const calendarName = mapping.provider_calendar_name || 'Calendar';
+        const providerLabel = connection.provider === 'microsoft' ? 'Outlook' : 'Google Calendar';
 
         // Try to find a matching aspect
         const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
@@ -502,7 +540,7 @@ export class CalendarMappingService {
         if (matchedAspect) {
           // Use existing aspect
           await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
-          console.log(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
+          logger.info(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
         } else {
           // Create new aspect with unused color
           const newColor = this.getUnusedColor(usedColors);
@@ -511,13 +549,13 @@ export class CalendarMappingService {
           const newAspect = await aspectService.createAspect(connection.user_id, {
             name: this.cleanCalendarName(calendarName),
             color: newColor,
-            description: `Auto-created from Google Calendar: ${calendarName}`
+            description: `Auto-created from ${providerLabel}: ${calendarName}`
           });
 
           if (newAspect) {
             await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
             existingAspects = [...existingAspects, newAspect]; // Add to list for future matching
-            console.log(`[CalendarMappingService] Created new aspect "${newAspect.name}" for calendar "${calendarName}"`);
+            logger.info(`[CalendarMappingService] Created new aspect "${newAspect.name}" for calendar "${calendarName}"`);
           }
         }
       }
@@ -535,7 +573,7 @@ export class CalendarMappingService {
     try {
       if (mapping.aspect_id) return mapping;
 
-      if (this.isNonUserCalendar(mapping.google_calendar_id)) {
+      if (this.isNonUserCalendar(mapping.provider_calendar_id)) {
         return mapping;
       }
 
@@ -546,7 +584,7 @@ export class CalendarMappingService {
           .filter((c): c is string => c !== undefined)
       );
 
-      const calendarName = mapping.google_calendar_name || 'Calendar';
+      const calendarName = mapping.provider_calendar_name || 'Calendar';
       const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
 
       if (matchedAspect) {
@@ -576,9 +614,12 @@ export class CalendarMappingService {
   }
 
   /**
-   * Check if a Google Calendar ID belongs to a non-user calendar (holidays, birthdays, contacts)
+   * Check if a calendar ID belongs to a non-user calendar (holidays, birthdays, contacts)
    */
-  private isNonUserCalendar(calendarId: string): boolean {
+  private isNonUserCalendar(calendarId: string, provider?: string): boolean {
+    // Microsoft calendars don't use special ID patterns like Google
+    if (provider === 'microsoft') return false;
+
     const nonUserPatterns = [
       '#holiday@group.v.calendar.google.com',
       '#contacts@group.v.calendar.google.com',

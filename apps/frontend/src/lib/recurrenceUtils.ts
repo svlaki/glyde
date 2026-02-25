@@ -94,7 +94,9 @@ export function getNextOccurrences(
     const localYear = parseInt(startTime.toLocaleString('en-US', { ...options, year: 'numeric' }));
     const localMonth = parseInt(startTime.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
     const localDay = parseInt(startTime.toLocaleString('en-US', { ...options, day: 'numeric' }));
-    const localHour = parseInt(startTime.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    // Intl with hour12:false can return "24" for midnight instead of "0"
+    const rawLocalHour = parseInt(startTime.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const localHour = rawLocalHour === 24 ? 0 : rawLocalHour;
     const localMinute = parseInt(startTime.toLocaleString('en-US', { ...options, minute: 'numeric' }));
 
     // Create a "fake UTC" date with local time components
@@ -108,7 +110,8 @@ export function getNextOccurrences(
     const nowYear = parseInt(now.toLocaleString('en-US', { ...options, year: 'numeric' }));
     const nowMonth = parseInt(now.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
     const nowDay = parseInt(now.toLocaleString('en-US', { ...options, day: 'numeric' }));
-    const nowHour = parseInt(now.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const rawNowHour = parseInt(now.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const nowHour = rawNowHour === 24 ? 0 : rawNowHour;
     const nowMinute = parseInt(now.toLocaleString('en-US', { ...options, minute: 'numeric' }));
     const localNow = new Date(Date.UTC(nowYear, nowMonth, nowDay, nowHour, nowMinute, 0));
 

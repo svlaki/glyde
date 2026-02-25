@@ -313,7 +313,7 @@ export class ConnectionService {
       } else {
         const { error } = await this.supabase
           .from('events')
-          .update({ connection_id: null, google_event_id: null, source: 'local' })
+          .update({ connection_id: null, google_event_id: null, outlook_event_id: null, source: 'local' })
           .eq('connection_id', connectionId)
           .eq('user_id', userId);
 

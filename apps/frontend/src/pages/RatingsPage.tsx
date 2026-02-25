@@ -20,7 +20,7 @@ export function RatingsPage() {
   return <RatingsPageDesktop />
 }
 
-// Score dot component for the 1-5 scale
+// Score dot component for the 1-10 scale
 function ScoreDots({ score, onSelect, size = 28, interactive = false, colors }: {
   score: number
   onSelect?: (score: number) => void
@@ -28,17 +28,9 @@ function ScoreDots({ score, onSelect, size = 28, interactive = false, colors }: 
   interactive?: boolean
   colors: ReturnType<typeof getColors>
 }) {
-  const getScoreColor = (value: number) => {
-    if (value <= 1) return '#ef4444'
-    if (value <= 2) return '#f97316'
-    if (value <= 3) return '#eab308'
-    if (value <= 4) return '#22c55e'
-    return '#10b981'
-  }
-
   return (
-    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-      {[1, 2, 3, 4, 5].map(value => (
+    <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => (
         <button
           key={value}
           onClick={() => onSelect?.(value)}
@@ -54,7 +46,7 @@ function ScoreDots({ score, onSelect, size = 28, interactive = false, colors }: 
               ? getScoreColor(score)
               : 'transparent',
             color: value <= score ? '#fff' : colors.textTertiary,
-            fontSize: `${Math.max(11, size * 0.45)}px`,
+            fontSize: `${Math.max(10, size * 0.4)}px`,
             fontWeight: 600,
             cursor: interactive ? 'pointer' : 'default',
             display: 'flex',
@@ -75,6 +67,14 @@ function ScoreDots({ score, onSelect, size = 28, interactive = false, colors }: 
       ))}
     </div>
   )
+}
+
+function getScoreColor(value: number): string {
+  if (value <= 2) return '#ef4444'
+  if (value <= 4) return '#f97316'
+  if (value <= 6) return '#eab308'
+  if (value <= 8) return '#22c55e'
+  return '#10b981'
 }
 
 // Trend indicator
@@ -216,7 +216,7 @@ function NewRatingForm({ onSave, onCancel, colors, isMobile }: {
 
       <div>
         <label style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '6px', display: 'block' }}>
-          Score (1-5)
+          Score (1-10)
         </label>
         <ScoreDots score={score} onSelect={setScore} size={36} interactive colors={colors} />
       </div>
@@ -293,14 +293,6 @@ function RatingDetailPanel({ summary, history, onUpdateScore, colors, isMobile }
     )
   }
 
-  const getScoreColor = (value: number) => {
-    if (value <= 1) return '#ef4444'
-    if (value <= 2) return '#f97316'
-    if (value <= 3) return '#eab308'
-    if (value <= 4) return '#22c55e'
-    return '#10b981'
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
@@ -342,7 +334,7 @@ function RatingDetailPanel({ summary, history, onUpdateScore, colors, isMobile }
             {summary.latestScore}
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '13px', color: colors.textSecondary }}>out of 5</span>
+            <span style={{ fontSize: '13px', color: colors.textSecondary }}>out of 10</span>
             <TrendBadge trend={summary.trend} colors={colors} />
           </div>
         </div>

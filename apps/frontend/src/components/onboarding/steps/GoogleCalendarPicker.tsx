@@ -77,8 +77,8 @@ export function GoogleCalendarPicker({ loading }: GoogleCalendarPickerProps) {
   const sortedMappings = [...state.calendarMappings].sort((a, b) => {
     if (a.is_primary && !b.is_primary) return -1
     if (!a.is_primary && b.is_primary) return 1
-    const nameA = a.google_calendar_name || ''
-    const nameB = b.google_calendar_name || ''
+    const nameA = a.provider_calendar_name || ''
+    const nameB = b.provider_calendar_name || ''
     return nameA.localeCompare(nameB)
   })
 
@@ -102,7 +102,7 @@ export function GoogleCalendarPicker({ loading }: GoogleCalendarPickerProps) {
       </p>
 
       {sortedMappings.map(mapping => {
-        const calColor = mapping.google_calendar_color || '#3b82f6'
+        const calColor = mapping.provider_calendar_color || '#3b82f6'
         return (
           <button
             key={mapping.id}
@@ -147,7 +147,7 @@ export function GoogleCalendarPicker({ loading }: GoogleCalendarPickerProps) {
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}>
-                  {mapping.google_calendar_name || 'Unnamed Calendar'}
+                  {mapping.provider_calendar_name || 'Unnamed Calendar'}
                 </span>
                 {mapping.is_primary && (
                   <span style={{

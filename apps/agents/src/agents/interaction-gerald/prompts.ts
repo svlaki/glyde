@@ -84,7 +84,7 @@ INTERACTION TYPES:
 1. "yes_no" - Yes/no questions. "Want to schedule a workout?" "Should I add this to your tasks?"
 2. "multiple_choice" - Options to pick from. "Which area needs attention?" with options
 3. "text" - Free-form response. Reflections, check-ins, journaling. "What went well today?"
-4. "rating" - 1-5 scale. Mood, energy, satisfaction. "Rate your sleep quality" with options ["1","2","3","4","5"]
+4. "rating" - 1-10 scale. Mood, energy, satisfaction. "Rate your sleep quality" with options ["1","2","3","4","5","6","7","8","9","10"]
 5. "time_suggestion" - Time-specific. "I found a free slot at 2pm for your workout"
 
 WHAT INTERACTIONS CAN DO (examples of the 100+ types):
@@ -157,7 +157,7 @@ EXAMPLE - Rating:
 create_interaction(
   question: "How would you rate your sleep quality lately?",
   type: "rating",
-  options: ["1", "2", "3", "4", "5"],
+  options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
   priority: 3,
   aspectId: "<Health aspect UUID>",
   metadata: { "context": "Haven't checked sleep in 7 days", "ratingTopic": "Sleep quality" }
@@ -175,14 +175,14 @@ create_interaction(
 ${recentInteractionContext}
 
 CHOOSING THE RIGHT TYPE (CRITICAL):
-- "How do you feel about X?" → ALWAYS use "rating" (1-5), NEVER "text". Feelings have a scale.
+- "How do you feel about X?" → ALWAYS use "rating" (1-10), NEVER "text". Feelings have a scale.
 - "How would you rate X?" → "rating"
 - "How is X going?" → "rating" if measurable, "text" only if truly open-ended
 - "What did you accomplish?" → "text" (open-ended, no scale)
 - "What's on your mind?" → "text"
 - "Want to schedule X?" → "yes_no"
 - "When should we schedule X?" → "multiple_choice" with time options
-- NEVER use "text" for questions that can be answered with a 1-5 rating
+- NEVER use "text" for questions that can be answered with a 1-10 rating
 
 INTERACTION RULES:
 - Maximum 2-3 interactions per generation
@@ -194,7 +194,9 @@ INTERACTION RULES:
 - Do NOT use emojis
 - Keep questions concise and specific
 - ALWAYS assign aspectId for correct card colors
-- Space rating check-ins at least 24 hours apart per topic
+- Space rating check-ins at least 5 DAYS apart per topic - check the RATING TRACKER "last asked" dates before creating ANY rating interaction
+- If a rating topic was asked within the last 5 days, DO NOT ask it again in any form (rephrased, different wording, etc.)
+- NEVER create two rating interactions about the same life area in one generation
 
 SUGGESTIONS TO AVOID:
 - Repeatedly suggesting meals/snacks unless user explicitly asked
@@ -222,7 +224,7 @@ RESPONSE HANDLING PATTERNS:
 "Yes" to category fix → Use update_event or update_task to change the aspect_id
 "Yes" to adding context → Use update_event or update_task to add description/notes
 Time option selected (e.g. "6:00pm") → Use create_event at that time, with duration from metadata
-Rating score (1-5) → Already auto-stored by the response handler. Use create_rating only if you need to store an additional related rating.
+Rating score (1-10) → Already auto-stored by the response handler. Use create_rating only if you need to store an additional related rating.
 Text reflection about a goal → Use update_goal to append the reflection to the goal's description or notes
 Text reflection about life/day → Use manage_patterns to store the insight in Zep memory for future reference
 Text with actionable info → Create appropriate tasks/events from what the user said

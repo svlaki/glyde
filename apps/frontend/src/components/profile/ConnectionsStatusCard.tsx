@@ -4,7 +4,7 @@ import { useTheme } from '../../lib/themeContext'
 import { getColors } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { usePlatform } from '../../hooks/usePlatform'
-import { triggerSync, getGoogleAuthUrl, handleGoogleCallback, disconnectConnection, fetchDisconnectPreview, fetchCalendarMappings, updateCalendarMapping } from '../../lib/connectionService'
+import { triggerSync, getGoogleAuthUrl, handleGoogleCallback, getMicrosoftAuthUrl, handleMicrosoftCallback, disconnectConnection, fetchDisconnectPreview, fetchCalendarMappings, updateCalendarMapping } from '../../lib/connectionService'
 import type { Connection, CalendarMapping } from '../../lib/connectionService'
 import { CalendarPicker } from './CalendarPicker'
 
@@ -53,7 +53,7 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
 
   const statusColors = SYNC_STATUS_COLORS[connection.sync_status] || SYNC_STATUS_COLORS.pending
   const statusBg = isDarkMode ? statusColors.dark : statusColors.light
-  const isGoogle = connection.provider === 'google'
+  const hasCalendarPicker = connection.provider === 'google' || connection.provider === 'microsoft'
 
   const loadMappings = useCallback(async () => {
     if (!user || !session?.access_token || mappingsLoadedRef.current) return
@@ -143,7 +143,7 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
             alignItems: 'center',
             gap: '8px',
           }}>
-            <span>{connection.calendar_name || 'Google Calendar'}</span>
+            <span>{connection.calendar_name || (connection.provider === 'microsoft' ? 'Outlook Calendar' : 'Google Calendar')}</span>
             <span style={{
               padding: '2px 8px',
               borderRadius: '10px',
@@ -161,7 +161,7 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-          {isGoogle && (
+          {hasCalendarPicker && (
             <button
               onClick={handleToggleCalendars}
               style={{
@@ -352,7 +352,7 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
 
       const { type, code, state, error } = event.data || {}
 
-      if (type === 'GOOGLE_CONNECTION_CALLBACK') {
+      if (type === 'GOOGLE_CONNECTION_CALLBACK' || type === 'MICROSOFT_CONNECTION_CALLBACK') {
         if (error) {
           setConnectError(`OAuth error: ${error}`)
           setConnecting(false)
@@ -363,7 +363,10 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
         if (code && state && user && session) {
           try {
             setConnectError(null)
-            const result = await handleGoogleCallback(user, code, state, session.access_token)
+            const handler = type === 'MICROSOFT_CONNECTION_CALLBACK'
+              ? handleMicrosoftCallback
+              : handleGoogleCallback
+            const result = await handler(user, code, state, session.access_token)
             if (result.error) {
               setConnectError(result.error)
             } else {
@@ -397,12 +400,13 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
     return () => clearInterval(interval)
   }, [connecting])
 
-  const handleConnect = async () => {
+  const openOAuthPopup = async (provider: 'google' | 'microsoft') => {
     if (!user || !session || connecting) return
     setConnecting(true)
     setConnectError(null)
     try {
-      const { authUrl, error: urlError } = await getGoogleAuthUrl(user, session.access_token)
+      const getAuthUrl = provider === 'microsoft' ? getMicrosoftAuthUrl : getGoogleAuthUrl
+      const { authUrl, error: urlError } = await getAuthUrl(user, session.access_token)
       if (urlError || !authUrl) {
         setConnectError(urlError || 'Failed to get authorization URL')
         setConnecting(false)
@@ -416,7 +420,7 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
 
       const popup = window.open(
         authUrl,
-        'google-oauth',
+        `${provider}-oauth`,
         `width=${width},height=${height},left=${left},top=${top},popup=1`
       )
 
@@ -431,6 +435,9 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
       setConnecting(false)
     }
   }
+
+  const handleConnect = () => openOAuthPopup('google')
+  const handleConnectMicrosoft = () => openOAuthPopup('microsoft')
 
   return (
     <div style={{
@@ -488,46 +495,82 @@ export function ConnectionsStatusCard({ connections, onConnectionChanged }: Conn
             <div style={{ ...typography.bodySm, color: colors.textTertiary, marginBottom: '10px' }}>
               Connect a calendar to sync your events
             </div>
-            <button
-              onClick={handleConnect}
-              disabled={connecting}
-              style={{
-                background: colors.bgTertiary,
-                border: `1px solid ${borderColor}`,
-                borderRadius: '6px',
-                padding: '8px 16px',
-                cursor: connecting ? 'default' : 'pointer',
-                color: colors.textPrimary,
-                ...typography.bodySm,
-                fontWeight: 500,
-                opacity: connecting ? 0.5 : 1,
-              }}
-            >
-              {connecting ? 'Connecting...' : 'Connect Google Calendar'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                style={{
+                  background: colors.bgTertiary,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  cursor: connecting ? 'default' : 'pointer',
+                  color: colors.textPrimary,
+                  ...typography.bodySm,
+                  fontWeight: 500,
+                  opacity: connecting ? 0.5 : 1,
+                }}
+              >
+                {connecting ? 'Connecting...' : 'Google Calendar'}
+              </button>
+              <button
+                onClick={handleConnectMicrosoft}
+                disabled={connecting}
+                style={{
+                  background: colors.bgTertiary,
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  cursor: connecting ? 'default' : 'pointer',
+                  color: colors.textPrimary,
+                  ...typography.bodySm,
+                  fontWeight: 500,
+                  opacity: connecting ? 0.5 : 1,
+                }}
+              >
+                {connecting ? 'Connecting...' : 'Outlook'}
+              </button>
+            </div>
           </div>
         ) : (
           <>
             {connections.map(conn => (
               <ConnectionRow key={conn.id} connection={conn} onConnectionChanged={onConnectionChanged} />
             ))}
-            <button
-              onClick={handleConnect}
-              disabled={connecting}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${borderColor}`,
-                borderRadius: '4px',
-                padding: '4px 12px',
-                cursor: connecting ? 'default' : 'pointer',
-                color: colors.textTertiary,
-                ...typography.labelMd,
-                marginTop: '6px',
-                opacity: connecting ? 0.5 : 1,
-              }}
-            >
-              {connecting ? 'Connecting...' : '+ Add Calendar'}
-            </button>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  cursor: connecting ? 'default' : 'pointer',
+                  color: colors.textTertiary,
+                  ...typography.labelMd,
+                  opacity: connecting ? 0.5 : 1,
+                }}
+              >
+                {connecting ? 'Connecting...' : '+ Google'}
+              </button>
+              <button
+                onClick={handleConnectMicrosoft}
+                disabled={connecting}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: '4px',
+                  padding: '4px 12px',
+                  cursor: connecting ? 'default' : 'pointer',
+                  color: colors.textTertiary,
+                  ...typography.labelMd,
+                  opacity: connecting ? 0.5 : 1,
+                }}
+              >
+                {connecting ? 'Connecting...' : '+ Outlook'}
+              </button>
+            </div>
           </>
         )}
       </div>

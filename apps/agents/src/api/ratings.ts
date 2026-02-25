@@ -48,8 +48,8 @@ export async function createRating(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    if (score < 1 || score > 5) {
-      res.status(400).json({ error: 'score must be between 1 and 5' });
+    if (score < 1 || score > 10) {
+      res.status(400).json({ error: 'score must be between 1 and 10' });
       return;
     }
 

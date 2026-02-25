@@ -337,6 +337,7 @@ export class SupabaseService {
         project_id: event.project_id || null,
         project_name: event.project_name || null,
         google_event_id: event.google_event_id || null,
+        outlook_event_id: event.outlook_event_id || null,
         local_notes: event.local_notes || null
       }));
 
@@ -603,9 +604,9 @@ export class SupabaseService {
       }
       if (updates.location !== undefined) updateData.location = updates.location;
       if (updates.description !== undefined) {
-        // For Google-synced events, write agent descriptions to local_notes
-        // so they aren't overwritten by the next Google sync
-        if (oldEvent?.google_event_id) {
+        // For externally-synced events, write agent descriptions to local_notes
+        // so they aren't overwritten by the next calendar sync
+        if (oldEvent?.google_event_id || oldEvent?.outlook_event_id) {
           updateData.local_notes = updates.description;
         } else {
           updateData.description = updates.description;

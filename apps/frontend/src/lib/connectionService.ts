@@ -16,9 +16,9 @@ export interface CalendarMapping {
   id: string
   user_id: string
   connection_id: string
-  google_calendar_id: string
-  google_calendar_name: string | null
-  google_calendar_color: string | null
+  provider_calendar_id: string
+  provider_calendar_name: string | null
+  provider_calendar_color: string | null
   is_primary: boolean
   aspect_id: string | null
   is_synced: boolean
@@ -183,6 +183,102 @@ export async function handleGoogleCallback(
     }
   } catch (err: any) {
     console.error('[connectionService] Exception in handleGoogleCallback:', err)
+    return { connection: null, error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+/**
+ * Get Microsoft OAuth URL for connecting Outlook calendar
+ */
+export async function getMicrosoftAuthUrl(
+  user: User,
+  accessToken?: string
+): Promise<{ authUrl: string | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { authUrl: null, error: 'User not authenticated' }
+    }
+
+    const url = `${getApiUrl()}/api/connections/microsoft/auth`
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ user_id: user.id })
+    })
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      return { authUrl: null, error: data.error || 'Failed to get auth URL' }
+    }
+
+    const data = await response.json()
+
+    if (data.success && data.authUrl) {
+      return { authUrl: data.authUrl, error: null }
+    } else {
+      return { authUrl: null, error: data.error || 'Failed to generate auth URL' }
+    }
+  } catch (err: any) {
+    return { authUrl: null, error: err.message || 'An unexpected error occurred' }
+  }
+}
+
+/**
+ * Handle Microsoft OAuth callback - exchange code for tokens
+ */
+export async function handleMicrosoftCallback(
+  user: User,
+  code: string,
+  state: string,
+  accessToken?: string
+): Promise<{ connection: Connection | null, error: string | null }> {
+  try {
+    if (!user) {
+      return { connection: null, error: 'User not authenticated' }
+    }
+
+    const url = `${getApiUrl()}/api/connections/microsoft/callback`
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    }
+
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        user_id: user.id,
+        code,
+        state
+      })
+    })
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      return { connection: null, error: data.error || 'Failed to connect Outlook' }
+    }
+
+    const data = await response.json()
+
+    if (data.success) {
+      return { connection: data.connection, error: null }
+    } else {
+      return { connection: null, error: data.error || 'Unknown error' }
+    }
+  } catch (err: any) {
     return { connection: null, error: err.message || 'An unexpected error occurred' }
   }
 }

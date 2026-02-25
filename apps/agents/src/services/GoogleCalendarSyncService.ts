@@ -396,7 +396,7 @@ export class GoogleCalendarSyncService {
         if (mapping.sync_token) {
           await this.performDeltaSyncForCalendar(
             connection,
-            mapping.google_calendar_id,
+            mapping.provider_calendar_id,
             mapping.id,
             mapping.sync_token,
             mapping.aspect_id || undefined
@@ -404,13 +404,13 @@ export class GoogleCalendarSyncService {
         } else {
           await this.performInitialSyncForCalendar(
             connection,
-            mapping.google_calendar_id,
+            mapping.provider_calendar_id,
             mapping.id,
             mapping.aspect_id || undefined
           );
         }
       } catch (error) {
-        console.error(`[GoogleCalendarSyncService] Failed to sync calendar ${mapping.google_calendar_id}:`, error);
+        logger.error(`[GoogleCalendarSyncService] Failed to sync calendar ${mapping.provider_calendar_id}:`, error);
         // Continue with other calendars
       }
     }

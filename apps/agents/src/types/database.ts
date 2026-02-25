@@ -40,8 +40,9 @@ export interface DatabaseEvent {
   project_id?: string;
   project_name?: string;
 
-  // Google Calendar sync fields
+  // Calendar sync fields
   google_event_id?: string;
+  outlook_event_id?: string;
   local_notes?: string;
 }
 

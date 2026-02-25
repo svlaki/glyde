@@ -76,7 +76,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     // Auto-store rating scores before routing to Gerald
     if (interaction.interaction_type === 'rating') {
       const score = parseInt(trimmedResponse, 10);
-      if (!isNaN(score) && score >= 1 && score <= 5) {
+      if (!isNaN(score) && score >= 1 && score <= 10) {
         const meta = (interaction.metadata || {}) as any;
         const ratingTopic = meta.ratingTopic || interaction.question;
         try {
@@ -86,7 +86,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
             description: meta.ratingDescription,
             aspectId: interaction.aspect_id || meta.aspectId,
           });
-          console.log(`[INTERACTION RESPONSE] Rating stored: "${ratingTopic}" = ${score}/5`);
+          console.log(`[INTERACTION RESPONSE] Rating stored: "${ratingTopic}" = ${score}/10`);
         } catch (ratingError) {
           console.error(`[INTERACTION RESPONSE] Failed to store rating:`, ratingError);
         }
@@ -132,7 +132,7 @@ Based on this response, take the appropriate action using your tools. For exampl
 - If they said "yes" to scheduling something, create the event at a sensible time
 - If they said "yes" to adding a task, create the task
 - If they picked a time option, create an event at that time
-- If they gave a rating (1-5), the rating is already stored automatically. No action needed.
+- If they gave a rating (1-10), the rating is already stored automatically. No action needed.
 - If they said "no" or "skip", do nothing
 - If they gave a text response (reflection, journal), acknowledge it and store useful insights
 

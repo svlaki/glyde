@@ -46,6 +46,8 @@ import {
   getConnections,
   getGoogleAuthUrl as getGoogleConnectionAuthUrl,
   handleGoogleCallback as handleGoogleConnectionCallback,
+  getMicrosoftAuthUrl,
+  handleMicrosoftCallback,
   triggerSync,
   getDisconnectPreview,
   disconnectConnection,
@@ -391,6 +393,8 @@ app.use('/api/shared-events', sharedEventsRouter);
 app.post('/api/connections', getConnections);
 app.post('/api/connections/google/auth', getGoogleConnectionAuthUrl);
 app.post('/api/connections/google/callback', handleGoogleConnectionCallback);
+app.post('/api/connections/microsoft/auth', getMicrosoftAuthUrl);
+app.post('/api/connections/microsoft/callback', handleMicrosoftCallback);
 app.post('/api/connections/sync', triggerSync);
 app.post('/api/connections/disconnect/preview', getDisconnectPreview);
 app.post('/api/connections/disconnect', disconnectConnection);

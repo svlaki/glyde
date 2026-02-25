@@ -30,13 +30,15 @@ export function OAuthCallbackPage() {
         return
       }
 
-      // Parse state to determine flow type
+      // Parse state to determine flow type and provider
       let flow = 'onboarding'
       let userId = state
+      let provider = 'google'
       try {
         const stateData = JSON.parse(state)
         flow = stateData.flow || 'onboarding'
         userId = stateData.userId || state
+        provider = stateData.provider || 'google'
       } catch {
         // State is just the userId string (legacy format)
       }
@@ -45,8 +47,11 @@ export function OAuthCallbackPage() {
       if (flow === 'connection') {
         setStatus('success')
         setMessage('Calendar connected!')
+        const messageType = provider === 'microsoft'
+          ? 'MICROSOFT_CONNECTION_CALLBACK'
+          : 'GOOGLE_CONNECTION_CALLBACK'
         sendMessage({
-          type: 'GOOGLE_CONNECTION_CALLBACK',
+          type: messageType,
           code,
           state
         })

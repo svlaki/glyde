@@ -113,7 +113,7 @@ export class InteractionAgentGerald extends BaseAgent {
       // Fetch recent interactions to avoid repetition
       let recentInteractions: any[] = [];
       try {
-        recentInteractions = await supabaseService.getRecentUserInteractions(context.userId, 20, 48);
+        recentInteractions = await supabaseService.getRecentUserInteractions(context.userId, 30, 120);
       } catch (error) {
         console.warn('[GERALD] Failed to fetch recent interactions:', error);
       }
@@ -535,9 +535,11 @@ RATING RULES:
 - For ratings that are LOW (1-2): suggest actions to improve that area before re-asking
 - For ratings that are HIGH (4-5): acknowledge and focus on maintaining
 - For DECLINING ratings: prioritize addressing what's causing the drop
-- Re-ask ratings after at least 3-7 days to check for change
-- When creating a rating interaction, include metadata.ratingTopic with the topic name
-- Use interaction type "rating" with options ["1", "2", "3", "4", "5"]`;
+- MINIMUM 5 DAYS between re-asking the same rating topic. Check "last asked" above - if less than 5 days ago, DO NOT ask about that topic in ANY form
+- When asking a rating, ask about the past 5 days (e.g., "How would you rate X over the past 5 days?")
+- When creating a rating interaction, include metadata.ratingTopic with the EXACT same topic name used before
+- Use interaction type "rating" with options ["1", "2", "3", "4", "5"]
+- NEVER create multiple rating interactions about the same topic or related topics in one batch`;
   }
 
   /**

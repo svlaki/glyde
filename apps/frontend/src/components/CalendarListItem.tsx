@@ -61,7 +61,7 @@ export function CalendarListItem({
         width: '12px',
         height: '12px',
         borderRadius: '3px',
-        background: mapping.google_calendar_color || '#4285f4',
+        background: mapping.provider_calendar_color || '#4285f4',
         flexShrink: 0
       }} />
 
@@ -75,7 +75,7 @@ export function CalendarListItem({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
         }}>
-          {mapping.google_calendar_name || 'Untitled Calendar'}
+          {mapping.provider_calendar_name || 'Untitled Calendar'}
           {mapping.is_primary && (
             <span style={{
               marginLeft: '8px',

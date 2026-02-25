@@ -2,11 +2,13 @@ import { Request, Response } from 'express';
 import { google } from 'googleapis';
 import { getConnectionService } from '../services/ConnectionService.js';
 import { getGoogleCalendarSyncService } from '../services/GoogleCalendarSyncService.js';
+import { getMicrosoftCalendarSyncService } from '../services/MicrosoftCalendarSyncService.js';
 import { getCalendarMappingService } from '../services/CalendarMappingService.js';
 import { logger } from '../utils/logger.js';
 
 const connectionService = getConnectionService();
 const googleSyncService = getGoogleCalendarSyncService();
+const microsoftSyncService = getMicrosoftCalendarSyncService();
 const calendarMappingService = getCalendarMappingService();
 
 /**
@@ -244,6 +246,192 @@ export async function handleGoogleCallback(req: Request, res: Response): Promise
 }
 
 /**
+ * Get Microsoft OAuth URL for connecting Outlook calendar
+ */
+export async function getMicrosoftAuthUrl(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || process.env.GOOGLE_CONNECTION_CALLBACK_URI;
+
+    if (!clientId || !redirectUri) {
+      res.status(500).json({
+        error: 'Microsoft OAuth not configured. Missing required environment variables.'
+      });
+      return;
+    }
+
+    const scopes = 'Calendars.Read offline_access User.Read';
+    const state = JSON.stringify({ userId, flow: 'connection', provider: 'microsoft' });
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      response_type: 'code',
+      redirect_uri: redirectUri,
+      scope: scopes,
+      state,
+      prompt: 'consent',
+      response_mode: 'query'
+    });
+
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+
+    logger.info('[connections] Generated Microsoft auth URL', { userId, redirectUri });
+
+    res.json({
+      success: true,
+      authUrl,
+      state: userId
+    });
+  } catch (error) {
+    logger.error('[connections] Error generating Microsoft auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate authorization URL' });
+  }
+}
+
+/**
+ * Handle Microsoft OAuth callback - exchange code for tokens and create connection
+ */
+export async function handleMicrosoftCallback(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { code, state } = req.body ?? {};
+
+    if (!code) {
+      res.status(400).json({ error: 'Authorization code is required' });
+      return;
+    }
+
+    // Validate state
+    let stateData: { userId?: string; flow?: string; provider?: string } = {};
+    try {
+      stateData = JSON.parse(state || '{}');
+    } catch {
+      stateData = { userId: state };
+    }
+
+    if (stateData.userId !== userId) {
+      res.status(400).json({ error: 'Invalid state parameter' });
+      return;
+    }
+
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || process.env.GOOGLE_CONNECTION_CALLBACK_URI;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      res.status(500).json({ error: 'Microsoft OAuth not configured' });
+      return;
+    }
+
+    logger.info('[connections] Processing Microsoft callback', { userId, hasCode: !!code });
+
+    // Exchange code for tokens
+    const tokenParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+      scope: 'Calendars.Read offline_access User.Read'
+    });
+
+    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenParams
+    });
+
+    const tokenData = await tokenResponse.json() as any;
+
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      logger.error('[connections] Microsoft token exchange failed', { error: tokenData.error_description || tokenData.error });
+      res.status(400).json({
+        error: `Token exchange failed: ${tokenData.error_description || 'Unknown error'}`
+      });
+      return;
+    }
+
+    // Get user profile from Microsoft Graph
+    let providerAccountId = '';
+    let calendarName = 'Outlook Calendar';
+
+    try {
+      const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+      });
+      const profile = await profileResponse.json() as any;
+      providerAccountId = profile.mail || profile.userPrincipalName || '';
+      calendarName = profile.displayName ? `${profile.displayName}'s Outlook` : 'Outlook Calendar';
+    } catch (profileError) {
+      logger.warn('[connections] Could not fetch Microsoft profile:', profileError);
+    }
+
+    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+
+    // Create or update connection
+    const connection = await connectionService.upsertConnection(userId, {
+      provider: 'microsoft',
+      provider_account_id: providerAccountId,
+      calendar_name: calendarName,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || undefined,
+      token_expires_at: expiresAt,
+      sync_status: 'pending'
+    });
+
+    logger.info('[connections] Microsoft connection created/updated:', connection.id);
+
+    // Perform initial sync in background
+    setImmediate(async () => {
+      try {
+        // 1. Sync calendar list from Outlook
+        await calendarMappingService.syncCalendarList(connection);
+
+        // 2. Auto-map calendars to aspects
+        await calendarMappingService.autoMapCalendarsToAspects(connection);
+
+        // 3. Sync events for all enabled calendars
+        await microsoftSyncService.syncAllEnabledCalendars(connection);
+
+        await connectionService.updateSyncStatus(connection.id, 'synced');
+      } catch (syncError) {
+        logger.error('[connections] Microsoft background sync failed:', syncError);
+        await connectionService.updateSyncStatus(connection.id, 'error',
+          syncError instanceof Error ? syncError.message : 'Sync failed');
+      }
+    });
+
+    res.json({
+      success: true,
+      connection: {
+        id: connection.id,
+        provider: connection.provider,
+        calendar_name: connection.calendar_name,
+        sync_status: connection.sync_status,
+        connected_at: connection.connected_at
+      },
+      message: 'Outlook Calendar connected successfully. Initial sync in progress.'
+    });
+  } catch (error) {
+    logger.error('[connections] Error in Microsoft callback:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to connect Outlook Calendar'
+    });
+  }
+}
+
+/**
  * Trigger a manual sync for a connection
  */
 export async function triggerSync(req: Request, res: Response): Promise<void> {
@@ -277,19 +465,20 @@ export async function triggerSync(req: Request, res: Response): Promise<void> {
     logger.info('[connections] Triggering sync for connection:', connection_id);
 
     // Perform sync based on provider
-    if (connection.provider === 'google') {
-      // Start sync in background - sync ALL enabled calendars, not just primary
-      setImmediate(async () => {
-        try {
+    setImmediate(async () => {
+      try {
+        if (connection.provider === 'microsoft') {
+          await microsoftSyncService.syncAllEnabledCalendars(connection);
+        } else {
           await googleSyncService.syncAllEnabledCalendars(connection);
-          await connectionService.updateSyncStatus(connection.id, 'synced');
-        } catch (syncError) {
-          logger.error('[connections] Sync failed:', syncError);
-          await connectionService.updateSyncStatus(connection.id, 'error',
-            syncError instanceof Error ? syncError.message : 'Sync failed');
         }
-      });
-    }
+        await connectionService.updateSyncStatus(connection.id, 'synced');
+      } catch (syncError) {
+        logger.error('[connections] Sync failed:', syncError);
+        await connectionService.updateSyncStatus(connection.id, 'error',
+          syncError instanceof Error ? syncError.message : 'Sync failed');
+      }
+    });
 
     res.json({
       success: true,
@@ -491,8 +680,10 @@ export async function getCalendarList(req: Request, res: Response): Promise<void
 
     logger.info('[connections] Fetching calendar list for connection:', connection_id);
 
-    // Fetch calendars from Google
-    const calendars = await calendarMappingService.fetchGoogleCalendarList(connection);
+    // Fetch calendars based on provider
+    const calendars = connection.provider === 'microsoft'
+      ? await calendarMappingService.fetchMicrosoftCalendarList(connection)
+      : await calendarMappingService.fetchGoogleCalendarList(connection);
 
     res.json({
       success: true,
@@ -647,13 +838,22 @@ export async function updateCalendarMapping(req: Request, res: Response): Promis
         const aspectId = updated.aspect_id || undefined;
         setImmediate(async () => {
           try {
-            logger.info('[connections] Triggering initial sync for newly enabled calendar:', mapping.google_calendar_id);
-            await googleSyncService.performInitialSyncForCalendar(
-              connection,
-              mapping.google_calendar_id,
-              mapping_id,
-              aspectId
-            );
+            logger.info('[connections] Triggering initial sync for newly enabled calendar:', mapping.provider_calendar_id);
+            if (connection.provider === 'microsoft') {
+              await microsoftSyncService.performInitialSyncForCalendar(
+                connection,
+                mapping.provider_calendar_id,
+                mapping_id,
+                aspectId
+              );
+            } else {
+              await googleSyncService.performInitialSyncForCalendar(
+                connection,
+                mapping.provider_calendar_id,
+                mapping_id,
+                aspectId
+              );
+            }
           } catch (syncError) {
             logger.error('[connections] Initial sync failed for calendar:', syncError);
           }

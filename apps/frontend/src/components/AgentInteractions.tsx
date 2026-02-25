@@ -624,16 +624,16 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
       case 'rating':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-              {[1, 2, 3, 4, 5].map((rating) => (
+            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
                 <button
                   key={rating}
                   onClick={() => handleRespond(interaction.id, rating.toString())}
                   disabled={isResponding}
                   style={{
-                    width: '36px',
-                    height: '36px',
-                    fontSize: fontSize.base,
+                    width: '32px',
+                    height: '32px',
+                    fontSize: fontSize.sm,
                     fontWeight: fontWeight.medium,
                     border: `1px solid ${colors.border}`,
                     borderRadius: '8px',
@@ -641,7 +641,8 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
                     background: colors.bgTertiary,
                     color: colors.textPrimary,
                     opacity: isResponding ? 0.6 : 1,
-                    transition: 'background 0.15s, transform 0.1s'
+                    transition: 'background 0.15s, transform 0.1s',
+                    padding: 0,
                   }}
                   onMouseEnter={(e) => {
                     if (!isResponding) {

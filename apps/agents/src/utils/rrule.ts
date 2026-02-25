@@ -172,7 +172,9 @@ function toFakeUtcLocal(utcDate: Date, timezone: string): Date {
   const localYear = parseInt(utcDate.toLocaleString('en-US', { ...options, year: 'numeric' }));
   const localMonth = parseInt(utcDate.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
   const localDay = parseInt(utcDate.toLocaleString('en-US', { ...options, day: 'numeric' }));
-  const localHour = parseInt(utcDate.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+  // Intl with hour12:false can return "24" for midnight instead of "0"
+  const rawHour = parseInt(utcDate.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+  const localHour = rawHour === 24 ? 0 : rawHour;
   const localMinute = parseInt(utcDate.toLocaleString('en-US', { ...options, minute: 'numeric' }));
   const localSecond = parseInt(utcDate.toLocaleString('en-US', { ...options, second: 'numeric' }));
 
@@ -214,7 +216,10 @@ function fromFakeUtcLocal(fakeUtc: Date, timezone: string): Date {
   const tzYear = parseInt(getPart('year'));
   const tzMonth = parseInt(getPart('month')) - 1;
   const tzDay = parseInt(getPart('day'));
-  const tzHour = parseInt(getPart('hour'));
+  // Intl.DateTimeFormat with hour12:false returns "24" for midnight instead of "0"
+  // This causes new Date(y, m, d, 24, min) to roll to the next day, shifting dates by -1
+  const rawHour = parseInt(getPart('hour'));
+  const tzHour = rawHour === 24 ? 0 : rawHour;
   const tzMinute = parseInt(getPart('minute'));
 
   // Calculate the offset by comparing
