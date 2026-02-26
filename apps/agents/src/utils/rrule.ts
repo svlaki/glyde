@@ -197,32 +197,32 @@ function fromFakeUtcLocal(fakeUtc: Date, timezone: string): Date {
   const minute = fakeUtc.getUTCMinutes();
   const second = fakeUtc.getUTCSeconds();
 
-  // Build an ISO string representing this local time as if it were UTC
-  // Then use Intl to find the actual UTC offset for this date in the target timezone
-  const pad = (n: number, w: number = 2) => String(n).padStart(w, '0');
-  const isoGuess = `${year}-${pad(month + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}Z`;
-  const guessUtc = new Date(isoGuess);
-
-  // Format this UTC guess in the target timezone to see what local time it maps to
-  const options: Intl.DateTimeFormatOptions = { timeZone: timezone };
-  const localYear = parseInt(guessUtc.toLocaleString('en-US', { ...options, year: 'numeric' }));
-  const localMonth = parseInt(guessUtc.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
-  const localDay = parseInt(guessUtc.toLocaleString('en-US', { ...options, day: 'numeric' }));
-  const rawHour = parseInt(guessUtc.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
-  const localHour = rawHour === 24 ? 0 : rawHour;
-  const localMinute = parseInt(guessUtc.toLocaleString('en-US', { ...options, minute: 'numeric' }));
-  const localSecond = parseInt(guessUtc.toLocaleString('en-US', { ...options, second: 'numeric' }));
-
-  // The difference between what we wanted (year/month/day/hour/min/sec) and what
-  // guessUtc maps to in the target timezone tells us the offset correction needed.
-  // wanted local = Date.UTC(year, month, day, hour, minute, second)
-  // actual local = Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond)
   const wantedMs = Date.UTC(year, month, day, hour, minute, second);
-  const actualMs = Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond);
-  const correctionMs = wantedMs - actualMs;
+  const options: Intl.DateTimeFormatOptions = { timeZone: timezone };
 
-  // Apply the correction: guessUtc + correction = real UTC for the desired local time
-  return new Date(guessUtc.getTime() + correctionMs);
+  // Start with a guess: treat desired local time as if it were UTC
+  let guess = new Date(wantedMs);
+
+  // Iterate twice to converge. On DST transition days, the first correction
+  // can overshoot by 1 hour because the offset at the guess differs from
+  // the offset at the corrected time. A second pass fixes this.
+  for (let i = 0; i < 2; i++) {
+    const localYear = parseInt(guess.toLocaleString('en-US', { ...options, year: 'numeric' }));
+    const localMonth = parseInt(guess.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
+    const localDay = parseInt(guess.toLocaleString('en-US', { ...options, day: 'numeric' }));
+    const rawHour = parseInt(guess.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+    const localHour = rawHour === 24 ? 0 : rawHour;
+    const localMinute = parseInt(guess.toLocaleString('en-US', { ...options, minute: 'numeric' }));
+    const localSecond = parseInt(guess.toLocaleString('en-US', { ...options, second: 'numeric' }));
+
+    const actualMs = Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond);
+    const correctionMs = wantedMs - actualMs;
+
+    if (correctionMs === 0) break;
+    guess = new Date(guess.getTime() + correctionMs);
+  }
+
+  return guess;
 }
 
 /**

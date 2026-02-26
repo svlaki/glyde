@@ -73,20 +73,22 @@ describe('API Utils', () => {
   });
 
   describe('debounce', () => {
-    it('should delay function execution', (done) => {
-      let callCount = 0;
-      const debouncedFn = debounce(() => {
-        callCount++;
-      }, 10);
+    it('should delay function execution', () => {
+      return new Promise<void>((resolve) => {
+        let callCount = 0;
+        const debouncedFn = debounce(() => {
+          callCount++;
+        }, 10);
 
-      debouncedFn();
-      debouncedFn();
-      debouncedFn();
+        debouncedFn();
+        debouncedFn();
+        debouncedFn();
 
-      setTimeout(() => {
-        expect(callCount).toBe(1);
-        done();
-      }, 20);
+        setTimeout(() => {
+          expect(callCount).toBe(1);
+          resolve();
+        }, 20);
+      });
     });
   });
 });
