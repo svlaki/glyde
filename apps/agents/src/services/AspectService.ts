@@ -108,19 +108,42 @@ export class AspectService {
    */
   async getAspectByName(userId: string, name: string): Promise<Aspect | null> {
     try {
-      const { data, error } = await this.supabase
+      // 1. Check user's own aspects first
+      const { data: ownData, error: ownError } = await this.supabase
         .from('aspects')
         .select(ASPECT_COLUMNS)
         .eq('user_id', userId)
-        .eq('name', name)
-        .single();
+        .ilike('name', name)
+        .maybeSingle();
 
-      if (error) {
-        console.error(`[AspectService] Error fetching aspect ${name}:`, error);
-        return null;
+      if (ownData) {
+        return ownData as Aspect;
       }
 
-      return data as Aspect;
+      // 2. Check shared aspects (where user is a member but not owner)
+      const { data: memberRows } = await this.supabase
+        .from('aspect_members')
+        .select('aspect_id')
+        .eq('user_id', userId);
+
+      if (memberRows && memberRows.length > 0) {
+        const sharedIds = memberRows.map(r => r.aspect_id);
+        const { data: sharedData } = await this.supabase
+          .from('aspects')
+          .select(ASPECT_COLUMNS)
+          .in('id', sharedIds)
+          .ilike('name', name)
+          .maybeSingle();
+
+        if (sharedData) {
+          return sharedData as Aspect;
+        }
+      }
+
+      if (ownError) {
+        console.error(`[AspectService] Error fetching aspect ${name}:`, ownError);
+      }
+      return null;
     } catch (error) {
       console.error(`[AspectService] Exception fetching aspect ${name}:`, error);
       return null;

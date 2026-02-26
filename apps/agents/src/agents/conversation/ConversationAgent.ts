@@ -16,6 +16,7 @@ import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { reverseGeocode } from '../../tools/search/location-search.js';
 import { buildSystemPrompt } from './prompts.js';
 import { DatabaseProfile, DatabaseAspect } from '../../types/database.js';
+import { FriendshipService } from '../../services/FriendshipService.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -73,6 +74,10 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  userFriends: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -102,7 +107,9 @@ export class ConversationAgent extends BaseAgent {
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary] = await Promise.all([
+      const friendshipService = new FriendshipService(supabaseService.getClient());
+
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
@@ -113,7 +120,10 @@ export class ConversationAgent extends BaseAgent {
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
         supabaseService.getRatingSummary(context.userId),
+        friendshipService.getFriends(context.userId),
       ]);
+
+      const userFriends = friendsResult.success ? friendsResult.data || [] : [];
 
       // Resolve timezone with validation
       let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
@@ -195,6 +205,7 @@ export class ConversationAgent extends BaseAgent {
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
+        userFriends: userFriends || [],
         // Add Graphiti memory context
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
@@ -273,7 +284,9 @@ IMPORTANT INSTRUCTIONS:
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary] = await Promise.all([
+      const friendshipService = new FriendshipService(supabaseService.getClient());
+
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
@@ -285,7 +298,10 @@ IMPORTANT INSTRUCTIONS:
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
         supabaseService.getRatingSummary(context.userId),
+        friendshipService.getFriends(context.userId),
       ]);
+
+      const userFriends = friendsResult.success ? friendsResult.data || [] : [];
 
       // Resolve timezone with validation
       let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
@@ -366,6 +382,7 @@ IMPORTANT INSTRUCTIONS:
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
+        userFriends: userFriends || [],
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
@@ -612,6 +629,7 @@ Use these scores to understand how the user feels about different areas of their
         messageCount: state.messages.length, // Conversation stage awareness
         currentLocation: locationContext, // User's GPS coordinates
         ratingContext: state.ratingSummary?.length ? this.buildRatingContext(state.ratingSummary) : undefined,
+        userFriends: state.userFriends, // User's friends list
       });
 
 

@@ -71,14 +71,35 @@ export class SupabaseService {
     if (aspect_id) return aspect_id;
     if (!aspect) return null;
 
-    const { data } = await this.client
+    // 1. Check user's own aspects
+    const { data: ownData } = await this.client
       .from('aspects')
       .select('id')
       .eq('user_id', userId)
       .ilike('name', aspect)
-      .single();
+      .maybeSingle();
 
-    return data?.id || null;
+    if (ownData?.id) return ownData.id;
+
+    // 2. Check shared aspects (where user is a member)
+    const { data: memberRows } = await this.client
+      .from('aspect_members')
+      .select('aspect_id')
+      .eq('user_id', userId);
+
+    if (memberRows && memberRows.length > 0) {
+      const sharedIds = memberRows.map(r => r.aspect_id);
+      const { data: sharedData } = await this.client
+        .from('aspects')
+        .select('id')
+        .in('id', sharedIds)
+        .ilike('name', aspect)
+        .maybeSingle();
+
+      if (sharedData?.id) return sharedData.id;
+    }
+
+    return null;
   }
 
   /**

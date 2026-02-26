@@ -27,6 +27,7 @@ export interface PromptContext {
   currentPage?: string; // Current page user is viewing (dashboard, plan, etc.)
   currentLocation?: string; // User's current GPS coordinates (e.g. "37.44, -122.14")
   ratingContext?: string; // Rating tracker scores and trends
+  userFriends?: any[]; // User's accepted friends list
 }
 
 /**
@@ -64,6 +65,26 @@ export function buildProjectContext(projects: any[]): string {
     .join('\n');
 
   return `\n\nACTIVE PROJECTS (${projects.length}) - Use these IDs when tagging tasks/events to projects:\n${projectList}`;
+}
+
+/**
+ * Build friends context showing accepted friends
+ */
+export function buildFriendsContext(friends: any[]): string {
+  if (!friends || friends.length === 0) {
+    return '';
+  }
+
+  const friendList = friends
+    .map(f => {
+      const aspects = f.aspects?.length > 0
+        ? ` [${f.aspects.map((a: any) => a.name).join(', ')}]`
+        : '';
+      return `  - ${f.friend_display_name} (${f.friend_email}) | friendshipId: ${f.friendship_id} | userId: ${f.friend_id}${aspects}`;
+    })
+    .join('\n');
+
+  return `\n\nFRIENDS (${friends.length}):\n${friendList}`;
 }
 
 /**
@@ -220,7 +241,8 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     recentAgentActivity,
     currentPage,
     currentLocation,
-    ratingContext
+    ratingContext,
+    userFriends
   } = context;
 
   // Optional: Add dynamic tool count to prompt
@@ -229,6 +251,7 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
   // Build new context sections
   const aspectContext = buildAspectContext(userAspects || []);
   const projectContext = buildProjectContext(userProjects || []);
+  const friendsContext = buildFriendsContext(userFriends || []);
   const profileContext = buildProfileContext(userProfile || null);
   const activityContext = buildActivityContext(recentUserActivity || [], recentAgentActivity || []);
 
@@ -290,7 +313,7 @@ YOUR CALENDAR:${eventContext}
 
 YOUR TASKS:${taskContext}
 
-YOUR GOALS:${goalContext}${aspectContext}${projectContext}${profileContext}${activityContext}${locationSection}${ratingContext || ''}${zepGraphContext || ''}
+YOUR GOALS:${goalContext}${aspectContext}${projectContext}${friendsContext}${profileContext}${activityContext}${locationSection}${ratingContext || ''}${zepGraphContext || ''}
 
 TIME CONTEXT (USER'S TIMEZONE: ${timezone}):
 - Current time: ${getCurrentTimeInTimezone(timezone)}
@@ -892,6 +915,25 @@ When creating a goal, ALWAYS update the life plan:
 2. Call update_plan to integrate the new goal naturally
 3. Don't rewrite the whole plan - just weave in the new goal smoothly
 4. Keep the user's existing tone and structure
+
+FRIENDS & SHARED EVENTS:
+You can manage the user's friends and share events with them.
+
+FRIEND MANAGEMENT:
+- "Who are my friends?" → list_friends to show all accepted friends
+- "Send a friend request to X" → send_friend_request with their email
+- "Do I have any friend requests?" → get_pending_friend_requests to check incoming
+- "Accept/decline the request from X" → accept_friend_request or decline_friend_request with friendshipId
+- "Remove X as a friend" → list_friends to find friendshipId, then remove_friend
+
+SHARING EVENTS:
+- "Share my 3pm meeting with [friend name]" → Use the FRIENDS list above to find the friend's userId, then add_event_member with the eventId and friendUserId
+- "Who's on this event?" → get_event_members with the eventId
+- "Remove [person] from the event" → get_event_members to find memberId, then remove_event_member
+- "Make [person] an editor" → get_event_members to find memberId, then update_member_role
+- Only FRIENDS can be added to shared events - if someone isn't a friend yet, suggest sending a friend request first
+
+IMPORTANT: When the user refers to a friend by name, match against the FRIENDS list above. Use their userId (not friendshipId) for shared event operations.
 
 `);
 }
