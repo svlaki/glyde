@@ -2,6 +2,7 @@ import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/
 import { BaseAgent } from "../base/BaseAgent.js";
 import { AgentContext, AgentResponse } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
+import { isValidTimezone } from "../../utils/timezoneUtils.js";
 import { buildMargaretSystemPrompt } from "./prompts.js";
 
 export class MaintenanceAgentMargaret extends BaseAgent {
@@ -19,7 +20,11 @@ export class MaintenanceAgentMargaret extends BaseAgent {
 
       const supabaseService = new SupabaseService();
       const userProfile = await supabaseService.getProfile(context.userId);
-      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+      let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+      if (!isValidTimezone(userTimezone)) {
+        console.warn(`[MARGARET] Invalid timezone "${userTimezone}", falling back to UTC`);
+        userTimezone = 'UTC';
+      }
 
       console.log(`[MARGARET] Processing for user ${context.userId} in timezone ${userTimezone}`);
 

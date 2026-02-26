@@ -525,7 +525,6 @@ export class SupabaseService {
           end_time: endTime,     // Must be UTC
           location: location,
           description: description,
-          category: event.aspect || 'Personal', // Deprecated text column for backward compatibility
           aspect_id: aspectId,
           visibility: event.visibility || 'private', // Default to private for privacy
           project_id: event.project_id || null,
@@ -590,7 +589,7 @@ export class SupabaseService {
       if (ownEvent) {
         oldEvent = ownEvent;
       } else {
-        // Check if user is an editor on this shared event
+        // Check if user is an editor on this shared event via event_members
         const { data: membership } = await this.client
           .from('event_members')
           .select('role')
@@ -606,8 +605,35 @@ export class SupabaseService {
             .single();
           oldEvent = sharedEvent;
         } else {
-          console.error('[SUPABASE SERVICE] User has no edit access to event:', eventId);
-          return null;
+          // Check if user is an editor/owner on the event's aspect via aspect_members
+          const { data: eventForAspect } = await this.client
+            .from('events')
+            .select('id, aspect_id')
+            .eq('id', eventId)
+            .single();
+
+          if (eventForAspect?.aspect_id) {
+            const { data: aspectMembership } = await this.client
+              .from('aspect_members')
+              .select('role')
+              .eq('aspect_id', eventForAspect.aspect_id)
+              .eq('user_id', userId)
+              .single();
+
+            if (aspectMembership?.role === 'editor' || aspectMembership?.role === 'owner') {
+              const { data: sharedEvent } = await this.client
+                .from('events')
+                .select('*')
+                .eq('id', eventId)
+                .single();
+              oldEvent = sharedEvent;
+            }
+          }
+
+          if (!oldEvent) {
+            console.error('[SUPABASE SERVICE] User has no edit access to event:', eventId);
+            return null;
+          }
         }
       }
 
@@ -644,7 +670,6 @@ export class SupabaseService {
       const aspectOwnerId = oldEvent?.user_id || userId;
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
         updateData.aspect_id = await this.resolveAspectId(aspectOwnerId, updates.aspect, updates.aspect_id);
-        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       // Update in public schema
@@ -1002,7 +1027,6 @@ export class SupabaseService {
           end_time: endTime,
           location: location,
           description: description,
-          category: event.aspect || 'Personal',
           aspect_id: aspectId,
           recurrence_rule: rrule,
           recurrence_end: event.recurrence_end || null,
@@ -1134,7 +1158,6 @@ export class SupabaseService {
         end_time: instanceEndDate.toISOString(),
         location: updates.location !== undefined ? updates.location : parent.location,
         description: updates.description !== undefined ? updates.description : parent.description,
-        category: updates.aspect || parent.aspect,
         aspect_id: resolvedAspectId,
         visibility: updates.visibility !== undefined ? updates.visibility : parent.visibility,
         reflection: updates.reflection !== undefined ? updates.reflection : null,
@@ -1279,7 +1302,6 @@ export class SupabaseService {
       if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
         updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
-        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       const { data, error } = await this.client
@@ -1363,7 +1385,6 @@ export class SupabaseService {
           user_id: userId,
           title: taskData.title,
           description: taskData.description,
-          category: taskData.aspect || 'Personal', // Deprecated text column for backward compatibility
           aspect_id: aspectId,
           due_date: taskData.dueDate,
           priority: taskData.priority || 'medium',
@@ -2103,7 +2124,6 @@ export class SupabaseService {
       // Handle aspect using helper method
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
         updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
-        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       const { data, error } = await this.client
@@ -2290,7 +2310,6 @@ export class SupabaseService {
           user_id: userId,
           title: goalData.title,
           description: goalData.description,
-          category: goalData.aspect || 'Personal', // Deprecated text column for backward compatibility
           aspect_id: aspectId,
           target_date: goalData.targetDate,
           status: goalData.status || 'active',
@@ -2469,7 +2488,6 @@ export class SupabaseService {
       // Handle aspect using helper method
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
         updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
-        if (updates.aspect) updateData.category = updates.aspect; // Deprecated text column for backward compatibility
       }
 
       const { data, error } = await this.client

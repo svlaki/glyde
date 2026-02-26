@@ -5,7 +5,7 @@ import { SupabaseService } from '../../services/SupabaseService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse } from '../../types/agents.js';
-import { getCurrentTimeInTimezone } from '../../utils/timezoneUtils.js';
+import { getCurrentTimeInTimezone, isValidTimezone } from '../../utils/timezoneUtils.js';
 import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
@@ -82,7 +82,11 @@ export class InteractionAgentGerald extends BaseAgent {
 
       // Get user profile with timezone
       const userProfile = await supabaseService.getProfile(context.userId);
-      const userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+      let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
+      if (!isValidTimezone(userTimezone)) {
+        console.warn(`[GERALD] Invalid timezone "${userTimezone}", falling back to UTC`);
+        userTimezone = 'UTC';
+      }
 
       console.log(`[GERALD] Processing for user ${context.userId} in timezone ${userTimezone}`);
 

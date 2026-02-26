@@ -49,6 +49,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/supertest": "^2.0.16",
     "@types/uuid": "^9.0.8",
+    "@vitest/coverage-v8": "^4.0.18",
     "supertest": "^7.0.0",
     "tsx": "^4.20.6",
     "typescript": "^5.5.3",

@@ -157,10 +157,14 @@ export const createEventTool = tool(
 
     // Create reminder in the unified reminders table if reminder_minutes is set
     if (reminderMinutes != null) {
-      await reminderService.syncEventReminder(
-        userId, event.id, title, startTimeUTC, reminderMinutes,
-        event.aspect_id || undefined
-      );
+      try {
+        await reminderService.syncEventReminder(
+          userId, event.id, title, startTimeUTC, reminderMinutes,
+          event.aspect_id || undefined
+        );
+      } catch (reminderError) {
+        console.warn('[CREATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
+      }
     }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat

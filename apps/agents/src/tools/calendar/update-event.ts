@@ -184,10 +184,14 @@ export const updateEventTool = tool(
 
     // Sync reminder if reminderMinutes was changed
     if (reminderMinutes !== undefined && updatedEvent) {
-      await reminderService.syncEventReminder(
-        userId, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
-        reminderMinutes, updatedEvent.aspect_id || undefined
-      );
+      try {
+        await reminderService.syncEventReminder(
+          userId, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
+          reminderMinutes, updatedEvent.aspect_id || undefined
+        );
+      } catch (reminderError) {
+        console.warn('[UPDATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
+      }
     }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat
