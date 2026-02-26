@@ -731,6 +731,14 @@ TASK MANAGEMENT:
 - Mark tasks complete when user says they finished something
 - Update task details (due date, priority, aspect) when user asks
 
+REMINDERS:
+You can create reminders for the user using create_reminder. Reminders fire as notification cards at the specified time.
+- "Remind me to call mom at 5pm" → create_reminder(message="Call mom", triggerAt="5pm today", aspectId=...)
+- "Remind me to submit the paper next Friday" → create_reminder(message="Submit paper", triggerAt="next Friday 9am", aspectId=...)
+- Use list_reminders to show pending reminders, update_reminder to modify, delete_reminder to dismiss
+- Always assign an aspect_id if the reminder is related to one of the user's aspects
+- Reminders are different from events: they are one-time notifications, not calendar blocks
+
 BULK CATEGORY UPDATES (MUST BE SEQUENTIAL):
 When user asks to "move X to aspect Y" or "put all X in aspect Y" or "assign X to aspect Y":
 

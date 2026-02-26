@@ -229,7 +229,7 @@ function ConnectionRow({ connection, onConnectionChanged }: { connection: Connec
         </div>
       </div>
 
-      {isGoogle && calendarsExpanded && (
+      {hasCalendarPicker && calendarsExpanded && (
         <div style={{ marginTop: '8px', paddingLeft: '4px' }}>
           <CalendarPicker
             mappings={mappings}

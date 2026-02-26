@@ -3,15 +3,15 @@ import { getSupabaseService } from '../services/SupabaseService.js';
 
 export async function getUserRatings(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, topic } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
+    const { topic } = req.body;
     const supabaseService = getSupabaseService();
-    const ratings = await supabaseService.getRatings(user_id, topic);
+    const ratings = await supabaseService.getRatings(userId, topic);
 
     res.json({ success: true, ratings });
   } catch (error) {
@@ -22,15 +22,14 @@ export async function getUserRatings(req: Request, res: Response): Promise<void>
 
 export async function getRatingSummary(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      res.status(400).json({ error: 'user_id is required' });
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
     const supabaseService = getSupabaseService();
-    const summary = await supabaseService.getRatingSummary(user_id);
+    const summary = await supabaseService.getRatingSummary(userId);
 
     res.json({ success: true, summary });
   } catch (error) {
@@ -41,10 +40,16 @@ export async function getRatingSummary(req: Request, res: Response): Promise<voi
 
 export async function createRating(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, topic, score, description, aspect_id, notes } = req.body;
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-    if (!user_id || !topic || score === undefined) {
-      res.status(400).json({ error: 'user_id, topic, and score are required' });
+    const { topic, score, description, aspect_id, notes } = req.body;
+
+    if (!topic || score === undefined) {
+      res.status(400).json({ error: 'topic and score are required' });
       return;
     }
 
@@ -54,7 +59,7 @@ export async function createRating(req: Request, res: Response): Promise<void> {
     }
 
     const supabaseService = getSupabaseService();
-    const rating = await supabaseService.createRating(user_id, {
+    const rating = await supabaseService.createRating(userId, {
       topic,
       score,
       description,

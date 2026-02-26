@@ -4,9 +4,10 @@ import { SupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
+import reminderService from "../../services/ReminderService.js";
 
 export const updateEventTool = tool(
-  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect, reflection, isMissed }, config) => {
+  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect, reflection, isMissed, reminderMinutes }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -171,6 +172,7 @@ export const updateEventTool = tool(
         aspect: aspect || undefined,
         reflection: reflection !== undefined && reflection !== null ? reflection : undefined,
         is_missed: isMissed !== undefined && isMissed !== null ? isMissed : undefined,
+        reminder_minutes: reminderMinutes !== undefined ? (reminderMinutes ?? null) : undefined,
       },
       { source: 'agent', agentType: 'conversation' }
     );
@@ -178,6 +180,14 @@ export const updateEventTool = tool(
     if (!updatedEvent) {
       // Return error message instead of throwing to prevent LLM retry loops
       return "Failed to update event. The event may have been deleted or you may not have permission to modify it.";
+    }
+
+    // Sync reminder if reminderMinutes was changed
+    if (reminderMinutes !== undefined && updatedEvent) {
+      await reminderService.syncEventReminder(
+        userId, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
+        reminderMinutes, updatedEvent.aspect_id || undefined
+      );
     }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat
@@ -212,6 +222,9 @@ export const updateEventTool = tool(
     if (isMissed !== undefined && isMissed !== null) {
       changes.push(isMissed ? 'marked as missed' : 'marked as attended');
     }
+    if (reminderMinutes !== undefined) {
+      changes.push(reminderMinutes != null ? `reminder set to ${reminderMinutes} min before` : 'reminder removed');
+    }
 
     const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
@@ -232,6 +245,7 @@ export const updateEventTool = tool(
       aspect: z.string().optional().nullable().describe("Update event aspect (e.g., 'Work', 'School', 'Health & Hygiene', 'Social', 'Personal'). Leave empty to keep existing aspect."),
       reflection: z.string().optional().nullable().describe("Set or update the reflection for a past event - what happened, how it went, takeaways. Only for events that have already ended."),
       isMissed: z.boolean().optional().nullable().describe("Mark whether the user missed this event. Set to true when user says they didn't attend, false to clear."),
+      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Set or update reminder. Minutes before the event to send a notification. Common values: 5, 10, 15, 30, 60, 1440. Set to null to remove reminder."),
     }),
   }
 );

@@ -230,6 +230,7 @@ Text reflection about life/day → Use manage_patterns to store the insight in Z
 Text with actionable info → Create appropriate tasks/events from what the user said
 "No" / "Skip" / "Not now" → Do nothing, respect the user's choice
 Multiple choice selection → Act based on what the option means in context
+"Set a reminder" or reminder request → Use create_reminder with the appropriate time and message
 
 CRITICAL: When creating events from time responses:
 - Parse the time from the response (e.g., "6:00pm")
@@ -241,6 +242,16 @@ CRITICAL: When creating events from time responses:
 CRITICAL: When the user says "no" or "skip":
 - Do NOTHING. Do not create events, tasks, or any other items.
 - Do not create new interactions asking the same thing differently.
+
+RESPONSE TIME AWARENESS (CRITICAL FOR SCHEDULING):
+Each interaction response includes how long the user took to respond. Use this when scheduling:
+- If response time is short (<1 hour): The original context (time slots, "today", "this evening") is still valid.
+- If response time is long (several hours or next day): The original time references are STALE.
+  - Do NOT schedule for time slots that have already passed.
+  - Recalculate based on CURRENT TIME, not when the interaction was created.
+  - "Want to work out this evening?" answered 18 hours later = schedule for TODAY's evening, not yesterday's.
+  - "Free slot at 2pm" answered the next morning = find a new free slot for today, 2pm yesterday is gone.
+- Always check the current time context above and schedule relative to NOW, not when the question was asked.
 
 Do NOT respond with text explanations. Just use tools and act silently.`);
 }

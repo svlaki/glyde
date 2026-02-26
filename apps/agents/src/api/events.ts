@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { SupabaseService } from '../services/SupabaseService.js';
 import { logger } from '../utils/logger.js';
+import reminderService from '../services/ReminderService.js';
+import { syncRecurringEventInstanceReminders } from '../jobs/reminder-checker.js';
 
 // Singleton pattern for service instance
 let supabaseService: SupabaseService | null = null;
@@ -119,6 +121,14 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
     });
     
     if (createdEvent) {
+      // Sync reminder if reminder_minutes was set
+      if (eventData.reminder_minutes != null) {
+        await reminderService.syncEventReminder(
+          user_id, createdEvent.id, createdEvent.title, createdEvent.start_time,
+          eventData.reminder_minutes, createdEvent.aspect_id || undefined
+        );
+      }
+
       res.json({
         success: true,
         event: createdEvent
@@ -176,6 +186,23 @@ export async function updateUserEvent(req: Request, res: Response): Promise<void
     const updatedEvent = await getSupabaseService().updateEvent(user_id, event_id, eventDataUpdate);
     
     if (updatedEvent) {
+      // Sync reminder if reminder_minutes changed, or if event time changed and event has a reminder
+      if (eventDataUpdate.reminder_minutes !== undefined) {
+        await reminderService.syncEventReminder(
+          user_id, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
+          eventDataUpdate.reminder_minutes, updatedEvent.aspect_id || undefined
+        );
+      } else if (
+        (eventDataUpdate.start_time || eventDataUpdate.end_time) &&
+        updatedEvent.reminder_minutes != null
+      ) {
+        // Event time changed but reminder setting didn't - resync with existing reminder_minutes
+        await reminderService.syncEventReminder(
+          user_id, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
+          updatedEvent.reminder_minutes, updatedEvent.aspect_id || undefined
+        );
+      }
+
       res.json({
         success: true,
         event: updatedEvent
@@ -241,7 +268,7 @@ export async function deleteUserEvent(req: Request, res: Response): Promise<void
 
 export async function createRecurringEvent(req: Request, res: Response): Promise<void> {
   try {
-    const { user_id, title, start_time, recurrence_rule, recurrence_end, location, description, aspect } = req.body;
+    const { user_id, title, start_time, recurrence_rule, recurrence_end, location, description, aspect, reminder_minutes } = req.body;
 
     // Validate required fields
     if (!user_id) {
@@ -279,7 +306,8 @@ export async function createRecurringEvent(req: Request, res: Response): Promise
       description: description || '',
       aspect: aspect || 'Personal',
       recurrence_rule,
-      recurrence_end: recurrence_end || null
+      recurrence_end: recurrence_end || null,
+      reminder_minutes: reminder_minutes ?? null
     });
 
     if (!event) {
@@ -288,6 +316,18 @@ export async function createRecurringEvent(req: Request, res: Response): Promise
     }
 
     logger.info('Successfully created recurring event', { event_id: event.id, user_id });
+
+    // Immediately create reminders for upcoming instances
+    if (reminder_minutes != null && recurrence_rule) {
+      const { data: profile } = await getSupabaseService().getClient()
+        .from('profile').select('timezone').eq('id', user_id).single();
+      const tz = profile?.timezone || 'America/Los_Angeles';
+
+      syncRecurringEventInstanceReminders(
+        user_id, event.id, event.title, event.start_time,
+        recurrence_rule, reminder_minutes, event.aspect_id || undefined, tz
+      ).catch(err => console.error('[EVENTS] Failed to sync recurring reminders:', err));
+    }
 
     res.status(201).json({
       success: true,
@@ -364,6 +404,26 @@ export async function updateRecurringEvent(req: Request, res: Response): Promise
       }
 
       logger.info('Successfully updated recurring series', { event_id, user_id });
+
+      // Sync reminders if reminder_minutes changed on the series
+      if (updates.reminder_minutes !== undefined && event.recurrence_rule) {
+        if (updates.reminder_minutes == null) {
+          // Reminder removed - dismiss all pending event reminders
+          await reminderService.dismissEventReminders(user_id, event_id);
+        } else {
+          const { data: profile } = await getSupabaseService().getClient()
+            .from('profile').select('timezone').eq('id', user_id).single();
+          const tz = profile?.timezone || 'America/Los_Angeles';
+
+          // Dismiss old, then create new for upcoming instances
+          await reminderService.dismissEventReminders(user_id, event_id);
+          syncRecurringEventInstanceReminders(
+            user_id, event_id, event.title, event.start_time,
+            event.recurrence_rule, updates.reminder_minutes,
+            event.aspect_id || undefined, tz
+          ).catch(err => console.error('[EVENTS] Failed to sync recurring reminders:', err));
+        }
+      }
 
       res.json({
         success: true,

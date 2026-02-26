@@ -98,6 +98,7 @@ export function EventFormUnified({
       start_time: startISO,
       end_time: endISO,
       ...(form.reflection.trim() ? { reflection: form.reflection.trim() } : {}),
+      reminder_minutes: form.reminderMinutes,
     }
   }
 
@@ -127,7 +128,8 @@ export function EventFormUnified({
           form.recurrence.endType === 'until' && form.recurrence.untilDate
             ? new Date(form.recurrence.untilDate).toISOString()
             : undefined,
-          session?.access_token
+          session?.access_token,
+          form.reminderMinutes
         )
 
         if (error) {
@@ -835,6 +837,38 @@ export function EventFormUnified({
                   resize: 'vertical'
                 }}
               />
+            </div>
+
+            {/* Reminder */}
+            <div>
+              <FormLabel>Reminder</FormLabel>
+              <select
+                value={form.reminderMinutes === null ? '' : String(form.reminderMinutes)}
+                onChange={(e) => {
+                  const val = e.target.value
+                  form.setReminderMinutes(val === '' ? null : Number(val))
+                }}
+                style={{
+                  ...inputStyle,
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 14px center',
+                  paddingRight: '36px',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="">No reminder</option>
+                <option value="0">At time of event</option>
+                <option value="5">5 minutes before</option>
+                <option value="10">10 minutes before</option>
+                <option value="15">15 minutes before</option>
+                <option value="30">30 minutes before</option>
+                <option value="60">1 hour before</option>
+                <option value="120">2 hours before</option>
+                <option value="1440">1 day before</option>
+                <option value="2880">2 days before</option>
+              </select>
             </div>
 
             {/* Reflection - only for past events being edited */}

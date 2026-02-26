@@ -34,6 +34,8 @@ export interface CalendarEvent {
   // Post-event metadata
   reflection?: string
   is_missed?: boolean
+  // Reminder field
+  reminder_minutes?: number | null  // Minutes before event to fire a reminder (null = no reminder)
   // Google sync fields
   google_event_id?: string
   local_notes?: string
@@ -379,7 +381,8 @@ export async function createRecurringEvent(
   description?: string,
   location?: string,
   recurrenceEnd?: string,
-  accessToken?: string
+  accessToken?: string,
+  reminderMinutes?: number | null
 ): Promise<{ event: CalendarEvent | null, error: string | null }> {
   try {
     if (!user) {
@@ -407,7 +410,8 @@ export async function createRecurringEvent(
         aspect: aspect || 'Personal',
         description: description || '',
         location: location || '',
-        recurrence_end: recurrenceEnd || null
+        recurrence_end: recurrenceEnd || null,
+        reminder_minutes: reminderMinutes ?? null
       })
     })
 

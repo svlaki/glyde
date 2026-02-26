@@ -5,9 +5,10 @@ import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 import { executeZepOperation } from "../../utils/zep-sync-helper.js";
+import reminderService from "../../services/ReminderService.js";
 
 export const createEventTool = tool(
-  async ({ title, startTime, endTime, location, description, category, visibility, replaceConflicting = false, projectId }, config) => {
+  async ({ title, startTime, endTime, location, description, category, visibility, replaceConflicting = false, projectId, reminderMinutes }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -141,7 +142,8 @@ export const createEventTool = tool(
       description: description || "",
       aspect: validatedAspect || '',
       visibility: visibility || 'private',
-      project_id: projectId || undefined
+      project_id: projectId || undefined,
+      reminder_minutes: reminderMinutes != null ? reminderMinutes : undefined
     }, { source: 'agent', agentType: 'conversation' });
 
     console.log('[CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
@@ -152,6 +154,14 @@ export const createEventTool = tool(
     }
 
     console.log('[CREATE-EVENT TOOL] Event created successfully:', event.id);
+
+    // Create reminder in the unified reminders table if reminder_minutes is set
+    if (reminderMinutes != null) {
+      await reminderService.syncEventReminder(
+        userId, event.id, title, startTimeUTC, reminderMinutes,
+        event.aspect_id || undefined
+      );
+    }
 
     // Note: Automatic graph sync disabled to prevent Zep graph bloat
     // Individual event creation creates too many nodes
@@ -178,6 +188,7 @@ export const createEventTool = tool(
       visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("Event visibility. 'private' = only you, 'friends' = visible to friends, 'public' = visible to everyone. Defaults to 'private'."),
       replaceConflicting: z.boolean().default(false).nullable().describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
       projectId: z.string().optional().nullable().describe("UUID of a project to link this event to. Use list_projects to find project IDs."),
+      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Minutes before the event to send a reminder notification. Common values: 5, 10, 15, 30, 60 (1hr), 1440 (1 day). Null or omit for no reminder."),
     }),
   }
 );

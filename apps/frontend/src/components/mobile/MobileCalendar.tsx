@@ -1803,12 +1803,13 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
             onSaveRecurring={isViewerOnly ? undefined : async (eventData, scope, recurrenceRule) => {
               if (!user || !session) return
               if (eventData.id) {
-                const updates: Record<string, string> = {}
+                const updates: Record<string, any> = {}
                 if (eventData.title) updates.title = eventData.title
                 if (eventData.start_time) updates.start_time = eventData.start_time
                 if (eventData.end_time) updates.end_time = eventData.end_time
                 if (eventData.description) updates.description = eventData.description
                 if (eventData.aspect) updates.aspect = eventData.aspect
+                if (eventData.reminder_minutes !== undefined) updates.reminder_minutes = eventData.reminder_minutes
                 if (recurrenceRule) updates.recurrence_rule = recurrenceRule
                 if (scope === 'this_instance' && selectedEvent?.instance_date) {
                   updates.instance_date = selectedEvent.instance_date

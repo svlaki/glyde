@@ -487,7 +487,17 @@ export class InteractionAgentGerald extends BaseAgent {
       const age = i.created_at ? `${Math.round((Date.now() - new Date(i.created_at).getTime()) / 3600000)}h ago` : '';
       const responseText = i.interaction_responses?.[0]?.response;
       const responseSuffix = responseText ? ` [user answered: "${responseText}"]` : '';
-      return `  - [${type}] "${i.question}" -> ${status} (${age})${responseSuffix}`;
+      // Calculate response time if the interaction was responded to
+      let responseTimeSuffix = '';
+      if (i.status === 'responded' && i.created_at && i.interaction_responses?.[0]?.created_at) {
+        const createdMs = new Date(i.created_at).getTime();
+        const respondedMs = new Date(i.interaction_responses[0].created_at).getTime();
+        const diffMin = Math.round((respondedMs - createdMs) / 60000);
+        responseTimeSuffix = diffMin < 60
+          ? ` [responded in ${diffMin}min]`
+          : ` [responded in ${Math.round(diffMin / 60 * 10) / 10}h]`;
+      }
+      return `  - [${type}] "${i.question}" -> ${status} (${age})${responseSuffix}${responseTimeSuffix}`;
     });
 
     // Extract dismissed topics for explicit avoidance

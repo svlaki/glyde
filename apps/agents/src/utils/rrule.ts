@@ -183,50 +183,46 @@ function toFakeUtcLocal(utcDate: Date, timezone: string): Date {
 }
 
 /**
- * Convert a "fake UTC" date back to real UTC
+ * Convert a "fake UTC" date back to real UTC.
+ * The fake UTC date has local time values stored in its UTC fields.
+ * We need to figure out what real UTC time corresponds to that local time
+ * in the given timezone on that specific date (accounting for DST).
  */
 function fromFakeUtcLocal(fakeUtc: Date, timezone: string): Date {
-  // The fake UTC has local time in UTC fields - create a real local date
-  const localDate = new Date(
-    fakeUtc.getUTCFullYear(),
-    fakeUtc.getUTCMonth(),
-    fakeUtc.getUTCDate(),
-    fakeUtc.getUTCHours(),
-    fakeUtc.getUTCMinutes(),
-    fakeUtc.getUTCSeconds()
-  );
+  // Extract the local time values from the fake UTC fields
+  const year = fakeUtc.getUTCFullYear();
+  const month = fakeUtc.getUTCMonth(); // 0-indexed
+  const day = fakeUtc.getUTCDate();
+  const hour = fakeUtc.getUTCHours();
+  const minute = fakeUtc.getUTCMinutes();
+  const second = fakeUtc.getUTCSeconds();
 
-  // Convert local date to UTC by getting the timezone offset
-  // Create a formatter to get the offset for this specific date in the timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
+  // Build an ISO string representing this local time as if it were UTC
+  // Then use Intl to find the actual UTC offset for this date in the target timezone
+  const pad = (n: number, w: number = 2) => String(n).padStart(w, '0');
+  const isoGuess = `${year}-${pad(month + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}Z`;
+  const guessUtc = new Date(isoGuess);
 
-  // Get what time it would be in the target timezone for this UTC interpretation
-  const parts = formatter.formatToParts(localDate);
-  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+  // Format this UTC guess in the target timezone to see what local time it maps to
+  const options: Intl.DateTimeFormatOptions = { timeZone: timezone };
+  const localYear = parseInt(guessUtc.toLocaleString('en-US', { ...options, year: 'numeric' }));
+  const localMonth = parseInt(guessUtc.toLocaleString('en-US', { ...options, month: 'numeric' })) - 1;
+  const localDay = parseInt(guessUtc.toLocaleString('en-US', { ...options, day: 'numeric' }));
+  const rawHour = parseInt(guessUtc.toLocaleString('en-US', { ...options, hour: 'numeric', hour12: false }));
+  const localHour = rawHour === 24 ? 0 : rawHour;
+  const localMinute = parseInt(guessUtc.toLocaleString('en-US', { ...options, minute: 'numeric' }));
+  const localSecond = parseInt(guessUtc.toLocaleString('en-US', { ...options, second: 'numeric' }));
 
-  const tzYear = parseInt(getPart('year'));
-  const tzMonth = parseInt(getPart('month')) - 1;
-  const tzDay = parseInt(getPart('day'));
-  // Intl.DateTimeFormat with hour12:false returns "24" for midnight instead of "0"
-  // This causes new Date(y, m, d, 24, min) to roll to the next day, shifting dates by -1
-  const rawHour = parseInt(getPart('hour'));
-  const tzHour = rawHour === 24 ? 0 : rawHour;
-  const tzMinute = parseInt(getPart('minute'));
+  // The difference between what we wanted (year/month/day/hour/min/sec) and what
+  // guessUtc maps to in the target timezone tells us the offset correction needed.
+  // wanted local = Date.UTC(year, month, day, hour, minute, second)
+  // actual local = Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond)
+  const wantedMs = Date.UTC(year, month, day, hour, minute, second);
+  const actualMs = Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond);
+  const correctionMs = wantedMs - actualMs;
 
-  // Calculate the offset by comparing
-  const offsetMs = localDate.getTime() - new Date(tzYear, tzMonth, tzDay, tzHour, tzMinute).getTime();
-
-  // Apply offset to get real UTC
-  return new Date(localDate.getTime() + offsetMs);
+  // Apply the correction: guessUtc + correction = real UTC for the desired local time
+  return new Date(guessUtc.getTime() + correctionMs);
 }
 
 /**
@@ -253,15 +249,17 @@ export function expandRecurrence(
     // Default end date to 1 year from start
     const expandEndDate = endDate || new Date(startTime.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-    // If timezone provided and RRULE has BYDAY, use fake UTC for correct day matching
-    const hasByday = rrule.includes('BYDAY');
+    // Always use fake UTC when timezone is provided to ensure recurring events
+    // stay at the same LOCAL time across DST boundaries. Without this, a daily
+    // noon event stored as 20:00 UTC (PST) would shift to 1pm when PDT starts.
     const tz = timezone || 'UTC';
+    const useFakeUtc = !!timezone && timezone !== 'UTC';
 
     let dtstart: Date;
     let searchEnd: Date;
 
-    if (hasByday && timezone) {
-      // Convert to fake UTC for correct BYDAY evaluation
+    if (useFakeUtc) {
+      // Convert to fake UTC so rrule generates occurrences at consistent local times
       dtstart = toFakeUtcLocal(startTime, tz);
       searchEnd = toFakeUtcLocal(expandEndDate, tz);
     } else {
@@ -277,7 +275,7 @@ export function expandRecurrence(
 
     // Convert back to real UTC if we used fake UTC
     let realOccurrences: Date[];
-    if (hasByday && timezone) {
+    if (useFakeUtc) {
       realOccurrences = occurrences.map(fakeUtc => fromFakeUtcLocal(fakeUtc, tz));
     } else {
       realOccurrences = occurrences;

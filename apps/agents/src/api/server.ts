@@ -58,12 +58,14 @@ import {
   updateCalendarMapping
 } from './connections.js';
 import { getChatHistory, saveChatMessage, saveChatMessagesBatch, clearChatHistory } from './chat.js';
+import { getUserReminders, createUserReminder, updateUserReminder, deleteUserReminder, snoozeUserReminder, dismissEventReminders } from './reminders.js';
 import { processAgentMessage, addStartTime } from './agent.js';
 import { streamAgentMessage } from './stream.js';
 import friendshipRouter from './friendships.js';
 import sharedAspectsRouter from './shared-aspects.js';
 import sharedEventsRouter from './shared-events.js';
 import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
+import { startReminderCheckerJob } from '../jobs/reminder-checker.js';
 import { authenticateRequest } from './middleware/auth.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
 import {
@@ -406,6 +408,14 @@ app.post('/api/connections/calendars/mapping', updateCalendarMapping);
 // Webhook endpoint - no auth required (called by Google)
 app.post('/api/connections/webhook/google', handleGoogleWebhook);
 
+// Reminder endpoints
+app.post('/api/reminders', getUserReminders);
+app.post('/api/reminders/create', createUserReminder);
+app.post('/api/reminders/update', updateUserReminder);
+app.post('/api/reminders/delete', deleteUserReminder);
+app.post('/api/reminders/snooze', snoozeUserReminder);
+app.post('/api/reminders/dismiss-event', dismissEventReminders);
+
 // Chat endpoints - persistent storage in user schema
 app.post('/api/chat/history', getChatHistory);
 app.post('/api/chat/message', saveChatMessage);
@@ -502,6 +512,7 @@ if (process.env.NODE_ENV !== 'test') {
 
     // Start background jobs
     startWatchRenewalJob();
+    startReminderCheckerJob();
   });
 
   // Graceful shutdown

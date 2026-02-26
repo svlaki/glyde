@@ -18,6 +18,7 @@ import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
 import { RatingsPage } from './src/pages/RatingsPage'
+import { RemindersPage } from './src/pages/RemindersPage'
 import { ProjectProvider } from './src/lib/projectContext'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
@@ -134,6 +135,16 @@ function App() {
                     <ProtectedRoute>
                       <OnboardingCheck>
                         <RatingsPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/reminders"
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <RemindersPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }

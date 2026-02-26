@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 
 import { getSupabaseService } from '../services/SupabaseService.js';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
+import reminderService from '../services/ReminderService.js';
 
 export async function getPendingInteractions(req: Request, res: Response): Promise<Response | void> {
   try {
@@ -95,6 +96,30 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       }
     }
 
+    // Handle reminder-specific responses (snooze/acknowledge)
+    const interactionMeta = (interaction.metadata || {}) as any;
+    if (interactionMeta.context === 'reminder_delivery' && interactionMeta.reminderId) {
+      const reminderId = interactionMeta.reminderId;
+      if (trimmedResponse === 'Got it') {
+        await reminderService.deleteReminder(userId, reminderId);
+      } else if (trimmedResponse === 'Snooze 15min') {
+        const snoozeUntil = new Date(Date.now() + 15 * 60000).toISOString();
+        await reminderService.snoozeReminder(userId, reminderId, snoozeUntil);
+      } else if (trimmedResponse === 'Snooze 1hr') {
+        const snoozeUntil = new Date(Date.now() + 60 * 60000).toISOString();
+        await reminderService.snoozeReminder(userId, reminderId, snoozeUntil);
+      } else if (trimmedResponse === 'Snooze tomorrow') {
+        const now = new Date();
+        const tomorrowAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0, 0);
+        await reminderService.snoozeReminder(userId, reminderId, tomorrowAt9.toISOString());
+      }
+
+      // Reminder responses are self-contained - no need to route to Gerald
+      // Response already saved above (line 72), just update status
+      await supabaseService.updateInteractionStatus(interactionId, 'responded');
+      return res.json({ success: true, message: 'Reminder response processed' });
+    }
+
     // Mark interaction as responded (not cancelled - that's for dismissals)
     await supabaseService.updateInteractionStatus(interactionId, 'responded');
 
@@ -124,9 +149,24 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     const metadata = (interaction.metadata || {}) as any;
     const metadataContext = metadata.context ? ` Context: ${metadata.context}.` : '';
 
+    // Calculate response time
+    let responseTimeContext = '';
+    if (interaction.created_at) {
+      const createdAt = new Date(interaction.created_at);
+      const respondedAt = new Date();
+      const diffMs = respondedAt.getTime() - createdAt.getTime();
+      const diffMinutes = Math.round(diffMs / 60000);
+      if (diffMinutes < 60) {
+        responseTimeContext = `\nResponse time: ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} after the interaction was created.`;
+      } else {
+        const diffHours = Math.round(diffMinutes / 60 * 10) / 10;
+        responseTimeContext = `\nResponse time: ${diffHours} hour${diffHours === 1 ? '' : 's'} after the interaction was created.`;
+      }
+    }
+
     const agentMessage = `INTERACTION RESPONSE - The user was asked: "${interaction.question}" (type: ${interactionType}, options: ${JSON.stringify(interaction.options || [])}).${metadataContext}
 
-The user responded: "${trimmedResponse}"
+The user responded: "${trimmedResponse}"${responseTimeContext}
 
 Based on this response, take the appropriate action using your tools. For example:
 - If they said "yes" to scheduling something, create the event at a sensible time

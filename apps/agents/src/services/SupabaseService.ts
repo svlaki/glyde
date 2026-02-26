@@ -507,7 +507,8 @@ export class SupabaseService {
           category: event.aspect || 'Personal', // Deprecated text column for backward compatibility
           aspect_id: aspectId,
           visibility: event.visibility || 'private', // Default to private for privacy
-          project_id: event.project_id || null
+          project_id: event.project_id || null,
+          reminder_minutes: event.reminder_minutes ?? null
         })
         .select()
         .single();
@@ -616,6 +617,7 @@ export class SupabaseService {
       if (updates.reflection !== undefined) updateData.reflection = updates.reflection;
       if (updates.is_missed !== undefined) updateData.is_missed = updates.is_missed;
       if (updates.project_id !== undefined) updateData.project_id = updates.project_id;
+      if (updates.reminder_minutes !== undefined) updateData.reminder_minutes = updates.reminder_minutes;
 
       // Handle aspect using helper method (use event owner for aspect resolution)
       const aspectOwnerId = oldEvent?.user_id || userId;
@@ -649,7 +651,7 @@ export class SupabaseService {
       const changes = this.computeChanges(
         oldEvent,
         updateData,
-        ['title', 'start_time', 'end_time', 'location', 'description', 'aspect', 'aspect_id', 'reflection', 'is_missed']
+        ['title', 'start_time', 'end_time', 'location', 'description', 'aspect', 'aspect_id', 'reflection', 'is_missed', 'reminder_minutes']
       );
       await this.logActivity(
         userId,
@@ -713,6 +715,11 @@ export class SupabaseService {
    */
   async getFriendsEvents(userId: string, startDate?: string, endDate?: string): Promise<DatabaseEvent[]> {
     try {
+      const {
+        expandRecurrenceWithEndTime,
+        validateRRule
+      } = await import('../utils/rrule.js');
+
       // Use the database function that handles friendship checks and visibility settings
       const { data, error } = await this.client
         .rpc('get_friends_events', {
@@ -723,17 +730,95 @@ export class SupabaseService {
 
       if (error) {
         console.error('Error fetching friends events via RPC:', error);
-        // Fall back to direct query if RPC fails (e.g., function doesn't exist yet)
         return this.getFriendsEventsDirectQuery(userId, startDate, endDate);
       }
 
-      // Map the RPC result to include is_friend_event flag
-      return (data || []).map((event: any) => ({
+      const rawEvents = (data || []).map((event: any) => ({
         ...event,
         is_friend_event: true,
         owner_display_name: event.owner_display_name,
         owner_avatar_url: event.owner_avatar_url
       }));
+
+      // Expand recurring friend events into instances
+      const now = new Date();
+      const endD = endDate ? new Date(endDate) : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      const startD = startDate ? new Date(startDate) : null;
+
+      // Get friend's timezone for each unique user (for correct expansion)
+      const friendUserIds = [...new Set(rawEvents.filter((e: any) => e.is_recurring).map((e: any) => e.user_id))];
+      const friendTimezones = new Map<string, string>();
+      for (const friendId of friendUserIds) {
+        const { data: profile } = await this.client
+          .from('profile')
+          .select('timezone')
+          .eq('id', friendId)
+          .single();
+        friendTimezones.set(friendId as string, profile?.timezone || 'America/Los_Angeles');
+      }
+
+      // Fetch exceptions for recurring friend events
+      const recurringIds = rawEvents.filter((e: any) => e.is_recurring && e.recurrence_rule).map((e: any) => e.id);
+      const exceptionMap = new Map<string, Set<string>>();
+      if (recurringIds.length > 0) {
+        const { data: exceptions } = await this.client
+          .from('recurring_event_exceptions')
+          .select('parent_event_id, exception_date')
+          .in('parent_event_id', recurringIds);
+        if (exceptions) {
+          for (const exc of exceptions) {
+            if (!exceptionMap.has(exc.parent_event_id)) {
+              exceptionMap.set(exc.parent_event_id, new Set());
+            }
+            exceptionMap.get(exc.parent_event_id)!.add(exc.exception_date);
+          }
+        }
+      }
+
+      const expandedEvents: DatabaseEvent[] = [];
+
+      for (const event of rawEvents) {
+        if (event.is_recurring && event.recurrence_rule) {
+          if (!validateRRule(event.recurrence_rule)) {
+            expandedEvents.push(event);
+            continue;
+          }
+
+          const deletedDates = exceptionMap.get(event.id) || new Set();
+          const friendTz = friendTimezones.get(event.user_id) || 'America/Los_Angeles';
+          const startT = new Date(event.start_time);
+          const endT = new Date(event.end_time);
+          const instances = expandRecurrenceWithEndTime(
+            event.recurrence_rule,
+            startT,
+            endT,
+            event.recurrence_end ? new Date(event.recurrence_end) : endD,
+            friendTz
+          );
+
+          for (const instance of instances) {
+            const instanceDate = instance.start.toISOString().split('T')[0];
+            if (deletedDates.has(instanceDate)) continue;
+            if (startD && instance.start < startD) continue;
+            if (instance.start > endD) continue;
+
+            expandedEvents.push({
+              ...event,
+              start_time: instance.start.toISOString(),
+              end_time: instance.end.toISOString(),
+              parent_event_id: event.id,
+              is_recurring: true,
+              is_instance: true,
+              instance_date: instanceDate
+            } as any);
+          }
+        } else {
+          expandedEvents.push(event);
+        }
+      }
+
+      expandedEvents.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      return expandedEvents;
     } catch (error) {
       console.error('Error in getFriendsEvents:', error);
       return [];
@@ -901,7 +986,8 @@ export class SupabaseService {
           recurrence_rule: rrule,
           recurrence_end: event.recurrence_end || null,
           parent_event_id: null, // This is the parent
-          is_recurring: true
+          is_recurring: true,
+          reminder_minutes: event.reminder_minutes ?? null
         })
         .select()
         .single();

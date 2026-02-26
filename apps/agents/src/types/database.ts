@@ -40,6 +40,9 @@ export interface DatabaseEvent {
   project_id?: string;
   project_name?: string;
 
+  // Reminder field
+  reminder_minutes?: number | null;  // Minutes before event to fire a reminder (null = no reminder)
+
   // Calendar sync fields
   google_event_id?: string;
   outlook_event_id?: string;
@@ -164,6 +167,21 @@ export interface DatabaseRating {
   aspect_id?: string;
   notes?: string;
   created_at: string;
+}
+
+export interface DatabaseReminder {
+  id: string;
+  user_id: string;
+  message: string;
+  trigger_at: string;
+  status: 'pending' | 'delivered' | 'snoozed' | 'dismissed';
+  aspect_id?: string;
+  created_by: 'conversation' | 'interaction' | 'user';
+  metadata: Record<string, any>;
+  delivered_at?: string;
+  interaction_id?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserSchema {

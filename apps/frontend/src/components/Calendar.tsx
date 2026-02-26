@@ -385,7 +385,8 @@ export function Calendar() {
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
             ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
-            ...(eventData.visibility ? { visibility: eventData.visibility } : {})
+            ...(eventData.visibility ? { visibility: eventData.visibility } : {}),
+            ...(eventData.reminder_minutes !== undefined ? { reminder_minutes: eventData.reminder_minutes } : {})
           },
           session?.access_token
         )
@@ -670,7 +671,7 @@ export function Calendar() {
                 minWidth: '18px',
                 textAlign: 'center'
               }}>
-                {friendsEvents.length}
+                {new Set(friendsEvents.map(e => (e as any).parent_event_id || e.id)).size}
               </span>
             )}
           </button>
@@ -1419,13 +1420,14 @@ export function Calendar() {
         onSaveRecurring={isViewerOnly ? undefined : async (eventData, scope, recurrenceRule) => {
           if (!user || !session) return
           if (eventData.id) {
-            const updates: Record<string, string> = {}
+            const updates: Record<string, any> = {}
             if (eventData.title) updates.title = eventData.title
             if (eventData.start_time) updates.start_time = eventData.start_time
             if (eventData.end_time) updates.end_time = eventData.end_time
             if (eventData.description) updates.description = eventData.description
             if (eventData.aspect) updates.aspect = eventData.aspect
             if (eventData.visibility) updates.visibility = eventData.visibility
+            if (eventData.reminder_minutes !== undefined) updates.reminder_minutes = eventData.reminder_minutes
 
             if (recurrenceRule) updates.recurrence_rule = recurrenceRule
             if (scope === 'this_instance' && selectedEvent?.instance_date) {

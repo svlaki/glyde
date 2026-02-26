@@ -69,6 +69,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const [startDate, setStartDate] = useState<Date>(new Date())
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [reflection, setReflection] = useState('')
+  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrence, setRecurrence] = useState<RecurrenceState>(defaultRecurrence)
@@ -96,6 +97,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setAspect(event.aspect || '')
       setVisibility(event.visibility || 'private')
       setReflection(event.reflection || '')
+      setReminderMinutes(event.reminder_minutes ?? null)
 
       if (event.start_time) {
         setStartDate(new Date(event.start_time))
@@ -142,6 +144,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setAspect('')
       setVisibility('private')
       setReflection('')
+      setReminderMinutes(null)
 
       const now = new Date()
       const roundedStart = new Date(now)
@@ -289,6 +292,9 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
     showEndTimePicker, setShowEndTimePicker,
     startTimeValue, setStartTimeValue,
     endTimeValue, setEndTimeValue,
+
+    // Reminder
+    reminderMinutes, setReminderMinutes,
 
     // Reflection
     reflection, setReflection,
