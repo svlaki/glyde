@@ -20,9 +20,13 @@ export const createInteractionTool = tool(
         const existingLower = (existing.question || '').toLowerCase();
         if (existingLower === questionLower) return true;
         const existingWords = existingLower.split(/\s+/).filter((w: string) => w.length > 3);
-        const overlap = questionWords.filter((w: string) => existingWords.includes(w)).length;
-        const overlapRatio = overlap / Math.max(questionWords.length, 1);
-        return overlapRatio > 0.5;
+        // Skip overlap check for very short questions to avoid false positives
+        if (questionWords.length < 3 || existingWords.length < 3) return false;
+        const overlapA = questionWords.filter((w: string) => existingWords.includes(w)).length;
+        const overlapB = existingWords.filter((w: string) => questionWords.includes(w)).length;
+        const ratioA = overlapA / questionWords.length;
+        const ratioB = overlapB / existingWords.length;
+        return Math.min(ratioA, ratioB) > 0.6;
       });
 
       if (isDuplicate) {
@@ -36,10 +40,7 @@ export const createInteractionTool = tool(
         const topicLower = (metadata.ratingTopic as string).toLowerCase();
         const recentRating = ratingSummary.find((r: any) => {
           const rTopicLower = (r.topic || '').toLowerCase();
-          // Check exact match or high similarity
-          return rTopicLower === topicLower
-            || rTopicLower.includes(topicLower)
-            || topicLower.includes(rTopicLower);
+          return rTopicLower === topicLower;
         });
 
         if (recentRating) {

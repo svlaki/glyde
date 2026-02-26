@@ -88,6 +88,14 @@ export class FriendshipService {
         )
         .maybeSingle()
 
+      if (lookupError) {
+        console.error('[FriendshipService] Error checking existing friendship:', lookupError)
+        return {
+          success: false,
+          error: 'Failed to check existing friendship status'
+        }
+      }
+
       if (existingFriendship) {
         return {
           success: false,
@@ -489,7 +497,19 @@ export class FriendshipService {
         }
       }
 
-      // 2. Delete record
+      // Determine the other user in the friendship
+      const friendId = friendship.requester_id === userId
+        ? friendship.addressee_id
+        : friendship.requester_id
+
+      // 2. Cascade cleanup before deleting friendship
+      try {
+        await this.cascadeUnfriend(userId, friendId, friendshipId)
+      } catch (cascadeError) {
+        console.warn('[FriendshipService] Cascade cleanup partially failed (continuing with unfriend):', cascadeError)
+      }
+
+      // 3. Delete friendship record
       const { error: deleteError } = await this.supabase
         .from('user_friendships')
         .delete()
@@ -510,6 +530,182 @@ export class FriendshipService {
       return {
         success: false,
         error: 'Failed to remove friend'
+      }
+    }
+  }
+
+  /**
+   * Clean up all shared resources between two users when unfriending.
+   * Each step logs warnings on failure but does not block the unfriend operation.
+   */
+  private async cascadeUnfriend(
+    userId: string,
+    friendId: string,
+    friendshipId: string
+  ): Promise<void> {
+    // 1. Remove friend_aspects for this friendship
+    const { error: faError } = await this.supabase
+      .from('friend_aspects')
+      .delete()
+      .eq('friendship_id', friendshipId)
+
+    if (faError) {
+      console.warn('[FriendshipService] Failed to clean up friend_aspects:', faError)
+    }
+
+    // 2. Remove aspect_members: remove friend from aspects owned by user, and vice versa
+    // Find shared aspects owned by userId where friendId is a member
+    const { data: userAspectMembers, error: uamError } = await this.supabase
+      .from('aspect_members')
+      .select('id, aspect_id, aspects!inner(user_id)')
+      .eq('user_id', friendId)
+
+    if (uamError) {
+      console.warn('[FriendshipService] Failed to query aspect memberships for friend:', uamError)
+    }
+
+    if (userAspectMembers) {
+      const memberIdsToRemove = userAspectMembers
+        .filter((m: any) => m.aspects?.user_id === userId)
+        .map((m: any) => m.id)
+
+      if (memberIdsToRemove.length > 0) {
+        const { error } = await this.supabase
+          .from('aspect_members')
+          .delete()
+          .in('id', memberIdsToRemove)
+
+        if (error) {
+          console.warn('[FriendshipService] Failed to remove friend from user aspects:', error)
+        }
+      }
+    }
+
+    // Find shared aspects owned by friendId where userId is a member
+    const { data: friendAspectMembers, error: famError } = await this.supabase
+      .from('aspect_members')
+      .select('id, aspect_id, aspects!inner(user_id)')
+      .eq('user_id', userId)
+
+    if (famError) {
+      console.warn('[FriendshipService] Failed to query aspect memberships for user:', famError)
+    }
+
+    if (friendAspectMembers) {
+      const memberIdsToRemove = friendAspectMembers
+        .filter((m: any) => m.aspects?.user_id === friendId)
+        .map((m: any) => m.id)
+
+      if (memberIdsToRemove.length > 0) {
+        const { error } = await this.supabase
+          .from('aspect_members')
+          .delete()
+          .in('id', memberIdsToRemove)
+
+        if (error) {
+          console.warn('[FriendshipService] Failed to remove user from friend aspects:', error)
+        }
+      }
+    }
+
+    // 3. Remove event_members: remove friend from events owned by user, and vice versa
+    const { data: userEventMembers, error: uemError } = await this.supabase
+      .from('event_members')
+      .select('id, event_id, role, events!inner(user_id)')
+      .eq('user_id', friendId)
+
+    if (uemError) {
+      console.warn('[FriendshipService] Failed to query event memberships for friend:', uemError)
+    }
+
+    if (userEventMembers) {
+      const nonOwnerMembers = userEventMembers
+        .filter((m: any) => m.events?.user_id === userId && m.role !== 'owner')
+
+      for (const member of nonOwnerMembers) {
+        const { error } = await this.supabase
+          .from('event_members')
+          .delete()
+          .eq('id', member.id)
+
+        if (error) {
+          console.warn('[FriendshipService] Failed to remove friend from event:', error)
+          continue
+        }
+
+        // Check if event has no non-owner members left -> revert to private
+        await this.revertEventIfNoMembers(member.event_id)
+      }
+    }
+
+    const { data: friendEventMembers, error: femError } = await this.supabase
+      .from('event_members')
+      .select('id, event_id, role, events!inner(user_id)')
+      .eq('user_id', userId)
+
+    if (femError) {
+      console.warn('[FriendshipService] Failed to query event memberships for user:', femError)
+    }
+
+    if (friendEventMembers) {
+      const nonOwnerMembers = friendEventMembers
+        .filter((m: any) => m.events?.user_id === friendId && m.role !== 'owner')
+
+      for (const member of nonOwnerMembers) {
+        const { error } = await this.supabase
+          .from('event_members')
+          .delete()
+          .eq('id', member.id)
+
+        if (error) {
+          console.warn('[FriendshipService] Failed to remove user from friend event:', error)
+          continue
+        }
+
+        await this.revertEventIfNoMembers(member.event_id)
+      }
+    }
+
+    // 4. Delete visibility settings for both directions
+    const { error: vsError } = await this.supabase
+      .from('user_friend_visibility_settings')
+      .delete()
+      .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${userId})`)
+
+    if (vsError) {
+      console.warn('[FriendshipService] Failed to clean up visibility settings:', vsError)
+    }
+  }
+
+  /**
+   * If an event has no non-owner members left, revert it to private visibility
+   * and remove the owner's member record.
+   */
+  private async revertEventIfNoMembers(eventId: string): Promise<void> {
+    const { data: remaining } = await this.supabase
+      .from('event_members')
+      .select('id, role')
+      .eq('event_id', eventId)
+      .neq('role', 'owner')
+
+    if (!remaining || remaining.length === 0) {
+      const { error: ownerError } = await this.supabase
+        .from('event_members')
+        .delete()
+        .eq('event_id', eventId)
+        .eq('role', 'owner')
+
+      if (ownerError) {
+        console.warn('[FriendshipService] Failed to remove owner member record:', ownerError)
+      }
+
+      const { error: visError } = await this.supabase
+        .from('events')
+        .update({ visibility: 'private' })
+        .eq('id', eventId)
+
+      if (visError) {
+        console.warn('[FriendshipService] Failed to revert event visibility:', visError)
       }
     }
   }

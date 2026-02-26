@@ -462,7 +462,10 @@ export class AspectService {
   }
 
   /**
-   * Archive an aspect (soft delete)
+   * Archive an aspect (soft delete) and cascade to linked items.
+   * Tasks -> cancelled, Goals -> paused, Future events -> deleted,
+   * Recurring events -> recurrence_end set to now.
+   * Items keep their aspect_id (not nullified).
    */
   async archiveAspect(userId: string, aspectId: string): Promise<void> {
     try {
@@ -484,10 +487,105 @@ export class AspectService {
         throw new Error(`Database error: ${error.message}`);
       }
 
+      // Cascade archive to linked items
+      await this.cascadeArchiveAspect(userId, aspectId);
+
       logger.info(`[AspectService] Archived aspect: ${aspectId}`);
     } catch (error) {
       logger.error('[AspectService] Exception archiving aspect:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Cascade archive effects to items linked to the aspect.
+   * Each step logs warnings on failure but does not block the archive.
+   */
+  private async cascadeArchiveAspect(userId: string, aspectId: string): Promise<void> {
+    const now = new Date().toISOString();
+
+    // 1. Cancel active tasks linked to this aspect
+    const { error: tasksError } = await this.supabase
+      .from('tasks')
+      .update({ status: 'cancelled', updated_at: now })
+      .eq('aspect_id', aspectId)
+      .eq('user_id', userId)
+      .not('status', 'in', '(completed,cancelled)');
+
+    if (tasksError) {
+      logger.warn('[AspectService] Failed to cancel tasks for archived aspect:', tasksError);
+    }
+
+    // 2. Pause active goals linked to this aspect
+    const { error: goalsError } = await this.supabase
+      .from('goals')
+      .update({ status: 'paused', updated_at: now })
+      .eq('aspect_id', aspectId)
+      .eq('user_id', userId)
+      .not('status', 'in', '(completed,abandoned,paused)');
+
+    if (goalsError) {
+      logger.warn('[AspectService] Failed to pause goals for archived aspect:', goalsError);
+    }
+
+    // 3. End recurring event series (set recurrence_end to now so no future instances)
+    const { error: recurringError } = await this.supabase
+      .from('events')
+      .update({ recurrence_end: now, updated_at: now })
+      .eq('aspect_id', aspectId)
+      .eq('user_id', userId)
+      .eq('is_recurring', true);
+
+    if (recurringError) {
+      logger.warn('[AspectService] Failed to end recurring events for archived aspect:', recurringError);
+    }
+
+    // 4. Delete future non-recurring events
+    const { data: futureEvents, error: futureQueryError } = await this.supabase
+      .from('events')
+      .select('id')
+      .eq('aspect_id', aspectId)
+      .eq('user_id', userId)
+      .gt('start_time', now)
+      .or('is_recurring.is.null,is_recurring.eq.false');
+
+    if (futureQueryError) {
+      logger.warn('[AspectService] Failed to query future events for archived aspect:', futureQueryError);
+    } else if (futureEvents && futureEvents.length > 0) {
+      const eventIds = futureEvents.map(e => e.id);
+      const { error: deleteError } = await this.supabase
+        .from('events')
+        .delete()
+        .in('id', eventIds);
+
+      if (deleteError) {
+        logger.warn('[AspectService] Failed to delete future events for archived aspect:', deleteError);
+      }
+
+      // Dismiss pending reminders for deleted events
+      for (const eventId of eventIds) {
+        const { error: reminderError } = await this.supabase
+          .from('reminders')
+          .update({ status: 'dismissed' })
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+          .contains('metadata', { event_reminder_id: eventId });
+
+        if (reminderError) {
+          logger.warn(`[AspectService] Failed to dismiss reminders for event ${eventId}: ${reminderError}`);
+        }
+      }
+    }
+
+    // 5. Nullify aspect_id on calendar mappings (sync config, not user data)
+    const { error: mappingsError } = await this.supabase
+      .from('user_calendar_mappings')
+      .update({ aspect_id: null })
+      .eq('aspect_id', aspectId)
+      .eq('user_id', userId);
+
+    if (mappingsError) {
+      logger.warn('[AspectService] Failed to clear calendar mappings for archived aspect:', mappingsError);
     }
   }
 
