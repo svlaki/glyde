@@ -11,6 +11,7 @@ node_modules/
 
 # Environment variables
 .env
+.env.notarize
 
 # Editor directories and files
 .idea
@@ -47,3 +48,7 @@ CLAUDE.md
 .trae/
 .roomodes
 /.claude
+
+# Electron
+out/
+release/

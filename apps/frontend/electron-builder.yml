@@ -1,0 +1,37 @@
+appId: com.svlaki.glyde
+productName: Glyde
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**/*
+  - "!node_modules/**/*"
+asarUnpack:
+  - resources/**
+protocols:
+  - name: Glyde
+    schemes:
+      - com.svlaki.glyde
+mac:
+  target:
+    - dmg
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: true
+  artifactName: ${name}-${version}-${arch}.${ext}
+dmg:
+  artifactName: ${name}-${version}.${ext}
+win:
+  target:
+    - nsis
+  artifactName: ${name}-${version}-setup.${ext}
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: Glyde
+  uninstallDisplayName: Glyde
+  createDesktopShortcut: always
+linux:
+  target:
+    - AppImage
+  artifactName: ${name}-${version}.${ext}
+  category: Utility

@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let appUrlListener: any = null
     if (Capacitor.isNativePlatform()) {
       appUrlListener = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
-        console.log('🔵 Deep link received:', url)
+        console.log('Deep link received:', url)
 
         // Handle Supabase OAuth callback
         if (url.includes('#access_token=') || url.includes('?access_token=')) {
@@ -141,12 +141,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refresh_token = params.get('refresh_token')
 
           if (access_token) {
-            console.log('OAuth tokens received via deep link')
             await supabase.auth.setSession({
               access_token,
               refresh_token: refresh_token || ''
             })
           }
+        }
+      })
+    }
+
+    // Handle deep links for OAuth on Electron
+    if (window.electronAPI?.isElectron) {
+      window.electronAPI.onOAuthCallback(async (params) => {
+        const searchParams = new URLSearchParams(params)
+        const access_token = searchParams.get('access_token')
+        const refresh_token = searchParams.get('refresh_token')
+        if (access_token) {
+          await supabase.auth.setSession({
+            access_token,
+            refresh_token: refresh_token || ''
+          })
         }
       })
     }
@@ -188,35 +202,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signInWithGoogle() {
     try {
-      // Use Supabase OAuth with deep linking for mobile
       const isNative = Capacitor.isNativePlatform()
-      const redirectTo = isNative
-        ? 'com.svlaki.glyde://oauth-callback' // Custom URL scheme for mobile
-        : `${window.location.origin}/calendar` // Regular redirect for web
+      const isElectron = !!window.electronAPI?.isElectron
 
-      console.log('🔵 Platform check:', {
-        isNative,
-        platform: Capacitor.getPlatform(),
-        redirectTo
-      })
+      let redirectTo: string
+      if (isNative || isElectron) {
+        redirectTo = 'com.svlaki.glyde://oauth-callback'
+      } else {
+        redirectTo = `${window.location.origin}/calendar`
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo,
-          skipBrowserRedirect: Capacitor.isNativePlatform() // Don't auto-redirect on mobile
+          skipBrowserRedirect: isNative || isElectron
         }
       })
 
       if (error) throw error
 
       // On mobile, open the OAuth URL in the system browser
-      if (Capacitor.isNativePlatform() && data?.url) {
-        console.log('🔵 Opening OAuth URL in system browser:', data.url)
-        // The system browser will handle the OAuth flow
-        // After completion, it will redirect back to our app via the custom URL scheme
-        // The deep link handler (appUrlOpen listener) will catch it
+      if (isNative && data?.url) {
         window.location.href = data.url
+      }
+
+      // On Electron, open OAuth URL via window.open (routed to system browser by setWindowOpenHandler)
+      if (isElectron && data?.url) {
+        window.open(data.url)
       }
     } catch (error) {
       console.error('Google sign in error:', error)
