@@ -39,6 +39,15 @@ export interface FriendRequest {
   created_at: string
 }
 
+export interface DiscoverUser {
+  id: string
+  email: string
+  display_name: string
+  avatar_url?: string
+  relationship: 'none' | 'pending_sent' | 'pending_received' | 'friends'
+  friendship_id?: string
+}
+
 export interface CreateFriendshipDto {
   addresseeEmail: string
 }
@@ -450,6 +459,104 @@ export class FriendshipService {
         success: false,
         error: 'Failed to fetch friend requests'
       }
+    }
+  }
+
+  /**
+   * Search/discover users for the friend directory.
+   * Returns all users (excluding self and blocked) with their relationship status.
+   */
+  async searchUsers(userId: string, query?: string): Promise<ApiResponse<DiscoverUser[]>> {
+    try {
+      // 1. Fetch all profiles (excluding self)
+      let profileQuery = this.supabase
+        .from('profile')
+        .select('id, email, display_name, avatar_url')
+        .neq('id', userId)
+        .order('display_name', { ascending: true })
+        .limit(50)
+
+      if (query && query.trim().length >= 2) {
+        const sanitized = query.trim().replace(/[,.()"'\\]/g, '')
+        if (sanitized.length > 0) {
+          const searchTerm = `%${sanitized}%`
+          profileQuery = profileQuery.or(`display_name.ilike.${searchTerm},email.ilike.${searchTerm}`)
+        }
+      }
+
+      const { data: profiles, error: profileError } = await profileQuery
+
+      if (profileError) {
+        console.error('[FriendshipService] Error searching profiles:', profileError)
+        return { success: false, error: 'Failed to search users' }
+      }
+
+      if (!profiles || profiles.length === 0) {
+        return { success: true, data: [] }
+      }
+
+      // 2. Fetch all friendships involving this user (to annotate relationship status)
+      const { data: friendships, error: friendshipError } = await this.supabase
+        .from('user_friendships')
+        .select('id, requester_id, addressee_id, status')
+        .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+
+      if (friendshipError) {
+        console.error('[FriendshipService] Error fetching friendships for search:', friendshipError)
+      }
+
+      // Build a map of userId -> relationship info
+      const relationshipMap = new Map<string, { relationship: DiscoverUser['relationship']; friendship_id: string }>()
+
+      if (friendships) {
+        for (const f of friendships) {
+          const otherId = f.requester_id === userId ? f.addressee_id : f.requester_id
+
+          if (f.status === 'accepted') {
+            relationshipMap.set(otherId, { relationship: 'friends', friendship_id: f.id })
+          } else if (f.status === 'pending') {
+            if (f.requester_id === userId) {
+              relationshipMap.set(otherId, { relationship: 'pending_sent', friendship_id: f.id })
+            } else {
+              relationshipMap.set(otherId, { relationship: 'pending_received', friendship_id: f.id })
+            }
+          // blocked users handled separately below
+          }
+        }
+      }
+
+      // 3. Build results, excluding users who blocked the requesting user
+      const blockedByOthers = new Set(
+        (friendships || [])
+          .filter(f => f.status === 'blocked' && f.addressee_id === userId)
+          .map(f => f.requester_id)
+      )
+
+      // Also exclude users that the requesting user has blocked
+      const blockedByUser = new Set(
+        (friendships || [])
+          .filter(f => f.status === 'blocked' && f.requester_id === userId)
+          .map(f => f.addressee_id)
+      )
+
+      const users: DiscoverUser[] = profiles
+        .filter(p => !blockedByOthers.has(p.id) && !blockedByUser.has(p.id))
+        .map(profile => {
+          const rel = relationshipMap.get(profile.id)
+          return {
+            id: profile.id,
+            email: profile.email || '',
+            display_name: profile.display_name || 'Unknown',
+            avatar_url: profile.avatar_url || undefined,
+            relationship: rel?.relationship || 'none',
+            friendship_id: rel?.friendship_id || undefined,
+          }
+        })
+
+      return { success: true, data: users }
+    } catch (error) {
+      console.error('[FriendshipService] Error in searchUsers:', error)
+      return { success: false, error: 'Failed to search users' }
     }
   }
 

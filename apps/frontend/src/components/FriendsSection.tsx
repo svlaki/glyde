@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
@@ -13,13 +13,16 @@ import {
   updateFriendNotes,
   addFriendAspect,
   removeFriendAspect,
+  searchUsers,
 } from '../lib/friendshipService'
-import type { Friend, FriendRequest } from '../lib/friendshipService'
+import type { Friend, FriendRequest, DiscoverUser } from '../lib/friendshipService'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
 import { FriendListItem } from './FriendListItem'
 import { FriendRequestItem } from './FriendRequestItem'
 import { FriendDetailPanel } from './FriendDetailPanel'
+import { DiscoverUserItem } from './DiscoverUserItem'
+import { FriendsTabBar } from './FriendsTabBar'
 import { MobileHeader } from './mobile/MobileHeader'
 
 interface FriendsSectionProps {
@@ -40,9 +43,15 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
   const [newFriendEmail, setNewFriendEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends')
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'discover'>('friends')
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
   const [showingDetail, setShowingDetail] = useState(false)
+
+  // Discover state
+  const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchLoading, setSearchLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const accessToken = session?.access_token
 
@@ -52,6 +61,33 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
       loadPendingRequests()
     }
   }, [user, accessToken])
+
+  // Load discover users when switching to discover tab or search query changes
+  const loadDiscoverUsers = useCallback(async (query: string) => {
+    if (!accessToken) return
+    setSearchLoading(true)
+    const response = await searchUsers(query, accessToken)
+    if (response.success && response.data) {
+      setDiscoverUsers(response.data)
+      setError(null)
+    } else {
+      setError(response.error || 'Failed to search users')
+    }
+    setSearchLoading(false)
+  }, [accessToken])
+
+  useEffect(() => {
+    if (activeTab === 'discover' && accessToken) {
+      const delay = searchQuery.trim().length > 0 ? 300 : 0
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        loadDiscoverUsers(searchQuery)
+      }, delay)
+      return () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+      }
+    }
+  }, [activeTab, searchQuery, accessToken, loadDiscoverUsers])
 
   async function loadFriends() {
     if (!accessToken) return
@@ -184,6 +220,30 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
     }
   }
 
+  async function handleAddFromDiscover(discoverUser: DiscoverUser) {
+    if (!accessToken) return
+    const response = await sendFriendRequest(discoverUser.email, accessToken)
+    if (response.success) {
+      setError(null)
+      loadDiscoverUsers(searchQuery)
+    } else {
+      setError(response.error || 'Failed to send friend request')
+    }
+  }
+
+  async function handleAcceptFromDiscover(discoverUser: DiscoverUser) {
+    if (!accessToken || !discoverUser.friendship_id) return
+    const response = await acceptFriendRequest(discoverUser.friendship_id, accessToken)
+    if (response.success) {
+      setError(null)
+      loadFriends()
+      loadPendingRequests()
+      loadDiscoverUsers(searchQuery)
+    } else {
+      setError(response.error || 'Failed to accept request')
+    }
+  }
+
   // --- Mobile: detail view ---
   if (isMobile && showingDetail && selectedFriend) {
     return (
@@ -228,121 +288,100 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
         overflow: 'hidden',
         background: colors.bgPrimary
       }}>
-        {/* Add Friend Form */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: `1px solid ${colors.border}`
-        }}>
-          <form onSubmit={handleSendRequest}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="email"
-                placeholder="friend@example.com"
-                value={newFriendEmail}
-                onChange={(e) => setNewFriendEmail(e.target.value)}
-                disabled={loading}
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  ...typography.bodySm,
-                  fontSize: '16px', // Prevent iOS zoom
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  background: colors.bgSecondary,
-                  color: colors.textPrimary,
-                  outline: 'none',
-                  minHeight: '44px'
-                }}
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  padding: '10px 16px',
-                  ...typography.labelLg,
-                  fontWeight: 500,
-                  background: colors.bgTertiary,
-                  color: colors.textSecondary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
-                  minHeight: '44px'
-                }}
-              >
-                {loading ? 'Sending...' : 'Add'}
-              </button>
-            </div>
-            {error && (
-              <div style={{
+        {/* Search input (discover tab) or Add Friend form (friends/requests) */}
+        {activeTab === 'discover' ? (
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: `1px solid ${colors.border}`
+          }}>
+            <input
+              type="text"
+              placeholder="Search by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
                 ...typography.bodySm,
-                color: '#d32f2f',
-                marginTop: '6px'
-              }}>
+                fontSize: '16px',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                background: colors.bgSecondary,
+                color: colors.textPrimary,
+                outline: 'none',
+                minHeight: '44px',
+                boxSizing: 'border-box',
+              }}
+            />
+            {error && (
+              <div style={{ ...typography.bodySm, color: '#d32f2f', marginTop: '6px' }}>
                 {error}
               </div>
             )}
-          </form>
-        </div>
+          </div>
+        ) : (
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: `1px solid ${colors.border}`
+          }}>
+            <form onSubmit={handleSendRequest}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="email"
+                  placeholder="friend@example.com"
+                  value={newFriendEmail}
+                  onChange={(e) => setNewFriendEmail(e.target.value)}
+                  disabled={loading}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    ...typography.bodySm,
+                    fontSize: '16px',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    background: colors.bgSecondary,
+                    color: colors.textPrimary,
+                    outline: 'none',
+                    minHeight: '44px'
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    padding: '10px 16px',
+                    ...typography.labelLg,
+                    fontWeight: 500,
+                    background: colors.bgTertiary,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.6 : 1,
+                    minHeight: '44px'
+                  }}
+                >
+                  {loading ? 'Sending...' : 'Add'}
+                </button>
+              </div>
+              {error && (
+                <div style={{ ...typography.bodySm, color: '#d32f2f', marginTop: '6px' }}>
+                  {error}
+                </div>
+              )}
+            </form>
+          </div>
+        )}
 
-        {/* Tabs */}
-        <div style={{
-          padding: '12px 20px',
-          borderBottom: `1px solid ${colors.border}`,
-          display: 'flex',
-          gap: '16px'
-        }}>
-          <button
-            onClick={() => setActiveTab('friends')}
-            style={{
-              padding: '8px 0',
-              ...typography.labelLg,
-              fontWeight: activeTab === 'friends' ? 600 : 500,
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'friends' ? `2px solid ${colors.textPrimary}` : '2px solid transparent',
-              color: activeTab === 'friends' ? colors.textPrimary : colors.textSecondary,
-              cursor: 'pointer',
-              minHeight: '44px'
-            }}
-          >
-            Friends ({friends.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('requests')}
-            style={{
-              padding: '8px 0',
-              ...typography.labelLg,
-              fontWeight: activeTab === 'requests' ? 600 : 500,
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'requests' ? `2px solid ${colors.textPrimary}` : '2px solid transparent',
-              color: activeTab === 'requests' ? colors.textPrimary : colors.textSecondary,
-              cursor: 'pointer',
-              position: 'relative',
-              minHeight: '44px'
-            }}
-          >
-            Requests
-            {pendingRequests.length > 0 && (
-              <span style={{
-                marginLeft: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: '20px',
-                height: '20px',
-                background: '#d32f2f',
-                color: 'white',
-                borderRadius: '10px',
-                ...typography.labelSm,
-                fontWeight: 600
-              }}>
-                {pendingRequests.length}
-              </span>
-            )}
-          </button>
-        </div>
+        <FriendsTabBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          friendsCount={friends.length}
+          requestsCount={pendingRequests.length}
+          isMobile={true}
+          colors={colors}
+          typography={typography}
+        />
 
         {/* List */}
         <div style={{
@@ -363,7 +402,7 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                   color: colors.textSecondary,
                   ...typography.bodySm
                 }}>
-                  No friends yet. Add one above!
+                  No friends yet. Discover people to connect with!
                 </div>
               ) : (
                 friends.map(friend => (
@@ -403,6 +442,42 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                     onAccept={handleAcceptRequest}
                     onDecline={handleDeclineRequest}
                     onBlock={handleBlockRequest}
+                  />
+                ))
+              )}
+            </>
+          )}
+
+          {activeTab === 'discover' && (
+            <>
+              {searchLoading ? (
+                <div style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: colors.textSecondary,
+                  ...typography.bodySm
+                }}>
+                  Searching...
+                </div>
+              ) : discoverUsers.length === 0 ? (
+                <div style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: colors.textSecondary,
+                  ...typography.bodySm
+                }}>
+                  {searchQuery ? 'No users found' : 'No other users yet'}
+                </div>
+              ) : (
+                discoverUsers.map(u => (
+                  <DiscoverUserItem
+                    key={u.id}
+                    user={u}
+                    isMobile={true}
+                    colors={colors}
+                    typography={typography}
+                    onAdd={handleAddFromDiscover}
+                    onAccept={handleAcceptFromDiscover}
                   />
                 ))
               )}
@@ -452,7 +527,7 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
         overflow: 'hidden',
         display: 'flex'
       }}>
-        {/* Left Panel - Add Friend + Tabs */}
+        {/* Left Panel - Search/Add + Tabs */}
         <div style={{
           width: '360px',
           borderRight: `1px solid ${colors.border}`,
@@ -461,146 +536,131 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Add Friend Form */}
-          <div style={{
-            padding: '20px',
-            borderBottom: `1px solid ${colors.border}`,
-            background: colors.bgPrimary
-          }}>
-            <form onSubmit={handleSendRequest}>
-              <div style={{
-                display: 'flex',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <input
-                  type="email"
-                  placeholder="friend@example.com"
-                  value={newFriendEmail}
-                  onChange={(e) => setNewFriendEmail(e.target.value)}
-                  disabled={loading}
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    ...typography.bodySm,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    background: colors.bgSecondary,
-                    color: colors.textPrimary,
-                    outline: 'none',
-                    transition: 'all 0.15s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = colors.textPrimary
-                    e.currentTarget.style.background = colors.bgPrimary
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = colors.border
-                    e.currentTarget.style.background = colors.bgSecondary
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    padding: '8px 16px',
-                    ...typography.labelLg,
-                    fontWeight: 500,
-                    background: colors.bgTertiary,
-                    color: colors.textSecondary,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '6px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.15s',
-                    opacity: loading ? 0.6 : 1
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!loading) {
-                      e.currentTarget.style.background = colors.bgHover
-                      e.currentTarget.style.color = colors.textPrimary
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!loading) {
-                      e.currentTarget.style.background = colors.bgTertiary
-                      e.currentTarget.style.color = colors.textSecondary
-                    }
-                  }}
-                >
-                  {loading ? 'Sending...' : 'Add'}
-                </button>
-              </div>
-              {error && (
-                <div style={{
+          {/* Search input (discover) or Add Friend form (friends/requests) */}
+          {activeTab === 'discover' ? (
+            <div style={{
+              padding: '20px',
+              borderBottom: `1px solid ${colors.border}`,
+              background: colors.bgPrimary
+            }}>
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
                   ...typography.bodySm,
-                  color: '#d32f2f',
-                  marginTop: '6px'
-                }}>
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  background: colors.bgSecondary,
+                  color: colors.textPrimary,
+                  outline: 'none',
+                  transition: 'all 0.15s',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = colors.textPrimary
+                  e.currentTarget.style.background = colors.bgPrimary
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = colors.border
+                  e.currentTarget.style.background = colors.bgSecondary
+                }}
+              />
+              {error && (
+                <div style={{ ...typography.bodySm, color: '#d32f2f', marginTop: '6px' }}>
                   {error}
                 </div>
               )}
-            </form>
-          </div>
-
-          {/* Tabs */}
-          <div style={{
-            padding: '12px 20px',
-            borderBottom: `1px solid ${colors.border}`,
-            display: 'flex',
-            gap: '16px',
-            background: colors.bgPrimary
-          }}>
-            <button
-              onClick={() => setActiveTab('friends')}
-              style={{
-                padding: '8px 0',
-                ...typography.labelLg,
-                fontWeight: activeTab === 'friends' ? 600 : 500,
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === 'friends' ? `2px solid ${colors.textPrimary}` : '2px solid transparent',
-                color: activeTab === 'friends' ? colors.textPrimary : colors.textSecondary,
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              Friends ({friends.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('requests')}
-              style={{
-                padding: '8px 0',
-                ...typography.labelLg,
-                fontWeight: activeTab === 'requests' ? 600 : 500,
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeTab === 'requests' ? `2px solid ${colors.textPrimary}` : '2px solid transparent',
-                color: activeTab === 'requests' ? colors.textPrimary : colors.textSecondary,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                position: 'relative'
-              }}
-            >
-              Requests
-              {pendingRequests.length > 0 && (
-                <span style={{
-                  marginLeft: '6px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  minWidth: '20px',
-                  height: '20px',
-                  background: '#d32f2f',
-                  color: 'white',
-                  borderRadius: '10px',
-                  ...typography.labelSm,
-                  fontWeight: 600
+            </div>
+          ) : (
+            <div style={{
+              padding: '20px',
+              borderBottom: `1px solid ${colors.border}`,
+              background: colors.bgPrimary
+            }}>
+              <form onSubmit={handleSendRequest}>
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginBottom: '8px'
                 }}>
-                  {pendingRequests.length}
-                </span>
-              )}
-            </button>
-          </div>
+                  <input
+                    type="email"
+                    placeholder="friend@example.com"
+                    value={newFriendEmail}
+                    onChange={(e) => setNewFriendEmail(e.target.value)}
+                    disabled={loading}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      ...typography.bodySm,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      background: colors.bgSecondary,
+                      color: colors.textPrimary,
+                      outline: 'none',
+                      transition: 'all 0.15s'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = colors.textPrimary
+                      e.currentTarget.style.background = colors.bgPrimary
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = colors.border
+                      e.currentTarget.style.background = colors.bgSecondary
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      padding: '8px 16px',
+                      ...typography.labelLg,
+                      fontWeight: 500,
+                      background: colors.bgTertiary,
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s',
+                      opacity: loading ? 0.6 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!loading) {
+                        e.currentTarget.style.background = colors.bgHover
+                        e.currentTarget.style.color = colors.textPrimary
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!loading) {
+                        e.currentTarget.style.background = colors.bgTertiary
+                        e.currentTarget.style.color = colors.textSecondary
+                      }
+                    }}
+                  >
+                    {loading ? 'Sending...' : 'Add'}
+                  </button>
+                </div>
+                {error && (
+                  <div style={{ ...typography.bodySm, color: '#d32f2f', marginTop: '6px' }}>
+                    {error}
+                  </div>
+                )}
+              </form>
+            </div>
+          )}
+
+          <FriendsTabBar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            friendsCount={friends.length}
+            requestsCount={pendingRequests.length}
+            colors={colors}
+            typography={typography}
+          />
 
           {/* List Container */}
           <div style={{
@@ -620,7 +680,7 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                     color: colors.textSecondary,
                     ...typography.bodySm
                   }}>
-                    No friends yet. Add one above!
+                    No friends yet. Discover people to connect with!
                   </div>
                 ) : (
                   friends.map(friend => (
@@ -663,6 +723,41 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                 )}
               </>
             )}
+
+            {activeTab === 'discover' && (
+              <>
+                {searchLoading ? (
+                  <div style={{
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    color: colors.textSecondary,
+                    ...typography.bodySm
+                  }}>
+                    Searching...
+                  </div>
+                ) : discoverUsers.length === 0 ? (
+                  <div style={{
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    color: colors.textSecondary,
+                    ...typography.bodySm
+                  }}>
+                    {searchQuery ? 'No users found' : 'No other users yet'}
+                  </div>
+                ) : (
+                  discoverUsers.map(u => (
+                    <DiscoverUserItem
+                      key={u.id}
+                      user={u}
+                      colors={colors}
+                      typography={typography}
+                      onAdd={handleAddFromDiscover}
+                      onAccept={handleAcceptFromDiscover}
+                    />
+                  ))
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -674,7 +769,7 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          {selectedFriend ? (
+          {selectedFriend && activeTab === 'friends' ? (
             <FriendDetailPanel
               friend={selectedFriend}
               colors={colors}
@@ -704,8 +799,10 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                 }}>
                   {activeTab === 'friends' ? (
                     friends.length === 0 ? 'No friends yet' : 'Select a friend'
-                  ) : (
+                  ) : activeTab === 'requests' ? (
                     pendingRequests.length === 0 ? 'No requests' : 'Review requests'
+                  ) : (
+                    'Find people'
                   )}
                 </div>
                 <div style={{
@@ -714,7 +811,9 @@ export function FriendsSection({ isMobileOverride }: FriendsSectionProps) {
                 }}>
                   {activeTab === 'friends'
                     ? 'Select a friend to view and edit their details'
-                    : 'Review and respond to friend requests'}
+                    : activeTab === 'requests'
+                    ? 'Review and respond to friend requests'
+                    : 'Search and add people from the beta community'}
                 </div>
               </div>
             </div>

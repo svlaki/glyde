@@ -1128,10 +1128,18 @@ export class SupabaseService {
       }
 
       // Determine start/end times for the override event
-      const instanceStartDate = updates.start_time
-        ? new Date(updates.start_time)
-        : new Date(instanceDate);
+      // When start_time is not provided, compute the correct instance time by
+      // combining the instance date with the parent's UTC time-of-day. Using just
+      // new Date(instanceDate) would produce midnight UTC (= wrong local time).
       const duration = new Date(parent.end_time).getTime() - new Date(parent.start_time).getTime();
+      let instanceStartDate: Date;
+      if (updates.start_time) {
+        instanceStartDate = new Date(updates.start_time);
+      } else {
+        const parentStart = new Date(parent.start_time);
+        const parentTimeOfDay = parentStart.toISOString().split('T')[1]; // e.g. "16:00:00.000Z"
+        instanceStartDate = new Date(instanceDate.split('T')[0] + 'T' + parentTimeOfDay);
+      }
       const instanceEndDate = updates.end_time
         ? new Date(updates.end_time)
         : new Date(instanceStartDate.getTime() + duration);

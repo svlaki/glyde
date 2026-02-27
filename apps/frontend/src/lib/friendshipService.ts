@@ -27,6 +27,15 @@ export interface FriendRequest {
   created_at: string
 }
 
+export interface DiscoverUser {
+  id: string
+  email: string
+  display_name: string
+  avatar_url?: string
+  relationship: 'none' | 'pending_sent' | 'pending_received' | 'friends'
+  friendship_id?: string
+}
+
 interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -266,6 +275,33 @@ export async function removeFriendAspect(
     return data
   } catch (error) {
     console.error('Error removing friend aspect:', error)
+    return { success: false, error: 'Network error' }
+  }
+}
+
+export async function searchUsers(
+  query: string,
+  accessToken: string
+): Promise<ApiResponse<DiscoverUser[]>> {
+  try {
+    const params = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''
+    const response = await fetch(`${API_URL}/api/friends/search${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      return { success: false, error: error.error || 'Failed to search users' }
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error searching users:', error)
     return { success: false, error: 'Network error' }
   }
 }

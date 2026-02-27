@@ -137,7 +137,7 @@ export function Calendar() {
           user,
           event.parent_event_id || event.id,
           'this_instance',
-          { is_missed: newMissedStatus, instance_date: event.instance_date } as any,
+          { is_missed: newMissedStatus, instance_date: event.instance_date, start_time: event.start_time, end_time: event.end_time } as any,
           session.access_token
         )
         error = result.error
