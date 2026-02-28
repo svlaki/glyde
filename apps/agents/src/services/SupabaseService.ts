@@ -1745,7 +1745,7 @@ export class SupabaseService {
 
       const { data, error } = await this.client
         .from('user_interactions')
-        .select('id, question, interaction_type, status, created_at, metadata, interaction_responses(response, created_at)')
+        .select('id, question, interaction_type, status, created_at, metadata, interaction_responses(response, responded_at)')
         .eq('user_id', userId)
         .gte('created_at', cutoffTime)
         .order('created_at', { ascending: false })

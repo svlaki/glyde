@@ -493,9 +493,9 @@ export class InteractionAgentGerald extends BaseAgent {
       const responseSuffix = responseText ? ` [user answered: "${responseText}"]` : '';
       // Calculate response time if the interaction was responded to
       let responseTimeSuffix = '';
-      if (i.status === 'responded' && i.created_at && i.interaction_responses?.[0]?.created_at) {
+      if (i.status === 'responded' && i.created_at && i.interaction_responses?.[0]?.responded_at) {
         const createdMs = new Date(i.created_at).getTime();
-        const respondedMs = new Date(i.interaction_responses[0].created_at).getTime();
+        const respondedMs = new Date(i.interaction_responses[0].responded_at).getTime();
         const diffMin = Math.round((respondedMs - createdMs) / 60000);
         responseTimeSuffix = diffMin < 60
           ? ` [responded in ${diffMin}min]`

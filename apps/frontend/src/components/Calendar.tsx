@@ -415,7 +415,8 @@ export function Calendar() {
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
             ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
-            ...(eventData.visibility ? { visibility: eventData.visibility } : {})
+            ...(eventData.visibility ? { visibility: eventData.visibility } : {}),
+            ...(eventData.reminder_minutes !== undefined ? { reminder_minutes: eventData.reminder_minutes } : {})
           },
           session?.access_token
         )

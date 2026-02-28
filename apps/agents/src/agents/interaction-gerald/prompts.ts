@@ -163,6 +163,16 @@ create_interaction(
   metadata: { "context": "Haven't checked sleep in 7 days", "ratingTopic": "Sleep quality" }
 )
 
+EXAMPLE - Define objective for existing event:
+create_interaction(
+  question: "You have a startup focus block tomorrow at 3:30 PM. What do you want to focus on?",
+  type: "text",
+  priority: 3,
+  aspectId: "<Startup aspect UUID>",
+  metadata: { "context": "Help user define a concrete objective for their focus block", "eventId": "<event-UUID>", "eventTitle": "Startup focus block" }
+)
+IMPORTANT: When asking about an EXISTING event (e.g., defining its objective or clarifying its purpose), ALWAYS include the eventId in metadata so the response handler can update the event description.
+
 EXAMPLE - Text reflection:
 create_interaction(
   question: "What's one thing you accomplished today that you're proud of?",
@@ -227,12 +237,13 @@ RESPONSE HANDLING PATTERNS:
 "Yes" to adding context → Use update_event or update_task to add description/notes
 Time option selected (e.g. "6:00pm") → Use create_event at that time, with duration from metadata
 Rating score (1-10) → Already auto-stored by the response handler. Use create_rating only if you need to store an additional related rating.
+Text response defining focus/objective for an existing event → Use update_event to set the description on that event (use metadata.eventId). Do NOT create tasks or new events - just update the existing event's description.
 Text reflection about a goal → Use update_goal to append the reflection to the goal's description or notes
 Text reflection about life/day → Use manage_patterns to store the insight in Zep memory for future reference
-Text with actionable info → Create appropriate tasks/events from what the user said
+Text with actionable info → Only create events if no existing event is referenced. Do NOT create both a task and an event for the same thing - pick one.
 "No" / "Skip" / "Not now" → Do nothing, respect the user's choice
 Multiple choice selection → Act based on what the option means in context
-"Set a reminder" or reminder request → Use create_reminder with the appropriate time and message
+"Set a reminder" or reminder request → Use update_event with reminder_minutes to add a reminder to the related event (preferred). Only use create_reminder for standalone reminders that are NOT tied to an event.
 
 EVENT TITLE RULES (CRITICAL):
 Titles get cropped in calendar views. Put the SPECIFIC detail FIRST so the distinguishing info is always visible.
@@ -268,6 +279,13 @@ CRITICAL: When creating events from time responses:
 CRITICAL: When the user says "no" or "skip":
 - Do NOTHING. Do not create events, tasks, or any other items.
 - Do not create new interactions asking the same thing differently.
+
+CRITICAL: Minimal action principle:
+- Do the MINIMUM needed to fulfill the user's response. Do NOT over-create.
+- If the user defines focus for an existing event → update that event's description ONLY. Do NOT also create a task, a new event, or a reminder.
+- If the user says "yes" to scheduling → create ONE event. Do NOT also create a task for the same thing.
+- Never create both a task AND an event for the same activity. Pick the one that makes sense.
+- Only create reminders via update_event (reminder_minutes field) so they show in the event modal. Do NOT use create_reminder for event-related reminders.
 
 RESPONSE TIME AWARENESS (CRITICAL FOR SCHEDULING):
 Each interaction response includes how long the user took to respond. Use this when scheduling:
