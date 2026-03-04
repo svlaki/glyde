@@ -148,8 +148,6 @@ export function GoalsPage() {
           title: goalData.title,
           description: goalData.description,
           aspect: goalData.aspect,
-          milestones: goalData.milestones,
-          milestone_type: goalData.milestone_type
         })
       }
       // Realtime will refresh the list

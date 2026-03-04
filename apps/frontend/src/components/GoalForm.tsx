@@ -58,15 +58,11 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
   const [category, setCategory] = useState('')
   const [dueDate, setDueDate] = useState<Date | null>(null)
   const [hasDueDate, setHasDueDate] = useState(false)
-  const [milestones, setMilestones] = useState<Array<{ title: string; due_date?: string; completed?: boolean }>>([])
-  const [milestoneType, setMilestoneType] = useState<'dated' | 'ordered'>('ordered')
-  const [showMilestones, setShowMilestones] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [isAspectFormOpen, setIsAspectFormOpen] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showTimePicker, setShowTimePicker] = useState(false)
-  const [milestoneDatePickerIndex, setMilestoneDatePickerIndex] = useState<number | null>(null)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -82,34 +78,12 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
         setDueDate(null)
         setHasDueDate(false)
       }
-      if (goal.milestones && goal.milestones.length > 0) {
-        setMilestones(goal.milestones.map(m => ({
-          title: m.title,
-          ...(m.due_date !== undefined && { due_date: m.due_date }),
-          ...(m.completed !== undefined && { completed: m.completed })
-        })))
-        setShowMilestones(true)
-      } else {
-        setMilestones([])
-        setShowMilestones(false)
-      }
-      // Set milestone type from goal or infer from milestones
-      if (goal.milestone_type) {
-        setMilestoneType(goal.milestone_type)
-      } else if (goal.milestones?.some(m => m.due_date)) {
-        setMilestoneType('dated')
-      } else {
-        setMilestoneType('ordered')
-      }
     } else {
       setTitle('')
       setDescription('')
       setCategory('')
       setDueDate(null)
       setHasDueDate(false)
-      setMilestones([])
-      setMilestoneType('ordered')
-      setShowMilestones(false)
     }
     setEditingField(null)
   }, [goal, isOpen])
@@ -181,20 +155,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
         aspect: category || null,
         due_date: (hasDueDate && dueDate) ? dueDate.toISOString() : null,
       }
-      if (milestones.length > 0) {
-        // Clear due_dates for ordered milestones to avoid confusion
-        const processedMilestones = milestones
-          .filter(m => m.title.trim())
-          .map(m => milestoneType === 'ordered'
-            ? { ...m, due_date: undefined }
-            : m
-          )
-        goalData.milestones = processedMilestones
-        goalData.milestone_type = milestoneType
-      } else {
-        goalData.milestones = []
-        goalData.milestone_type = null
-      }
       await onSave(goalData)
       onClose()
     } catch (error) {
@@ -203,20 +163,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
     } finally {
       setLoading(false)
     }
-  }
-
-  const addMilestone = () => {
-    setMilestones([...milestones, { title: '', completed: false }])
-  }
-
-  const updateMilestone = (index: number, field: string, value: string | boolean) => {
-    setMilestones(milestones.map((m, i) =>
-      i === index ? { ...m, [field]: value } : m
-    ))
-  }
-
-  const removeMilestone = (index: number) => {
-    setMilestones(milestones.filter((_, i) => i !== index))
   }
 
   const titleInput = (
@@ -623,209 +569,6 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
                 resize: 'vertical'
               }}
             />
-          </div>
-
-          {/* Milestones */}
-          <div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              marginBottom: showMilestones || milestones.length > 0 ? '8px' : 0
-            }}>
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showMilestones || milestones.length > 0}
-                  onChange={(e) => {
-                    setShowMilestones(e.target.checked)
-                    if (e.target.checked && milestones.length === 0) {
-                      addMilestone()
-                    }
-                  }}
-                  style={{ width: '18px', height: '18px', accentColor: colors.textPrimary }}
-                />
-                <span style={{ fontSize: fontSize.base, color: colors.textPrimary }}>Add milestones</span>
-              </label>
-            </div>
-
-            {(showMilestones || milestones.length > 0) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Milestone Type Toggle */}
-                <div style={{
-                  display: 'flex',
-                  gap: '8px',
-                  marginBottom: '8px'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setMilestoneType('ordered')}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: fontSize.sm,
-                      background: milestoneType === 'ordered' ? colors.accent : 'transparent',
-                      color: milestoneType === 'ordered' ? colors.bgPrimary : colors.textSecondary,
-                      border: `1px solid ${milestoneType === 'ordered' ? colors.accent : colors.border}`,
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Steps (no dates)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMilestoneType('dated')}
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: fontSize.sm,
-                      background: milestoneType === 'dated' ? colors.accent : 'transparent',
-                      color: milestoneType === 'dated' ? colors.bgPrimary : colors.textSecondary,
-                      border: `1px solid ${milestoneType === 'dated' ? colors.accent : colors.border}`,
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Timeline (with dates)
-                  </button>
-                </div>
-
-                {milestones.map((milestone, index) => (
-                  <div key={index} style={{
-                    display: 'flex',
-                    gap: '8px',
-                    alignItems: 'center'
-                  }}>
-                    {/* Step number for ordered milestones */}
-                    {milestoneType === 'ordered' && (
-                      <span style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        background: colors.accent,
-                        color: colors.bgPrimary,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: fontSize.sm,
-                        fontWeight: fontWeight.semibold,
-                        flexShrink: 0
-                      }}>
-                        {index + 1}
-                      </span>
-                    )}
-                    <input
-                      type="text"
-                      value={milestone.title}
-                      onChange={(e) => updateMilestone(index, 'title', e.target.value)}
-                      placeholder={milestoneType === 'ordered' ? `Step ${index + 1}` : 'Milestone title'}
-                      style={{
-                        flex: 1,
-                        padding: '8px 10px',
-                        fontSize: fontSize.sm,
-                        background: colors.bgPrimary,
-                        color: colors.textPrimary,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: '4px'
-                      }}
-                    />
-                    {milestoneType === 'dated' && (
-                      isMobile ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setMilestoneDatePickerIndex(index)}
-                            style={{
-                              padding: '8px 10px',
-                              fontSize: fontSize.sm,
-                              background: colors.bgPrimary,
-                              color: milestone.due_date ? colors.textPrimary : colors.textTertiary,
-                              border: `1px solid ${colors.border}`,
-                              borderRadius: '4px',
-                              width: '140px',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {milestone.due_date
-                              ? new Date(milestone.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                              : 'Set date'}
-                          </button>
-                          <DatePickerMobile
-                            value={milestone.due_date ? new Date(milestone.due_date + 'T00:00:00') : new Date()}
-                            onChange={(date) => {
-                              const yyyy = date.getFullYear()
-                              const mm = String(date.getMonth() + 1).padStart(2, '0')
-                              const dd = String(date.getDate()).padStart(2, '0')
-                              updateMilestone(index, 'due_date', `${yyyy}-${mm}-${dd}`)
-                            }}
-                            isOpen={milestoneDatePickerIndex === index}
-                            onClose={() => setMilestoneDatePickerIndex(null)}
-                          />
-                        </>
-                      ) : (
-                        <DatePickerWeb
-                          value={milestone.due_date ? new Date(milestone.due_date + 'T00:00:00') : new Date()}
-                          onChange={(date) => {
-                            const yyyy = date.getFullYear()
-                            const mm = String(date.getMonth() + 1).padStart(2, '0')
-                            const dd = String(date.getDate()).padStart(2, '0')
-                            updateMilestone(index, 'due_date', `${yyyy}-${mm}-${dd}`)
-                          }}
-                          colors={colors}
-                          inputStyle={{
-                            padding: '8px 10px',
-                            fontSize: fontSize.sm,
-                            background: colors.bgPrimary,
-                            color: milestone.due_date ? colors.textPrimary : colors.textTertiary,
-                            border: `1px solid ${colors.border}`,
-                            borderRadius: '4px',
-                            width: '140px',
-                          }}
-                        />
-                      )
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeMilestone(index)}
-                      style={{
-                        padding: '6px 10px',
-                        fontSize: fontSize.base,
-                        background: 'transparent',
-                        color: colors.textSecondary,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addMilestone}
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: fontSize.sm,
-                    background: 'transparent',
-                    color: colors.textSecondary,
-                    border: `1px dashed ${colors.border}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                >
-                  + Add {milestoneType === 'ordered' ? 'step' : 'milestone'}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Actions */}

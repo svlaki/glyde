@@ -446,7 +446,7 @@ IMPORTANT INSTRUCTIONS:
       const trendLabel = r.trend > 0 ? 'improving' : r.trend < 0 ? 'declining' : 'stable';
       const daysSince = Math.round((Date.now() - new Date(r.lastAsked).getTime()) / 86400000);
       const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince}d ago`;
-      return `  - "${r.topic}": ${r.latestScore}/5 (${trendLabel}, last: ${timeAgo}, ${r.totalEntries} entries)`;
+      return `  - "${r.topic}": ${r.latestScore}/10 (${trendLabel}, last: ${timeAgo}, ${r.totalEntries} entries)`;
     });
 
     return `\n\nUSER SELF-ASSESSMENT RATINGS:

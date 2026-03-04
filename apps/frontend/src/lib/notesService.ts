@@ -1,10 +1,14 @@
-import { User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
-export interface LifePlan {
+export interface Note {
   id: string
   user_id: string
   title: string
   content?: string
+  aspect_id: string
+  aspect_name?: string
+  aspect_color?: string
+  aspect_icon?: string
   horizon_start?: string
   horizon_end?: string
   status: 'draft' | 'active' | 'archived'
@@ -14,16 +18,16 @@ export interface LifePlan {
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
-export async function fetchUserPlan(
+export async function fetchUserNotes(
   user: User,
   accessToken: string
-): Promise<{ plan: LifePlan | null; error: string | null }> {
+): Promise<{ notes: Note[]; error: string | null }> {
   if (!user || !accessToken) {
-    return { plan: null, error: 'User not authenticated' }
+    return { notes: [], error: 'User not authenticated' }
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/plan`, {
+    const response = await fetch(`${API_URL}/api/notes`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,33 +39,34 @@ export async function fetchUserPlan(
     const data = await response.json()
 
     if (!response.ok) {
-      return { plan: null, error: data.error || 'Failed to fetch plan' }
+      return { notes: [], error: data.error || 'Failed to fetch notes' }
     }
 
-    return { plan: data.plan, error: null }
+    return { notes: data.notes || [], error: null }
   } catch (error) {
-    console.error('Error fetching plan:', error)
-    return { plan: null, error: 'Failed to fetch plan' }
+    console.error('Error fetching notes:', error)
+    return { notes: [], error: 'Failed to fetch notes' }
   }
 }
 
-export async function createUserPlan(
+export async function createUserNotes(
   user: User,
   accessToken: string,
-  planData: {
+  notesData: {
     title?: string
     content?: string
+    aspect_id: string
     horizon_start?: string
     horizon_end?: string
     status?: 'draft' | 'active' | 'archived'
   }
-): Promise<{ plan: LifePlan | null; error: string | null }> {
+): Promise<{ note: Note | null; error: string | null }> {
   if (!user || !accessToken) {
-    return { plan: null, error: 'User not authenticated' }
+    return { note: null, error: 'User not authenticated' }
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/plan/create`, {
+    const response = await fetch(`${API_URL}/api/notes/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,41 +74,42 @@ export async function createUserPlan(
       },
       body: JSON.stringify({
         user_id: user.id,
-        ...planData
+        ...notesData
       })
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      return { plan: null, error: data.error || 'Failed to create plan' }
+      return { note: null, error: data.error || 'Failed to create notes' }
     }
 
-    return { plan: data.plan, error: null }
+    return { note: data.note, error: null }
   } catch (error) {
-    console.error('Error creating plan:', error)
-    return { plan: null, error: 'Failed to create plan' }
+    console.error('Error creating notes:', error)
+    return { note: null, error: 'Failed to create notes' }
   }
 }
 
-export async function updateUserPlan(
+export async function updateUserNotes(
   user: User,
   accessToken: string,
-  planId: string,
+  notesId: string,
   updates: {
     title?: string
     content?: string
+    aspect_id?: string
     horizon_start?: string
     horizon_end?: string
     status?: 'draft' | 'active' | 'archived'
   }
-): Promise<{ plan: LifePlan | null; error: string | null }> {
+): Promise<{ note: Note | null; error: string | null }> {
   if (!user || !accessToken) {
-    return { plan: null, error: 'User not authenticated' }
+    return { note: null, error: 'User not authenticated' }
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/plan/update`, {
+    const response = await fetch(`${API_URL}/api/notes/update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +117,7 @@ export async function updateUserPlan(
       },
       body: JSON.stringify({
         user_id: user.id,
-        plan_id: planId,
+        plan_id: notesId,
         ...updates
       })
     })
@@ -119,27 +125,27 @@ export async function updateUserPlan(
     const data = await response.json()
 
     if (!response.ok) {
-      return { plan: null, error: data.error || 'Failed to update plan' }
+      return { note: null, error: data.error || 'Failed to update notes' }
     }
 
-    return { plan: data.plan, error: null }
+    return { note: data.note, error: null }
   } catch (error) {
-    console.error('Error updating plan:', error)
-    return { plan: null, error: 'Failed to update plan' }
+    console.error('Error updating notes:', error)
+    return { note: null, error: 'Failed to update notes' }
   }
 }
 
-export async function deleteUserPlan(
+export async function deleteUserNotes(
   user: User,
   accessToken: string,
-  planId: string
+  notesId: string
 ): Promise<{ success: boolean; error: string | null }> {
   if (!user || !accessToken) {
     return { success: false, error: 'User not authenticated' }
   }
 
   try {
-    const response = await fetch(`${API_URL}/api/plan/delete`, {
+    const response = await fetch(`${API_URL}/api/notes/delete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -147,19 +153,19 @@ export async function deleteUserPlan(
       },
       body: JSON.stringify({
         user_id: user.id,
-        plan_id: planId
+        plan_id: notesId
       })
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to delete plan' }
+      return { success: false, error: data.error || 'Failed to delete notes' }
     }
 
     return { success: data.success, error: data.error }
   } catch (error) {
-    console.error('Error deleting plan:', error)
-    return { success: false, error: 'Failed to delete plan' }
+    console.error('Error deleting notes:', error)
+    return { success: false, error: 'Failed to delete notes' }
   }
 }

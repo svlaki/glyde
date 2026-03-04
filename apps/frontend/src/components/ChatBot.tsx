@@ -136,7 +136,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     if (currentPageOverride) return currentPageOverride
     const path = location.pathname
     if (path === '/' || path === '/dashboard') return 'dashboard'
-    if (path === '/plan') return 'plan'
+    if (path === '/notes') return 'notes'
     if (path.startsWith('/goals')) return 'goals'
     if (path.startsWith('/tasks')) return 'tasks'
     return 'dashboard'

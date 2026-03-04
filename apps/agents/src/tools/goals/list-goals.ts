@@ -58,7 +58,7 @@ export const listGoalsTool = tool(
     schema: z.object({
       status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("Filter by status"),
       aspect: z.string().optional().nullable().describe("Filter by aspect"),
-      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Filter by goal type"),
+      goalType: z.enum(["SMART", "OKR", "habit", "project"]).optional().nullable().describe("Filter by goal type"),
     }),
   }
 );

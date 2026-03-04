@@ -146,11 +146,11 @@ export const mockSupabaseService = {
   logActivity: vi.fn().mockResolvedValue(undefined),
   getRecentActivity: vi.fn().mockResolvedValue([]),
 
-  // Plans
-  getPlan: vi.fn().mockResolvedValue(null),
-  createPlan: vi.fn().mockResolvedValue(null),
-  updatePlan: vi.fn().mockResolvedValue({ success: true }),
-  deletePlan: vi.fn().mockResolvedValue({ success: true, error: null }),
+  // Notes
+  getNotes: vi.fn().mockResolvedValue(null),
+  createNotes: vi.fn().mockResolvedValue(null),
+  updateNotes: vi.fn().mockResolvedValue({ success: true }),
+  deleteNotes: vi.fn().mockResolvedValue({ success: true, error: null }),
 
   // Vector search
   searchSimilarEvents: vi.fn().mockResolvedValue([]),

@@ -148,8 +148,6 @@ export function GoalsSection() {
           description: goalData.description,
           aspect: goalData.aspect,
           due_date: (goalData as any).due_date,
-          milestones: goalData.milestones,
-          milestone_type: goalData.milestone_type
         } as any)
       }
 

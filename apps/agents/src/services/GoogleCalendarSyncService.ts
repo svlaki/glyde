@@ -20,6 +20,7 @@ interface CalendarEvent {
   location?: string;
   recurrence_rule?: string | null;
   is_recurring?: boolean;
+  is_all_day?: boolean;
   status: 'confirmed' | 'tentative' | 'cancelled';
 }
 
@@ -473,6 +474,7 @@ export class GoogleCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             updated_at: new Date().toISOString()
           };
 
@@ -501,6 +503,7 @@ export class GoogleCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             source: 'google_calendar',
             connection_id: connectionId
           };
@@ -534,6 +537,10 @@ export class GoogleCalendarSyncService {
     googleEvent: calendar_v3.Schema$Event,
     userId: string
   ): CalendarEvent | null {
+    // Detect all-day events: Google uses start.date (YYYY-MM-DD) for all-day,
+    // start.dateTime (ISO 8601) for timed events
+    const isAllDay = !!(googleEvent.start?.date && !googleEvent.start?.dateTime);
+
     // Get start and end times
     const startTime = googleEvent.start?.dateTime || googleEvent.start?.date;
     const endTime = googleEvent.end?.dateTime || googleEvent.end?.date;
@@ -554,6 +561,7 @@ export class GoogleCalendarSyncService {
       location: googleEvent.location || undefined,
       recurrence_rule: rrule,
       is_recurring: !!rrule,
+      is_all_day: isAllDay,
       status: googleEvent.status as 'confirmed' | 'tentative' | 'cancelled'
     };
   }

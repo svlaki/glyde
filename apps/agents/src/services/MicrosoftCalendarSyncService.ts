@@ -262,6 +262,7 @@ export class MicrosoftCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             updated_at: new Date().toISOString()
           };
 
@@ -289,6 +290,7 @@ export class MicrosoftCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             source: 'outlook_calendar',
             connection_id: connectionId
           };
@@ -323,7 +325,7 @@ export class MicrosoftCalendarSyncService {
   private parseMicrosoftEvent(
     msEvent: MicrosoftEvent,
     userId: string
-  ): { title: string; start_time: string; end_time: string; description?: string; location?: string; recurrence_rule?: string | null; is_recurring: boolean } | null {
+  ): { title: string; start_time: string; end_time: string; description?: string; location?: string; recurrence_rule?: string | null; is_recurring: boolean; is_all_day: boolean } | null {
     if (!msEvent.start?.dateTime || !msEvent.end?.dateTime) {
       return null;
     }
@@ -357,7 +359,8 @@ export class MicrosoftCalendarSyncService {
       description: description || undefined,
       location: msEvent.location?.displayName || undefined,
       recurrence_rule: recurrenceRule,
-      is_recurring: !!recurrenceRule
+      is_recurring: !!recurrenceRule,
+      is_all_day: msEvent.isAllDay === true
     };
   }
 

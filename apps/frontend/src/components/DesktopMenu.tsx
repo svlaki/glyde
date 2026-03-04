@@ -112,21 +112,21 @@ export function DesktopMenu({ isOpen, onClose }: DesktopMenuProps) {
               Calendar
             </a>
             <a
-              href="/plan"
+              href="/notes"
               onClick={onClose}
-              style={getActiveStyle('/plan')}
+              style={getActiveStyle('/notes')}
               onMouseEnter={(e) => {
-                if (window.location.pathname !== '/plan') {
+                if (window.location.pathname !== '/notes') {
                   e.currentTarget.style.background = colors.bgHover
                 }
               }}
               onMouseLeave={(e) => {
-                if (window.location.pathname !== '/plan') {
+                if (window.location.pathname !== '/notes') {
                   e.currentTarget.style.background = 'transparent'
                 }
               }}
             >
-              Plan
+              Notes
             </a>
             <a
               href="/aspects"

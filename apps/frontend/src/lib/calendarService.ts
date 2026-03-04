@@ -36,6 +36,8 @@ export interface CalendarEvent {
   is_missed?: boolean
   // Reminder field
   reminder_minutes?: number | null  // Minutes before event to fire a reminder (null = no reminder)
+  // All-day event flag
+  is_all_day?: boolean
   // Google sync fields
   google_event_id?: string
   local_notes?: string

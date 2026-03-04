@@ -4,7 +4,7 @@ import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const updateGoalTool = tool(
-  async ({ goalId, title, description, targetDate, status, progress, aspect, priorityScore, milestones }, config) => {
+  async ({ goalId, title, description, targetDate, status, progress, aspect, priorityScore }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "User ID required";
@@ -28,8 +28,6 @@ export const updateGoalTool = tool(
       if (progress !== undefined && progress !== null) updates.progress = progress;
       if (aspect !== undefined && aspect !== null && aspect.trim() !== '') updates.aspect = aspect;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
-      if (milestones !== undefined && milestones !== null) updates.milestones = milestones;
-
       const goal = await supabaseService.updateGoal(userId, goalId, updates, { source: 'agent', agentType: 'conversation' });
 
       if (!goal) {
@@ -84,10 +82,6 @@ export const updateGoalTool = tool(
       if (aspect !== undefined && originalGoal?.aspect !== aspect) {
         changes.push(`aspect changed to "${aspect}"`);
       }
-      if (milestones !== undefined && milestones !== null) {
-        changes.push(`milestones updated (${milestones.length} total)`);
-      }
-
       const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
 
       return `GOAL: "${goalTitle}" has been updated${changeDescription}`;
@@ -108,12 +102,6 @@ export const updateGoalTool = tool(
       progress: z.number().min(0).max(100).optional().nullable().describe("Progress percentage (0-100)"),
       aspect: z.string().optional().nullable().describe("New aspect name"),
       priorityScore: z.number().min(1).max(10).optional().nullable().describe("New priority score (1-10)"),
-      milestones: z.array(z.object({
-        title: z.string().describe("Milestone title"),
-        description: z.string().optional().nullable().describe("Milestone description"),
-        due_date: z.string().optional().nullable().describe("Target date for milestone (ISO format)"),
-        status: z.enum(["pending", "in_progress", "completed"]).optional().nullable().describe("Milestone status"),
-      })).optional().nullable().describe("Updated list of milestones. This replaces existing milestones. Include all milestones (existing and new) when updating."),
     }),
   }
 );

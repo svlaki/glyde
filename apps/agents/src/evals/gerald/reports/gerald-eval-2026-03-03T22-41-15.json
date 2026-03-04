@@ -1,0 +1,3013 @@
+{
+  "timestamp": "2026-03-03T22:41:15.443Z",
+  "config": {
+    "userEmail": "pc6176@stanford.edu",
+    "targetInteractionCount": 50,
+    "batchSize": 3,
+    "batchDelayMs": 2000,
+    "generationModel": "gpt-5.1",
+    "judgeModel": "gpt-4o",
+    "responseSimModel": "gpt-4o-mini",
+    "outputDir": "src/evals/gerald/reports"
+  },
+  "userData": {
+    "userId": "d2aaf633-ca91-404d-9a30-04b87a0f4aa0",
+    "email": "pc6176@stanford.edu",
+    "timezone": "America/Los_Angeles",
+    "displayName": "Peef"
+  },
+  "summary": {
+    "totalInteractions": 50,
+    "overallScore": 3,
+    "generationScore": 3,
+    "responseScore": 3,
+    "passFail": "FAIL"
+  },
+  "typeDistribution": {
+    "yes_no": 17,
+    "rating": 7,
+    "text": 13,
+    "multiple_choice": 13
+  },
+  "aspectCoverage": 0.5,
+  "topicDiversity": 0.38,
+  "results": [
+    {
+      "interaction": {
+        "index": 0,
+        "batchNumber": 0,
+        "question": "You’ve got a high-priority CS 247B discussion post task due today and some afternoon time before your startup beta push at 6:45 PM. Would you like to block a 30-minute “CS 247B discussion posts” work slot later this afternoon?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 0,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 0,
+        "simulatedResponse": {
+          "interactionIndex": 0,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B discussion posts work slot",
+              "start_time": "2026-03-03T17:45:00",
+              "end_time": "2026-03-03T18:15:00",
+              "description": "Focused time to work on CS 247B discussion posts before startup beta push.",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 1,
+        "batchNumber": 0,
+        "question": "Thinking about your main goal of eating more consistently, over the past 5 days how would you rate your consistent eating progress?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 1,
+        "responseText": "7",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 1,
+        "simulatedResponse": {
+          "interactionIndex": 1,
+          "responseText": "7",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "No further action is needed here—the 7/10 rating is already stored automatically."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 2,
+        "batchNumber": 0,
+        "question": "You’ve got a startup beta push scheduled for 6:45–7:15 PM today. What’s one specific outcome you’d be happy to have by the end of that 30-minute window (e.g., “ship feature X to staging,” “draft beta announcement copy,” “verify signup flow end-to-end”)?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 2,
+        "responseText": "I’d be happy to successfully verify the signup flow end-to-end so that we can ensure everything works smoothly for our beta users. It’s crucial to make a good first impression!",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 2,
+        "simulatedResponse": {
+          "interactionIndex": 2,
+          "responseText": "I’d be happy to successfully verify the signup flow end-to-end so that we can ensure everything works smoothly for our beta users. It’s crucial to make a good first impression!",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "During short startup focus windows, Peef likes to define a single concrete outcome (e.g., verifying the signup flow end-to-end) to make progress toward the beta launch and ensure a good first impression for users.",
+              "category": "work_style"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 3,
+        "batchNumber": 0,
+        "question": "You’ve got a high-priority CS 247B discussion post task due today and some afternoon time before your startup beta push at 6:45 PM. Would you like to block a 30-minute “CS 247B discussion posts” work slot later this afternoon?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 3,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 3,
+        "simulatedResponse": {
+          "interactionIndex": 3,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B discussion posts work",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:45:00",
+              "description": "Focused work on CS 247B discussion posts before startup beta push.",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 4,
+        "batchNumber": 0,
+        "question": "Thinking about your main goal of eating more consistently, over the past 5 days how would you rate your consistent eating progress?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 4,
+        "responseText": "5",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 4,
+        "simulatedResponse": {
+          "interactionIndex": 4,
+          "responseText": "5",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "No further action is needed here—the 5/5 rating is already stored automatically."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 5,
+        "batchNumber": 0,
+        "question": "You’ve got a startup beta push scheduled 6:45–7:15 PM today. In one sentence, what would make that 30-minute window feel like a win by the time it’s over?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 5,
+        "responseText": "A win for me during the startup beta push would be successfully gathering at least three actionable pieces of feedback from the users that I can implement right away, as I’m feeling a bit overwhelmed with balancing my coursework and this project. If I can see tangible improvements or insights come from our efforts, it would really boost my motivation and confidence amidst my busy schedule. Plus, it would help me feel more connected to the team, which is important during this hectic semester.",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 5,
+        "simulatedResponse": {
+          "interactionIndex": 5,
+          "responseText": "A win for me during the startup beta push would be successfully gathering at least three actionable pieces of feedback from the users that I can implement right away, as I’m feeling a bit overwhelmed with balancing my coursework and this project. If I can see tangible improvements or insights come from our efforts, it would really boost my motivation and confidence amidst my busy schedule. Plus, it would help me feel more connected to the team, which is important during this hectic semester.",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "During startup beta push sessions, Peef feels most motivated when the goal is to gather a small number of clearly actionable user feedback items that can be implemented quickly, especially when feeling overwhelmed by coursework. Feeling tangible progress and connection with the team helps reduce stress and boost confidence during busy semesters.",
+              "category": "motivation"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 6,
+        "batchNumber": 0,
+        "question": "You’ve got a high-priority CS 247B discussion post task due today and some afternoon/evening space. Would you like to block a 30-minute “CS 247B discussion posts” work session before your startup beta push?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 6,
+        "responseText": "No thanks",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 6,
+        "simulatedResponse": {
+          "interactionIndex": 6,
+          "responseText": "No thanks",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 7,
+        "batchNumber": 0,
+        "question": "Thinking about your main goal of eating more consistently, what’s one small pattern you’ve noticed in the past few days (good or bad) about when you tend to miss meals or feel low on energy?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 7,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 7,
+        "simulatedResponse": {
+          "interactionIndex": 7,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 8,
+        "batchNumber": 0,
+        "question": "You’ve got a startup beta push scheduled 6:45–7:15 PM today. What’s the single most important outcome you’d like from that 30-minute window?",
+        "type": "multiple_choice",
+        "options": [
+          "Ship or test one specific feature",
+          "Review key metrics or logs",
+          "Fix a known bug",
+          "Do quick UX polish or copy tweaks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 8,
+        "responseText": "All of the above",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 8,
+        "simulatedResponse": {
+          "interactionIndex": 8,
+          "responseText": "All of the above",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [
+          {
+            "name": "update_event",
+            "args": {
+              "event_id": "Startup beta push",
+              "description": "Focus for this 30-minute window:\n- Ship or test one specific feature\n- Review key metrics or logs\n- Fix a known bug\n- Do quick UX polish or copy tweaks\n\nAim to touch each briefly, but if time gets tight, prioritize shipping/testing the feature first."
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 9,
+        "batchNumber": 1,
+        "question": "You’ve got several high-priority class and startup tasks that are overdue or due soon. For the rest of this afternoon before your 6:45 PM startup beta push, what kind of work block feels most realistic to you?",
+        "type": "multiple_choice",
+        "options": [
+          "25-minute CS 247B discussion post push",
+          "25-minute CS 525 project work",
+          "25-minute startup observability review",
+          "Skip for now"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 9,
+        "responseText": "All of the above",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 9,
+        "simulatedResponse": {
+          "interactionIndex": 9,
+          "responseText": "All of the above",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B discussion post push",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:25:00",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          },
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 525 project work",
+              "start_time": "2026-03-03T15:30:00",
+              "end_time": "2026-03-03T15:55:00",
+              "aspect_id": "97b449c7-f9a3-48c4-bea0-4ad92fa009b2"
+            }
+          },
+          {
+            "name": "create_event",
+            "args": {
+              "title": "Startup observability review",
+              "start_time": "2026-03-03T16:00:00",
+              "end_time": "2026-03-03T16:25:00",
+              "aspect_id": "b7dd1bce-e079-46df-9815-179347210c9c"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 10,
+        "batchNumber": 1,
+        "question": "For your goal of reading 1 book per month, what’s one small tweak you could make this week to make reading more likely (e.g., keeping your book by your bed, reading during breakfast, 5 minutes before sleep)?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 10,
+        "responseText": "I think I'll start bringing my book to the café on campus so I can read for a bit between classes. It’ll help me squeeze in some reading without disrupting my schedule too much.",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 10,
+        "simulatedResponse": {
+          "interactionIndex": 10,
+          "responseText": "I think I'll start bringing my book to the café on campus so I can read for a bit between classes. It’ll help me squeeze in some reading without disrupting my schedule too much.",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "Peef prefers to fit reading into natural gaps in their day, like bringing a book to the campus café to read between classes, rather than scheduling separate dedicated reading blocks.",
+              "category": "reading habit"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 11,
+        "batchNumber": 1,
+        "question": "You have several academic and startup items under different aspects. Is the task “Review observability for startup” correctly categorized under your startup company work, or should it be moved somewhere else?",
+        "type": "yes_no",
+        "options": [
+          "Yes, it’s correctly under startup company",
+          "No, it should be moved"
+        ],
+        "priority": 2,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 11,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 11,
+        "simulatedResponse": {
+          "interactionIndex": 11,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "No changes are needed based on that response, so I won’t modify or move the “Review observability for startup” task."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 12,
+        "batchNumber": 1,
+        "question": "You’ve got several high-priority class and startup tasks that are overdue or due soon. For the next couple of days, which area would you most like to carve out a bit of focused time for, so we can schedule something concrete next?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B assignments",
+          "CS 525 project",
+          "Startup beta test work",
+          "None of these right now"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 12,
+        "responseText": "CS 247B assignments",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 12,
+        "simulatedResponse": {
+          "interactionIndex": 12,
+          "responseText": "CS 247B assignments",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B Assignment Focus",
+              "start_time": "2026-03-03T15:30:00",
+              "end_time": "2026-03-03T16:30:00",
+              "description": "Focused work on CS 247B assignments (catch-up and current).",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 13,
+        "batchNumber": 1,
+        "question": "You’ve got a goal to have your startup beta test running smoothly by March 18. In 1–2 sentences, what’s one specific thing you’ve done in the past week that moved that beta goal forward (even a tiny bit)?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 13,
+        "responseText": "Last week, I dedicated an entire afternoon to refining our user interface based on feedback from our initial testers. It felt great to see improvements take shape as I incorporated their suggestions, and I even reached out to a couple of potential beta testers to gauge their interest and gather more insights. That small step boosted my confidence and helped me feel more aligned with our March 18 deadline!",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 13,
+        "simulatedResponse": {
+          "interactionIndex": 13,
+          "responseText": "Last week, I dedicated an entire afternoon to refining our user interface based on feedback from our initial testers. It felt great to see improvements take shape as I incorporated their suggestions, and I even reached out to a couple of potential beta testers to gauge their interest and gather more insights. That small step boosted my confidence and helped me feel more aligned with our March 18 deadline!",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "When Peef makes visible progress on the startup (like refining the UI from tester feedback and reaching out to potential beta testers), it boosts their confidence and makes the March 18 beta deadline feel more achievable.",
+              "category": "motivation"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 14,
+        "batchNumber": 1,
+        "question": "Your CS 247B and CS 525 tasks are all marked high priority and a bit overdue. Would it help to add a quick “triage and reorder tasks” item to your to-do list so you can decide what’s realistically doable this week?",
+        "type": "yes_no",
+        "options": [
+          "Yes, add a triage task",
+          "No, skip this"
+        ],
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 14,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 14,
+        "simulatedResponse": {
+          "interactionIndex": 14,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "Task triage and reordering",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:45:00",
+              "description": "Review CS 247B, CS 525, and startup tasks; decide what’s realistically doable this week and adjust priorities.",
+              "aspect_id": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062",
+              "reminder_minutes": 5
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 15,
+        "batchNumber": 1,
+        "question": "You’ve got several high-priority class and startup tasks that are overdue or due soon. For the rest of this afternoon before your 6:45 PM startup beta push, what kind of small win feels most realistic?",
+        "type": "multiple_choice",
+        "options": [
+          "Move CS 247B discussion posts forward for 20–30 minutes",
+          "Make any concrete progress on the CS 525 project",
+          "Do one small thing for the startup beta (not observability)",
+          "Use the time to reset (rest, short walk, or admin)"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 15,
+        "responseText": "Make any concrete progress on the CS 525 project",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 15,
+        "simulatedResponse": {
+          "interactionIndex": 15,
+          "responseText": "Make any concrete progress on the CS 525 project",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 525 project progress",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:30:00",
+              "description": "Make any concrete progress on the CS 525 project (light, no-pressure work).",
+              "aspect_id": "97b449c7-f9a3-48c4-bea0-4ad92fa009b2",
+              "reminder_minutes": 5
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 16,
+        "batchNumber": 1,
+        "question": "Thinking about your broader personal life (not just eating), over the past 5 days how would you rate your overall stress level?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 16,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 16,
+        "simulatedResponse": {
+          "interactionIndex": 16,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 17,
+        "batchNumber": 1,
+        "question": "You’ve got a goal to read 1 book per month. What’s one small tweak you could make this week to give reading a slightly better chance of happening (e.g., leaving a book on your pillow, opening a reading app before bed, 5 minutes after lunch)?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 17,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 17,
+        "simulatedResponse": {
+          "interactionIndex": 17,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 18,
+        "batchNumber": 2,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. Before then, would you like to carve out a 25-minute “Startup beta prep – checklist & sanity check” block this afternoon to make that push smoother?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 18,
+        "responseText": "Maybe later",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 18,
+        "simulatedResponse": {
+          "interactionIndex": 18,
+          "responseText": "Maybe later",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Understood. Since “Maybe later” isn’t a clear “Yes” to scheduling and the original interaction only offered Yes/No, I won’t create any events or tasks from this. No further action taken."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 19,
+        "batchNumber": 2,
+        "question": "You’ve got several high-priority, slightly overdue class tasks (CS 247B, CS 525, CS 224G). Looking at just the next 3 days, which area feels most important to move forward first so we can plan around it next time?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B assignments",
+          "CS 525 project",
+          "CS 224G meeting with Ken Muller",
+          "I’m not sure"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 19,
+        "responseText": "All of the above",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 19,
+        "simulatedResponse": {
+          "interactionIndex": 19,
+          "responseText": "All of the above",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "When asked to choose a single priority among multiple important academic tasks, Peef sometimes feels that all of them are equally important and struggles to pick just one.",
+              "category": "prioritization"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 20,
+        "batchNumber": 2,
+        "question": "Thinking about your startup goal of having the beta test running smoothly by March 18, what’s one concrete thing you’ve done in the last week (even tiny) that nudged that goal forward?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 20,
+        "responseText": "Last week, I finalized the user feedback survey that I'll send out to beta testers, so I can gather insights on their experience and make adjustments before the launch. It feels like a small step, but it’s essential for refining the product!",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 20,
+        "simulatedResponse": {
+          "interactionIndex": 20,
+          "responseText": "Last week, I finalized the user feedback survey that I'll send out to beta testers, so I can gather insights on their experience and make adjustments before the launch. It feels like a small step, but it’s essential for refining the product!",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "Peef feels that finalizing the user feedback survey for beta testers was a small but essential step toward refining the startup product before launch.",
+              "category": "startup progress reflection"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 21,
+        "batchNumber": 2,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. Before then, would you like to carve out a 25-minute “Startup beta prep” block this afternoon to make that push smoother?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 21,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 21,
+        "simulatedResponse": {
+          "interactionIndex": 21,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "Startup beta prep",
+              "start_time": "2026-03-03T15:45:00",
+              "end_time": "2026-03-03T16:10:00",
+              "description": "Light prep for this evening’s startup beta push (6:45–7:15 PM).",
+              "aspect_id": "b7dd1bce-e079-46df-9815-179347210c9c"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 22,
+        "batchNumber": 2,
+        "question": "Looking at your CS classes and startup work, which area would you most like to reflect on for a quick 2–3 sentence check-in about how it’s going this week?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B",
+          "CS 224G",
+          "CS 525",
+          "Startup company",
+          "Personal life (non-school/work)"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 22,
+        "responseText": "CS 247B",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 22,
+        "simulatedResponse": {
+          "interactionIndex": 22,
+          "responseText": "CS 247B",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "User chose CS 247B as the area they most want to reflect on this week, suggesting it feels particularly salient or in need of attention compared to other classes and startup work.",
+              "category": "academic_focus"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 23,
+        "batchNumber": 2,
+        "question": "You’ve got several high-priority academic and startup tasks marked as overdue or due soon. Is there at least one task whose title feels too vague or unclear when you look at your list?",
+        "type": "yes_no",
+        "options": [
+          "Yes, at least one is unclear",
+          "No, they’re all clear enough"
+        ],
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 23,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 23,
+        "simulatedResponse": {
+          "interactionIndex": 23,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_task",
+            "args": {
+              "title": "Clarify vague tasks",
+              "description": "Spend 45 minutes reviewing my current task list and rewriting any titles that feel vague or unclear into specific, actionable items.",
+              "due_date": "2026-03-03T23:59:00",
+              "priority": "medium",
+              "aspect_id": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 24,
+        "batchNumber": 2,
+        "question": "You’ve got a startup beta push today at 6:45–7:15 PM. Before then, would you like to set a clear 1–2 sentence objective for that session so you know exactly what “done” looks like?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 24,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 24,
+        "simulatedResponse": {
+          "interactionIndex": 24,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "update_event",
+            "args": {
+              "event_id": "Startup beta push",
+              "description": "Objective for this session: define a clear 1–2 sentence objective for the startup beta push so it’s obvious what “done” looks like by the end of the 45-minute block.",
+              "start_time": "2026-03-03T18:45:00",
+              "end_time": "2026-03-03T19:30:00"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 25,
+        "batchNumber": 2,
+        "question": "You’ve got several high-priority class and startup tasks that are overdue or due soon. For the rest of this afternoon before your 6:45 PM startup beta push, what kind of small win feels most realistic?",
+        "type": "multiple_choice",
+        "options": [
+          "Make visible progress on CS 247B discussion posts",
+          "Do a short push on the CS 525 project",
+          "Tidy up one concrete thing for the startup beta (e.g., bugfix, copy, or small feature)",
+          "Honestly, I don’t have energy for work before the beta push"
+        ],
+        "priority": 4,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 25,
+        "responseText": "Do a short push on the CS 525 project",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 25,
+        "simulatedResponse": {
+          "interactionIndex": 25,
+          "responseText": "Do a short push on the CS 525 project",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 525 project push",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:30:00",
+              "description": "Short, low-pressure push on the CS 525 project before the startup beta push.",
+              "aspect_id": "97b449c7-f9a3-48c4-bea0-4ad92fa009b2",
+              "reminder_minutes": 5
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 26,
+        "batchNumber": 2,
+        "question": "Thinking about your main goal of eating more consistently, over the past 5 days how would you rate your consistent eating progress?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 26,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 26,
+        "simulatedResponse": {
+          "interactionIndex": 26,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 27,
+        "batchNumber": 3,
+        "question": "You’ve got a startup beta push today from 6:45–7:15 PM. Before then, would you like to set aside a 25-minute “Startup beta prep – final checks” block this afternoon so that push feels smoother?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 27,
+        "responseText": "No thanks",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 27,
+        "simulatedResponse": {
+          "interactionIndex": 27,
+          "responseText": "No thanks",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 28,
+        "batchNumber": 3,
+        "question": "Looking at your overdue high-priority class tasks (CS 247B assignments and CS 525 project), which one would you most like to make a bit of progress on sometime tomorrow?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B assignments",
+          "CS 525 project",
+          "Neither – tomorrow is packed"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 28,
+        "responseText": "All of the above",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 28,
+        "simulatedResponse": {
+          "interactionIndex": 28,
+          "responseText": "All of the above",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "When asked to choose between CS 247B and CS 525 for tomorrow, Peef said \"All of the above,\" indicating they feel pressure to make progress on both and may be overcommitted.",
+              "category": "overcommitment"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 29,
+        "batchNumber": 3,
+        "question": "You’ve got several high-priority academic and startup items in motion. In 1–2 sentences, what’s one thing you did in the past few days that you’re genuinely glad you got done (even if it felt small)?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 29,
+        "responseText": "idk",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 29,
+        "simulatedResponse": {
+          "interactionIndex": 29,
+          "responseText": "idk",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "User had trouble identifying a recent win or accomplishment when prompted, responding with 'idk'. They may benefit from more concrete, guided prompts and smaller, specific examples when reflecting.",
+              "category": "reflection_difficulty"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 30,
+        "batchNumber": 3,
+        "question": "You’ve got a startup beta push today from 6:45–7:15 PM. Before then, would you like to set a clear 1-sentence objective for that session so it’s easier to know when you’re “done enough” for today?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 30,
+        "responseText": "Sure! My objective for the session is to gather user feedback on the new features we implemented and identify at least three key areas for improvement. That way, I’ll know we’ve made progress and can plan our next steps.",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 30,
+        "simulatedResponse": {
+          "interactionIndex": 30,
+          "responseText": "Sure! My objective for the session is to gather user feedback on the new features we implemented and identify at least three key areas for improvement. That way, I’ll know we’ve made progress and can plan our next steps.",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "For startup beta push sessions, Peef likes to define a clear, outcome-based objective (e.g., gather user feedback and identify specific improvement areas) so it’s easy to know when they’re \"done enough\" and can plan next steps.",
+              "category": "workflows"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 31,
+        "batchNumber": 3,
+        "question": "You have several high-priority class and startup tasks that are overdue or due soon. Looking at just tomorrow, which area would you most like to make at least a little progress on so we can plan around it next time?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B assignments",
+          "CS 525 project",
+          "CS 224G meeting prep with Ken Muller",
+          "Startup beta test work"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 31,
+        "responseText": "CS 247B assignments",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 31,
+        "simulatedResponse": {
+          "interactionIndex": 31,
+          "responseText": "CS 247B assignments",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "update_task",
+            "args": {
+              "task_id": "1",
+              "description": "Work through all missing and current assignments for CS 247B, with tomorrow’s focus being: make at least a little progress on CS 247B assignments so we can plan around that priority next time.",
+              "title": "Catch up on CS 247B assignments"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 32,
+        "batchNumber": 3,
+        "question": "Some of your tasks and goals span different areas of your life (classes, startup, personal). Is it okay if we occasionally suggest re-tagging items when they look miscategorized (for example, a class-related task under Personal)?",
+        "type": "yes_no",
+        "options": [
+          "Yes, that’s helpful",
+          "No, keep things as they are"
+        ],
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 32,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 32,
+        "simulatedResponse": {
+          "interactionIndex": 32,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "User is okay with occasional suggestions to re-tag miscategorized tasks and events across life areas.",
+              "category": "preferences"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 33,
+        "batchNumber": 3,
+        "question": "You’ve got a startup beta push today 6:45–7:15 PM. Before then, would you like to spend 20 minutes reviewing your deployment checklist and recent changes so that push goes more smoothly?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 33,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 33,
+        "simulatedResponse": {
+          "interactionIndex": 33,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "Startup deployment review",
+              "start_time": "2026-03-03T18:00:00",
+              "end_time": "2026-03-03T18:45:00",
+              "description": "Review deployment checklist and recent changes to prepare for 6:45–7:15 PM startup beta push.",
+              "aspect_id": "b7dd1bce-e079-46df-9815-179347210c9c"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 34,
+        "batchNumber": 3,
+        "question": "Looking at your active tasks, which area would you most like to make a small dent in over the next couple of days?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B assignments and discussion posts",
+          "CS 525 project work",
+          "CS 224G meeting with Ken / prep",
+          "Startup observability and beta work"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 34,
+        "responseText": "CS 525 project work",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 34,
+        "simulatedResponse": {
+          "interactionIndex": 34,
+          "responseText": "CS 525 project work",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_task",
+            "args": {
+              "title": "CS 525 project work - small dent",
+              "description": "Make a small but concrete bit of progress on the CS 525 Data for AI project within the next couple of days (e.g., clarify project scope, outline experiments, or implement a tiny piece).",
+              "due_date": "2026-03-05",
+              "priority": "high",
+              "aspect_id": "97b449c7-f9a3-48c4-bea0-4ad92fa009b2"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 35,
+        "batchNumber": 3,
+        "question": "You’ve got several high-priority academic and startup tasks that are a bit overdue. Is the task “Catch up on CS 247B assignments” still relevant as written, or does it need to be updated (e.g., narrowed down or marked done)?",
+        "type": "multiple_choice",
+        "options": [
+          "Still accurate as-is",
+          "Needs to be broken into smaller tasks",
+          "Mostly done – should be marked complete or updated",
+          "No longer relevant"
+        ],
+        "priority": 2,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 35,
+        "responseText": "Needs to be broken into smaller tasks",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 35,
+        "simulatedResponse": {
+          "interactionIndex": 35,
+          "responseText": "Needs to be broken into smaller tasks",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_task",
+            "args": {
+              "title": "CS 247B – list all missing assignments",
+              "description": "Brain-dump: write out every missing or current CS 247B assignment and key pieces (e.g., readings, posts, project work) so they can be split into smaller tasks.",
+              "due_date": "2026-03-04",
+              "priority": "high",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 36,
+        "batchNumber": 4,
+        "question": "You’ve got a startup beta push today from 6:45–7:15 PM. Before that, would you like to set a simple 1–2 item checklist for what you’ll do in that window so it feels focused and doable?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 36,
+        "responseText": "No thanks",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 36,
+        "simulatedResponse": {
+          "interactionIndex": 36,
+          "responseText": "No thanks",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 37,
+        "batchNumber": 4,
+        "question": "Looking at your mix of classes, startup work, and personal life, over the past 5 days how would you rate your overall work–life balance?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 37,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 37,
+        "simulatedResponse": {
+          "interactionIndex": 37,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Understood. Since you chose \"Skip\" for that work–life balance rating, I won’t record anything or make any changes."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 38,
+        "batchNumber": 4,
+        "question": "You’ve got several high-priority academic and startup tasks. What’s one small habit you could try this week to make it easier to start important work even when you’re low on energy (e.g., 5-minute “warm-up” task, putting your laptop where you’ll see it, setting a single daily “must-do”)?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 38,
+        "responseText": "idk",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 38,
+        "simulatedResponse": {
+          "interactionIndex": 38,
+          "responseText": "idk",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 39,
+        "batchNumber": 4,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. After that, would you like to reserve a 20-minute “wind-down and quick plan for tomorrow” block this evening so you’re not carrying everything in your head overnight?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 39,
+        "responseText": "Maybe later",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 39,
+        "simulatedResponse": {
+          "interactionIndex": 39,
+          "responseText": "Maybe later",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 40,
+        "batchNumber": 4,
+        "question": "Looking at your CS courses (247B, 224G, 525), is the task “Meet with Ken Muller about CS 224G” still something you intend to do this quarter, or has it become irrelevant?",
+        "type": "multiple_choice",
+        "options": [
+          "Still relevant – keep it",
+          "Not needed anymore – you can remove it",
+          "I’m not sure yet"
+        ],
+        "priority": 2,
+        "aspectId": "c43b6bf1-e42e-4087-a9b9-4ff83e6e40b6"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 40,
+        "responseText": "Still relevant – keep it",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 40,
+        "simulatedResponse": {
+          "interactionIndex": 40,
+          "responseText": "Still relevant – keep it",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 41,
+        "batchNumber": 4,
+        "question": "Thinking about your startup goal of having the beta test running smoothly by March 18, what’s one concrete step you took in the last week (even tiny) that moved that goal forward?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 41,
+        "responseText": "Last week, I set up a user feedback survey to gather insights from potential testers, which will help me refine the features before the beta launch. I also reached out to a few classmates to see if they’d be willing to test it out when the time comes.",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 41,
+        "simulatedResponse": {
+          "interactionIndex": 41,
+          "responseText": "Last week, I set up a user feedback survey to gather insights from potential testers, which will help me refine the features before the beta launch. I also reached out to a few classmates to see if they’d be willing to test it out when the time comes.",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 42,
+        "batchNumber": 4,
+        "question": "You’ve got a startup beta push today from 6:45–7:15 PM. Before that, would you like to set a clear 1–2 sentence objective for that session so it’s easier to know when you’re “done enough” for today?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 42,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 42,
+        "simulatedResponse": {
+          "interactionIndex": 42,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 43,
+        "batchNumber": 4,
+        "question": "You’ve got several high-priority class tasks that are overdue or due soon (CS 247B, CS 525, CS 224G). For the next couple of days, which area feels most important to move forward first so we can plan around it next time?",
+        "type": "multiple_choice",
+        "options": [
+          "CS 247B – catch up and discussion posts",
+          "CS 525 – project progress",
+          "CS 224G – meeting with Ken / course work",
+          "None of these – something else is bigger"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 43,
+        "responseText": "CS 525 – project progress",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 43,
+        "simulatedResponse": {
+          "interactionIndex": 43,
+          "responseText": "CS 525 – project progress",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 44,
+        "batchNumber": 4,
+        "question": "Thinking about your broader personal life (not just eating), over the past 5 days how would you rate your overall stress level?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 44,
+        "responseText": "5",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 44,
+        "simulatedResponse": {
+          "interactionIndex": 44,
+          "responseText": "5",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 45,
+        "batchNumber": 5,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. After that, would you like to set aside a short 15-minute “post-push notes & next steps” block this evening to capture what you learned and what’s next while it’s fresh?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 45,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 45,
+        "simulatedResponse": {
+          "interactionIndex": 45,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 46,
+        "batchNumber": 5,
+        "question": "Looking at your CS courses (247B, 224G, 525), is there any task or assignment on your list that feels unclear or too vague and could use a more specific title or description so it’s easier to start? If so, which one?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 46,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 46,
+        "simulatedResponse": {
+          "interactionIndex": 46,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 47,
+        "batchNumber": 5,
+        "question": "Thinking about your startup goal of having the beta test running smoothly by March 18, what’s one concrete step you could realistically take tomorrow (even a 15–20 minute action) to move that goal forward?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 47,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 47,
+        "simulatedResponse": {
+          "interactionIndex": 47,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 48,
+        "batchNumber": 5,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. Before then, would you like to set aside a 20-minute “Startup beta sanity check – key flows” block this afternoon to quickly walk through the most important user paths?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 48,
+        "responseText": "Maybe later",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 48,
+        "simulatedResponse": {
+          "interactionIndex": 48,
+          "responseText": "Maybe later",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 49,
+        "batchNumber": 5,
+        "question": "You’ve got several high-priority class tasks that are overdue (CS 247B, CS 525, CS 224G). Over the past 5 days, how would you rate your sense of being on top of your coursework overall?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 49,
+        "responseText": "3",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 49,
+        "simulatedResponse": {
+          "interactionIndex": 49,
+          "responseText": "3",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    }
+  ],
+  "topInteractions": [
+    {
+      "interaction": {
+        "index": 0,
+        "batchNumber": 0,
+        "question": "You’ve got a high-priority CS 247B discussion post task due today and some afternoon time before your startup beta push at 6:45 PM. Would you like to block a 30-minute “CS 247B discussion posts” work slot later this afternoon?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 0,
+        "responseText": "Yes",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 0,
+        "simulatedResponse": {
+          "interactionIndex": 0,
+          "responseText": "Yes",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B discussion posts work slot",
+              "start_time": "2026-03-03T17:45:00",
+              "end_time": "2026-03-03T18:15:00",
+              "description": "Focused time to work on CS 247B discussion posts before startup beta push.",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 1,
+        "batchNumber": 0,
+        "question": "Thinking about your main goal of eating more consistently, over the past 5 days how would you rate your consistent eating progress?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 1,
+        "responseText": "7",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 1,
+        "simulatedResponse": {
+          "interactionIndex": 1,
+          "responseText": "7",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [],
+        "rawResponse": "No further action is needed here—the 7/10 rating is already stored automatically."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 2,
+        "batchNumber": 0,
+        "question": "You’ve got a startup beta push scheduled for 6:45–7:15 PM today. What’s one specific outcome you’d be happy to have by the end of that 30-minute window (e.g., “ship feature X to staging,” “draft beta announcement copy,” “verify signup flow end-to-end”)?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 2,
+        "responseText": "I’d be happy to successfully verify the signup flow end-to-end so that we can ensure everything works smoothly for our beta users. It’s crucial to make a good first impression!",
+        "responseCategory": "accept"
+      },
+      "responseProcessing": {
+        "interactionIndex": 2,
+        "simulatedResponse": {
+          "interactionIndex": 2,
+          "responseText": "I’d be happy to successfully verify the signup flow end-to-end so that we can ensure everything works smoothly for our beta users. It’s crucial to make a good first impression!",
+          "responseCategory": "accept"
+        },
+        "toolCalls": [
+          {
+            "name": "manage_patterns",
+            "args": {
+              "action": "add",
+              "pattern": "During short startup focus windows, Peef likes to define a single concrete outcome (e.g., verifying the signup flow end-to-end) to make progress toward the beta launch and ensure a good first impression for users.",
+              "category": "work_style"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 3,
+        "batchNumber": 0,
+        "question": "You’ve got a high-priority CS 247B discussion post task due today and some afternoon time before your startup beta push at 6:45 PM. Would you like to block a 30-minute “CS 247B discussion posts” work slot later this afternoon?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 4,
+        "aspectId": "23903b47-d2c9-451a-947f-096712fe8a87"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 3,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 3,
+        "simulatedResponse": {
+          "interactionIndex": 3,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [
+          {
+            "name": "create_event",
+            "args": {
+              "title": "CS 247B discussion posts work",
+              "start_time": "2026-03-03T15:00:00",
+              "end_time": "2026-03-03T15:45:00",
+              "description": "Focused work on CS 247B discussion posts before startup beta push.",
+              "aspect_id": "23903b47-d2c9-451a-947f-096712fe8a87"
+            }
+          }
+        ],
+        "rawResponse": ""
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 4,
+        "batchNumber": 0,
+        "question": "Thinking about your main goal of eating more consistently, over the past 5 days how would you rate your consistent eating progress?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "priority": 3,
+        "aspectId": "6097ea29-d8d6-4d7b-8d2b-6c6b5ada51ed"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 4,
+        "responseText": "5",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 4,
+        "simulatedResponse": {
+          "interactionIndex": 4,
+          "responseText": "5",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "No further action is needed here—the 5/5 rating is already stored automatically."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    }
+  ],
+  "bottomInteractions": [
+    {
+      "interaction": {
+        "index": 49,
+        "batchNumber": 5,
+        "question": "You’ve got several high-priority class tasks that are overdue (CS 247B, CS 525, CS 224G). Over the past 5 days, how would you rate your sense of being on top of your coursework overall?",
+        "type": "rating",
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "priority": 3,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 49,
+        "responseText": "3",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 49,
+        "simulatedResponse": {
+          "interactionIndex": 49,
+          "responseText": "3",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 48,
+        "batchNumber": 5,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. Before then, would you like to set aside a 20-minute “Startup beta sanity check – key flows” block this afternoon to quickly walk through the most important user paths?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 48,
+        "responseText": "Maybe later",
+        "responseCategory": "edge_case"
+      },
+      "responseProcessing": {
+        "interactionIndex": 48,
+        "simulatedResponse": {
+          "interactionIndex": 48,
+          "responseText": "Maybe later",
+          "responseCategory": "edge_case"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 47,
+        "batchNumber": 5,
+        "question": "Thinking about your startup goal of having the beta test running smoothly by March 18, what’s one concrete step you could realistically take tomorrow (even a 15–20 minute action) to move that goal forward?",
+        "type": "text",
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 47,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 47,
+        "simulatedResponse": {
+          "interactionIndex": 47,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 46,
+        "batchNumber": 5,
+        "question": "Looking at your CS courses (247B, 224G, 525), is there any task or assignment on your list that feels unclear or too vague and could use a more specific title or description so it’s easier to start? If so, which one?",
+        "type": "text",
+        "priority": 2,
+        "aspectId": "f2e71f3f-2a33-4c18-b2d0-6cd38eefe062"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 46,
+        "responseText": "Skip",
+        "responseCategory": "decline"
+      },
+      "responseProcessing": {
+        "interactionIndex": 46,
+        "simulatedResponse": {
+          "interactionIndex": 46,
+          "responseText": "Skip",
+          "responseCategory": "decline"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    },
+    {
+      "interaction": {
+        "index": 45,
+        "batchNumber": 5,
+        "question": "You’ve got a startup beta push at 6:45–7:15 PM today. After that, would you like to set aside a short 15-minute “post-push notes & next steps” block this evening to capture what you learned and what’s next while it’s fresh?",
+        "type": "yes_no",
+        "options": [
+          "Yes",
+          "No thanks"
+        ],
+        "priority": 3,
+        "aspectId": "b7dd1bce-e079-46df-9815-179347210c9c"
+      },
+      "interactionScore": {
+        "contextRelevance": 3,
+        "specificity": 3,
+        "appropriateness": 3,
+        "metadataQuality": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      },
+      "response": {
+        "interactionIndex": 45,
+        "responseText": "Yes, and make it 45 minutes please",
+        "responseCategory": "specific"
+      },
+      "responseProcessing": {
+        "interactionIndex": 45,
+        "simulatedResponse": {
+          "interactionIndex": 45,
+          "responseText": "Yes, and make it 45 minutes please",
+          "responseCategory": "specific"
+        },
+        "toolCalls": [],
+        "rawResponse": "Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+      },
+      "responseScore": {
+        "actionCorrectness": 3,
+        "toolSelection": 3,
+        "minimalAction": 3,
+        "overall": 3,
+        "reasoning": "Judge API error"
+      }
+    }
+  ],
+  "toolUsageSummary": {
+    "create_event": 11,
+    "(no action)": 24,
+    "manage_patterns": 11,
+    "update_event": 2,
+    "create_task": 3,
+    "update_task": 1
+  }
+}

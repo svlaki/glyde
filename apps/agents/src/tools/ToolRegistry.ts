@@ -13,7 +13,7 @@ import { searchTools } from './search/index.js';
 import { memoryTools } from './memory/index.js';
 import { interactionTools } from './interactions/index.js';
 import { rulesTools } from './rules/index.js';
-import { getPlanTool, updatePlanTool } from './plans/index.js';
+import { getNotesTool, updateNotesTool, createNotesTool } from './notes/index.js';
 import { projectTools } from './projects/index.js';
 import { reminderTools } from './reminders/index.js';
 import { friendTools } from './friends/index.js';
@@ -80,9 +80,10 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
-    // Register plan tools
-    this.tools.set(getPlanTool.name, getPlanTool);
-    this.tools.set(updatePlanTool.name, updatePlanTool);
+    // Register notes tools
+    this.tools.set(getNotesTool.name, getNotesTool);
+    this.tools.set(updateNotesTool.name, updateNotesTool);
+    this.tools.set(createNotesTool.name, createNotesTool);
 
     // Register project tools
     projectTools.forEach(tool => {
@@ -137,7 +138,7 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events'): any[] {
+  getToolsByCategory(category: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'notes' | 'projects' | 'reminders' | 'friends' | 'shared-events'): any[] {
     const categoryPrefixes = {
       calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
       aspects: ['create_aspect', 'list_aspects', 'update_aspect', 'delete_aspect', 'archive_aspect'],
@@ -148,7 +149,7 @@ export class ToolRegistry {
       search: ['web_search', 'location_search'],
       interactions: ['create_interaction', 'create_rating'],
       rules: ['create_rule', 'list_rules', 'delete_rule'],
-      plans: ['get_plan', 'update_plan'],
+      notes: ['get_notes', 'update_notes', 'create_notes'],
       projects: ['create_project', 'list_projects', 'update_project', 'archive_project', 'tag_to_project'],
       reminders: ['create_reminder', 'update_reminder', 'delete_reminder', 'list_reminders'],
       friends: ['list_friends', 'get_pending_friend_requests', 'send_friend_request', 'accept_friend_request', 'decline_friend_request', 'remove_friend', 'update_friend_notes', 'add_friend_aspect', 'remove_friend_aspect'],
@@ -179,7 +180,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events'): string[] {
+  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'notes' | 'projects' | 'reminders' | 'friends' | 'shared-events'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

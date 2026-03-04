@@ -13,7 +13,7 @@ import { ProfilePage } from './src/pages/ProfilePage'
 import { ProfileEditPage } from './src/pages/ProfileEditPage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { ConnectionsPage } from './src/pages/ConnectionsPage'
-import { PlanPage } from './src/pages/PlanPage'
+import { NotesPage } from './src/pages/NotesPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
@@ -120,11 +120,11 @@ function App() {
                   }
                 />
                 <Route
-                  path="/plan"
+                  path="/notes"
                   element={
                     <ProtectedRoute>
                       <OnboardingCheck>
-                        <PlanPage />
+                        <NotesPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }

@@ -47,6 +47,10 @@ const GeraldState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  recentPastEvents: Annotation<any[]>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => [],
+  }),
 });
 
 type GeraldStateType = typeof GeraldState.State;
@@ -110,6 +114,12 @@ export class InteractionAgentGerald extends BaseAgent {
       // Filter to future/ongoing events
       const userEvents = allEvents.filter(event => new Date(event.end_time) >= now);
 
+      // Also keep recent past events (last 7 days) for pattern context
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
+      const recentPastEvents = allEvents.filter(event =>
+        new Date(event.end_time) < now && new Date(event.start_time) >= sevenDaysAgo
+      );
+
       // Filter to only actionable tasks and goals to prevent suggesting actions on completed/cancelled items
       const activeTasks = userTasks?.filter(t => t.status === 'pending' || t.status === 'in_progress') || [];
       const activeGoals = userGoals?.filter(g => g.status === 'active') || [];
@@ -159,6 +169,7 @@ export class InteractionAgentGerald extends BaseAgent {
         userAspects: userAspects || [],
         recentInteractions: recentInteractions || [],
         ratingSummary: ratingSummary || [],
+        recentPastEvents: recentPastEvents || [],
       }, {
         recursionLimit: 15 // Allow more steps for complex interactions with retries
       });
@@ -269,6 +280,9 @@ export class InteractionAgentGerald extends BaseAgent {
       // Build rating context
       const ratingContext = self.buildRatingContext(state.ratingSummary);
 
+      // Build recent activity context (past 7 days)
+      const recentActivityContext = self.buildRecentActivityContext(state.recentPastEvents, state.timezone);
+
       // Build system prompt with full context
       const promptContext: GeraldPromptContext = {
         timezone: state.timezone,
@@ -286,6 +300,7 @@ export class InteractionAgentGerald extends BaseAgent {
         rulesContext,
         recentInteractionContext,
         ratingContext,
+        recentActivityContext,
       };
 
       const systemMessage = buildGeraldSystemPrompt(promptContext);
@@ -540,19 +555,19 @@ DEDUPLICATION RULES (CRITICAL):
       const lastAskedDate = new Date(r.lastAsked);
       const daysSince = Math.round((Date.now() - lastAskedDate.getTime()) / 86400000);
       const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince} days ago`;
-      return `  - "${r.topic}": ${r.latestScore}/5 ${trendIcon} (last asked: ${timeAgo}, ${r.totalEntries} entries)`;
+      return `  - "${r.topic}": ${r.latestScore}/10 ${trendIcon} (last asked: ${timeAgo}, ${r.totalEntries} entries)`;
     });
 
     return `\nRATING TRACKER (user's self-assessment scores):
 ${lines.join('\n')}
 RATING RULES:
-- For ratings that are LOW (1-2): suggest actions to improve that area before re-asking
-- For ratings that are HIGH (4-5): acknowledge and focus on maintaining
+- For ratings that are LOW (1-4): suggest actions to improve that area before re-asking
+- For ratings that are HIGH (8-10): acknowledge and focus on maintaining
 - For DECLINING ratings: prioritize addressing what's causing the drop
 - MINIMUM 5 DAYS between re-asking the same rating topic. Check "last asked" above - if less than 5 days ago, DO NOT ask about that topic in ANY form
 - When asking a rating, ask about the past 5 days (e.g., "How would you rate X over the past 5 days?")
 - When creating a rating interaction, include metadata.ratingTopic with the EXACT same topic name used before
-- Use interaction type "rating" with options ["1", "2", "3", "4", "5"]
+- Use interaction type "rating" with options ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 - NEVER create multiple rating interactions about the same topic or related topics in one batch`;
   }
 
@@ -571,5 +586,31 @@ RATING RULES:
     }).join('\n');
 
     return `\nASPECTS (${aspects.length}) - Use these IDs when creating events/tasks/goals:\n${aspectList}`;
+  }
+
+  /**
+   * Build recent activity context from past 7 days of events.
+   * This gives Gerald pattern data about user's actual habits and routines.
+   */
+  private buildRecentActivityContext(pastEvents: any[], timezone: string): string {
+    if (!pastEvents || pastEvents.length === 0) {
+      return '';
+    }
+
+    const sorted = [...pastEvents].sort(
+      (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+    );
+
+    const eventLines = sorted.slice(0, 20).map((e) => {
+      const startDate = toDate(e.start_time);
+      const dateStr = formatInTimeZone(startDate, timezone, 'EEE, MMM d');
+      const startTime = formatInTimeZone(startDate, timezone, 'h:mm a');
+      const categoryInfo = e.category_name ? ` [${e.category_name}]` : '';
+      return `  - "${e.title}" on ${dateStr} at ${startTime}${categoryInfo}`;
+    });
+
+    return `\nRECENT ACTIVITY (past 7 days - use to understand user's patterns and habits):
+${eventLines.join('\n')}
+Use this to suggest interactions that fit the user's actual routine and lifestyle patterns.`;
   }
 }

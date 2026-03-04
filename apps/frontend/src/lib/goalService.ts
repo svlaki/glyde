@@ -10,13 +10,7 @@ export interface Goal {
   target_date?: string
   status?: 'active' | 'completed' | 'paused' | 'abandoned'
   progress?: number
-  milestone_type?: 'dated' | 'ordered'
-  milestones?: Array<{
-    title: string
-    completed: boolean
-    due_date?: string
-  }>
-  goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+  goal_type?: 'smart' | 'okr' | 'habit' | 'project'
   time_horizon?: 'long_term' | 'short_term'
   parent_goal_id?: string
   key_results?: Array<{
@@ -108,13 +102,7 @@ export async function createUserGoal(
     target_date?: string
     status?: 'active' | 'completed' | 'paused' | 'abandoned'
     progress?: number
-    milestone_type?: 'dated' | 'ordered'
-    milestones?: Array<{
-      title: string
-      completed: boolean
-      due_date?: string
-    }>
-    goal_type?: 'smart' | 'okr' | 'milestone' | 'habit' | 'project'
+    goal_type?: 'smart' | 'okr' | 'habit' | 'project'
     time_horizon?: 'long_term' | 'short_term'
     parent_goal_id?: string
     key_results?: Array<{
