@@ -2,6 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
+import {
+  ThemedAreaChart,
+  ThemedStackedAreaChart,
+  ThemedBarChart,
+  ThemedLineChart,
+  ThemedPieChart,
+  ThemedRetentionBarChart,
+} from '../components/charts/AnalyticsCharts'
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
@@ -44,7 +52,21 @@ interface RetentionBucket {
   rate: number
 }
 
-type Tab = 'overview' | 'engagement' | 'agents' | 'users' | 'retention'
+interface ContextData {
+  totals: {
+    input_tokens: number
+    output_tokens: number
+    total_tokens: number
+    total_interactions: number
+    avg_tokens_per_interaction: number
+    avg_processing_time_ms: number
+    est_cost: number
+  }
+  daily_usage: { date: string; input_tokens: number; output_tokens: number }[]
+  top_users: { user_id: string; display_name: string; total_tokens: number }[]
+}
+
+type Tab = 'overview' | 'engagement' | 'agents' | 'users' | 'retention' | 'context'
 
 const ADMIN_USER_IDS = (import.meta.env.VITE_ADMIN_USER_IDS || '').split(',').filter(Boolean)
 
@@ -72,6 +94,12 @@ export function AdminAnalyticsPage() {
   const [agents, setAgents] = useState<AgentData | null>(null)
   const [users, setUsers] = useState<UserRow[]>([])
   const [retention, setRetention] = useState<Record<string, RetentionBucket> | null>(null)
+  const [contextData, setContextData] = useState<ContextData | null>(null)
+
+  // Timeseries data
+  const [overviewTimeseries, setOverviewTimeseries] = useState<{ date: string; dau: number }[] | null>(null)
+  const [agentsTimeseries, setAgentsTimeseries] = useState<{ date: string; responded: number; dismissed: number; chat_messages: number }[] | null>(null)
+  const [engagementTimeseries, setEngagementTimeseries] = useState<{ date: string; page_views: number; sessions: number }[] | null>(null)
 
   const fetchData = useCallback(async (endpoint: string) => {
     if (!session) return null
@@ -96,18 +124,30 @@ export function AdminAnalyticsPage() {
     try {
       switch (t) {
         case 'overview': {
-          const data = await fetchData('overview')
+          const [data, ts] = await Promise.all([
+            fetchData('overview'),
+            fetchData('overview-timeseries'),
+          ])
           if (data) setOverview(data)
+          if (ts) setOverviewTimeseries(ts.timeseries)
           break
         }
         case 'engagement': {
-          const data = await fetchData('engagement')
+          const [data, ts] = await Promise.all([
+            fetchData('engagement'),
+            fetchData('engagement-timeseries'),
+          ])
           if (data) setEngagement(data)
+          if (ts) setEngagementTimeseries(ts.timeseries)
           break
         }
         case 'agents': {
-          const data = await fetchData('agents')
+          const [data, ts] = await Promise.all([
+            fetchData('agents'),
+            fetchData('agents-timeseries'),
+          ])
           if (data) setAgents(data)
+          if (ts) setAgentsTimeseries(ts.timeseries)
           break
         }
         case 'users': {
@@ -118,6 +158,11 @@ export function AdminAnalyticsPage() {
         case 'retention': {
           const data = await fetchData('retention')
           if (data) setRetention(data.retention)
+          break
+        }
+        case 'context': {
+          const data = await fetchData('context')
+          if (data) setContextData(data)
           break
         }
       }
@@ -172,12 +217,20 @@ export function AdminAnalyticsPage() {
     color: colors.textPrimary,
   }
 
+  const sectionHeading: React.CSSProperties = {
+    fontSize: '16px',
+    fontWeight: 600,
+    margin: '24px 0 12px',
+  }
+
+  const formatNum = (n: number) => n.toLocaleString()
+
   return (
     <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto', color: colors.textPrimary }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Beta Analytics</h1>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        {(['overview', 'engagement', 'agents', 'users', 'retention'] as Tab[]).map(t => (
+        {(['overview', 'engagement', 'agents', 'users', 'retention', 'context'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(tab === t)} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -192,27 +245,38 @@ export function AdminAnalyticsPage() {
 
       {loading && <p style={{ color: colors.textSecondary }}>Loading...</p>}
 
+      {/* ── Overview Tab ── */}
       {!loading && tab === 'overview' && overview && (
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-          <div style={cardStyle}>
-            <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.total_users}</div>
-            <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Total Users</div>
+        <div>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.total_users}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Total Users</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.dau}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Daily Active Users</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.wau}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Weekly Active Users</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.mau}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Monthly Active Users</div>
+            </div>
           </div>
-          <div style={cardStyle}>
-            <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.dau}</div>
-            <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Daily Active Users</div>
-          </div>
-          <div style={cardStyle}>
-            <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.wau}</div>
-            <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Weekly Active Users</div>
-          </div>
-          <div style={cardStyle}>
-            <div style={{ fontSize: '32px', fontWeight: 700 }}>{overview.mau}</div>
-            <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Monthly Active Users</div>
-          </div>
+
+          {overviewTimeseries && (
+            <>
+              <h3 style={sectionHeading}>DAU Trend (30 days)</h3>
+              <ThemedAreaChart data={overviewTimeseries} colors={colors} dataKey="dau" label="DAU" />
+            </>
+          )}
         </div>
       )}
 
+      {/* ── Engagement Tab ── */}
       {!loading && tab === 'engagement' && engagement && (
         <div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
@@ -226,48 +290,44 @@ export function AdminAnalyticsPage() {
             </div>
           </div>
 
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Page Views by Path</h3>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Path</th>
-                <th style={thStyle}>Views</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(engagement.page_view_counts)
-                .sort(([, a], [, b]) => b - a)
-                .map(([path, count]) => (
-                  <tr key={path}>
-                    <td style={tdStyle}>{path}</td>
-                    <td style={tdStyle}>{count}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          {engagementTimeseries && (
+            <>
+              <h3 style={sectionHeading}>Daily Page Views & Sessions</h3>
+              <ThemedStackedAreaChart
+                data={engagementTimeseries}
+                colors={colors}
+                areas={[
+                  { dataKey: 'page_views', color: colors.accent, label: 'Page Views' },
+                  { dataKey: 'sessions', color: colors.success, label: 'Sessions' },
+                ]}
+              />
+            </>
+          )}
 
-          <h3 style={{ fontSize: '16px', fontWeight: 600, margin: '24px 0 12px' }}>Feature Usage</h3>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Event</th>
-                <th style={thStyle}>Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(engagement.feature_counts)
-                .sort(([, a], [, b]) => b - a)
-                .map(([name, count]) => (
-                  <tr key={name}>
-                    <td style={tdStyle}>{name}</td>
-                    <td style={tdStyle}>{count}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          <h3 style={sectionHeading}>Page Views by Path</h3>
+          <ThemedBarChart
+            data={Object.entries(engagement.page_view_counts)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 15)
+              .map(([name, value]) => ({ name, value }))}
+            colors={colors}
+            label="Views"
+          />
+
+          <h3 style={sectionHeading}>Feature Usage</h3>
+          <ThemedBarChart
+            data={Object.entries(engagement.feature_counts)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 15)
+              .map(([name, value]) => ({ name, value }))}
+            colors={colors}
+            barColor={colors.success}
+            label="Count"
+          />
         </div>
       )}
 
+      {/* ── Agents Tab ── */}
       {!loading && tab === 'agents' && agents && (
         <div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
@@ -288,9 +348,35 @@ export function AdminAnalyticsPage() {
               <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Chat Messages (30d)</div>
             </div>
           </div>
+
+          {agentsTimeseries && (
+            <>
+              <h3 style={sectionHeading}>Daily Responded vs Dismissed</h3>
+              <ThemedLineChart
+                data={agentsTimeseries}
+                colors={colors}
+                lines={[
+                  { dataKey: 'responded', color: colors.success, label: 'Responded' },
+                  { dataKey: 'dismissed', color: colors.error, label: 'Dismissed' },
+                  { dataKey: 'chat_messages', color: colors.warning, label: 'Chat Messages' },
+                ]}
+              />
+            </>
+          )}
+
+          <h3 style={sectionHeading}>Responded vs Dismissed</h3>
+          <ThemedPieChart
+            data={[
+              { name: 'Responded', value: agents.interactions_responded },
+              { name: 'Dismissed', value: agents.interactions_dismissed },
+            ]}
+            colors={colors}
+            pieColors={[colors.success, colors.error]}
+          />
         </div>
       )}
 
+      {/* ── Users Tab ── */}
       {!loading && tab === 'users' && users.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>
@@ -322,9 +408,19 @@ export function AdminAnalyticsPage() {
         </div>
       )}
 
+      {/* ── Retention Tab ── */}
       {!loading && tab === 'retention' && retention && (
         <div>
-          <table style={tableStyle}>
+          <h3 style={sectionHeading}>Retention Rate by Cohort</h3>
+          <ThemedRetentionBarChart
+            data={Object.entries(retention).map(([label, bucket]) => ({
+              label,
+              rate: bucket.rate,
+            }))}
+            colors={colors}
+          />
+
+          <table style={{ ...tableStyle, marginTop: '24px' }}>
             <thead>
               <tr>
                 <th style={thStyle}>Cohort Day</th>
@@ -345,6 +441,71 @@ export function AdminAnalyticsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ── Context Tab (Token Usage) ── */}
+      {!loading && tab === 'context' && contextData && (
+        <div>
+          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.total_tokens)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Total Tokens (30d)</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.input_tokens)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Input Tokens</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.output_tokens)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Output Tokens</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.total_interactions)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Interactions</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.avg_tokens_per_interaction)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Avg Tokens/Interaction</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>{contextData.totals.avg_processing_time_ms > 0 ? `${(contextData.totals.avg_processing_time_ms / 1000).toFixed(1)}s` : '-'}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Avg Processing Time</div>
+            </div>
+            <div style={cardStyle}>
+              <div style={{ fontSize: '28px', fontWeight: 700 }}>${contextData.totals.est_cost.toFixed(2)}</div>
+              <div style={{ color: colors.textSecondary, fontSize: '13px' }}>Est. Cost (30d)</div>
+            </div>
+          </div>
+
+          <h3 style={sectionHeading}>Daily Token Usage</h3>
+          <ThemedStackedAreaChart
+            data={contextData.daily_usage}
+            colors={colors}
+            areas={[
+              { dataKey: 'input_tokens', color: colors.accent, label: 'Input Tokens' },
+              { dataKey: 'output_tokens', color: colors.warning, label: 'Output Tokens' },
+            ]}
+          />
+
+          {contextData.top_users.length > 0 && (
+            <>
+              <h3 style={sectionHeading}>Top Users by Token Consumption</h3>
+              <ThemedBarChart
+                data={contextData.top_users.map(u => ({
+                  name: u.display_name,
+                  value: u.total_tokens,
+                }))}
+                colors={colors}
+                label="Tokens"
+                barColor={colors.accent}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && tab === 'context' && !contextData && (
+        <p style={{ color: colors.textSecondary }}>No token usage data available yet. Data will appear after agent interactions occur.</p>
       )}
     </div>
   )

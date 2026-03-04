@@ -338,4 +338,233 @@ router.post('/retention', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/analytics/overview-timeseries — daily DAU for last 30 days
+router.post('/overview-timeseries', async (req: Request, res: Response) => {
+  try {
+    const db = getSupabaseClient();
+    const day30 = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const [eventsRes, activityRes] = await Promise.all([
+      db.from('beta_analytics_events')
+        .select('user_id, created_at')
+        .gte('created_at', day30)
+        .not('user_id', 'is', null)
+        .limit(20000),
+      db.from('user_activity_log')
+        .select('user_id, created_at')
+        .gte('created_at', day30)
+        .not('user_id', 'is', null)
+        .limit(20000),
+    ]);
+
+    // Group unique users by date
+    const dailyUsers: Record<string, Set<string>> = {};
+    for (const row of [...(eventsRes.data || []), ...(activityRes.data || [])]) {
+      if (!row.user_id) continue;
+      const date = new Date(row.created_at).toISOString().slice(0, 10);
+      if (!dailyUsers[date]) dailyUsers[date] = new Set();
+      dailyUsers[date].add(row.user_id);
+    }
+
+    // Build sorted array for last 30 days
+    const timeseries: { date: string; dau: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      timeseries.push({ date, dau: dailyUsers[date]?.size ?? 0 });
+    }
+
+    res.json({ success: true, data: { timeseries } });
+  } catch (error) {
+    console.error('[ANALYTICS] Overview timeseries error:', error);
+    res.status(500).json({ error: 'Failed to fetch overview timeseries' });
+  }
+});
+
+// POST /api/analytics/agents-timeseries — daily agent interactions for last 30 days
+router.post('/agents-timeseries', async (req: Request, res: Response) => {
+  try {
+    const db = getSupabaseClient();
+    const day30 = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const { data: events } = await db.from('beta_analytics_events')
+      .select('event_name, created_at')
+      .in('event_name', ['interaction_responded', 'interaction_dismissed', 'chat_message_sent'])
+      .gte('created_at', day30)
+      .limit(10000);
+
+    // Group by date and event type
+    const dailyCounts: Record<string, { responded: number; dismissed: number; chat_messages: number }> = {};
+    for (const row of events || []) {
+      const date = new Date(row.created_at).toISOString().slice(0, 10);
+      if (!dailyCounts[date]) dailyCounts[date] = { responded: 0, dismissed: 0, chat_messages: 0 };
+      if (row.event_name === 'interaction_responded') dailyCounts[date].responded++;
+      else if (row.event_name === 'interaction_dismissed') dailyCounts[date].dismissed++;
+      else if (row.event_name === 'chat_message_sent') dailyCounts[date].chat_messages++;
+    }
+
+    const timeseries: { date: string; responded: number; dismissed: number; chat_messages: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      timeseries.push({
+        date,
+        responded: dailyCounts[date]?.responded ?? 0,
+        dismissed: dailyCounts[date]?.dismissed ?? 0,
+        chat_messages: dailyCounts[date]?.chat_messages ?? 0,
+      });
+    }
+
+    res.json({ success: true, data: { timeseries } });
+  } catch (error) {
+    console.error('[ANALYTICS] Agents timeseries error:', error);
+    res.status(500).json({ error: 'Failed to fetch agents timeseries' });
+  }
+});
+
+// POST /api/analytics/engagement-timeseries — daily page views & sessions for last 30 days
+router.post('/engagement-timeseries', async (req: Request, res: Response) => {
+  try {
+    const db = getSupabaseClient();
+    const day30 = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const { data: events } = await db.from('beta_analytics_events')
+      .select('event_name, session_id, created_at')
+      .in('event_name', ['page_view', 'session_start'])
+      .gte('created_at', day30)
+      .limit(10000);
+
+    const dailyCounts: Record<string, { page_views: number; sessionIds: Set<string> }> = {};
+    for (const row of events || []) {
+      const date = new Date(row.created_at).toISOString().slice(0, 10);
+      if (!dailyCounts[date]) dailyCounts[date] = { page_views: 0, sessionIds: new Set() };
+      if (row.event_name === 'page_view') dailyCounts[date].page_views++;
+      if (row.event_name === 'session_start' && row.session_id) dailyCounts[date].sessionIds.add(row.session_id);
+    }
+
+    const timeseries: { date: string; page_views: number; sessions: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      timeseries.push({
+        date,
+        page_views: dailyCounts[date]?.page_views ?? 0,
+        sessions: dailyCounts[date]?.sessionIds.size ?? 0,
+      });
+    }
+
+    res.json({ success: true, data: { timeseries } });
+  } catch (error) {
+    console.error('[ANALYTICS] Engagement timeseries error:', error);
+    res.status(500).json({ error: 'Failed to fetch engagement timeseries' });
+  }
+});
+
+// POST /api/analytics/context — token usage metrics for Context tab
+router.post('/context', async (req: Request, res: Response) => {
+  try {
+    const db = getSupabaseClient();
+    const day30 = new Date(Date.now() - 30 * 86400000).toISOString();
+
+    const { data: tokenRows } = await db.from('agent_token_usage')
+      .select('user_id, input_tokens, output_tokens, total_tokens, processing_time_ms, created_at')
+      .gte('created_at', day30)
+      .order('created_at', { ascending: false })
+      .limit(10000);
+
+    const rows = tokenRows || [];
+
+    // Totals
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalTokens = 0;
+    let totalProcessingMs = 0;
+    let processingCount = 0;
+
+    for (const row of rows) {
+      totalInput += row.input_tokens || 0;
+      totalOutput += row.output_tokens || 0;
+      totalTokens += row.total_tokens || 0;
+      if (row.processing_time_ms) {
+        totalProcessingMs += row.processing_time_ms;
+        processingCount++;
+      }
+    }
+
+    const totalInteractions = rows.length;
+    const avgTokensPerInteraction = totalInteractions > 0 ? Math.round(totalTokens / totalInteractions) : 0;
+    const avgProcessingTimeMs = processingCount > 0 ? Math.round(totalProcessingMs / processingCount) : 0;
+
+    // Estimated cost: GPT-5.1 pricing approximation ($2.50/1M input, $10/1M output)
+    const estCost = (totalInput / 1_000_000) * 2.5 + (totalOutput / 1_000_000) * 10;
+
+    // Daily token usage
+    const dailyTokens: Record<string, { input: number; output: number }> = {};
+    for (const row of rows) {
+      const date = new Date(row.created_at).toISOString().slice(0, 10);
+      if (!dailyTokens[date]) dailyTokens[date] = { input: 0, output: 0 };
+      dailyTokens[date].input += row.input_tokens || 0;
+      dailyTokens[date].output += row.output_tokens || 0;
+    }
+
+    const daily_usage: { date: string; input_tokens: number; output_tokens: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      daily_usage.push({
+        date,
+        input_tokens: dailyTokens[date]?.input ?? 0,
+        output_tokens: dailyTokens[date]?.output ?? 0,
+      });
+    }
+
+    // Top 10 users by token consumption
+    const userTokens: Record<string, number> = {};
+    for (const row of rows) {
+      if (!row.user_id) continue;
+      userTokens[row.user_id] = (userTokens[row.user_id] || 0) + (row.total_tokens || 0);
+    }
+
+    // Resolve display names for top users
+    const sortedUserIds = Object.entries(userTokens)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([id]) => id);
+
+    let topUsers: { user_id: string; display_name: string; total_tokens: number }[] = [];
+    if (sortedUserIds.length > 0) {
+      const { data: profiles } = await db.from('profile')
+        .select('id, display_name')
+        .in('id', sortedUserIds);
+
+      const nameMap: Record<string, string> = {};
+      for (const p of profiles || []) {
+        nameMap[p.id] = p.display_name || p.id.slice(0, 8);
+      }
+
+      topUsers = sortedUserIds.map(id => ({
+        user_id: id,
+        display_name: nameMap[id] || id.slice(0, 8),
+        total_tokens: userTokens[id],
+      }));
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totals: {
+          input_tokens: totalInput,
+          output_tokens: totalOutput,
+          total_tokens: totalTokens,
+          total_interactions: totalInteractions,
+          avg_tokens_per_interaction: avgTokensPerInteraction,
+          avg_processing_time_ms: avgProcessingTimeMs,
+          est_cost: Math.round(estCost * 100) / 100,
+        },
+        daily_usage,
+        top_users: topUsers,
+      },
+    });
+  } catch (error) {
+    console.error('[ANALYTICS] Context error:', error);
+    res.status(500).json({ error: 'Failed to fetch context analytics' });
+  }
+});
+
 export default router;
