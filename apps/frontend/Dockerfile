@@ -3,11 +3,11 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+# Copy package.json only (fresh install for correct platform binaries)
+COPY package.json ./
 
 # Install dependencies with legacy peer deps to handle React version conflicts
-RUN npm install --legacy-peer-deps && npm rebuild rollup
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application source code
 COPY . .
