@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
+import { trackEvent } from '../lib/analytics'
 import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
@@ -61,6 +62,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
   // Dismiss an interaction - remove from UI and mark as dismissed in backend
   const dismissInteraction = useCallback(async (interactionId: string) => {
     setInteractions(prev => prev.filter(i => i.id !== interactionId))
+    trackEvent('interaction_dismissed', 'agent', { interaction_id: interactionId })
 
     if (!session) return
     try {
@@ -218,6 +220,8 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
       }
 
       const responseData = await res.json()
+
+      trackEvent('interaction_responded', 'agent', { interaction_id: interactionId, response })
 
       // Remove the interaction from the list
       setInteractions(prev => prev.filter(i => i.id !== interactionId))

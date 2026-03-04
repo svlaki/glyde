@@ -1,5 +1,6 @@
 import { User } from '@supabase/supabase-js'
 import { apiCall, validateRequired, formatErrorMessage } from './apiUtils'
+import { trackEvent } from './analytics'
 
 export interface Goal {
   id: string
@@ -142,6 +143,7 @@ export async function createUserGoal(
       return { goal: null, error: data.error || 'Failed to create goal' }
     }
 
+    trackEvent('goal_created', 'engagement', { goal_id: data.goal?.id })
     return { goal: data.goal, error: null }
   } catch (error) {
     console.error('Error creating goal:', error)
@@ -260,6 +262,7 @@ export async function addGoalCheckIn(
       return { checkIn: null, error: data.error || 'Failed to add check-in' }
     }
 
+    trackEvent('goal_checkin', 'engagement', { goal_id: goalId })
     return { checkIn: data.checkIn, error: null }
   } catch (error) {
     console.error('Error adding goal check-in:', error)

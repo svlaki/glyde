@@ -19,6 +19,12 @@ export function convertToUTC(localTimeString: string, timezone: string): string 
     return toDate(localTimeString).toISOString();
   }
 
+  // Validate the date string before conversion — catch impossible dates like Feb 29 in non-leap years
+  const parsed = new Date(localTimeString);
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Invalid date: "${localTimeString}". Check for impossible dates (e.g. Feb 29 in a non-leap year).`);
+  }
+
   // Otherwise, treat as local time in the specified timezone and convert to UTC
   const utcDate = fromZonedTime(localTimeString, timezone);
 

@@ -4,7 +4,7 @@ import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { SupabaseService, ActivityLogEntry } from '../../services/SupabaseService.js';
+import { SupabaseService, ActivityLogEntry, getSupabaseClient } from '../../services/SupabaseService.js';
 import projectService from '../../services/ProjectService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
@@ -220,6 +220,31 @@ export class ConversationAgent extends BaseAgent {
 
       let response = lastAiMessage?.content || "Let me work on that for you...";
 
+      // Track token usage (fire-and-forget)
+      try {
+        const usage = lastAiMessage?.usage_metadata || lastAiMessage?.response_metadata?.tokenUsage;
+        if (usage) {
+          const inputTokens = usage.input_tokens ?? usage.promptTokens ?? 0;
+          const outputTokens = usage.output_tokens ?? usage.completionTokens ?? 0;
+          Promise.resolve(
+            getSupabaseClient()
+              .from('agent_token_usage')
+              .insert({
+                user_id: context.userId,
+                session_id: context.sessionId,
+                model_name: 'gpt-5.1',
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                total_tokens: inputTokens + outputTokens,
+              })
+          )
+            .then(() => console.log(`[TOKEN TRACKING] Recorded ${inputTokens + outputTokens} tokens for user ${context.userId}`))
+            .catch((err: any) => console.warn('[TOKEN TRACKING] Failed to record:', err));
+        }
+      } catch (err) {
+        console.warn('[TOKEN TRACKING] Error extracting usage:', err);
+      }
+
       // Add assistant response to Zep (user message was already added before context retrieval)
       try {
         await this.zepService.addAssistantMessage(context.userId, response);
@@ -399,6 +424,10 @@ IMPORTANT INSTRUCTIONS:
       });
 
       let fullResponse = '';
+      let streamInputTokens = 0;
+      let streamOutputTokens = 0;
+      const toolsUsed: string[] = [];
+      const streamStartTime = Date.now();
 
       for await (const event of eventStream) {
         // Handle text streaming from the model
@@ -408,12 +437,33 @@ IMPORTANT INSTRUCTIONS:
             fullResponse += chunk.content;
             yield { type: 'text-delta', content: chunk.content };
           }
+          // Accumulate token usage from streaming chunks (final chunk has totals)
+          if (chunk?.usage_metadata) {
+            if (chunk.usage_metadata.input_tokens) streamInputTokens = chunk.usage_metadata.input_tokens;
+            if (chunk.usage_metadata.output_tokens) streamOutputTokens = chunk.usage_metadata.output_tokens;
+          }
+        }
+
+        // Capture token usage from model end event (primary source for LangGraph streamEvents)
+        else if (event.event === 'on_chat_model_end') {
+          const output = event.data?.output;
+          if (output?.usage_metadata) {
+            streamInputTokens += output.usage_metadata.input_tokens || 0;
+            streamOutputTokens += output.usage_metadata.output_tokens || 0;
+          } else if (output?.response_metadata?.tokenUsage) {
+            const tu = output.response_metadata.tokenUsage;
+            streamInputTokens += tu.promptTokens || 0;
+            streamOutputTokens += tu.completionTokens || 0;
+          }
         }
 
         // Handle tool execution start
         else if (event.event === 'on_tool_start') {
-          console.log(`🔧 [STREAM] Tool starting: ${event.name}`);
+          console.log(`[STREAM] Tool starting: ${event.name}`);
           yield { type: 'tool-start', toolName: event.name };
+          if (event.name && !toolsUsed.includes(event.name)) {
+            toolsUsed.push(event.name);
+          }
         }
 
         // Handle tool execution end
@@ -421,6 +471,27 @@ IMPORTANT INSTRUCTIONS:
           console.log(`[STREAM] Tool completed: ${event.name}`);
           yield { type: 'tool-end', toolName: event.name, toolResult: event.data?.output };
         }
+      }
+
+      // Track token usage after streaming (fire-and-forget)
+      console.log(`[TOKEN TRACKING] Stream complete. Input: ${streamInputTokens}, Output: ${streamOutputTokens}, Tools: [${toolsUsed.join(', ')}]`);
+      if (streamInputTokens > 0 || streamOutputTokens > 0) {
+        Promise.resolve(
+          getSupabaseClient()
+            .from('agent_token_usage')
+            .insert({
+              user_id: context.userId,
+              session_id: context.sessionId,
+              model_name: 'gpt-5.1',
+              input_tokens: streamInputTokens,
+              output_tokens: streamOutputTokens,
+              total_tokens: streamInputTokens + streamOutputTokens,
+              tools_used: toolsUsed,
+              processing_time_ms: Date.now() - streamStartTime,
+            })
+        )
+          .then(() => console.log(`[TOKEN TRACKING] Recorded ${streamInputTokens + streamOutputTokens} tokens (stream) for user ${context.userId}`))
+          .catch((err: any) => console.warn('[TOKEN TRACKING] Failed to record:', err));
       }
 
       // Persist conversation to memory after streaming completes

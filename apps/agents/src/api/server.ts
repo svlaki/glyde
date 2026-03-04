@@ -1,5 +1,5 @@
 import { env, isDevelopment, ENV_PATH } from '../utils/env.js';
-import { initializeSupabase } from '../services/SupabaseService.js';
+import { initializeSupabase, getSupabaseService } from '../services/SupabaseService.js';
 
 // Set environment variables explicitly if needed
 const requiredEnvVars = [
@@ -68,6 +68,7 @@ import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { startReminderCheckerJob } from '../jobs/reminder-checker.js';
 import { authenticateRequest } from './middleware/auth.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
+import analyticsRouter from './analytics.js';
 import {
   getGoogleAuthUrl,
   handleGoogleCallback,
@@ -167,6 +168,47 @@ if (isDevelopment) {
     next();
   });
 }
+
+// Performance tracking middleware — logs slow requests (>1s) and errors to beta_analytics_events
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const start = Date.now();
+  const originalEnd = res.end;
+  let tracked = false;
+
+  res.end = function (this: express.Response, ...args: any[]) {
+    if (!tracked) {
+      tracked = true;
+      const duration = Date.now() - start;
+      const status = res.statusCode;
+
+      if (status >= 400 || duration > 1000) {
+        try {
+          const client = getSupabaseService().getClient();
+          Promise.resolve(
+            client.from('beta_analytics_events').insert({
+              user_id: req.authUserId || null,
+              event_name: status >= 400 ? 'api_error' : 'slow_request',
+              event_category: 'performance',
+              event_properties: {
+                method: req.method,
+                path: req.path,
+                status,
+                duration_ms: duration,
+              },
+              device_type: 'server',
+            })
+          ).catch(() => {});
+        } catch {
+          // Supabase not initialized yet (startup), skip
+        }
+      }
+    }
+
+    return originalEnd.apply(this, args as any);
+  } as any;
+
+  next();
+});
 
 // Authentication middleware - validates JWT and sets req.authUserId
 // This runs early to ensure protected routes have user context
@@ -390,6 +432,9 @@ app.use('/api/shared-aspects', sharedAspectsRouter);
 
 // Shared events endpoints
 app.use('/api/shared-events', sharedEventsRouter);
+
+// Admin analytics endpoints
+app.use('/api/analytics', analyticsRouter);
 
 // Connections endpoints (for calendar sync)
 app.post('/api/connections', getConnections);
