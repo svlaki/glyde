@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface CalendarEvent {
   id: string
@@ -171,6 +172,7 @@ export async function createEvent(
       return { event: null, error: data.error }
     }
 
+    trackEvent('event_created', 'engagement', { event_id: data.event?.id })
     return { event: data.event, error: null };
 
   } catch (err: any) {
@@ -231,6 +233,7 @@ export async function updateEvent(
       return { event: null, error: data.error };
     }
 
+    trackEvent('event_updated', 'engagement', { event_id: eventId })
     return { event: data.event, error: null };
   } catch (err: any) {
     console.error('Unexpected error in updateEvent:', err);
@@ -282,6 +285,7 @@ export async function deleteEvent(
     const data = await response.json();
 
     if (data.success) {
+      trackEvent('event_deleted', 'engagement', { event_id: eventId })
       return { success: true, error: null };
     } else {
       return { success: false, error: data.error || 'Unknown error' };

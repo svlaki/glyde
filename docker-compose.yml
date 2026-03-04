@@ -26,6 +26,7 @@ services:
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
       - MICROSOFT_REDIRECT_URI=${MICROSOFT_REDIRECT_URI:-${GOOGLE_CONNECTION_CALLBACK_URI:-${GOOGLE_REDIRECT_URI}}}
       - API_BASE_URL=${API_BASE_URL}
+      - ADMIN_USER_IDS=${VITE_ADMIN_USER_IDS}
     # healthcheck:
     #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
     #   interval: 30s
@@ -53,6 +54,7 @@ services:
       - VITE_SUPABASE_URL=${SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - VITE_AGENT_SERVICE_URL=http://localhost:8000
+      - VITE_ADMIN_USER_IDS=${VITE_ADMIN_USER_IDS}
     depends_on:
       agent:
         condition: service_started

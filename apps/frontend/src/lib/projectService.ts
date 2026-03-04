@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Project {
   id: string
@@ -77,6 +78,7 @@ export async function createUserProject(
     const data = await response.json()
     if (!response.ok) return { project: null, error: data.error || 'Failed to create project' }
 
+    trackEvent('project_created', 'engagement', { project_id: data.project?.id })
     return { project: data.project, error: null }
   } catch (error) {
     return { project: null, error: 'Failed to create project' }

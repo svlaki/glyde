@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Rule {
   id: string
@@ -123,6 +124,7 @@ export async function createRule(
     const data = await response.json()
 
     if (data.success) {
+      trackEvent('rule_created', 'engagement', { rule_id: data.rule?.id })
       return { rule: data.rule, error: null }
     } else {
       return { rule: null, error: data.error || 'Unknown error' }

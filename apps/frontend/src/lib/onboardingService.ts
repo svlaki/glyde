@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
@@ -96,6 +97,7 @@ export async function completeOnboarding(
     }
 
     console.log('Onboarding completed successfully')
+    trackEvent('onboarding_complete', 'engagement')
     return { success: true }
   } catch (error) {
     console.error('🔴 Error completing onboarding:', error)
@@ -146,6 +148,7 @@ export async function saveOnboardingStep(
       return { success: false, error: result.error || 'Failed to save step' }
     }
 
+    trackEvent('onboarding_step', 'engagement', { step })
     return { success: true }
   } catch (error) {
     console.error('Error saving onboarding step:', error)

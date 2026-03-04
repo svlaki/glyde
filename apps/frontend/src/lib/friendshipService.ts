@@ -42,6 +42,8 @@ interface ApiResponse<T> {
   error?: string
 }
 
+import { trackEvent } from './analytics'
+
 const API_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://localhost:8000'
 
 export async function sendFriendRequest(
@@ -64,6 +66,7 @@ export async function sendFriendRequest(
     }
 
     const data = await response.json()
+    if (data.success) trackEvent('friend_request_sent', 'engagement')
     return data
   } catch (error) {
     console.error('Error sending friend request:', error)
@@ -90,6 +93,7 @@ export async function acceptFriendRequest(
     }
 
     const data = await response.json()
+    if (data.success) trackEvent('friend_request_accepted', 'engagement')
     return data
   } catch (error) {
     console.error('Error accepting friend request:', error)
