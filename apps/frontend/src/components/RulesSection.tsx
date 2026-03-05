@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { useRules } from '../lib/ruleContext'
-import { Rule } from '../lib/ruleService'
+import type { Rule } from '../lib/ruleService'
 import { RuleCard } from './RuleCard'
 import { RuleForm } from './RuleForm'
 import { EmptyState } from './EmptyState'
