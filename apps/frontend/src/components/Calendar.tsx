@@ -173,6 +173,21 @@ export function Calendar() {
     }
   }
 
+  // Get all-day events for a specific date (must be declared before allDayBannerInfo IIFE)
+  const getAllDayEventsForDate = (date: Date) => {
+    return allEvents.filter(event => {
+      if (!event.is_all_day) return false
+      const eventStart = new Date(event.start_time)
+      const eventEnd = new Date(event.end_time)
+      // All-day event spans this date if: start <= end-of-day AND end >= start-of-day
+      const dayStart = new Date(date)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(date)
+      dayEnd.setHours(23, 59, 59, 999)
+      return eventStart <= dayEnd && eventEnd > dayStart
+    }).sort((a, b) => a.title.localeCompare(b.title))
+  }
+
   const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getWeekDates(currentDate) : getMonthDates(currentDate)
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
@@ -288,20 +303,6 @@ export function Calendar() {
     return `${displayHour}${ampm}`
   }
 
-  // Get all-day events for a specific date
-  const getAllDayEventsForDate = (date: Date) => {
-    return allEvents.filter(event => {
-      if (!event.is_all_day) return false
-      const eventStart = new Date(event.start_time)
-      const eventEnd = new Date(event.end_time)
-      // All-day event spans this date if: start <= end-of-day AND end >= start-of-day
-      const dayStart = new Date(date)
-      dayStart.setHours(0, 0, 0, 0)
-      const dayEnd = new Date(date)
-      dayEnd.setHours(23, 59, 59, 999)
-      return eventStart <= dayEnd && eventEnd > dayStart
-    }).sort((a, b) => a.title.localeCompare(b.title))
-  }
 
   // Get timed (non-all-day) events for a specific date and hour
   const getEventsForSlot = (date: Date, hour: number) => {
