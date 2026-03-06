@@ -1,5 +1,5 @@
 import "./src/styles/globals.css"
-import React, { useEffect, useRef } from 'react'
+import React, { Suspense, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './src/lib/authContext'
@@ -19,7 +19,7 @@ import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
 import { RatingsPage } from './src/pages/RatingsPage'
 import { RemindersPage } from './src/pages/RemindersPage'
-import { AdminAnalyticsPage } from './src/pages/AdminAnalyticsPage'
+const AdminAnalyticsPage = React.lazy(() => import('./src/pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })))
 import { ProjectProvider } from './src/lib/projectContext'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
@@ -217,7 +217,9 @@ function App() {
                   path="/admin/analytics"
                   element={
                     <ProtectedRoute>
-                      <AdminAnalyticsPage />
+                      <Suspense fallback={<div style={{ padding: '64px', textAlign: 'center' }}>Loading...</div>}>
+                        <AdminAnalyticsPage />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />

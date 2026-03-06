@@ -75,15 +75,7 @@ export function AdminAnalyticsPage() {
   const { theme } = useTheme()
   const colors = getColors(theme)
 
-  // Frontend admin guard — API also enforces this server-side
-  if (!user || !ADMIN_USER_IDS.includes(user.id)) {
-    return (
-      <div style={{ padding: '64px', textAlign: 'center', color: colors.textSecondary }}>
-        <h2>Access Denied</h2>
-        <p>You do not have permission to view this page.</p>
-      </div>
-    )
-  }
+  const isAdmin = !!user && ADMIN_USER_IDS.includes(user.id)
 
   const [tab, setTab] = useState<Tab>('overview')
   const [loading, setLoading] = useState(false)
@@ -174,8 +166,18 @@ export function AdminAnalyticsPage() {
   }, [fetchData])
 
   useEffect(() => {
-    loadTab(tab)
-  }, [tab, loadTab])
+    if (isAdmin) loadTab(tab)
+  }, [tab, loadTab, isAdmin])
+
+  // Frontend admin guard — API also enforces this server-side
+  if (!isAdmin) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', color: colors.textSecondary }}>
+        <h2>Access Denied</h2>
+        <p>You do not have permission to view this page.</p>
+      </div>
+    )
+  }
 
   const cardStyle: React.CSSProperties = {
     background: colors.bgSecondary,
