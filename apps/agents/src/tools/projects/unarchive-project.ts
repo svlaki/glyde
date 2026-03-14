@@ -18,9 +18,9 @@ export const unarchiveProjectTool = tool(
   },
   {
     name: "unarchive_project",
-    description: "Restore an archived project back to active status. Use this when the user wants to reactivate a previously archived project.",
+    description: "Restore an archived project.",
     schema: z.object({
-      project_id: z.string().describe("UUID of the archived project to restore"),
+      project_id: z.string().describe("Project UUID"),
     }),
   }
 );

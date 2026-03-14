@@ -14,9 +14,10 @@ import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { reverseGeocode } from '../../tools/search/location-search.js';
-import { buildSystemPrompt } from './prompts.js';
+import { buildSystemPrompt, buildSummaryContext } from './prompts.js';
 import { DatabaseProfile, DatabaseAspect } from '../../types/database.js';
 import { FriendshipService } from '../../services/FriendshipService.js';
+import { ContextRouter, RoutingDecision } from './ContextRouter.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -78,15 +79,29 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
+  routingDecision: Annotation<RoutingDecision | null>({
+    reducer: (_existing, update) => update ?? _existing,
+    default: () => null,
+  }),
+  zepContext: Annotation<string>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => '',
+  }),
+  rulesContext: Annotation<string>({
+    reducer: (_existing, update) => update || _existing,
+    default: () => '',
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
 
 export class ConversationAgent extends BaseAgent {
   private graph: any;
+  private contextRouter: ContextRouter;
 
   constructor() {
     super('conversation', "gpt-5.1"); // Use GPT-5.1 for best intelligence
+    this.contextRouter = new ContextRouter();
     this.graph = this.createGraph();
   }
 
@@ -96,39 +111,51 @@ export class ConversationAgent extends BaseAgent {
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
     try {
+      // Step 1: Route the message to determine what context/tools are needed
+      const recentMsgs = context.conversationHistory?.slice(-2).map(m =>
+        typeof m.content === 'string' ? m.content : ''
+      );
+      const routingDecision = await this.contextRouter.route(message, recentMsgs);
+      console.log(`[ROUTER] needs_tools=${routingDecision.needs_tools} tools=[${routingDecision.tools?.join(', ') || ''}] mode=${routingDecision.context_mode} | Categories: [${routingDecision.tool_categories.join(', ')}] | Prompts: [${routingDecision.prompt_sections.join(', ')}]`);
+
       // Load memory context using Graphiti
       const memoryContext = await this.loadMemoryContext(context, 'conversation');
 
       // Pre-load user data for LangGraph context
       const supabaseService = new SupabaseService();
 
-      // Parallel data fetching for better performance
+      // Conditional data fetching based on routing decision
+      const ctx = routingDecision.context_sections;
+
       const reverseGeocodePromise = context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
+      // Always fetch: profile, events, tasks, goals, aspects (core data)
+      // Conditionally fetch: projects, activity, ratings, friends
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, ...conditionalResults] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        projectService.getProjects(context.userId),
-        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
-        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
+        // Conditional fetches — return null/[] if not needed
+        ctx.projects ? projectService.getProjects(context.userId) : Promise.resolve([]),
+        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'user', 30, 20) : Promise.resolve([]),
+        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'agent', 60, 5) : Promise.resolve([]),
         reverseGeocodePromise,
-        supabaseService.getRatingSummary(context.userId),
-        friendshipService.getFriends(context.userId),
+        ctx.ratings ? supabaseService.getRatingSummary(context.userId) : Promise.resolve([]),
+        ctx.friends ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
       ]);
 
-      const userFriends = friendsResult.success ? friendsResult.data || [] : [];
+      const [userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = conditionalResults;
+      const userFriends = (friendsResult as any)?.success ? (friendsResult as any).data || [] : [];
 
       // Resolve timezone with validation
       let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      // Validate timezone - fall back to UTC if invalid
       if (!isValidTimezone(userTimezone)) {
         console.error(`[CONVERSATION AGENT] Invalid timezone "${userTimezone}", falling back to UTC`);
         userTimezone = 'UTC';
@@ -145,54 +172,83 @@ export class ConversationAgent extends BaseAgent {
         console.warn('Failed to add user message to Zep:', error);
       }
 
-      // Filter and limit events (max 15 future/ongoing events)
+      // Fetch Zep + rules ONCE here (not inside callModel which loops)
+      let zepContext = '';
+      try {
+        const threadId = await this.zepService.getOrCreateSession(context.userId);
+        const rawZep = await this.zepService.getThreadContext(threadId);
+        // Cap Zep context to ~2000 chars (~500 tokens) to prevent bloat
+        zepContext = rawZep.length > 2000 ? rawZep.slice(0, 2000) + '\n[context truncated]' : rawZep;
+        console.log(`[CONVERSATION AGENT] Zep context: ${rawZep.length} chars${rawZep.length > 2000 ? ' (truncated to 2000)' : ''}`);
+      } catch (error) {
+        console.warn('Failed to load Zep context:', error);
+      }
+
+      let rulesCtx = '';
+      if (routingDecision.context_sections.rules) {
+        try {
+          const userRules = await ruleService.getRules(context.userId);
+          if (userRules.length > 0) {
+            rulesCtx = ruleService.formatRulesForPrompt(userRules);
+          }
+        } catch (error) {
+          console.warn('Failed to load rules:', error);
+        }
+      }
+
+      // Filter and limit events: future/ongoing (max 15) + recent past 24h (max 5)
       const now = new Date();
-      const userEvents = allEvents
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const futureEvents = allEvents
         .filter((event: any) => new Date(event.end_time) >= now)
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
         .slice(0, 15);
-      console.log(`Loading ${userEvents?.length || 0} future/ongoing events (limited from ${allEvents?.length || 0} total) for user ${context.userId}`);
+      const recentPastEvents = allEvents
+        .filter((event: any) => {
+          const endTime = new Date(event.end_time);
+          return endTime < now && endTime >= twentyFourHoursAgo;
+        })
+        .sort((a: any, b: any) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime())
+        .slice(0, 5); // 5 most recent past events
+      const userEvents = [...recentPastEvents, ...futureEvents];
 
       // Limit tasks (max 10)
       const userTasks = allTasks.slice(0, 10);
-      console.log(`Loading ${userTasks?.length || 0} tasks (limited from ${allTasks?.length || 0} total) for user ${context.userId}`);
 
       // Limit goals (max 8)
       const userGoals = allGoals.slice(0, 8);
-      console.log(`Loading ${userGoals?.length || 0} goals (limited from ${allGoals?.length || 0} total) for user ${context.userId}`);
 
-      console.log(`Loading ${userAspects?.length || 0} aspects for user ${context.userId}`);
-      console.log(`Loading ${recentUserActivity?.length || 0} recent user activities, ${recentAgentActivity?.length || 0} recent agent activities`);
+      console.log(`[CONVERSATION AGENT] Loaded: ${userEvents.length} events (${recentPastEvents.length} past + ${futureEvents.length} future), ${userTasks.length} tasks, ${userGoals.length} goals, ${userAspects?.length || 0} aspects`);
 
-      // Build conversation history from context
+      // Build conversation history — 6 messages (3 exchanges) instead of 10
       const messages: BaseMessage[] = [];
-      
-      // Add conversation history if available
+
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        // Keep last 10 messages for context (5 exchanges)
-        const recentHistory = context.conversationHistory.slice(-10);
+        const recentHistory = context.conversationHistory.slice(-6);
         for (const msg of recentHistory) {
           if (msg.role === 'user') {
-            // Handle multipart content (text + images from recent messages)
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
             } else {
               messages.push(new HumanMessage(msg.content));
             }
           } else if (msg.role === 'assistant') {
+            // Truncate long assistant messages in history
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            messages.push(new AIMessage(textContent));
+            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
+            messages.push(new AIMessage(truncated));
           }
         }
       }
 
       // Add the current message
       messages.push(new HumanMessage(message));
-      
+
       // Invoke LangGraph with enhanced context including proper timezone
       const result = await this.graph.invoke({
         messages: messages,
         userId: context.userId,
-        timezone: userTimezone, // Use resolved timezone from profile, context, or UTC fallback
+        timezone: userTimezone,
         userEvents: userEvents || [],
         userTasks: userTasks || [],
         userGoals: userGoals || [],
@@ -206,7 +262,9 @@ export class ConversationAgent extends BaseAgent {
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
         userFriends: userFriends || [],
-        // Add Graphiti memory context
+        routingDecision: routingDecision,
+        zepContext: zepContext,
+        rulesContext: rulesCtx,
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
@@ -220,12 +278,22 @@ export class ConversationAgent extends BaseAgent {
 
       let response = lastAiMessage?.content || "Let me work on that for you...";
 
-      // Track token usage (fire-and-forget)
+      // Track token usage — aggregate across ALL AI messages (not just the last one)
+      // The agent may loop through tools multiple times, each producing an AI message with its own usage
       try {
-        const usage = lastAiMessage?.usage_metadata || lastAiMessage?.response_metadata?.tokenUsage;
-        if (usage) {
-          const inputTokens = usage.input_tokens ?? usage.promptTokens ?? 0;
-          const outputTokens = usage.output_tokens ?? usage.completionTokens ?? 0;
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
+        let modelCallCount = 0;
+        for (const msg of aiMessages) {
+          const usage = msg?.usage_metadata || msg?.response_metadata?.tokenUsage;
+          if (usage) {
+            totalInputTokens += usage.input_tokens ?? usage.promptTokens ?? 0;
+            totalOutputTokens += usage.output_tokens ?? usage.completionTokens ?? 0;
+            modelCallCount++;
+          }
+        }
+        if (totalInputTokens > 0 || totalOutputTokens > 0) {
+          console.log(`[TOKEN TRACKING] processMessage: ${modelCallCount} model calls, input=${totalInputTokens}, output=${totalOutputTokens}`);
           Promise.resolve(
             getSupabaseClient()
               .from('agent_token_usage')
@@ -233,12 +301,13 @@ export class ConversationAgent extends BaseAgent {
                 user_id: context.userId,
                 session_id: context.sessionId,
                 model_name: 'gpt-5.1',
-                input_tokens: inputTokens,
-                output_tokens: outputTokens,
-                total_tokens: inputTokens + outputTokens,
+                input_tokens: totalInputTokens,
+                output_tokens: totalOutputTokens,
+                total_tokens: totalInputTokens + totalOutputTokens,
+                model_calls: modelCallCount,
               })
           )
-            .then(() => console.log(`[TOKEN TRACKING] Recorded ${inputTokens + outputTokens} tokens for user ${context.userId}`))
+            .then(() => console.log(`[TOKEN TRACKING] Recorded ${totalInputTokens + totalOutputTokens} tokens for user ${context.userId}`))
             .catch((err: any) => console.warn('[TOKEN TRACKING] Failed to record:', err));
         }
       } catch (err) {
@@ -300,81 +369,117 @@ IMPORTANT INSTRUCTIONS:
       // Immediately yield status so user sees activity
       yield { type: 'status', content: 'Loading your context...' };
 
-      const supabaseService = new SupabaseService();
+      // Step 1: Route the message (cheap GPT-4.1-nano call)
+      const recentMsgs = context.conversationHistory?.slice(-2).map(m =>
+        typeof m.content === 'string' ? m.content : ''
+      );
+      const routingDecision = await this.contextRouter.route(message, recentMsgs);
+      console.log(`[ROUTER] needs_tools=${routingDecision.needs_tools} tools=[${routingDecision.tools?.join(', ') || ''}] mode=${routingDecision.context_mode} | Categories: [${routingDecision.tool_categories.join(', ')}] | Prompts: [${routingDecision.prompt_sections.join(', ')}]`);
 
-      // Parallel data fetching - run all async operations concurrently
-      // This significantly reduces time-to-first-token
-      // Also reverse-geocode user's location if available
+      const supabaseService = new SupabaseService();
+      const ctx = routingDecision.context_sections;
+
+      // Parallel data fetching — conditional based on routing
       const reverseGeocodePromise = context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, ...conditionalResults] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        projectService.getProjects(context.userId),
-        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
-        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
+        // Conditional fetches
+        ctx.projects ? projectService.getProjects(context.userId) : Promise.resolve([]),
+        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'user', 30, 20) : Promise.resolve([]),
+        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'agent', 60, 5) : Promise.resolve([]),
         reverseGeocodePromise,
-        supabaseService.getRatingSummary(context.userId),
-        friendshipService.getFriends(context.userId),
+        ctx.ratings ? supabaseService.getRatingSummary(context.userId) : Promise.resolve([]),
+        ctx.friends ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
       ]);
 
-      const userFriends = friendsResult.success ? friendsResult.data || [] : [];
+      const [userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = conditionalResults;
+      const userFriends = (friendsResult as any)?.success ? (friendsResult as any).data || [] : [];
 
       // Resolve timezone with validation
       let userTimezone = userProfile?.timezone || context.timezone || 'UTC';
 
-      // Validate timezone - fall back to UTC if invalid
       if (!isValidTimezone(userTimezone)) {
-        console.error(`🌊 [CONVERSATION AGENT] Invalid timezone "${userTimezone}", falling back to UTC`);
+        console.error(`[CONVERSATION AGENT] Invalid timezone "${userTimezone}", falling back to UTC`);
         userTimezone = 'UTC';
       }
 
-      console.log(`🌊 [CONVERSATION AGENT] Streaming with validated timezone: ${userTimezone}`);
+      console.log(`[CONVERSATION AGENT] Streaming with validated timezone: ${userTimezone}`);
 
-      // Filter and limit events (max 15 future/ongoing events)
+      // Fetch Zep + rules ONCE here (not inside callModel which loops)
+      let zepContext = '';
+      try {
+        const threadId = await this.zepService.getOrCreateSession(context.userId);
+        const rawZep = await this.zepService.getThreadContext(threadId);
+        zepContext = rawZep.length > 2000 ? rawZep.slice(0, 2000) + '\n[context truncated]' : rawZep;
+        console.log(`[CONVERSATION AGENT] Zep context: ${rawZep.length} chars${rawZep.length > 2000 ? ' (truncated to 2000)' : ''}`);
+      } catch (error) {
+        console.warn('Failed to load Zep context:', error);
+      }
+
+      let rulesCtx = '';
+      if (routingDecision.context_sections.rules) {
+        try {
+          const userRules = await ruleService.getRules(context.userId);
+          if (userRules.length > 0) {
+            rulesCtx = ruleService.formatRulesForPrompt(userRules);
+          }
+        } catch (error) {
+          console.warn('Failed to load rules:', error);
+        }
+      }
+
+      // Filter and limit events: future/ongoing (max 15) + recent past 24h (max 5)
       const now = new Date();
-      const userEvents = allEvents
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const futureEvents = allEvents
         .filter((event: any) => new Date(event.end_time) >= now)
+        .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
         .slice(0, 15);
+      const recentPastEvents = allEvents
+        .filter((event: any) => {
+          const endTime = new Date(event.end_time);
+          return endTime < now && endTime >= twentyFourHoursAgo;
+        })
+        .sort((a: any, b: any) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime())
+        .slice(0, 5); // 5 most recent past events
+      const userEvents = [...recentPastEvents, ...futureEvents];
 
       // Limit tasks and goals
       const userTasks = allTasks.slice(0, 10);
       const userGoals = allGoals.slice(0, 8);
 
-      // Build conversation history from context
+      // Build conversation history — 6 messages (3 exchanges) instead of 10
       const messages: BaseMessage[] = [];
 
-      // Add conversation history if available
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        // Keep last 10 messages for context (5 exchanges)
-        const recentHistory = context.conversationHistory.slice(-10);
+        const recentHistory = context.conversationHistory.slice(-6);
         for (const msg of recentHistory) {
           if (msg.role === 'user') {
-            // Handle multipart content (text + images from recent messages)
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
             } else {
               messages.push(new HumanMessage(msg.content));
             }
           } else if (msg.role === 'assistant') {
-            // Assistant messages are always text-only
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            messages.push(new AIMessage(textContent));
+            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
+            messages.push(new AIMessage(truncated));
           }
         }
       }
 
       // Add the current message (with images if present)
       if (images.length > 0) {
-        // Build multipart content for vision
         const contentParts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string; detail?: string } }> = [
           { type: 'text', text: message }
         ];
@@ -408,6 +513,9 @@ IMPORTANT INSTRUCTIONS:
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
         userFriends: userFriends || [],
+        routingDecision: routingDecision,
+        zepContext: zepContext,
+        rulesContext: rulesCtx,
         memoryContext: memoryContext.graphiti ? {
           userNodeUuid: memoryContext.graphiti.userNodeUuid,
           relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
@@ -426,6 +534,7 @@ IMPORTANT INSTRUCTIONS:
       let fullResponse = '';
       let streamInputTokens = 0;
       let streamOutputTokens = 0;
+      let modelCallCount = 0;
       const toolsUsed: string[] = [];
       const streamStartTime = Date.now();
 
@@ -437,23 +546,22 @@ IMPORTANT INSTRUCTIONS:
             fullResponse += chunk.content;
             yield { type: 'text-delta', content: chunk.content };
           }
-          // Accumulate token usage from streaming chunks (final chunk has totals)
-          if (chunk?.usage_metadata) {
-            if (chunk.usage_metadata.input_tokens) streamInputTokens = chunk.usage_metadata.input_tokens;
-            if (chunk.usage_metadata.output_tokens) streamOutputTokens = chunk.usage_metadata.output_tokens;
-          }
+          // Skip token tracking from stream chunks — use on_chat_model_end only to avoid double counting
         }
 
-        // Capture token usage from model end event (primary source for LangGraph streamEvents)
+        // Capture token usage from model end event (single source of truth)
         else if (event.event === 'on_chat_model_end') {
+          modelCallCount++;
           const output = event.data?.output;
           if (output?.usage_metadata) {
             streamInputTokens += output.usage_metadata.input_tokens || 0;
             streamOutputTokens += output.usage_metadata.output_tokens || 0;
+            console.log(`[TOKEN TRACKING] Model call #${modelCallCount}: input=${output.usage_metadata.input_tokens}, output=${output.usage_metadata.output_tokens}`);
           } else if (output?.response_metadata?.tokenUsage) {
             const tu = output.response_metadata.tokenUsage;
             streamInputTokens += tu.promptTokens || 0;
             streamOutputTokens += tu.completionTokens || 0;
+            console.log(`[TOKEN TRACKING] Model call #${modelCallCount}: input=${tu.promptTokens}, output=${tu.completionTokens}`);
           }
         }
 
@@ -474,7 +582,7 @@ IMPORTANT INSTRUCTIONS:
       }
 
       // Track token usage after streaming (fire-and-forget)
-      console.log(`[TOKEN TRACKING] Stream complete. Input: ${streamInputTokens}, Output: ${streamOutputTokens}, Tools: [${toolsUsed.join(', ')}]`);
+      console.log(`[TOKEN TRACKING] Stream complete. ${modelCallCount} model calls. Total input: ${streamInputTokens}, output: ${streamOutputTokens}, Tools: [${toolsUsed.join(', ')}]`);
       if (streamInputTokens > 0 || streamOutputTokens > 0) {
         Promise.resolve(
           getSupabaseClient()
@@ -486,6 +594,7 @@ IMPORTANT INSTRUCTIONS:
               input_tokens: streamInputTokens,
               output_tokens: streamOutputTokens,
               total_tokens: streamInputTokens + streamOutputTokens,
+              model_calls: modelCallCount,
               tools_used: toolsUsed,
               processing_time_ms: Date.now() - streamStartTime,
             })
@@ -525,196 +634,208 @@ ${lines.join('\n')}
 Use these scores to understand how the user feels about different areas of their life. If a score is declining, proactively suggest improvements.`;
   }
 
+  /**
+   * Format event context with compressed format
+   */
+  private formatEventContext(events: any[], timezone: string): string {
+    if (events.length === 0) return '\n\nCALENDAR: No events';
+
+    const lines = events.map(e => {
+      const startDate = toDate(e.start_time);
+      const endDate = toDate(e.end_time);
+      const dateStr = formatInTimeZone(startDate, timezone, 'EEE M/d');
+      const startTime = formatInTimeZone(startDate, timezone, 'h:mma').toLowerCase();
+      const endTime = formatInTimeZone(endDate, timezone, 'h:mma').toLowerCase();
+      const loc = e.location ? ` @${e.location}` : '';
+      const aspect = e.aspect ? ` [${e.aspect}]` : '';
+      return `- "${e.title}" ${dateStr} ${startTime}-${endTime}${loc}${aspect} #${e.id}`;
+    });
+
+    return `\n\nCALENDAR (${events.length}):\n${lines.join('\n')}`;
+  }
+
+  /**
+   * Format task context with compressed format
+   */
+  private formatTaskContext(tasks: any[], timezone: string): string {
+    if (tasks.length === 0) return '\n\nTASKS: None';
+
+    const lines = tasks.map((t, i) => {
+      const due = t.due_date ? ` due:${formatInTimeZone(toDate(t.due_date), timezone, 'M/d')}` : '';
+      const pri = t.priority ? ` [${t.priority[0].toUpperCase()}]` : '';
+      const status = t.status === 'completed' ? ' [done]' : t.status === 'in_progress' ? ' [wip]' : '';
+      const aspect = t.aspect ? ` {${t.aspect}}` : '';
+      return `${i + 1}. ${t.title}${pri}${due}${status}${aspect} #${t.id}`;
+    });
+
+    return `\n\nTASKS (${tasks.length}):\n${lines.join('\n')}`;
+  }
+
+  /**
+   * Format goal context with compressed format
+   */
+  private formatGoalContext(goals: any[], timezone: string): string {
+    if (goals.length === 0) return '\n\nGOALS: None';
+
+    const lines = goals.map((g, i) => {
+      const target = g.target_date ? ` by:${formatInTimeZone(toDate(g.target_date), timezone, 'MMM d')}` : '';
+      const progress = g.progress != null ? ` ${g.progress}%` : '';
+      const status = g.status ? ` [${g.status}]` : '';
+      const aspect = g.aspect ? ` (${g.aspect})` : '';
+      return `${i + 1}. ${g.title}${status}${progress}${target}${aspect} #${g.id}`;
+    });
+
+    return `\n\nGOALS (${goals.length}):\n${lines.join('\n')}`;
+  }
+
   private createGraph(): any {
     // Get all tools from ToolRegistry (centralized tool management)
     const toolRegistry = ToolRegistry.getInstance();
-    const tools = toolRegistry.getAllTools();
-    const toolNode = new ToolNode(tools);
+    const allTools = toolRegistry.getAllTools();
 
-    // Bind tools to the model
-    const modelWithTools = this.model.bindTools(tools);
+    // ToolNode always has ALL tools (can execute anything the model requests)
+    const toolNode = new ToolNode(allTools);
 
     // Register tools with the base agent
-    this.registerTools(tools);
+    this.registerTools(allTools);
 
-    console.log(`🔧 [CONVERSATION AGENT] Loaded ${tools.length} tools from ToolRegistry`);
+    console.log(`[CONVERSATION AGENT] Loaded ${allTools.length} tools from ToolRegistry`);
+
+    // Slim continuation prompt for tool re-entry (saves ~3K tokens per loop)
+    const CONTINUATION_PROMPT = `You are Glyde, a life assistant. You just executed tools. Respond to the user based on the tool results. Be concise (1-3 sentences). Use 12-hour AM/PM for times.`;
 
     // Define the workflow nodes
     const callModel = async (state: ConversationStateType) => {
-      // Load recent events for context using SupabaseService
-      let recentEvents: any[] = [];
+      // Detect if this is a re-entry after tool execution
+      const lastMsg = state.messages[state.messages.length - 1];
+      const isToolReentry = lastMsg?._getType() === 'tool';
 
-      // Use pre-loaded events if available, otherwise fetch them
-      if (state.userEvents && state.userEvents.length > 0) {
-        recentEvents = state.userEvents;
-        console.log(`Using ${recentEvents.length} pre-loaded events for context`);
+      // Dynamic tool binding based on routing decision
+      const routing = state.routingDecision;
+      const needsTools = routing?.needs_tools !== false; // default true for safety
+
+      let selectedTools: any[] = [];
+      if (needsTools) {
+        // Use specific tool names + categories for precise binding
+        if (routing?.tools?.length || routing?.tool_categories?.length) {
+          selectedTools = toolRegistry.getToolsForRouting(routing?.tools, routing?.tool_categories);
+        } else {
+          selectedTools = allTools;
+        }
+      }
+
+      // Zero-tool mode: invoke without bindTools when no tools needed
+      const model = needsTools && selectedTools.length > 0
+        ? this.model.bindTools(selectedTools)
+        : this.model;
+
+      let messages: BaseMessage[];
+
+      if (isToolReentry) {
+        // RE-ENTRY: Use slim continuation prompt (saves ~3K+ tokens)
+        messages = [new SystemMessage(CONTINUATION_PROMPT), ...state.messages];
+        console.log(`[AGENT NODE] Tool re-entry: slim prompt, ${messages.length} messages (${selectedTools.length} tools)`);
       } else {
-        try {
-          const supabaseService = new SupabaseService();
-          // Filter to only include events that haven't ended yet (including ongoing multi-day events)
-          const now = new Date();
-          const allEventsData = await supabaseService.getEventsForAgent(state.userId);
-          const eventsData = allEventsData.filter(event => new Date(event.end_time) >= now);
+        // FIRST CALL: Build system prompt based on context mode
+        const contextMode = routing?.context_mode || 'full';
 
-          if (eventsData && eventsData.length > 0) {
-            recentEvents = eventsData;
-            console.log(`Found ${recentEvents.length} future/ongoing events (filtered from ${allEventsData.length} total) for user context`);
+        const nowUtc = new Date();
+        const todayFormatted = formatInTimeZone(nowUtc, state.timezone, 'yyyy-MM-dd');
+        const tomorrowDayName = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'EEEE');
+        const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
+
+        if (contextMode === 'summary' && !needsTools) {
+          // SUMMARY MODE: Compact prompt, no tools, minimal context
+          const summaryCtx = buildSummaryContext(
+            state.userEvents || [],
+            state.userTasks || [],
+            state.userGoals || [],
+            state.timezone
+          );
+
+          const systemMessage = buildSystemPrompt({
+            timezone: state.timezone,
+            eventContext: '',
+            taskContext: '',
+            goalContext: '',
+            todayFormatted,
+            tomorrowFormatted,
+            tomorrowDayName,
+            messageCount: state.messages.length,
+            zepGraphContext: state.zepContext || '',
+            userProfile: state.userProfile,
+            contextMode: 'summary',
+            summaryContext: summaryCtx,
+          });
+
+          messages = [systemMessage, ...state.messages];
+          console.log(`[AGENT NODE] Summary mode: compact prompt, ${messages.length} messages, 0 tools`);
+        } else {
+          // FULL MODE: Detailed prompt with context
+          let recentEvents: any[] = [];
+          if (state.userEvents && state.userEvents.length > 0) {
+            recentEvents = state.userEvents;
           } else {
-            console.log('No future/ongoing events found for user context');
+            try {
+              const supabaseService = new SupabaseService();
+              const now = new Date();
+              const allEventsData = await supabaseService.getEventsForAgent(state.userId);
+              recentEvents = allEventsData.filter(event => new Date(event.end_time) >= now);
+            } catch (error) {
+              console.error('Error loading recent events for context:', error);
+            }
           }
-        } catch (error) {
-          console.error('Error loading recent events for context:', error);
+
+          const eventContext = this.formatEventContext(recentEvents, state.timezone);
+          const taskContext = this.formatTaskContext(state.userTasks || [], state.timezone);
+          const goalContext = this.formatGoalContext(state.userGoals || [], state.timezone);
+
+          const zepThreadContext = state.zepContext || '';
+          const rulesContext = state.rulesContext || '';
+
+          let locationContext: string | undefined;
+          if (state.currentLocation) {
+            const coords = `${state.currentLocation.latitude}, ${state.currentLocation.longitude}`;
+            locationContext = state.currentAddress
+              ? `${state.currentAddress} (${coords})`
+              : coords;
+          }
+
+          const systemMessage = buildSystemPrompt({
+            timezone: state.timezone,
+            eventContext,
+            taskContext,
+            goalContext,
+            todayFormatted,
+            tomorrowFormatted,
+            tomorrowDayName,
+            toolCount: selectedTools.length,
+            zepGraphContext: zepThreadContext,
+            rulesContext,
+            userAspects: state.userAspects,
+            userProjects: routing?.context_sections.projects ? state.userProjects : [],
+            userProfile: state.userProfile,
+            recentUserActivity: routing?.context_sections.activity_logs ? state.recentUserActivity : [],
+            recentAgentActivity: routing?.context_sections.activity_logs ? state.recentAgentActivity : [],
+            currentPage: state.currentPage,
+            messageCount: state.messages.length,
+            currentLocation: locationContext,
+            ratingContext: routing?.context_sections.ratings && state.ratingSummary?.length
+              ? this.buildRatingContext(state.ratingSummary)
+              : undefined,
+            userFriends: routing?.context_sections.friends ? state.userFriends : [],
+            promptSections: routing?.prompt_sections,
+            contextMode: 'full',
+          });
+
+          messages = [systemMessage, ...state.messages];
+          console.log(`[AGENT NODE] Full mode: ${messages.length} messages (${selectedTools.length} tools)`);
         }
       }
 
-      const eventContext = recentEvents.length > 0
-        ? `\n\nUSER'S CALENDAR EVENTS (${recentEvents.length} total):\n${recentEvents.map((e) => {
-            // Events are UTC from database - format for user's timezone display
-            const startDate = toDate(e.start_time);
-            const endDate = toDate(e.end_time);
-
-            // Format times in user's timezone using date-fns-tz
-            const dateStr = formatInTimeZone(startDate, state.timezone, 'EEE, MMM d');
-            const startTime = formatInTimeZone(startDate, state.timezone, 'h:mm a');
-            const endTime = formatInTimeZone(endDate, state.timezone, 'h:mm a');
-
-            // Determine time of day based on user's timezone
-            const localHour = parseInt(formatInTimeZone(startDate, state.timezone, 'H'));
-            const timeOfDay = localHour < 12 ? 'morning' : localHour < 17 ? 'afternoon' : 'evening';
-
-            const aspectStr = e.aspect ? ` [${e.aspect}]` : '';
-            return `- "${e.title}" on ${dateStr} (${timeOfDay}) from ${startTime} to ${endTime}${e.location ? ` at ${e.location}` : ''}${aspectStr} [Date: ${formatInTimeZone(startDate, state.timezone, 'yyyy-MM-dd')}] (ID: ${e.id})`;
-          }).join('\n')}`
-        : `\n\nUSER'S CALENDAR: No events found`;
-
-      // Load user tasks for context
-      let userTasks: any[] = [];
-      if (state.userTasks && state.userTasks.length > 0) {
-        userTasks = state.userTasks;
-        console.log(`Using ${userTasks.length} pre-loaded tasks for context`);
-      }
-
-      const taskContext = userTasks.length > 0
-        ? `\n\nUSER'S TASKS (${userTasks.length} total):\n${userTasks.map((t, idx) => {
-            const dueStr = t.due_date ? ` (Due: ${formatInTimeZone(toDate(t.due_date), state.timezone, 'EEE, MMM d')})` : '';
-            const priorityStr = t.priority ? ` [${t.priority.toUpperCase()}]` : '';
-            const statusStr = t.status === 'completed' ? ' [done]' : t.status === 'in_progress' ? ' [in progress]' : '';
-            const aspectStr = t.aspect ? ` {${t.aspect}}` : '';
-            return `${idx + 1}. ${t.title}${priorityStr}${dueStr}${statusStr}${aspectStr} (ID: ${t.id})`;
-          }).join('\n')}`
-        : `\n\nUSER'S TASKS: No tasks found`;
-
-      // Load user goals for context
-      let userGoals: any[] = [];
-      if (state.userGoals && state.userGoals.length > 0) {
-        userGoals = state.userGoals;
-        console.log(`Using ${userGoals.length} pre-loaded goals for context`);
-      }
-
-      const goalContext = userGoals.length > 0
-        ? `\n\nUSER'S GOALS (${userGoals.length} total):\n${userGoals.map((g, idx) => {
-            const targetStr = g.target_date ? ` (Target: ${formatInTimeZone(toDate(g.target_date), state.timezone, 'MMM d, yyyy')})` : '';
-            const progressStr = g.progress !== null && g.progress !== undefined ? ` - ${g.progress}% complete` : '';
-            const statusStr = g.status ? ` [${g.status.toUpperCase()}]` : '';
-            const aspectStr = g.aspect ? ` (${g.aspect})` : '';
-            return `${idx + 1}. ${g.title}${statusStr}${progressStr}${targetStr}${aspectStr} (ID: ${g.id})`;
-          }).join('\n')}`
-        : `\n\nUSER'S GOALS: No goals set`;
-
-      // Log the actual goal context being sent to the LLM
-      console.log(`[GOAL CONTEXT] ${goalContext}`);
-
-      // Load Zep thread context using built-in API
-      // This returns Zep's pre-formatted context block with user summary + relevant facts
-      let zepThreadContext = '';
-      try {
-        // Ensure thread exists in Zep before retrieving context
-        const threadId = await this.zepService.getOrCreateSession(state.userId);
-        zepThreadContext = await this.zepService.getThreadContext(threadId);
-        if (zepThreadContext) {
-          console.log(`[CONVERSATION AGENT] Zep context loaded for thread ${threadId}`);
-        } else {
-          console.log(`[CONVERSATION AGENT] No Zep context found for thread`);
-        }
-      } catch (error) {
-        console.error('Error loading Zep context:', error);
-      }
-
-      // Load ALL user rules (enabled and disabled) for context injection
-      // This allows the agent to see disabled rules and re-enable them instead of creating duplicates
-      let rulesContext = '';
-      try {
-        const userRules = await ruleService.getRules(state.userId);
-        if (userRules.length > 0) {
-          rulesContext = ruleService.formatRulesForPrompt(userRules);
-          const enabledCount = userRules.filter(r => r.enabled).length;
-          const disabledCount = userRules.length - enabledCount;
-          console.log(`[CONVERSATION AGENT] Loaded ${userRules.length} rules (${enabledCount} enabled, ${disabledCount} disabled)`);
-        } else {
-          console.log(`[CONVERSATION AGENT] No rules found for user`);
-        }
-      } catch (error) {
-        console.error('Error loading user rules:', error);
-      }
-
-      // Calculate temporal context IN USER'S TIMEZONE (critical for correct "tomorrow" interpretation)
-      // Get current UTC time
-      const nowUtc = new Date();
-
-      // Format dates directly in user's timezone (this is the correct way)
-      const todayFormatted = formatInTimeZone(nowUtc, state.timezone, 'yyyy-MM-dd');
-      const tomorrowDayName = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'EEEE');
-      const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
-
-      // Build system prompt from extracted function (was 200+ lines inline)
-      // Pass tool count from ToolRegistry for dynamic prompt generation
-      // Include Zep's pre-formatted context block with user summary and relevant facts
-      // Include user rules for behavioral guidance
-      // Include aspects, profile, and recent activity for context awareness
-      // Build location context string from live coords + resolved address
-      let locationContext: string | undefined;
-      if (state.currentLocation) {
-        const coords = `${state.currentLocation.latitude}, ${state.currentLocation.longitude}`;
-        locationContext = state.currentAddress
-          ? `${state.currentAddress} (${coords})`
-          : coords;
-      }
-
-      const systemMessage = buildSystemPrompt({
-        timezone: state.timezone,
-        eventContext,
-        taskContext,
-        goalContext,
-        todayFormatted,
-        tomorrowFormatted,
-        tomorrowDayName,
-        toolCount: tools.length,
-        zepGraphContext: zepThreadContext, // Use Zep's built-in context block
-        rulesContext, // User's custom rules
-        userAspects: state.userAspects, // Available aspects with IDs
-        userProjects: state.userProjects, // Active projects with IDs
-        userProfile: state.userProfile, // User profile with preferences
-        recentUserActivity: state.recentUserActivity, // Recent manual changes
-        recentAgentActivity: state.recentAgentActivity, // Recent agent actions
-        currentPage: state.currentPage, // Current page user is viewing
-        messageCount: state.messages.length, // Conversation stage awareness
-        currentLocation: locationContext, // User's GPS coordinates
-        ratingContext: state.ratingSummary?.length ? this.buildRatingContext(state.ratingSummary) : undefined,
-        userFriends: state.userFriends, // User's friends list
-      });
-
-
-      const messages = [systemMessage, ...state.messages];
-
-      console.log(`[AGENT NODE] Invoking model with ${messages.length} messages (${state.messages.length} state messages)`);
-      const response = await modelWithTools.invoke(messages);
-      console.log(`[AGENT NODE] Model response type: ${response._getType()}`);
-      console.log(`[AGENT NODE] Model response has tool_calls: ${(response as any).tool_calls ? (response as any).tool_calls.length : 0}`);
-      if ((response as any).tool_calls && (response as any).tool_calls.length > 0) {
-        console.log(`[AGENT NODE] Tool calls requested:`, (response as any).tool_calls.map((t: any) => ({ name: t.name || t.tool, args: t.args })));
-      } else {
-        console.log(`[AGENT NODE] Model response content:`, response.content);
-      }
+      const response = await model.invoke(messages);
+      const toolCalls = (response as any).tool_calls?.length || 0;
+      console.log(`[AGENT NODE] Response: ${toolCalls} tool_calls${toolCalls > 0 ? ': ' + (response as any).tool_calls.map((t: any) => t.name || t.tool).join(', ') : ''}`);
 
       return {
         messages: [response],
@@ -723,21 +844,19 @@ Use these scores to understand how the user feels about different areas of their
 
     const executeTools = async (state: ConversationStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
-      console.log(`[TOOLS NODE] Checking last message type: ${lastMessage._getType()}`);
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls && (lastMessage as any).tool_calls.length > 0) {
-        console.log(`[TOOLS NODE] Found ${(lastMessage as any).tool_calls.length} tool calls to execute:`, (lastMessage as any).tool_calls.map((t: any) => t.name || t.tool));
+        console.log(`[TOOLS NODE] Executing ${(lastMessage as any).tool_calls.length} tool calls:`, (lastMessage as any).tool_calls.map((t: any) => t.name || t.tool));
         const toolResults = await toolNode.invoke(state, {
           configurable: {
             userId: state.userId,
             timezone: state.timezone
           }
         });
-        console.log(`[TOOLS NODE] Tool execution completed, results:`, toolResults.messages);
+        console.log(`[TOOLS NODE] Tool execution completed`);
         return {
           messages: toolResults.messages,
         };
       }
-      console.log(`[TOOLS NODE] No tool calls found in message`);
       return {};
     };
 

@@ -7,7 +7,7 @@ import { buildMargaretSystemPrompt } from "./prompts.js";
 
 export class MaintenanceAgentMargaret extends BaseAgent {
   constructor() {
-    super('maintenance', "gpt-5.1");
+    super('maintenance', "gpt-4.1-mini"); // GPT-4.1-mini: structured audit/cleanup tasks don't need frontier reasoning
   }
 
   async initialize(): Promise<void> {

@@ -1,10 +1,12 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const createTaskTool = tool(
   async ({ title, description, dueDate, priority, aspect, energyRequired, estimatedDuration, parentGoalId, status, contextRequired, recurringPattern, projectId }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
     if (!userId) {
       return "User ID required";
     }
@@ -12,10 +14,13 @@ export const createTaskTool = tool(
     try {
       const supabaseService = getSupabaseService();
 
+      // Convert local time to UTC for storage
+      const dueDateUTC = dueDate && timezone ? convertToUTC(dueDate, timezone) : dueDate;
+
       const task = await supabaseService.createTask(userId, {
         title,
         description: description || undefined,
-        dueDate: dueDate || undefined,
+        dueDate: dueDateUTC || undefined,
         priority: priority || 'medium',
         aspect: aspect || 'Personal',
         energyRequired: energyRequired || undefined,
@@ -40,20 +45,20 @@ export const createTaskTool = tool(
   },
   {
     name: "create_task",
-    description: "Create a new task. IMPORTANT: You must specify the correct aspect that matches the user's existing aspects. Check the user's aspects first and use the exact aspect name.",
+    description: "Create a new task.",
     schema: z.object({
       title: z.string().describe("Task title"),
-      description: z.string().optional().nullable().describe("Task description"),
-      dueDate: z.string().optional().nullable().describe("Due date (ISO format)"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Priority level"),
-      aspect: z.string().describe("Aspect name - MUST match an existing user aspect exactly (e.g., 'CS 525', 'Personal', 'Health'). Check user's aspects first."),
-      energyRequired: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy level required"),
-      estimatedDuration: z.number().optional().nullable().describe("Estimated duration in minutes"),
-      parentGoalId: z.string().optional().nullable().describe("ID of a parent goal to link this task to. Use list_goals to find goal IDs."),
-      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Initial task status. Defaults to 'pending'."),
-      contextRequired: z.record(z.any()).optional().nullable().describe("Context needed for this task (e.g., tools, location, prerequisites)"),
-      recurringPattern: z.record(z.any()).optional().nullable().describe("Recurring pattern config (e.g., { frequency: 'daily', interval: 1 })"),
-      projectId: z.string().optional().nullable().describe("UUID of a project to link this task to. Use list_projects to find project IDs."),
+      description: z.string().optional().nullable().describe("Description"),
+      dueDate: z.string().optional().nullable().describe("Due date/time in ISO format (local timezone, no Z suffix)"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Priority"),
+      aspect: z.string().describe("Aspect name (must exist)"),
+      energyRequired: z.enum(["low", "medium", "high"]).optional().nullable().describe("Energy level"),
+      estimatedDuration: z.number().optional().nullable().describe("Duration in minutes"),
+      parentGoalId: z.string().optional().nullable().describe("Parent goal UUID"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Initial status"),
+      contextRequired: z.record(z.any()).optional().nullable().describe("Context needed (JSON)"),
+      recurringPattern: z.record(z.any()).optional().nullable().describe("Recurring config (JSON)"),
+      projectId: z.string().optional().nullable().describe("Project UUID"),
     }),
   }
 );

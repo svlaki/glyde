@@ -69,14 +69,14 @@ export const updateRecurringEventTool = tool(
   },
   {
     name: "update_recurring_event",
-    description: "Update a recurring calendar event. Can update the entire series or a single instance.",
+    description: "Update a recurring event (series or instance).",
     schema: z.object({
-      eventId: z.string().describe("ID of the recurring event (parent event)"),
-      scope: z.enum(['entire_series', 'this_instance']).describe("Update entire series or just this instance"),
-      title: z.string().optional().describe("New event title"),
+      eventId: z.string().describe("Event UUID"),
+      scope: z.enum(['entire_series', 'this_instance']).describe("Update scope"),
+      title: z.string().optional().describe("New title"),
       description: z.string().optional().describe("New description"),
       location: z.string().optional().describe("New location"),
-      startTime: z.string().optional().describe("New start time for the event (affects all instances or just this one depending on scope)"),
+      startTime: z.string().optional().describe("New start time ISO"),
     }),
   }
 );

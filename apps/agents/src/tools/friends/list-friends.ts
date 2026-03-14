@@ -36,7 +36,7 @@ export const listFriendsTool = tool(
   },
   {
     name: "list_friends",
-    description: "Get all accepted friends with their profiles and aspects. Use this to find a friend's userId (needed for sharing events) or friendshipId (needed for managing the friendship).",
+    description: "List all friends.",
     schema: z.object({}),
   }
 );

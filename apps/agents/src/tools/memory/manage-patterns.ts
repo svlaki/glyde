@@ -64,32 +64,16 @@ export const managePatternsTool = tool(
   },
   {
     name: "manage_patterns",
-    description: `Manage behavioral patterns in user or community knowledge graphs.
-
-**Action: 'add-user'** - Record patterns to user's personal graph:
-- Peak productivity hours, meeting preferences, task completion tendencies
-- Energy fluctuations, scheduling preferences
-- Requires: frequency, confidence
-
-**Action: 'add-community'** - Record patterns to community graph:
-- Cross-user behavioral patterns for collective intelligence
-- Optimal productivity times, common scheduling preferences
-- Requires: userCount, avgConfidence, category
-
-Use this to remember long-term behaviors and improve recommendations.`,
+    description: "Record behavioral patterns to user or community graph.",
     schema: z.object({
-      action: z.enum(["add-user", "add-community"]).describe("Action: 'add-user' for personal patterns, 'add-community' for cross-user patterns"),
-      patternType: z.string().describe("Type of pattern (e.g., 'peak_productivity_hours', 'meeting_preference', 'task_completion_rate')"),
-      description: z.string().describe("Human-readable description of the pattern"),
-
-      // User pattern parameters (required for add-user)
-      frequency: z.enum(["daily", "weekly", "monthly", "rare"]).optional().nullable().describe("How often pattern occurs (required for add-user)"),
-      confidence: z.number().min(0).max(1).optional().nullable().describe("Confidence in pattern 0-1 (required for add-user)"),
-
-      // Community pattern parameters (required for add-community)
-      userCount: z.number().optional().nullable().describe("Number of users exhibiting pattern (required for add-community)"),
-      avgConfidence: z.number().min(0).max(1).optional().nullable().describe("Average confidence across users (required for add-community)"),
-      category: z.string().optional().nullable().describe("Pattern category like 'productivity', 'scheduling' (required for add-community)")
+      action: z.enum(["add-user", "add-community"]).describe("Target graph"),
+      patternType: z.string().describe("Pattern type identifier"),
+      description: z.string().describe("Pattern description"),
+      frequency: z.enum(["daily", "weekly", "monthly", "rare"]).optional().nullable().describe("Frequency (for add-user)"),
+      confidence: z.number().min(0).max(1).optional().nullable().describe("Confidence 0-1 (for add-user)"),
+      userCount: z.number().optional().nullable().describe("User count (for add-community)"),
+      avgConfidence: z.number().min(0).max(1).optional().nullable().describe("Avg confidence (for add-community)"),
+      category: z.string().optional().nullable().describe("Category (for add-community)")
     }),
   }
 );

@@ -23,10 +23,10 @@ export const removeFriendAspectTool = tool(
   },
   {
     name: "remove_friend_aspect",
-    description: "Remove an aspect tag from a friendship.",
+    description: "Remove an aspect from a friendship.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID to remove the aspect from"),
-      aspectId: z.string().uuid().describe("The aspect ID to remove"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
+      aspectId: z.string().uuid().describe("Aspect UUID"),
     }),
   }
 );

@@ -18,9 +18,9 @@ export const deleteProjectTool = tool(
   },
   {
     name: "delete_project",
-    description: "Permanently delete a project. WARNING: This cannot be undone. Only use when the user explicitly asks to delete a project. Consider archive_project for soft removal instead.",
+    description: "Permanently delete a project.",
     schema: z.object({
-      project_id: z.string().describe("UUID of the project to permanently delete"),
+      project_id: z.string().describe("Project UUID"),
     }),
   }
 );

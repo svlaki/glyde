@@ -32,7 +32,7 @@ export const getPendingFriendRequestsTool = tool(
   },
   {
     name: "get_pending_friend_requests",
-    description: "Get incoming pending friend requests. Shows who wants to be your friend so you can accept or decline.",
+    description: "Get pending friend requests.",
     schema: z.object({}),
   }
 );

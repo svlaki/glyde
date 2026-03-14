@@ -242,6 +242,16 @@ export function Calendar() {
       if (isSubscribed) loadEvents()
     }, 60000)
 
+    // Listen for agent-initiated data changes (agent creates via service role,
+    // which may not trigger Supabase Realtime reliably)
+    const handleAgentChange = () => {
+      if (isSubscribed) {
+        if (refreshTimer) clearTimeout(refreshTimer)
+        refreshTimer = setTimeout(() => loadEvents(), 500)
+      }
+    }
+    window.addEventListener('agent-data-changed', handleAgentChange)
+
     // Set up real-time subscription for events
     if (!user) return
 
@@ -271,6 +281,7 @@ export function Calendar() {
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
+      window.removeEventListener('agent-data-changed', handleAgentChange)
       supabase.removeChannel(channel)
     }
   }, [user, session])

@@ -95,14 +95,14 @@ export const searchTasksTool = tool(
   },
   {
     name: "search_tasks",
-    description: "Search tasks by text content in title and description. Use this to find tasks containing specific keywords or phrases. Supports optional filters for status, aspect, priority, and due dates.",
+    description: "Search tasks by text in title/description.",
     schema: z.object({
-      query: z.string().describe("Search query to match in task title or description (case-insensitive, partial matching)"),
-      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Optional: Filter by status"),
-      aspect: z.string().optional().nullable().describe("Optional: Filter by aspect"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Optional: Filter by priority"),
-      dueBefore: z.string().optional().nullable().describe("Optional: Show tasks due before this date (ISO format)"),
-      dueAfter: z.string().optional().nullable().describe("Optional: Show tasks due after this date (ISO format)"),
+      query: z.string().describe("Search query"),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional().nullable().describe("Filter by status"),
+      aspect: z.string().optional().nullable().describe("Filter by aspect"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().nullable().describe("Filter by priority"),
+      dueBefore: z.string().optional().nullable().describe("Due before date ISO"),
+      dueAfter: z.string().optional().nullable().describe("Due after date ISO"),
     }),
   }
 );

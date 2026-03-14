@@ -2292,7 +2292,7 @@ export class SupabaseService {
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
-      goalType?: 'SMART' | 'OKR' | 'habit' | 'project';
+      goalType?: 'SMART' | 'OKR' | 'habit' | 'project' | 'milestone';
       parentGoalId?: string;
       keyResults?: any[];
       blockers?: any[];
@@ -2302,6 +2302,8 @@ export class SupabaseService {
       energyRequirement?: 'low' | 'medium' | 'high';
       reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
       timeHorizon?: 'long_term' | 'short_term';
+      milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
     },
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<any> {
@@ -2330,7 +2332,9 @@ export class SupabaseService {
           priority_score: goalData.priorityScore || 5,
           energy_requirement: goalData.energyRequirement,
           review_frequency: goalData.reviewFrequency || 'weekly',
-          time_horizon: goalData.timeHorizon || 'short_term'
+          time_horizon: goalData.timeHorizon || 'short_term',
+          milestones: goalData.milestones || null,
+          milestone_type: goalData.milestoneType || 'dated',
         })
         .select()
         .single();
@@ -2437,7 +2441,7 @@ export class SupabaseService {
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
-      goalType?: 'SMART' | 'OKR' | 'habit' | 'project';
+      goalType?: 'SMART' | 'OKR' | 'habit' | 'project' | 'milestone';
       parentGoalId?: string;
       keyResults?: any[];
       blockers?: any[];
@@ -3009,6 +3013,107 @@ export class SupabaseService {
    */
   async deleteNotes(userId: string, notesId: string): Promise<{ success: boolean; error: string | null }> {
     return this.deleteRecord('notes', userId, notesId, 'notes');
+  }
+
+  // ==================== LIFE PLANS ====================
+
+  /**
+   * Get the user's active life plan
+   */
+  async getPlan(userId: string): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('life_plans')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // No rows
+        console.error('Error fetching plan:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception fetching plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new life plan
+   */
+  async createPlan(userId: string, planData: {
+    title: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: string;
+  }): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('life_plans')
+        .insert({
+          user_id: userId,
+          title: planData.title,
+          content: planData.content || '',
+          horizon_start: planData.horizonStart || null,
+          horizon_end: planData.horizonEnd || null,
+          status: planData.status || 'active',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating plan:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception creating plan:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing life plan
+   */
+  async updatePlan(userId: string, planId: string, updates: {
+    title?: string;
+    content?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: string;
+  }): Promise<any | null> {
+    try {
+      const updateData: any = {};
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.content !== undefined) updateData.content = updates.content;
+      if (updates.horizonStart !== undefined) updateData.horizon_start = updates.horizonStart;
+      if (updates.horizonEnd !== undefined) updateData.horizon_end = updates.horizonEnd;
+      if (updates.status !== undefined) updateData.status = updates.status;
+
+      const { data, error } = await this.client
+        .from('life_plans')
+        .update(updateData)
+        .eq('id', planId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating plan:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception updating plan:', error);
+      return null;
+    }
   }
 }
 

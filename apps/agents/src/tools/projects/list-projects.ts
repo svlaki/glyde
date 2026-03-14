@@ -29,7 +29,7 @@ export const listProjectsTool = tool(
   },
   {
     name: "list_projects",
-    description: "List all active (non-archived) projects for the user. Shows project name, aspect, and deadline.",
+    description: "List active projects.",
     schema: z.object({}),
   }
 );

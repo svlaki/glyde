@@ -1,10 +1,12 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import reminderService from "../../services/ReminderService.js";
+import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateReminderTool = tool(
   async ({ reminderId, message, triggerAt, aspectId }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
     if (!userId) {
       return "Error: User ID required";
     }
@@ -13,11 +15,12 @@ export const updateReminderTool = tool(
       const updates: Record<string, any> = {};
       if (message) updates.message = message;
       if (triggerAt) {
-        const triggerDate = new Date(triggerAt);
+        const triggerAtUTC = timezone ? convertToUTC(triggerAt, timezone) : new Date(triggerAt).toISOString();
+        const triggerDate = new Date(triggerAtUTC);
         if (isNaN(triggerDate.getTime())) {
           return "Error: Invalid trigger time.";
         }
-        updates.trigger_at = triggerDate.toISOString();
+        updates.trigger_at = triggerAtUTC;
       }
       if (aspectId !== undefined) updates.aspect_id = aspectId;
 
@@ -35,12 +38,12 @@ export const updateReminderTool = tool(
   },
   {
     name: "update_reminder",
-    description: "Update an existing reminder's message, time, or aspect.",
+    description: "Update a reminder.",
     schema: z.object({
-      reminderId: z.string().uuid().describe("ID of the reminder to update"),
-      message: z.string().optional().nullable().describe("Updated reminder message"),
-      triggerAt: z.string().optional().nullable().describe("Updated trigger time (ISO 8601)"),
-      aspectId: z.string().uuid().optional().nullable().describe("Updated aspect UUID"),
+      reminderId: z.string().uuid().describe("Reminder UUID"),
+      message: z.string().optional().nullable().describe("New message"),
+      triggerAt: z.string().optional().nullable().describe("New trigger time in ISO format (local timezone, no Z suffix)"),
+      aspectId: z.string().uuid().optional().nullable().describe("New aspect UUID"),
     }),
   }
 );

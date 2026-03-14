@@ -79,6 +79,13 @@ export function GoalsSection() {
 
     loadGoals()
 
+    // Listen for agent-initiated data changes
+    const handleAgentChange = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(() => loadGoals(), 500)
+    }
+    window.addEventListener('agent-data-changed', handleAgentChange)
+
     // Realtime subscription
     const channel = supabase
       .channel(`goals-section-${user.id}-${Date.now()}`)
@@ -102,6 +109,7 @@ export function GoalsSection() {
     return () => {
       isSubscribed = false
       if (refreshTimer) clearTimeout(refreshTimer)
+      window.removeEventListener('agent-data-changed', handleAgentChange)
       supabase.removeChannel(channel)
     }
   }, [user, session, refreshKey])

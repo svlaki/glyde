@@ -145,10 +145,10 @@ export const deleteGoalTool = tool(
   },
   {
     name: "delete_goal",
-    description: "Delete a goal by searching for it with a text query. Finds the goal using fuzzy matching on title and description. Use this when users want to remove or cancel a goal.",
+    description: "Delete a goal by ID or search query.",
     schema: z.object({
-      goalId: z.string().optional().nullable().describe("Goal ID to delete (optional - rarely used, prefer searchQuery)"),
-      searchQuery: z.string().describe("Search query to find and delete the goal. Examples: 'fitness goal', 'learn Spanish', 'read 50 books'. The tool will fuzzy match against goal titles and descriptions."),
+      goalId: z.string().optional().nullable().describe("Goal UUID (optional)"),
+      searchQuery: z.string().describe("Fuzzy search to find goal"),
     }),
   }
 );

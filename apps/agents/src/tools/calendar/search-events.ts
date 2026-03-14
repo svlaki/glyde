@@ -60,12 +60,12 @@ export const searchEventsTool = tool(
   },
   {
     name: "search_events",
-    description: "Search for calendar events. By default shows only future/ongoing events. Use includePast=true to search historical events. Returns events (optionally filtered by aspect) and relies on the agent to semantically match them to the search query.",
+    description: "Search calendar events by query. Future events by default.",
     schema: z.object({
-      query: z.string().describe("Search query to find events. The agent will semantically match this against event titles, descriptions, and context."),
-      aspect: z.string().optional().nullable().describe("Optional: Filter by specific aspect first. Examples: 'Work', 'School', 'Health & Hygiene', 'Social', 'Fitness'."),
-      limit: z.number().optional().nullable().describe("Maximum number of results to return (default: 10)"),
-      includePast: z.boolean().optional().nullable().describe("Optional: Set to true to include past events in search. Default is false (only future/ongoing events). Use true when user asks about history like 'What did I do last week?'"),
+      query: z.string().describe("Search query"),
+      aspect: z.string().optional().nullable().describe("Filter by aspect name"),
+      limit: z.number().optional().nullable().describe("Max results (default: 10)"),
+      includePast: z.boolean().optional().nullable().describe("Include past events"),
     }),
   }
 );

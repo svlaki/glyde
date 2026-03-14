@@ -24,9 +24,9 @@ export const deleteReminderTool = tool(
   },
   {
     name: "delete_reminder",
-    description: "Dismiss/cancel a reminder. The reminder is kept in history but won't fire.",
+    description: "Dismiss/cancel a reminder.",
     schema: z.object({
-      reminderId: z.string().uuid().describe("ID of the reminder to dismiss"),
+      reminderId: z.string().uuid().describe("Reminder UUID"),
     }),
   }
 );

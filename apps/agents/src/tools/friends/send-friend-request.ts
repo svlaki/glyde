@@ -23,9 +23,9 @@ export const sendFriendRequestTool = tool(
   },
   {
     name: "send_friend_request",
-    description: "Send a friend request to another user by their email address.",
+    description: "Send a friend request by email.",
     schema: z.object({
-      email: z.string().email().describe("Email address of the person to send a friend request to"),
+      email: z.string().email().describe("Recipient email"),
     }),
   }
 );

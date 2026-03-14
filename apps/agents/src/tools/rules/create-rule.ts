@@ -40,17 +40,11 @@ export const createRuleTool = tool(
   },
   {
     name: "create_rule",
-    description: `Create a persistent rule that guides agent behavior. Use this when:
-- User explicitly asks to "always" or "never" do something
-- User says "from now on..." or "going forward..."
-- User makes a general behavioral request (not task-specific)
-- You notice a pattern the user wants maintained
-
-Examples: "Always respond formally", "Never schedule meetings before 9am", "Use 30-minute blocks for focus work"`,
+    description: "Create a persistent behavioral rule.",
     schema: z.object({
-      rule_text: z.string().describe("The rule instruction. Be specific and actionable. Example: 'Always use 30-minute time blocks for focus work'"),
-      description: z.string().optional().nullable().describe("Optional explanation of why this rule exists or when it applies"),
-      priority: z.number().min(1).max(10).optional().nullable().describe("Priority level 1-10 (10 = highest). Default is 5. Higher priority rules take precedence when rules conflict."),
+      rule_text: z.string().describe("Rule instruction"),
+      description: z.string().optional().nullable().describe("Why this rule exists"),
+      priority: z.number().min(1).max(10).optional().nullable().describe("Priority 1-10 (default 5)"),
     }),
   }
 );

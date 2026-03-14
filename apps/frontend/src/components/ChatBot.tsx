@@ -653,6 +653,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       saveMessageToAPI(botMessage)
       refreshAspects()
 
+      // Notify other components (Calendar, TodoList, Goals) to refetch data
+      // since the agent may have created/updated/deleted events, tasks, or goals
+      window.dispatchEvent(new CustomEvent('agent-data-changed'))
+
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         // Stream was aborted - don't process queue

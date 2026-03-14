@@ -35,12 +35,12 @@ export const createAspectTool = tool(
   },
   {
     name: "create_aspect",
-    description: "Create a new aspect for organizing events, tasks, and goals. Aspects are universal and can be used by all entity types. CRITICAL: Create SPECIFIC, GRANULAR aspects for specific entities - individual classes (e.g., 'CS173A', 'PHIL 1'), projects (e.g., 'Project Phoenix'), clients (e.g., 'Client Acme'). Generic aspects (Personal, Fitness, Social) should ONLY be used for truly generic recurring activities. Always check existing aspects with list_aspects before creating.",
+    description: "Create a new aspect (life category).",
     schema: z.object({
-      name: z.string().describe("Aspect name (e.g., 'Gym', 'Project X', 'Doctor Appointments')"),
-      color: z.string().optional().nullable().describe("Hex color code (e.g., '#3b82f6'). Use meaningful colors that match the aspect type."),
-      description: z.string().optional().nullable().describe("Description of what this aspect is for"),
-      context: z.record(z.any()).optional().nullable().describe("AI context object with preferences and patterns for this aspect"),
+      name: z.string().describe("Aspect name"),
+      color: z.string().optional().nullable().describe("Hex color code"),
+      description: z.string().optional().nullable().describe("Aspect description"),
+      context: z.record(z.any()).optional().nullable().describe("AI context object (JSON)"),
     }),
   }
 );

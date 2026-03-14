@@ -68,7 +68,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   constructor() {
     // Use 'interaction' as type so it can replace the current interaction agent
-    super('interaction', "gpt-5.1"); // Use GPT-5.1 for best reasoning and creativity
+    super('interaction', "gpt-4.1-mini"); // GPT-4.1-mini: solid tool calling, 5x cheaper for structured tasks
     this.graph = this.createGraph();
   }
 

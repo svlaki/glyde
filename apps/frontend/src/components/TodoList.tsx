@@ -41,6 +41,10 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
   useEffect(() => {
     if (!user) return
 
+    // Listen for agent-initiated data changes
+    const handleAgentChange = () => loadTasks()
+    window.addEventListener('agent-data-changed', handleAgentChange)
+
     const channel = supabase
       .channel(`tasks-${user.id}-${Date.now()}`)
       .on(
@@ -64,6 +68,7 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
       })
 
     return () => {
+      window.removeEventListener('agent-data-changed', handleAgentChange)
       supabase.removeChannel(channel)
     }
   }, [user, session])

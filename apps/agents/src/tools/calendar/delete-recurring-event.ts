@@ -80,10 +80,10 @@ export const deleteRecurringEventTool = tool(
   },
   {
     name: "delete_recurring_event",
-    description: "Delete a recurring event. Can delete the entire series, just this instance, or this and all future instances.",
+    description: "Delete a recurring event (series, instance, or future).",
     schema: z.object({
-      eventId: z.string().describe("ID of the recurring event or a specific instance"),
-      scope: z.enum(['entire_series', 'this_instance', 'all_future']).describe("Delete entire series, just this instance, or all future instances"),
+      eventId: z.string().describe("Event UUID"),
+      scope: z.enum(['entire_series', 'this_instance', 'all_future']).describe("Delete scope"),
     }),
   }
 );

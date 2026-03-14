@@ -23,10 +23,10 @@ export const removeEventMemberTool = tool(
   },
   {
     name: "remove_event_member",
-    description: "Remove a member from a shared event. Only the event owner can remove members. Use get_event_members to find the memberId.",
+    description: "Remove a member from a shared event.",
     schema: z.object({
-      eventId: z.string().uuid().describe("The event ID to remove a member from"),
-      memberId: z.string().uuid().describe("The member record ID (from get_event_members) to remove"),
+      eventId: z.string().uuid().describe("Event UUID"),
+      memberId: z.string().uuid().describe("Member UUID"),
     }),
   }
 );
