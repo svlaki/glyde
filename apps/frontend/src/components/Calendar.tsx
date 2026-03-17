@@ -9,6 +9,7 @@ import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typography'
 import { EventFormUnified } from './event'
 import { getRecurrenceBadge } from '../lib/recurrenceUtils'
+import { computeDayEventLayouts } from '../lib/calendarLayoutUtils'
 
 type ViewType = 'day' | 'week' | 'month'
 
@@ -113,8 +114,7 @@ export function Calendar() {
   }
 
   // Toggle missed status for past events
-  const handleToggleMissed = async (e: React.MouseEvent, event: CalendarEvent) => {
-    e.stopPropagation()
+  const handleToggleMissed = async (event: CalendarEvent) => {
     if (!user || !session) return
 
     const newMissedStatus = !event.is_missed
@@ -128,6 +128,10 @@ export function Calendar() {
     setEvents(prev => prev.map(ev =>
       matchInstance(ev) ? { ...ev, is_missed: newMissedStatus } : ev
     ))
+    // Also update selectedEvent so the form reflects the change immediately
+    setSelectedEvent(prev =>
+      prev && matchInstance(prev) ? { ...prev, is_missed: newMissedStatus } : prev
+    )
     try {
       let error: string | null = null
 
@@ -157,6 +161,9 @@ export function Calendar() {
         setEvents(prev => prev.map(ev =>
           matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
         ))
+        setSelectedEvent(prev =>
+          prev && matchInstance(prev) ? { ...prev, is_missed: !newMissedStatus } : prev
+        )
       } else {
         // Refresh to get the new override event from the backend
         if (event.is_instance) {
@@ -169,6 +176,9 @@ export function Calendar() {
       setEvents(prev => prev.map(ev =>
         matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
       ))
+      setSelectedEvent(prev =>
+        prev && matchInstance(prev) ? { ...prev, is_missed: !newMissedStatus } : prev
+      )
     }
   }
 
@@ -286,39 +296,7 @@ export function Calendar() {
     })
   }
 
-  // Calculate overlap layout using ALL events for the day, not just same-hour events
-  const getEventLayout = (event: CalendarEvent, dayEvents: CalendarEvent[]) => {
-    const eventStart = new Date(event.start_time).getTime()
-    const eventEnd = new Date(event.end_time).getTime()
-
-    // Find all events on this day that overlap with this event's time range
-    const overlapping = dayEvents.filter(e => {
-      const start = new Date(e.start_time).getTime()
-      const end = new Date(e.end_time).getTime()
-      return (start < eventEnd && end > eventStart)
-    }).sort((a, b) =>
-      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    )
-
-    if (overlapping.length <= 1) {
-      return { width: '100%', left: '2px', right: '2px', zIndex: 3 }
-    }
-
-    // Calculate position in overlap group
-    const index = overlapping.findIndex(e => e.id === event.id)
-    const totalOverlapping = overlapping.length
-
-    // Stagger horizontally
-    const widthPercent = Math.max(50, 100 / totalOverlapping) // Minimum 50% width
-    const offsetPercent = (index * (100 - widthPercent)) / Math.max(1, totalOverlapping - 1)
-
-    return {
-      width: `${widthPercent}%`,
-      left: `${offsetPercent}%`,
-      right: 'auto',
-      zIndex: 3 + index
-    }
-  }
+  // Overlap layout now handled by computeDayEventLayouts from calendarLayoutUtils
 
   // Get events for a specific date (for month view)
   const getEventsForDate = (date: Date) => {
@@ -1070,6 +1048,7 @@ export function Calendar() {
             {displayDates.map((date, dayIndex) => {
               const isToday = date.toDateString() === new Date().toDateString()
               const dayEvents = getEventsForDay(date)
+              const dayLayouts = computeDayEventLayouts(dayEvents, { minWidthPercent: 50 })
               const todayBg = isToday
                 ? (isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)')
                 : 'transparent'
@@ -1186,7 +1165,7 @@ export function Calendar() {
                         {/* Render events - Mobile-style cards with left border */}
                         {slotEvents.map(event => {
                           const { top, height } = getEventStyle(event)
-                          const layout = getEventLayout(event, dayEvents)
+                          const layout = dayLayouts.get(event.id) || { width: '100%', left: '4px', right: '4px', zIndex: 3 }
                           const eventColor = getEventColor(event)
                           const startTime = new Date(event.start_time).toLocaleTimeString('en-US', {
                             hour: 'numeric',
@@ -1288,33 +1267,18 @@ export function Calendar() {
                                 )}
                                 <span>{event.title}</span>
                               </div>
-                              {/* Missed button - absolute, below title line, right side */}
-                              {!isFriendEvent && !isShared && isEventPast(event) && (
-                                <button
-                                  onClick={(e) => handleToggleMissed(e, event)}
-                                  title={event.is_missed ? 'Click to mark as attended' : 'Mark as missed'}
-                                  style={{
-                                    position: 'absolute',
-                                    top: 17,
-                                    right: 4,
-                                    padding: '0px 3px',
-                                    fontSize: '7px',
-                                    fontFamily: fontFamily.sans,
-                                    fontWeight: fontWeight.semibold,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.3px',
-                                    border: 'none',
-                                    borderRadius: '2px',
-                                    cursor: 'pointer',
-                                    lineHeight: '12px',
-                                    zIndex: 1,
-                                    background: event.is_missed ? '#ef4444' : hexToRgba(eventColor, 0.15),
-                                    color: event.is_missed ? '#fff' : hexToRgba(eventColor, 0.5),
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  Missed
-                                </button>
+                              {/* Missed indicator - small red dot */}
+                              {!isFriendEvent && isEventPast(event) && event.is_missed && (
+                                <span style={{
+                                  position: 'absolute',
+                                  top: 4,
+                                  right: 4,
+                                  width: '6px',
+                                  height: '6px',
+                                  borderRadius: '50%',
+                                  background: '#ef4444',
+                                  flexShrink: 0
+                                }} />
                               )}
                               {height > 30 && (
                                 <div style={{
@@ -1440,6 +1404,7 @@ export function Calendar() {
           setSelectedEvent(null)
           setIsFormOpen(false)
         }}
+        onToggleMissed={isViewerOnly ? undefined : (evt) => handleToggleMissed(evt)}
         onDelete={isViewerOnly ? undefined : async (scope) => {
           if (!selectedEvent || !user) return
           if (scope) {

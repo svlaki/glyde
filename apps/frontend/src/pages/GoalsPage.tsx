@@ -132,25 +132,33 @@ export function GoalsPage() {
   }
 
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
-    if (!user || !session) return
+    if (!user || !session) {
+      throw new Error('Not authenticated')
+    }
 
     try {
       if (goalData.id) {
         // Update existing goal - pass all fields from the form
         const { id, ...updates } = goalData
-        await updateUserGoal(user, session.access_token, id, updates)
+        const result = await updateUserGoal(user, session.access_token, id, updates)
+        if (result.error) {
+          throw new Error(result.error)
+        }
       } else {
         // Create new goal
         if (!goalData.title) {
           throw new Error('Goal title is required')
         }
-        await createUserGoal(user, session.access_token, {
+        const result = await createUserGoal(user, session.access_token, {
           title: goalData.title,
           description: goalData.description,
           aspect: goalData.aspect,
           milestones: goalData.milestones,
           milestone_type: goalData.milestone_type
         })
+        if (result.error) {
+          throw new Error(result.error)
+        }
       }
       // Realtime will refresh the list
       setIsFormOpen(false)

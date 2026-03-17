@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { useAuth } from '../lib/authContext'
-import { PlanTimeline } from '../components/PlanTimeline'
-import { GoalsSection } from '../components/GoalsSection'
+import { TabbedGoalsPanel } from '../components/TabbedGoalsPanel'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
 import { getTypography } from '../styles/typography'
@@ -258,8 +257,6 @@ function PlanPageDesktop() {
     )
   }
 
-  const goalsWithMilestones = goals.filter(g => g.milestones && g.milestones.length > 0)
-
   return (
     <div style={{
       height: '100vh',
@@ -436,80 +433,16 @@ function PlanPageDesktop() {
           />
         </div>
 
-        {/* RIGHT COLUMN - Timelines + Goals */}
+        {/* RIGHT COLUMN - Tabbed Goals Panel */}
         <div style={{
           flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
           overflow: 'hidden',
           minWidth: '300px'
         }}>
-          {/* Goal Timelines (Top Right) */}
-          <div style={{
-            flex: 1,
-            minHeight: 0,
-            background: colors.bgPrimary,
-            borderRadius: '12px',
-            border: `1px solid ${colors.border}`,
-            overflow: 'auto',
-            padding: '16px',
-          }}>
-            <h3 style={{
-              ...typography.headingMd,
-              margin: '0 0 12px 0',
-              fontWeight: 600,
-              color: colors.textPrimary
-            }}>
-              Goal Timelines
-            </h3>
-
-            {goalsWithMilestones.length === 0 ? (
-              <div style={{
-                ...typography.bodySm,
-                color: colors.textSecondary,
-                padding: '20px',
-                textAlign: 'center'
-              }}>
-                No goals with milestones yet. Create goals with milestones to see their timelines.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {goalsWithMilestones.map(goal => (
-                  <div key={goal.id} style={{
-                    background: colors.bgSecondary,
-                    borderRadius: '8px',
-                    padding: '12px'
-                  }}>
-                    <div style={{
-                      ...typography.labelMd,
-                      fontWeight: 500,
-                      color: colors.textPrimary,
-                      marginBottom: '8px'
-                    }}>
-                      {goal.title}
-                    </div>
-                    <div style={{ height: '60px' }}>
-                      <PlanTimeline
-                        goals={[goal]}
-                        onMilestoneUpdate={handleMilestoneUpdate}
-                        hideTitle
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Goals Section (Bottom Right) */}
-          <div style={{
-            flex: 1,
-            minHeight: 0,
-            overflow: 'auto',
-          }}>
-            <GoalsSection />
-          </div>
+          <TabbedGoalsPanel
+            goals={goals}
+            onMilestoneUpdate={handleMilestoneUpdate}
+          />
         </div>
       </div>
     </div>
@@ -569,7 +502,7 @@ function ExpandableCard({ title, preview, onExpand, colors }: ExpandableCardProp
   )
 }
 
-type ExpandedView = 'none' | 'plan' | 'timelines' | 'goals'
+type ExpandedView = 'none' | 'plan' | 'goals'
 
 function PlanPageMobile() {
   const { theme, isDarkMode } = useTheme()
@@ -744,8 +677,6 @@ function PlanPageMobile() {
     setRefreshKey(k => k + 1)
   }
 
-  const goalsWithMilestones = goals.filter(g => g.milestones && g.milestones.length > 0)
-
   if (isLoading) {
     return (
       <div style={mobileStyles.fullHeight}>
@@ -871,87 +802,23 @@ function PlanPageMobile() {
     )
   }
 
-  // ============ FULLSCREEN: Goal Timelines ============
-  if (expandedView === 'timelines') {
-    return (
-      <div style={mobileStyles.fullHeight}>
-        <MobileHeader
-          title="Goal Timelines"
-          onBack={() => setExpandedView('none')}
-        />
-        <div style={{
-          ...mobileStyles.scrollContainer,
-          background: colors.bgPrimary,
-          paddingLeft: mobileSpacing.paddingX,
-          paddingRight: mobileSpacing.paddingX,
-          paddingTop: mobileSpacing.paddingTop,
-          paddingBottom: mobileSpacing.paddingBottomNoTabs
-        }}>
-          {goalsWithMilestones.length === 0 ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '60px 20px',
-              color: colors.textSecondary,
-              fontSize: '14px',
-              textAlign: 'center'
-            }}>
-              No goals with milestones yet. Create goals with milestones to see their timelines.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {goalsWithMilestones.map(goal => (
-                <div key={goal.id} style={{
-                  background: colors.bgSecondary,
-                  borderRadius: '12px',
-                  padding: '16px',
-                  border: `1px solid ${colors.border}`
-                }}>
-                  <div style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: colors.textPrimary,
-                    marginBottom: '12px',
-                    fontFamily: "'EB Garamond', Georgia, serif"
-                  }}>
-                    {goal.title}
-                  </div>
-                  <div style={{ height: '80px' }}>
-                    <PlanTimeline
-                      goals={[goal]}
-                      onMilestoneUpdate={handleMilestoneUpdate}
-                      hideTitle
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // ============ FULLSCREEN: Goals ============
+  // ============ FULLSCREEN: Goals (with Timeline/Goals tabs) ============
   if (expandedView === 'goals') {
     return (
       <div style={mobileStyles.fullHeight}>
         <MobileHeader
-          title="Goals"
+          title="My Goals"
           onBack={() => setExpandedView('none')}
         />
         <div style={{
           flex: 1,
-          overflow: 'auto',
-          background: colors.bgPrimary,
-          paddingLeft: mobileSpacing.paddingX,
-          paddingRight: mobileSpacing.paddingX,
-          paddingTop: mobileSpacing.paddingTop,
-          paddingBottom: mobileSpacing.paddingBottomNoTabs
+          overflow: 'hidden',
+          background: colors.bgPrimary
         }}>
-          <GoalsSection />
+          <TabbedGoalsPanel
+            goals={goals}
+            onMilestoneUpdate={handleMilestoneUpdate}
+          />
         </div>
       </div>
     )
@@ -1018,57 +885,9 @@ function PlanPageMobile() {
           {null}
         </ExpandableCard>
 
-        {/* Goal Timelines Card */}
+        {/* My Goals Card */}
         <ExpandableCard
-          title="Goal Timelines"
-          onExpand={() => setExpandedView('timelines')}
-          colors={colors}
-          preview={
-            goalsWithMilestones.length === 0 ? (
-              <div style={{
-                padding: '20px',
-                textAlign: 'center',
-                color: colors.textSecondary,
-                fontSize: '13px'
-              }}>
-                No goals with milestones yet
-              </div>
-            ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                {goalsWithMilestones.slice(0, 2).map(goal => (
-                  <div key={goal.id} style={{
-                    padding: '10px 12px',
-                    background: colors.bgSecondary,
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    color: colors.textSecondary
-                  }}>
-                    {goal.title}
-                  </div>
-                ))}
-                {goalsWithMilestones.length > 2 && (
-                  <div style={{
-                    fontSize: '12px',
-                    color: colors.textTertiary,
-                    textAlign: 'center'
-                  }}>
-                    +{goalsWithMilestones.length - 2} more
-                  </div>
-                )}
-              </div>
-            )
-          }
-        >
-          {null}
-        </ExpandableCard>
-
-        {/* Goals Card */}
-        <ExpandableCard
-          title="Goals"
+          title="My Goals"
           onExpand={() => setExpandedView('goals')}
           colors={colors}
           preview={

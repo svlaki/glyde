@@ -6,7 +6,7 @@ import type { CalendarEvent } from '../../lib/calendarService'
 import { buildRRuleFromForm, formatRRuleForDisplay } from '../../lib/recurrenceUtils'
 import { usePlatform } from '../../hooks/usePlatform'
 import { getColors } from '../../styles/colors'
-import { getTypography, fontFamily, fontSize } from '../../styles/typography'
+import { getTypography, fontFamily, fontSize, fontWeight } from '../../styles/typography'
 import { Modal } from '../Modal'
 import { DeleteButton, DeleteTextButton, SaveTextButton } from '../ui/IconButtons'
 import { DatePickerMobile } from '../mobile/DatePickerMobile'
@@ -29,6 +29,7 @@ interface EventFormUnifiedProps {
     recurrenceRule?: string
   ) => Promise<void>) | undefined
   onDelete?: ((scope?: 'this_instance' | 'entire_series') => Promise<void>) | undefined
+  onToggleMissed?: (event: CalendarEvent) => void
   isViewerOnly?: boolean
 }
 
@@ -39,6 +40,7 @@ export function EventFormUnified({
   onSave,
   onSaveRecurring,
   onDelete,
+  onToggleMissed,
   isViewerOnly = false
 }: EventFormUnifiedProps) {
   const { user, session } = useAuth()
@@ -534,7 +536,26 @@ export function EventFormUnified({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={event?.id ? 'Edit Event' : 'New Event'}
+        headerContent={
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => form.setTitle(e.target.value)}
+            required
+            placeholder="Event title"
+            style={{
+              width: '100%',
+              padding: '0',
+              fontSize: fontSize.xl,
+              fontWeight: fontWeight.semibold,
+              background: 'transparent',
+              color: colors.textPrimary,
+              border: 'none',
+              outline: 'none',
+              fontFamily: fontFamily.sans
+            }}
+          />
+        }
         maxWidth="500px"
         preventAutoFocus={!!event?.id}
       >
@@ -554,19 +575,6 @@ export function EventFormUnified({
             flex: 1,
             minHeight: 0
           }}>
-            {/* Title */}
-            <div>
-              <FormLabel>Title *</FormLabel>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => form.setTitle(e.target.value)}
-                required
-                placeholder="Event title"
-                style={inputStyle}
-              />
-            </div>
-
             {/* Location */}
             <div>
               <FormLabel>Location</FormLabel>
@@ -892,6 +900,56 @@ export function EventFormUnified({
                 }}>
                   Add notes about how this event went
                 </div>
+              </div>
+            )}
+
+            {/* Missed toggle - only for past own events */}
+            {form.isPastEvent && form.isEditing && event && !event.is_friend_event && onToggleMissed && (
+              <div>
+                <FormLabel>Attendance</FormLabel>
+                <button
+                  type="button"
+                  onClick={() => onToggleMissed(event)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    fontSize: '14px',
+                    fontFamily: fontFamily.sans,
+                    fontWeight: 500,
+                    background: event.is_missed
+                      ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.08)')
+                      : colors.bgTertiary,
+                    color: event.is_missed ? '#ef4444' : colors.textSecondary,
+                    border: `1px solid ${event.is_missed ? 'rgba(239, 68, 68, 0.3)' : colors.border}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {event.is_missed ? (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                      </svg>
+                      Missed - tap to mark as attended
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="16 12 12 8 8 12"/>
+                        <line x1="12" y1="16" x2="12" y2="8"/>
+                      </svg>
+                      Mark as missed
+                    </>
+                  )}
+                </button>
               </div>
             )}
 

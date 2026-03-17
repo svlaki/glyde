@@ -129,9 +129,14 @@ function AspectsPageMobile() {
   }
 
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
-    if (!user || !session || !editingGoal) return
+    if (!user || !session || !editingGoal) {
+      throw new Error('Not authenticated or no goal selected')
+    }
     const { id, ...updates } = goalData
-    await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    const result = await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    if (result.error) {
+      throw new Error(result.error)
+    }
     setEditingGoal(null)
   }
 
@@ -399,9 +404,14 @@ function AspectsPageDesktop() {
   }
 
   const handleSaveGoal = async (goalData: Partial<Goal>) => {
-    if (!user || !session || !editingGoal) return
+    if (!user || !session || !editingGoal) {
+      throw new Error('Not authenticated or no goal selected')
+    }
     const { id, ...updates } = goalData
-    await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    const result = await updateUserGoal(user, session.access_token, editingGoal.id, updates)
+    if (result.error) {
+      throw new Error(result.error)
+    }
     setEditingGoal(null)
   }
 

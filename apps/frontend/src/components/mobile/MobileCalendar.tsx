@@ -9,6 +9,7 @@ import { getColors, hexToRgba } from '../../styles/colors'
 import { getTypography } from '../../styles/typography'
 import { EventFormUnified } from '../event'
 import { getRecurrenceBadge } from '../../lib/recurrenceUtils'
+import { computeDayEventLayouts } from '../../lib/calendarLayoutUtils'
 
 type MobileViewType = 'day' | '3day' | 'month'
 
@@ -714,6 +715,69 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
     }
   }
 
+  // Toggle missed status for past events
+  const handleToggleMissed = async (event: CalendarEvent) => {
+    if (!user || !session) return
+
+    const newMissedStatus = !event.is_missed
+    const matchInstance = (ev: CalendarEvent) =>
+      event.is_instance && event.instance_date
+        ? ev.id === event.id && ev.instance_date === event.instance_date
+        : ev.id === event.id
+
+    // Optimistic update
+    setEvents(prev => prev.map(ev =>
+      matchInstance(ev) ? { ...ev, is_missed: newMissedStatus } : ev
+    ))
+    // Also update selectedEvent so the form reflects the change immediately
+    setSelectedEvent(prev =>
+      prev && matchInstance(prev) ? { ...prev, is_missed: newMissedStatus } : prev
+    )
+
+    try {
+      let error: string | null = null
+
+      if (event.is_instance && event.instance_date) {
+        const result = await updateRecurringEvent(
+          user,
+          event.parent_event_id || event.id,
+          'this_instance',
+          { is_missed: newMissedStatus, instance_date: event.instance_date } as any,
+          session.access_token
+        )
+        error = result.error
+      } else {
+        const result = await updateEvent(
+          user,
+          event.id,
+          { is_missed: newMissedStatus },
+          session.access_token
+        )
+        error = result.error
+      }
+
+      if (error) {
+        setEvents(prev => prev.map(ev =>
+          matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
+        ))
+        setSelectedEvent(prev =>
+          prev && matchInstance(prev) ? { ...prev, is_missed: !newMissedStatus } : prev
+        )
+      } else if (event.is_instance) {
+        const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+        if (refreshed) setEvents(refreshed)
+      }
+    } catch (err) {
+      console.error('Error toggling missed status:', err)
+      setEvents(prev => prev.map(ev =>
+        matchInstance(ev) ? { ...ev, is_missed: !newMissedStatus } : ev
+      ))
+      setSelectedEvent(prev =>
+        prev && matchInstance(prev) ? { ...prev, is_missed: !newMissedStatus } : prev
+      )
+    }
+  }
+
   // Handle tap on time slot to create event
   const handleTimeSlotTap = (hour: number) => {
     const startTime = new Date(currentDate)
@@ -1222,6 +1286,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               {/* Day columns */}
               {getVisibleDays(currentDate, 63).map((date, dayIndex) => {
                 const dayEvents = getEventsForDate(date)
+                const dayLayouts = computeDayEventLayouts(dayEvents, { leftOffset: 4, rightMargin: 4, minWidthPercent: 40 })
                 const dayWidth = `${columnWidth}px`
                 const todayDate = isToday(date)
 
@@ -1352,6 +1417,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     const eventColor = getEventColor(event)
                     const isFriendEvent = event.is_friend_event
                     const isShared = isSharedEvent(event)
+                    const eventLayout = dayLayouts.get(event.id)
                     const isBeingDragged = isDragging && draggingEvent?.id === event.id
 
                     // Calculate drag offset (vertical and horizontal)
@@ -1421,8 +1487,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         }}
                         style={{
                           position: 'absolute',
-                          left: '4px',
-                          right: '4px',
+                          left: eventLayout?.left ?? '4px',
+                          right: eventLayout?.right ?? '4px',
+                          width: eventLayout?.width,
                           top: `${startMinutes + dragOffset}px`,
                           height: `${Math.max(duration, 15)}px`,
                           background: !showInThisColumn ? 'transparent' : hexToRgba(eventColor, isBeingDragged ? 0.35 : 0.25),
@@ -1431,7 +1498,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           padding: '2px 4px',
                           cursor: isDragging ? 'grabbing' : 'pointer',
                           overflow: 'hidden',
-                          zIndex: isBeingDragged ? 100 : 5,
+                          zIndex: isBeingDragged ? 100 : (eventLayout?.zIndex ?? 5),
                           opacity: !showInThisColumn ? 0 : (isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1)),
                           transition: isBeingDragged ? 'none' : 'all 0.2s',
                           touchAction: 'none',
@@ -1490,6 +1557,16 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                             <span style={{ marginLeft: '2px', fontSize: '8px', opacity: 0.7, fontWeight: 700 }}>
                               {event.user_role === 'viewer' ? 'V' : 'E'}
                             </span>
+                          )}
+                          {!isFriendEvent && event.is_missed && (
+                            <span style={{
+                              width: '5px',
+                              height: '5px',
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              flexShrink: 0,
+                              marginLeft: 'auto'
+                            }} />
                           )}
                         </div>
                         {duration >= 30 && (
@@ -1644,7 +1721,10 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
             )}
 
             {/* Events */}
-            {getEventsForDate(currentDate).map((event) => {
+            {(() => {
+              const dayEventsForLayout = getEventsForDate(currentDate)
+              const dayViewLayouts = computeDayEventLayouts(dayEventsForLayout, { leftOffset: 58, rightMargin: 8, minWidthPercent: 45 })
+              return dayEventsForLayout.map((event) => {
               const startTime = new Date(event.start_time)
               const endTime = new Date(event.end_time)
               const startMinutes = startTime.getHours() * 60 + startTime.getMinutes()
@@ -1653,6 +1733,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               const isFriendEvent = event.is_friend_event
               const isShared = isSharedEvent(event)
               const isBeingDragged = isDragging && draggingEvent?.id === event.id
+              const eventLayout = dayViewLayouts.get(event.id)
 
               let dragOffset = 0
               if (isBeingDragged) {
@@ -1695,8 +1776,9 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   className="calendar-event"
                   style={{
                     position: 'absolute',
-                    left: '58px',
-                    right: '8px',
+                    left: eventLayout?.left ?? '58px',
+                    right: eventLayout?.right ?? '8px',
+                    width: eventLayout?.width,
                     top: `${startMinutes + dragOffset}px`,
                     height: `${Math.max(duration, 15)}px`,
                     background: hexToRgba(eventColor, isBeingDragged ? 0.35 : 0.25),
@@ -1705,7 +1787,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     padding: '4px 8px',
                     cursor: isDragging ? 'grabbing' : 'pointer',
                     overflow: 'hidden',
-                    zIndex: isBeingDragged ? 100 : 5,
+                    zIndex: isBeingDragged ? 100 : (eventLayout?.zIndex ?? 5),
                     opacity: isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1),
                     transition: isBeingDragged ? 'none' : 'all 0.2s',
                     touchAction: 'none',
@@ -1760,6 +1842,16 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                         {event.user_role === 'viewer' ? 'V' : 'E'}
                       </span>
                     )}
+                    {!isFriendEvent && event.is_missed && (
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: '#ef4444',
+                        flexShrink: 0,
+                        marginLeft: 'auto'
+                      }} />
+                    )}
                   </div>
                   <div style={{
                     ...typography.labelMd,
@@ -1773,7 +1865,8 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                   </div>
                 </div>
               )
-            })}
+            })
+            })()}
           </div>
         </div>
       )}
@@ -1821,6 +1914,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
               setIsFormOpen(false)
               setSelectedEvent(null)
             }}
+            onToggleMissed={isViewerOnly ? undefined : (evt) => handleToggleMissed(evt)}
             onDelete={isViewerOnly ? undefined : async (scope) => {
               if (!selectedEvent?.id || !user) return
               if (scope) {
