@@ -286,6 +286,7 @@ TOOL USAGE:
 - Call tools immediately when asked to create, update, delete, or reschedule anything.
 - Act directly with tools rather than describing actions. Execute without confirmation if intent is clear.
 - For multi-action requests, call ALL relevant tools before responding.
+- NEVER tell the user you completed an action unless you actually called the tool and it succeeded. If you haven't called the tool yet, call it now — do not just describe what you would do.
 
 YOUR CALENDAR:${eventContext}
 
