@@ -23,11 +23,11 @@ export const addEventMemberTool = tool(
   },
   {
     name: "add_event_member",
-    description: "Add a friend to a shared event. Only friends can be added. Use list_friends to find the friend's userId and list_events/search_events to find the eventId.",
+    description: "Add a friend to a shared event.",
     schema: z.object({
-      eventId: z.string().uuid().describe("The event ID to add a member to"),
-      friendUserId: z.string().uuid().describe("The friend's user ID (from list_friends) to add to the event"),
-      role: z.enum(['editor', 'viewer']).default('viewer').describe("Role for the new member. 'editor' can modify the event, 'viewer' can only see it."),
+      eventId: z.string().uuid().describe("Event UUID"),
+      friendUserId: z.string().uuid().describe("Friend's user UUID"),
+      role: z.enum(['editor', 'viewer']).default('viewer').describe("Member role"),
     }),
   }
 );

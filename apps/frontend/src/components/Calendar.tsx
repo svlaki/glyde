@@ -32,6 +32,7 @@ export function Calendar() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragPreview, setDragPreview] = useState<{ date: Date; hour: number; quarter: number } | null>(null)
+  const [expandedAllDayDates, setExpandedAllDayDates] = useState<Set<string>>(new Set())
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Persist friends events toggle
@@ -141,7 +142,7 @@ export function Calendar() {
           user,
           event.parent_event_id || event.id,
           'this_instance',
-          { is_missed: newMissedStatus, instance_date: event.instance_date } as any,
+          { is_missed: newMissedStatus, instance_date: event.instance_date, start_time: event.start_time, end_time: event.end_time } as any,
           session.access_token
         )
         error = result.error
@@ -182,8 +183,46 @@ export function Calendar() {
     }
   }
 
+  // Get all-day events for a specific date (must be declared before allDayBannerInfo IIFE)
+  const getAllDayEventsForDate = (date: Date) => {
+    return allEvents.filter(event => {
+      if (!event.is_all_day) return false
+      const eventStart = new Date(event.start_time)
+      const eventEnd = new Date(event.end_time)
+      // All-day event spans this date if: start <= end-of-day AND end >= start-of-day
+      const dayStart = new Date(date)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(date)
+      dayEnd.setHours(23, 59, 59, 999)
+      return eventStart <= dayEnd && eventEnd > dayStart
+    }).sort((a, b) => a.title.localeCompare(b.title))
+  }
+
   const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getWeekDates(currentDate) : getMonthDates(currentDate)
   const hours = Array.from({ length: 24 }, (_, i) => i)
+
+  // Compute all-day banner height for day/week views (uniform across columns)
+  const allDayMaxVisible = 2
+  const allDayBannerInfo = (() => {
+    if (view === 'month') return { maxCount: 0, height: 0 }
+    let maxCount = 0
+    for (const date of displayDates) {
+      const count = getAllDayEventsForDate(date).length
+      if (count > maxCount) maxCount = count
+    }
+    if (maxCount === 0) return { maxCount: 0, height: 0 }
+    // Check if any date is expanded
+    const anyExpanded = displayDates.some(d => expandedAllDayDates.has(d.toDateString()))
+    const visibleCount = anyExpanded ? maxCount : Math.min(maxCount, allDayMaxVisible)
+    // Each pill is ~24px + 3px gap, plus 4px padding top/bottom, plus "+N more" row if needed
+    const pillHeight = 24
+    const gap = 3
+    const padding = 8
+    const moreRowHeight = maxCount > allDayMaxVisible && !anyExpanded ? 20 : 0
+    const lessRowHeight = anyExpanded && maxCount > allDayMaxVisible ? 20 : 0
+    const height = padding + (visibleCount * pillHeight) + ((visibleCount - 1) * gap) + moreRowHeight + lessRowHeight + 1 // +1 for border
+    return { maxCount, height }
+  })()
 
   // Load events and set up real-time subscription
   useEffect(() => {
@@ -212,6 +251,16 @@ export function Calendar() {
     const syncInterval = setInterval(() => {
       if (isSubscribed) loadEvents()
     }, 60000)
+
+    // Listen for agent-initiated data changes (agent creates via service role,
+    // which may not trigger Supabase Realtime reliably)
+    const handleAgentChange = () => {
+      if (isSubscribed) {
+        if (refreshTimer) clearTimeout(refreshTimer)
+        refreshTimer = setTimeout(() => loadEvents(), 500)
+      }
+    }
+    window.addEventListener('agent-data-changed', handleAgentChange)
 
     // Set up real-time subscription for events
     if (!user) return
@@ -242,6 +291,7 @@ export function Calendar() {
       if (refreshTimer) {
         clearTimeout(refreshTimer)
       }
+      window.removeEventListener('agent-data-changed', handleAgentChange)
       supabase.removeChannel(channel)
     }
   }, [user, session])
@@ -274,9 +324,11 @@ export function Calendar() {
     return `${displayHour}${ampm}`
   }
 
-  // Get events for a specific date and hour
+
+  // Get timed (non-all-day) events for a specific date and hour
   const getEventsForSlot = (date: Date, hour: number) => {
     const filtered = allEvents.filter(event => {
+      if (event.is_all_day) return false
       const eventStart = new Date(event.start_time)
       const eventDate = eventStart.toDateString()
       const eventHour = eventStart.getHours()
@@ -288,9 +340,10 @@ export function Calendar() {
     return filtered
   }
 
-  // Get all events for a specific date (for overlap calculation)
+  // Get all timed (non-all-day) events for a specific date (for overlap calculation)
   const getEventsForDay = (date: Date) => {
     return allEvents.filter(event => {
+      if (event.is_all_day) return false
       const eventStart = new Date(event.start_time)
       return eventStart.toDateString() === date.toDateString()
     })
@@ -299,11 +352,27 @@ export function Calendar() {
   // Overlap layout now handled by computeDayEventLayouts from calendarLayoutUtils
 
   // Get events for a specific date (for month view)
+  // All-day events sorted first, then timed events by start time
   const getEventsForDate = (date: Date) => {
     return allEvents.filter(event => {
+      if (event.is_all_day) {
+        // All-day events span the date if start <= end-of-day and end > start-of-day
+        const eventStart = new Date(event.start_time)
+        const eventEnd = new Date(event.end_time)
+        const dayStart = new Date(date)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(date)
+        dayEnd.setHours(23, 59, 59, 999)
+        return eventStart <= dayEnd && eventEnd > dayStart
+      }
       const eventStart = new Date(event.start_time)
       return eventStart.toDateString() === date.toDateString()
-    }).sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    }).sort((a, b) => {
+      // All-day events first
+      if (a.is_all_day && !b.is_all_day) return -1
+      if (!a.is_all_day && b.is_all_day) return 1
+      return new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    })
   }
 
   // Calculate event position and height
@@ -393,7 +462,8 @@ export function Calendar() {
             end_time: eventData.end_time!,
             ...(eventData.description ? { description: eventData.description } : {}),
             ...(eventData.aspect ? { aspect: eventData.aspect } : {}),
-            ...(eventData.visibility ? { visibility: eventData.visibility } : {})
+            ...(eventData.visibility ? { visibility: eventData.visibility } : {}),
+            ...(eventData.reminder_minutes !== undefined ? { reminder_minutes: eventData.reminder_minutes } : {})
           },
           session?.access_token
         )
@@ -860,6 +930,7 @@ export function Calendar() {
                         const eventColor = getEventColor(event)
                         const isFriendEvent = event.is_friend_event
                         const isShared = isSharedEvent(event)
+                        const isAllDay = event.is_all_day
                         return (
                           <div
                             key={event.id}
@@ -869,12 +940,14 @@ export function Calendar() {
                               setIsFormOpen(true)
                             }}
                             style={{
-                              background: hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
-                              borderLeft: `2px solid ${eventColor}`,
-                              color: colors.textPrimary,
+                              background: isAllDay
+                                ? hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
+                                : hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
+                              borderLeft: isAllDay ? 'none' : `2px solid ${eventColor}`,
+                              color: isAllDay ? eventColor : colors.textPrimary,
                               fontSize: fontSize.xs,
                               fontFamily: fontFamily.sans,
-                              fontWeight: fontWeight.medium,
+                              fontWeight: isAllDay ? fontWeight.semibold : fontWeight.medium,
                               padding: '3px 6px',
                               borderRadius: '4px',
                               overflow: 'hidden',
@@ -889,12 +962,12 @@ export function Calendar() {
                               gap: '4px'
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
+                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : (isAllDay ? 0.3 : 0.2))
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12)
+                              e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? (isAllDay ? 0.12 : 0.08) : (isAllDay ? 0.2 : 0.12))
                             }}
-                            title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''} - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                            title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''}${isAllDay ? ' (all day)' : ` - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}`}
                           >
                             {isFriendEvent && (
                               <span style={{
@@ -1015,6 +1088,21 @@ export function Calendar() {
               }}>
                 {new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()}
               </div>
+              {/* All-day banner spacer (matches day column banner height) */}
+              {allDayBannerInfo.height > 0 && (
+                <div style={{
+                  height: `${allDayBannerInfo.height}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: fontSize.xs,
+                  fontFamily: fontFamily.sans,
+                  color: colors.textTertiary,
+                  borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                }}>
+                  all-day
+                </div>
+              )}
               {/* Spacer for gap between header and first hour */}
               <div style={{ height: '12px' }} />
               {hours.map(hour => (
@@ -1060,7 +1148,13 @@ export function Calendar() {
                     flex: 1,
                     minWidth: view === 'day' ? '300px' : '100px',
                     position: 'relative',
-                    background: todayBg,
+                    backgroundColor: todayBg,
+                    backgroundImage: dayIndex > 0
+                      ? `linear-gradient(${isDarkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)'} 50%, transparent 50%)`
+                      : 'none',
+                    backgroundSize: dayIndex > 0 ? '1px 6px' : 'auto',
+                    backgroundRepeat: dayIndex > 0 ? 'repeat-y' : 'no-repeat',
+                    backgroundPosition: dayIndex > 0 ? 'left top' : 'initial',
                   }}
                 >
                   {/* Day Header - Mobile style */}
@@ -1090,6 +1184,136 @@ export function Calendar() {
                       {date.getDate()}
                     </span>
                   </div>
+
+                  {/* All-Day Events Banner */}
+                  {allDayBannerInfo.height > 0 && (() => {
+                    const allDayEvents = getAllDayEventsForDate(date)
+                    const dateKey = date.toDateString()
+                    const anyExpanded = displayDates.some(d => expandedAllDayDates.has(d.toDateString()))
+                    const visibleEvents = anyExpanded ? allDayEvents : allDayEvents.slice(0, allDayMaxVisible)
+                    const hiddenCount = allDayEvents.length - allDayMaxVisible
+
+                    return (
+                      <div style={{
+                        height: `${allDayBannerInfo.height}px`,
+                        padding: '4px 6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px',
+                        borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                        background: isDarkMode ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)',
+                        overflow: 'hidden',
+                        boxSizing: 'border-box',
+                      }}>
+                        {visibleEvents.map(event => {
+                          const eventColor = getEventColor(event)
+                          const isFriendEvent = event.is_friend_event
+                          return (
+                            <div
+                              key={`allday-${event.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedEvent(event)
+                                setIsFormOpen(true)
+                              }}
+                              style={{
+                                height: '24px',
+                                background: hexToRgba(eventColor, isFriendEvent ? 0.1 : 0.15),
+                                color: eventColor,
+                                fontSize: fontSize.xs,
+                                fontFamily: fontFamily.sans,
+                                fontWeight: fontWeight.medium,
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                cursor: 'pointer',
+                                transition: 'background 0.15s ease',
+                                opacity: isFriendEvent ? 0.7 : 1,
+                                flexShrink: 0,
+                                boxSizing: 'border-box',
+                                lineHeight: '18px',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.15 : 0.25)
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.1 : 0.15)
+                              }}
+                              title={event.title}
+                            >
+                              {event.title}
+                            </div>
+                          )
+                        })}
+                        {!anyExpanded && hiddenCount > 0 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedAllDayDates(prev => {
+                                const next = new Set(prev)
+                                next.add(dateKey)
+                                return next
+                              })
+                            }}
+                            style={{
+                              height: '20px',
+                              fontSize: fontSize.xs,
+                              fontFamily: fontFamily.sans,
+                              fontWeight: fontWeight.medium,
+                              color: colors.textTertiary,
+                              cursor: 'pointer',
+                              padding: '2px 8px',
+                              flexShrink: 0,
+                              boxSizing: 'border-box',
+                              lineHeight: '16px',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = colors.textPrimary
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = colors.textTertiary
+                            }}
+                          >
+                            +{hiddenCount} more
+                          </div>
+                        )}
+                        {anyExpanded && hiddenCount > 0 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExpandedAllDayDates(prev => {
+                                const next = new Set(prev)
+                                next.delete(dateKey)
+                                return next
+                              })
+                            }}
+                            style={{
+                              height: '20px',
+                              fontSize: fontSize.xs,
+                              fontFamily: fontFamily.sans,
+                              fontWeight: fontWeight.medium,
+                              color: colors.textTertiary,
+                              cursor: 'pointer',
+                              padding: '2px 8px',
+                              flexShrink: 0,
+                              boxSizing: 'border-box',
+                              lineHeight: '16px',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = colors.textPrimary
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = colors.textTertiary
+                            }}
+                          >
+                            show less
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Spacer for gap between header and first hour */}
                   <div style={{ height: '12px' }} />

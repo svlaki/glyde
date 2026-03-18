@@ -59,10 +59,10 @@ export const deleteRuleTool = tool(
   },
   {
     name: "delete_rule",
-    description: "Delete a rule. You can either provide the rule_id directly, or use search_query to find and delete a rule by its content.",
+    description: "Delete a rule by ID or search.",
     schema: z.object({
-      rule_id: z.string().optional().nullable().describe("The ID of the rule to delete (UUID format)"),
-      search_query: z.string().optional().nullable().describe("Search text to find a rule by its content. If multiple rules match, they will be listed for the user to choose."),
+      rule_id: z.string().optional().nullable().describe("Rule UUID"),
+      search_query: z.string().optional().nullable().describe("Search text to find rule"),
     }),
   }
 );

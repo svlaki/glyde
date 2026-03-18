@@ -68,19 +68,10 @@ export const webSearchTool = tool(
   },
   {
     name: "web_search",
-    description: `Search the web for real-time information about restaurants, locations, businesses, events, and general queries.
-
-Use this tool when:
-- User mentions a restaurant, cafe, or venue (get address, hours, phone, menu info)
-- Creating events at specific locations (enrich with venue details)
-- User asks about current events, news, or factual information
-- User needs directions, business hours, or contact information
-- User wants recommendations or information about places/things
-
-Returns: AI-generated answer summary (when available) with supporting search results including titles, content snippets, and source URLs.`,
+    description: "Search the web for real-time information.",
     schema: z.object({
-      query: z.string().describe("The search query. Be specific. Examples: 'Flour + Water restaurant San Francisco address hours', 'Stanford vs Cal football game 2025 date', 'Coupa Cafe Palo Alto location menu'"),
-      maxResults: z.number().default(5).optional().nullable().describe("Maximum number of results to return (default: 5)"),
+      query: z.string().describe("Search query"),
+      maxResults: z.number().default(5).optional().nullable().describe("Max results (default 5)"),
     }),
   }
 );

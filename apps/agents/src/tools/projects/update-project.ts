@@ -29,14 +29,14 @@ export const updateProjectTool = tool(
   },
   {
     name: "update_project",
-    description: "Update an existing project's name, description, deadline, aspect, or details.",
+    description: "Update a project.",
     schema: z.object({
-      project_id: z.string().describe("UUID of the project to update"),
-      name: z.string().optional().nullable().describe("New project name"),
+      project_id: z.string().describe("Project UUID"),
+      name: z.string().optional().nullable().describe("New name"),
       description: z.string().optional().nullable().describe("New description"),
-      deadline: z.string().optional().nullable().describe("New deadline in ISO format, or null to clear"),
+      deadline: z.string().optional().nullable().describe("New deadline ISO"),
       aspect_id: z.string().optional().nullable().describe("New aspect UUID"),
-      details: z.record(z.any()).optional().nullable().describe("Updated details JSON"),
+      details: z.record(z.any()).optional().nullable().describe("Updated details (JSON)"),
     }),
   }
 );

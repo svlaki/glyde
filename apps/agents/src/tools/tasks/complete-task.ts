@@ -39,11 +39,11 @@ export const completeTaskTool = tool(
   },
   {
     name: "complete_task",
-    description: "Mark a task as completed. Use this when the user finishes a task or says they're done with something.",
+    description: "Mark a task as completed.",
     schema: z.object({
-      taskId: z.string().describe("Task ID to complete"),
-      notes: z.string().optional().nullable().describe("Completion notes or comments"),
-      actualDuration: z.number().optional().nullable().describe("Actual time spent in minutes"),
+      taskId: z.string().describe("Task UUID"),
+      notes: z.string().optional().nullable().describe("Completion notes"),
+      actualDuration: z.number().optional().nullable().describe("Actual time in minutes"),
     }),
   }
 );

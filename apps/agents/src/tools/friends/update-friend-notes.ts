@@ -23,10 +23,10 @@ export const updateFriendNotesTool = tool(
   },
   {
     name: "update_friend_notes",
-    description: "Update the notes on a friendship. Useful for saving context about a friend.",
+    description: "Update notes on a friendship.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID to update notes for"),
-      notes: z.string().describe("The notes to save on this friendship"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
+      notes: z.string().describe("Notes text"),
     }),
   }
 );

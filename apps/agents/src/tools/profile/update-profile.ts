@@ -30,10 +30,10 @@ export const updateProfileTool = tool(
   },
   {
     name: "update_profile",
-    description: "Update a specific field in the user profile. Use this to learn and store information about the user as you interact with them. Examples: 'productivity.peakFocusHours', 'work.role', 'health.sleepSchedule.targetBedtime'",
+    description: "Update a user profile field.",
     schema: z.object({
-      field: z.string().describe("Profile field path (e.g., 'productivity.peakFocusHours', 'work.workingHours.start')"),
-      value: z.any().describe("New value for the field (can be string, number, array, or object)"),
+      field: z.string().describe("Field path (e.g., 'productivity.peakFocusHours')"),
+      value: z.any().describe("New value"),
     }),
   }
 );

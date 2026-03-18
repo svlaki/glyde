@@ -4,6 +4,7 @@ import { getConnectionService, UserConnection } from './ConnectionService.js';
 import aspectService from './AspectService.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
+import OpenAI from 'openai';
 
 const MAPPING_COLUMNS = 'id, user_id, connection_id, provider_calendar_id, provider_calendar_name, provider_calendar_color, is_primary, aspect_id, is_synced, is_visible, sync_token, last_synced_at, created_at, updated_at';
 
@@ -474,12 +475,23 @@ export class CalendarMappingService {
       for (const gcal of calendars) {
         const existing = existingByCalendarId.get(gcal.id);
 
+        // Determine sync behavior based on calendar type
+        const calendarType = this.classifyCalendar(gcal.id, connection.provider);
+        // Skip contacts, weather, other system calendars entirely
+        const shouldSync = calendarType === 'user' ? gcal.primary : calendarType === 'holiday';
+        const shouldSkip = calendarType === 'skip';
+
         if (existing) {
           // Update existing mapping with latest calendar info
-          const updated = await this.updateMapping(existing.id, {
+          const updateData: UpdateCalendarMappingInput = {
             provider_calendar_name: gcal.summary,
             provider_calendar_color: gcal.backgroundColor || undefined
-          });
+          };
+          // Force skip calendars to not sync
+          if (shouldSkip) {
+            updateData.is_synced = false;
+          }
+          const updated = await this.updateMapping(existing.id, updateData);
           results.push(updated);
         } else {
           // Create new mapping (upsert to handle concurrent syncs)
@@ -489,8 +501,8 @@ export class CalendarMappingService {
             provider_calendar_name: gcal.summary,
             provider_calendar_color: gcal.backgroundColor || undefined,
             is_primary: gcal.primary,
-            is_synced: gcal.primary, // Only sync primary by default
-            is_visible: true
+            is_synced: shouldSkip ? false : shouldSync,
+            is_visible: !shouldSkip
           });
           results.push(created);
         }
@@ -505,14 +517,14 @@ export class CalendarMappingService {
   }
 
   /**
-   * Auto-map calendars to aspects based on name matching
-   * Only maps synced calendars, skips non-user calendars (holidays, birthdays, etc.)
+   * Auto-map calendars to aspects using LLM-based categorization.
+   * Falls back to simple synonym matching if LLM call fails.
+   * Only maps synced user calendars, skips holiday/system calendars.
    */
   async autoMapCalendarsToAspects(connection: UserConnection): Promise<void> {
     logger.info('[CalendarMappingService] Auto-mapping calendars to aspects for:', connection.id);
 
     try {
-      // Only process calendars that are actually being synced
       const mappings = await this.getSyncedMappings(connection.id);
       let existingAspects = await aspectService.getAspects(connection.user_id);
       const usedColors = new Set<string>(
@@ -521,53 +533,173 @@ export class CalendarMappingService {
           .filter((c): c is string => c !== undefined)
       );
 
+      // Collect calendars that need mapping
+      const unmappedCalendars: Array<{ mapping: CalendarMapping; calendarName: string }> = [];
       for (const mapping of mappings) {
-        // Skip if already has an aspect assigned
         if (mapping.aspect_id) continue;
-
-        // Skip non-user calendars (holidays, birthdays, contacts, etc.)
         if (this.isNonUserCalendar(mapping.provider_calendar_id, connection.provider)) {
           logger.info(`[CalendarMappingService] Skipping non-user calendar: ${mapping.provider_calendar_name}`);
           continue;
         }
+        unmappedCalendars.push({
+          mapping,
+          calendarName: mapping.provider_calendar_name || 'Calendar'
+        });
+      }
 
-        const calendarName = mapping.provider_calendar_name || 'Calendar';
-        const providerLabel = connection.provider === 'microsoft' ? 'Outlook' : 'Google Calendar';
+      if (unmappedCalendars.length === 0) return;
 
-        // Try to find a matching aspect
-        const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
+      // Try LLM-based mapping first, fall back to synonym matching
+      let llmMappings: Record<string, string | null> | null = null;
+      try {
+        llmMappings = await this.getLLMCalendarMappings(
+          unmappedCalendars.map(c => ({
+            name: c.calendarName,
+            isPrimary: c.mapping.is_primary
+          })),
+          existingAspects.map(a => ({ id: a.id, name: a.name }))
+        );
+      } catch (error) {
+        logger.warn('[CalendarMappingService] LLM mapping failed, falling back to synonym matching:', error);
+      }
 
-        if (matchedAspect) {
-          // Use existing aspect
-          await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
-          logger.info(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
-        } else {
-          // Create new aspect with unused color
+      const providerLabel = connection.provider === 'microsoft' ? 'Outlook' : 'Google Calendar';
+
+      for (const { mapping, calendarName } of unmappedCalendars) {
+        // Check LLM result first
+        const llmAspectId = llmMappings?.[calendarName];
+
+        if (llmAspectId === null) {
+          // LLM says don't map (e.g. primary calendar -> use Personal or leave null)
+          // Find a "Personal" aspect to use as fallback for primary calendar
+          if (mapping.is_primary) {
+            const personalAspect = existingAspects.find(
+              a => a.name.toLowerCase() === 'personal'
+            );
+            if (personalAspect) {
+              await this.updateMapping(mapping.id, { aspect_id: personalAspect.id });
+              logger.info(`[CalendarMappingService] Mapped primary calendar to "Personal" aspect`);
+            }
+          }
+          continue;
+        }
+
+        if (llmAspectId && llmAspectId.startsWith('existing:')) {
+          // LLM matched to an existing aspect
+          const aspectId = llmAspectId.replace('existing:', '');
+          const matchedAspect = existingAspects.find(a => a.id === aspectId);
+          if (matchedAspect) {
+            await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
+            logger.info(`[CalendarMappingService] LLM mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
+            continue;
+          }
+        }
+
+        if (llmAspectId && llmAspectId.startsWith('new:')) {
+          // LLM suggests creating a new aspect with a clean name
+          const cleanName = llmAspectId.replace('new:', '');
           const newColor = this.getUnusedColor(usedColors);
           usedColors.add(newColor.toLowerCase());
 
           const newAspect = await aspectService.createAspect(connection.user_id, {
-            name: this.cleanCalendarName(calendarName),
+            name: cleanName,
             color: newColor,
             description: `Auto-created from ${providerLabel}: ${calendarName}`
           });
 
           if (newAspect) {
             await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
-            existingAspects = [...existingAspects, newAspect]; // Add to list for future matching
-            logger.info(`[CalendarMappingService] Created new aspect "${newAspect.name}" for calendar "${calendarName}"`);
+            existingAspects = [...existingAspects, newAspect];
+            logger.info(`[CalendarMappingService] LLM created aspect "${cleanName}" for calendar "${calendarName}"`);
+          }
+          continue;
+        }
+
+        // Fallback: use simple synonym matching
+        const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
+        if (matchedAspect) {
+          await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
+          logger.info(`[CalendarMappingService] Synonym-matched "${calendarName}" to "${matchedAspect.name}"`);
+        } else {
+          const newColor = this.getUnusedColor(usedColors);
+          usedColors.add(newColor.toLowerCase());
+          const newAspect = await aspectService.createAspect(connection.user_id, {
+            name: this.cleanCalendarName(calendarName),
+            color: newColor,
+            description: `Auto-created from ${providerLabel}: ${calendarName}`
+          });
+          if (newAspect) {
+            await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
+            existingAspects = [...existingAspects, newAspect];
+            logger.info(`[CalendarMappingService] Created aspect "${newAspect.name}" for "${calendarName}"`);
           }
         }
       }
     } catch (error) {
       logger.error('[CalendarMappingService] Error auto-mapping calendars:', error);
-      // Don't throw - mapping is optional, sync can still work
+    }
+  }
+
+  /**
+   * Use LLM to intelligently map calendar names to existing aspects
+   * or suggest creating new ones with clean names.
+   */
+  private async getLLMCalendarMappings(
+    calendars: Array<{ name: string; isPrimary: boolean }>,
+    existingAspects: Array<{ id: string; name: string }>
+  ): Promise<Record<string, string | null>> {
+    const openai = new OpenAI();
+
+    const aspectList = existingAspects.length > 0
+      ? existingAspects.map(a => `- "${a.name}" (id: ${a.id})`).join('\n')
+      : '(No existing aspects yet)';
+
+    const calendarList = calendars
+      .map(c => `- "${c.name}"${c.isPrimary ? ' [PRIMARY]' : ''}`)
+      .join('\n');
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      messages: [
+        {
+          role: 'system',
+          content: `You map Google/Outlook calendar names to life aspects (categories like Work, Health, Personal, Social, etc).
+
+Rules:
+1. Map each calendar to the best-fitting existing aspect if one matches semantically.
+2. If no existing aspect fits, suggest a clean, short aspect name (2-3 words max).
+3. For PRIMARY calendars (the user's main calendar): map to "Personal" if it exists, otherwise return null. Do NOT create an aspect from the user's email address.
+4. Clean up messy calendar names: "ebf social calendar!!" -> "Social", "Du Bois Lab (Chem)" -> "Chemistry Lab", "PHYSICS 44" -> "Physics".
+5. If a calendar name is just an email address, map to "Personal" or null.
+
+Return JSON only, no markdown. Format:
+{
+  "calendar name": "existing:aspect-uuid" | "new:Clean Aspect Name" | null
+}`
+        },
+        {
+          role: 'user',
+          content: `Existing aspects:\n${aspectList}\n\nCalendars to map:\n${calendarList}`
+        }
+      ]
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) return {};
+
+    try {
+      return JSON.parse(content.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+    } catch {
+      logger.warn('[CalendarMappingService] Failed to parse LLM response:', content);
+      return {};
     }
   }
 
   /**
    * Auto-map a single calendar mapping to an aspect.
    * Used when a calendar is toggled ON outside of onboarding.
+   * Uses LLM for intelligent mapping, falls back to synonym matching.
    */
   async autoMapSingleCalendar(userId: string, mapping: CalendarMapping): Promise<CalendarMapping> {
     try {
@@ -585,11 +717,51 @@ export class CalendarMappingService {
       );
 
       const calendarName = mapping.provider_calendar_name || 'Calendar';
-      const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
 
+      // Try LLM mapping first
+      try {
+        const llmResult = await this.getLLMCalendarMappings(
+          [{ name: calendarName, isPrimary: mapping.is_primary }],
+          existingAspects.map(a => ({ id: a.id, name: a.name }))
+        );
+        const llmAspectId = llmResult[calendarName];
+
+        if (llmAspectId === null && mapping.is_primary) {
+          const personalAspect = existingAspects.find(a => a.name.toLowerCase() === 'personal');
+          if (personalAspect) {
+            await this.updateMapping(mapping.id, { aspect_id: personalAspect.id });
+            return { ...mapping, aspect_id: personalAspect.id };
+          }
+          return mapping;
+        }
+
+        if (llmAspectId?.startsWith('existing:')) {
+          const aspectId = llmAspectId.replace('existing:', '');
+          await this.updateMapping(mapping.id, { aspect_id: aspectId });
+          return { ...mapping, aspect_id: aspectId };
+        }
+
+        if (llmAspectId?.startsWith('new:')) {
+          const cleanName = llmAspectId.replace('new:', '');
+          const newColor = this.getUnusedColor(usedColors);
+          const newAspect = await aspectService.createAspect(userId, {
+            name: cleanName,
+            color: newColor,
+            description: `Auto-created from calendar: ${calendarName}`
+          });
+          if (newAspect) {
+            await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
+            return { ...mapping, aspect_id: newAspect.id };
+          }
+        }
+      } catch {
+        logger.warn('[CalendarMappingService] LLM mapping failed for single calendar, using fallback');
+      }
+
+      // Fallback: synonym matching
+      const matchedAspect = this.findMatchingAspect(calendarName, existingAspects);
       if (matchedAspect) {
         await this.updateMapping(mapping.id, { aspect_id: matchedAspect.id });
-        logger.info(`[CalendarMappingService] Mapped "${calendarName}" to existing aspect "${matchedAspect.name}"`);
         return { ...mapping, aspect_id: matchedAspect.id };
       }
 
@@ -597,12 +769,11 @@ export class CalendarMappingService {
       const newAspect = await aspectService.createAspect(userId, {
         name: this.cleanCalendarName(calendarName),
         color: newColor,
-        description: `Auto-created from Google Calendar: ${calendarName}`
+        description: `Auto-created from calendar: ${calendarName}`
       });
 
       if (newAspect) {
         await this.updateMapping(mapping.id, { aspect_id: newAspect.id });
-        logger.info(`[CalendarMappingService] Created aspect "${newAspect.name}" for calendar "${calendarName}"`);
         return { ...mapping, aspect_id: newAspect.id };
       }
 
@@ -614,27 +785,28 @@ export class CalendarMappingService {
   }
 
   /**
+   * Classify a calendar by its ID into: 'user', 'holiday', or 'skip'
+   * - 'user': regular user calendars (should be aspect-mapped)
+   * - 'holiday': holiday calendars (sync as all-day, no aspect mapping)
+   * - 'skip': contacts, weather, other system calendars (don't sync)
+   */
+  private classifyCalendar(calendarId: string, provider?: string): 'user' | 'holiday' | 'skip' {
+    if (provider === 'microsoft') return 'user';
+
+    const id = calendarId.toLowerCase();
+
+    if (id.includes('#holiday@')) return 'holiday';
+    if (id.includes('#contacts@') || id.includes('#weather@') || id.includes('#other@')) return 'skip';
+    if (id.endsWith('@group.v.calendar.google.com') && id.includes('#')) return 'skip';
+
+    return 'user';
+  }
+
+  /**
    * Check if a calendar ID belongs to a non-user calendar (holidays, birthdays, contacts)
    */
   private isNonUserCalendar(calendarId: string, provider?: string): boolean {
-    // Microsoft calendars don't use special ID patterns like Google
-    if (provider === 'microsoft') return false;
-
-    const nonUserPatterns = [
-      '#holiday@group.v.calendar.google.com',
-      '#contacts@group.v.calendar.google.com',
-      '#other@group.v.calendar.google.com',
-      '#weather@group.v.calendar.google.com',
-      'addressbook#contacts@group.v.calendar.google.com',
-      'en.usa#holiday@group.v.calendar.google.com',
-    ];
-
-    const id = calendarId.toLowerCase();
-    return nonUserPatterns.some(pattern => id.includes(pattern.toLowerCase())) ||
-      id.includes('#holiday@') ||
-      id.includes('#contacts@') ||
-      id.includes('#weather@') ||
-      id.endsWith('@group.v.calendar.google.com') && id.includes('#');
+    return this.classifyCalendar(calendarId, provider) !== 'user';
   }
 
   /**

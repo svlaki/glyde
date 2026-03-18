@@ -1,3 +1,4 @@
+import { ToolCategory } from '../types/routing.js';
 import { calendarTools } from './calendar/index.js';
 import {
   createAspectTool,
@@ -137,19 +138,24 @@ export class ToolRegistry {
   }
 
   // Get tools by category
-  getToolsByCategory(category: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events'): any[] {
-    const categoryPrefixes = {
-      calendar: ['create_event', 'update_event', 'delete_event', 'delete_multiple_events', 'bulk_update_events', 'search_events', 'list_events', 'analyze_schedule'],
+  getToolsByCategory(category: ToolCategory | 'calendar' | 'interactions'): any[] {
+    const categoryPrefixes: Record<string, string[]> = {
+      // Split calendar: core (always) vs advanced (on-demand)
+      calendar_core: ['create_event', 'update_event', 'delete_event', 'search_events', 'list_events'],
+      calendar_advanced: ['delete_multiple_events', 'bulk_update_events', 'analyze_schedule', 'create_recurring_event', 'update_recurring_event', 'delete_recurring_event', 'find_free_time'],
+      // Legacy "calendar" returns all calendar tools (for backward compat)
+      calendar: ['create_event', 'update_event', 'delete_event', 'search_events', 'list_events', 'delete_multiple_events', 'bulk_update_events', 'analyze_schedule', 'create_recurring_event', 'update_recurring_event', 'delete_recurring_event', 'find_free_time'],
+      // Trim aspects: only core 3 always, delete/archive on demand
       aspects: ['create_aspect', 'list_aspects', 'update_aspect', 'delete_aspect', 'archive_aspect'],
       tasks: ['create_task', 'update_task', 'delete_task', 'list_tasks', 'complete_task', 'search_tasks'],
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],
-      memory: ['search_memory_unified', 'manage_patterns'],
+      memory: ['search_memory_unified', 'manage_patterns', 'update_memory_advanced'],
       search: ['web_search', 'location_search'],
       interactions: ['create_interaction', 'create_rating'],
-      rules: ['create_rule', 'list_rules', 'delete_rule'],
+      rules: ['create_rule', 'list_rules', 'delete_rule', 'toggle_rule'],
       plans: ['get_plan', 'update_plan'],
-      projects: ['create_project', 'list_projects', 'update_project', 'archive_project', 'tag_to_project'],
+      projects: ['create_project', 'list_projects', 'update_project', 'archive_project', 'unarchive_project', 'delete_project', 'tag_to_project'],
       reminders: ['create_reminder', 'update_reminder', 'delete_reminder', 'list_reminders'],
       friends: ['list_friends', 'get_pending_friend_requests', 'send_friend_request', 'accept_friend_request', 'decline_friend_request', 'remove_friend', 'update_friend_notes', 'add_friend_aspect', 'remove_friend_aspect'],
       'shared-events': ['add_event_member', 'remove_event_member', 'get_event_members', 'update_member_role'],
@@ -176,6 +182,40 @@ export class ToolRegistry {
 
     console.log(`[GERALD TOOLS] Loaded ${allTools.length} tools (full toolset)`);
     return allTools;
+  }
+
+  // Get tools for multiple categories (used by ContextRouter)
+  getToolsForCategories(categories: ToolCategory[]): any[] {
+    const toolNames = new Set<string>();
+    for (const cat of categories) {
+      const names = this.getToolsByCategory(cat as any).map(t => t.name);
+      for (const name of names) toolNames.add(name);
+    }
+    return Array.from(this.tools.values()).filter(t => toolNames.has(t.name));
+  }
+
+  /**
+   * Get tools by specific tool names + categories combined.
+   * Used when router returns both specific tool names and categories.
+   * Returns the union of both sets (deduped).
+   */
+  getToolsForRouting(specificTools?: string[], categories?: ToolCategory[]): any[] {
+    const toolNames = new Set<string>();
+
+    // Add specific tool names
+    if (specificTools?.length) {
+      for (const name of specificTools) toolNames.add(name);
+    }
+
+    // Add tools from categories
+    if (categories?.length) {
+      for (const cat of categories) {
+        const names = this.getToolsByCategory(cat as any).map(t => t.name);
+        for (const name of names) toolNames.add(name);
+      }
+    }
+
+    return Array.from(this.tools.values()).filter(t => toolNames.has(t.name));
   }
 
   // Get tool names for a specific category

@@ -30,10 +30,10 @@ export const toggleRuleTool = tool(
   },
   {
     name: "toggle_rule",
-    description: "Enable or disable an existing rule. Use this to re-enable a previously disabled rule instead of creating a duplicate, or to temporarily disable a rule without deleting it.",
+    description: "Enable or disable a rule.",
     schema: z.object({
-      rule_id: z.string().describe("The ID of the rule to enable or disable"),
-      enabled: z.boolean().describe("Whether to enable (true) or disable (false) the rule"),
+      rule_id: z.string().describe("Rule UUID"),
+      enabled: z.boolean().describe("Enable (true) or disable (false)"),
     }),
   }
 );

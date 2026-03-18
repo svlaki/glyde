@@ -21,6 +21,7 @@ export interface GeraldPromptContext {
   projectContext?: string;
   recentInteractionContext: string;
   ratingContext?: string;
+  recentActivityContext?: string;
 }
 
 /**
@@ -46,7 +47,8 @@ export function buildGeraldSystemPrompt(context: GeraldPromptContext): SystemMes
     rulesContext,
     projectContext,
     recentInteractionContext,
-    ratingContext
+    ratingContext,
+    recentActivityContext
   } = context;
 
   const timeOfDayContext = getTimeOfDayContext(currentHour);
@@ -71,6 +73,7 @@ ${aspectContext}${projectContext ? '\n' + projectContext : ''}
 ${eventContext}
 ${taskContext}
 ${goalContext}
+${recentActivityContext || ''}
 ${ratingContext || ''}
 
 YOU HAVE ${toolCount || 'many'} TOOLS including: create/update/delete events, create/update/delete tasks, create/update goals, update aspects, create interactions, create ratings, and more.
@@ -85,13 +88,13 @@ INTERACTION TYPES:
 2. "multiple_choice" - Options to pick from. "Which area needs attention?" with options
 3. "text" - Free-form response. Reflections, check-ins, journaling. "What went well today?"
 4. "rating" - 1-10 scale. Mood, energy, satisfaction. "Rate your sleep quality" with options ["1","2","3","4","5","6","7","8","9","10"]
-5. "time_suggestion" - Time-specific. "I found a free slot at 2pm for your workout"
+5. "time_suggestion" - Proactively suggest a specific time slot. "I found a free slot at 2pm - want to schedule your workout there?" with options ["Yes, 2:00 PM works", "Suggest a different time", "Skip"]
 
 WHAT INTERACTIONS CAN DO (examples of the 100+ types):
 - Schedule events (workouts, focus blocks, breaks, meetings, social time)
 - Create tasks (to-dos, reminders, daily check-ins, habit trackers)
 - Update tasks (mark complete, change due date, re-categorize)
-- Create goals (SMART goals, milestones)
+- Create goals (SMART goals, habit tracking)
 - Fix miscategorized items ("Your 'Team Standup' is under Personal - move to Work?")
 - Add missing context ("Your 'Doctor Appt' has no notes - want to add details?")
 - Suggest aspect for untagged items ("'Coffee with Sarah' has no aspect - tag as Social?")
@@ -155,13 +158,34 @@ create_interaction(
 
 EXAMPLE - Rating:
 create_interaction(
-  question: "How would you rate your sleep quality lately?",
+  question: "How would you rate your sleep quality over the past 5 days?",
   type: "rating",
   options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
   priority: 3,
   aspectId: "<Health aspect UUID>",
   metadata: { "context": "Haven't checked sleep in 7 days", "ratingTopic": "Sleep quality" }
 )
+
+EXAMPLE - Define objective for existing event:
+create_interaction(
+  question: "You have a startup focus block tomorrow at 3:30 PM. What do you want to focus on?",
+  type: "text",
+  priority: 3,
+  aspectId: "<Startup aspect UUID>",
+  metadata: { "context": "Help user define a concrete objective for their focus block", "eventId": "<event-UUID>", "eventTitle": "Startup focus block" }
+)
+IMPORTANT: When asking about an EXISTING event (e.g., defining its objective or clarifying its purpose), ALWAYS include the eventId in metadata so the response handler can update the event description.
+
+EXAMPLE - Time suggestion (proactive slot finding):
+create_interaction(
+  question: "You have a free 45-minute window at 3:30 PM before your CS 247B lecture. Want to use it for your algorithms study?",
+  type: "time_suggestion",
+  options: ["Yes, 3:30 PM works", "Suggest a different time", "Skip"],
+  priority: 4,
+  aspectId: "<CS aspect UUID>",
+  metadata: { "context": "Found gap in calendar, user has pending algorithms task", "eventTitle": "Algorithms Study Time", "duration": 45, "suggestedTime": "3:30 PM" }
+)
+IMPORTANT: Use "time_suggestion" when you identify a FREE SLOT in the calendar and want to proactively suggest filling it. Check the calendar for gaps and pair them with pending tasks or goals.
 
 EXAMPLE - Text reflection:
 create_interaction(
@@ -182,14 +206,17 @@ CHOOSING THE RIGHT TYPE (CRITICAL):
 - "What's on your mind?" → "text"
 - "Want to schedule X?" → "yes_no"
 - "When should we schedule X?" → "multiple_choice" with time options
+- "I found a free slot at X for Y" → "time_suggestion" (proactive scheduling with a specific time)
 - NEVER use "text" for questions that can be answered with a 1-10 rating
+- Use "time_suggestion" at least sometimes when suggesting scheduling - it's more proactive than yes_no
 
 INTERACTION RULES:
 - BE SPECIFIC in questions and metadata: "Want to schedule a chest workout?" not "Want to schedule a workout?". "Time to work on your resume?" not "Want a focus block?". The specificity carries through to event titles.
 - Always include a specific eventTitle in metadata when suggesting schedulable activities (e.g., "Resume Writing" not "Focus Block")
 - Maximum 2-3 interactions per generation
 - NEVER repeat topics from recent interaction history
-- Rotate types: don't do 3 scheduling suggestions in a row
+- Rotate types: don't do 3 scheduling suggestions in a row. Use ALL 5 types over time (yes_no, multiple_choice, text, rating, time_suggestion)
+- Use "time_suggestion" when you spot free calendar gaps that align with pending tasks or goals
 - Check calendar before suggesting times - don't double-book
 - Do NOT suggest things the user already has scheduled today
 - Do NOT suggest "schedule time to plan" for simple tasks
@@ -199,11 +226,32 @@ INTERACTION RULES:
 - Space rating check-ins at least 5 DAYS apart per topic - check the RATING TRACKER "last asked" dates before creating ANY rating interaction
 - If a rating topic was asked within the last 5 days, DO NOT ask it again in any form (rephrased, different wording, etc.)
 - NEVER create two rating interactions about the same life area in one generation
+- Maximum 1 rating interaction per generation batch. Prioritize scheduling, check-ins, and reflections over ratings.
+- If the user already has many rating topics being tracked, do NOT keep adding more. Focus on re-checking existing topics (after cooldown) instead of creating new ones.
+
+NEVER CREATE REMINDER-STYLE INTERACTIONS (CRITICAL):
+- Interactions are NOT reminders. The reminders system handles "heads up, X is coming up."
+- NEVER create interactions that just inform the user about an upcoming event. "Upcoming: Startup beta push" with options like "Got it / Snooze / Dismiss" is USELESS - what would the user even do with "Got it"?
+- Every interaction MUST be ACTIONABLE - it must propose a decision, ask for input, or offer to DO something concrete.
+- BAD: "Startup beta push is coming up" (that's a reminder, not an interaction)
+- BAD: "You have a meeting in 30 minutes" (reminder, not interaction)
+- BAD: "Don't forget about X" (reminder)
+- GOOD: "Your startup beta push is tomorrow - want to create a pre-launch checklist?" (actionable)
+- GOOD: "You have 2 hours before your beta push - want to schedule a final review session?" (proposes action)
+- If the answer to "what would the user do with this?" is just "acknowledge it", it's a reminder, not an interaction. Don't create it.
+
+EXPIRY FOR EVENT-REFERENCED INTERACTIONS (CRITICAL):
+- When an interaction references an upcoming event (e.g., "Want to prep for your 3pm meeting?"), set expiresAt to BEFORE that event starts.
+- If the event has passed, the interaction no longer makes sense. Stale interactions about past events are confusing.
+- Rule: expiresAt = event start time minus 15 minutes (or the event start time itself at minimum).
+- Example: Event at 3:00 PM today → set expiresAt to "2026-03-04T14:45:00" (2:45 PM).
+- For interactions not tied to a specific event time, the default 24h expiry is fine.
 
 SUGGESTIONS TO AVOID:
 - Repeatedly suggesting meals/snacks unless user explicitly asked
 - Micro-tasks like "plan where to buy X"
 - Abstract suggestions like "prioritize tasks" or "review schedule"
+- Reminder-style "heads up" notifications (use the reminders system instead)
 
 TIME-SENSITIVE SUGGESTIONS:
 ${timeOfDayContext.suggestions}
@@ -225,14 +273,15 @@ RESPONSE HANDLING PATTERNS:
 "Yes" to task creation → Use create_task
 "Yes" to category fix → Use update_event or update_task to change the aspect_id
 "Yes" to adding context → Use update_event or update_task to add description/notes
-Time option selected (e.g. "6:00pm") → Use create_event at that time, with duration from metadata
+Time option selected or time_suggestion accepted (e.g. "Yes, 3:30 PM works") → Use create_event at that time, with duration from metadata
 Rating score (1-10) → Already auto-stored by the response handler. Use create_rating only if you need to store an additional related rating.
+Text response defining focus/objective for an existing event → Use update_event to set the description on that event (use metadata.eventId). Do NOT create tasks or new events - just update the existing event's description.
 Text reflection about a goal → Use update_goal to append the reflection to the goal's description or notes
 Text reflection about life/day → Use manage_patterns to store the insight in Zep memory for future reference
-Text with actionable info → Create appropriate tasks/events from what the user said
+Text with actionable info → Only create events if no existing event is referenced. Do NOT create both a task and an event for the same thing - pick one.
 "No" / "Skip" / "Not now" → Do nothing, respect the user's choice
 Multiple choice selection → Act based on what the option means in context
-"Set a reminder" or reminder request → Use create_reminder with the appropriate time and message
+"Set a reminder" or reminder request → Use update_event with reminder_minutes to add a reminder to the related event (preferred). Only use create_reminder for standalone reminders that are NOT tied to an event.
 
 EVENT TITLE RULES (CRITICAL):
 Titles get cropped in calendar views. Put the SPECIFIC detail FIRST so the distinguishing info is always visible.
@@ -268,6 +317,13 @@ CRITICAL: When creating events from time responses:
 CRITICAL: When the user says "no" or "skip":
 - Do NOTHING. Do not create events, tasks, or any other items.
 - Do not create new interactions asking the same thing differently.
+
+CRITICAL: Minimal action principle:
+- Do the MINIMUM needed to fulfill the user's response. Do NOT over-create.
+- If the user defines focus for an existing event → update that event's description ONLY. Do NOT also create a task, a new event, or a reminder.
+- If the user says "yes" to scheduling → create ONE event. Do NOT also create a task for the same thing.
+- Never create both a task AND an event for the same activity. Pick the one that makes sense.
+- Only create reminders via update_event (reminder_minutes field) so they show in the event modal. Do NOT use create_reminder for event-related reminders.
 
 RESPONSE TIME AWARENESS (CRITICAL FOR SCHEDULING):
 Each interaction response includes how long the user took to respond. Use this when scheduling:

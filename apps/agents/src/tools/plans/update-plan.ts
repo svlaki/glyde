@@ -55,14 +55,14 @@ export const updatePlanTool = tool(
   },
   {
     name: "update_plan",
-    description: "Update the user's life plan. Use this to weave new goals into the plan content or update plan metadata. If no planId is provided, updates the active plan (or creates one if none exists). When adding a new goal, read the current plan first with get_plan, then update with the new content naturally integrated.",
+    description: "Update the user's life plan.",
     schema: z.object({
-      planId: z.string().optional().nullable().describe("Plan ID to update. If not provided, updates the active plan."),
-      title: z.string().optional().nullable().describe("New plan title"),
-      content: z.string().optional().nullable().describe("New plan content (markdown). When updating, integrate new goals naturally into the existing text rather than appending. Keep the tone consistent with the user's existing plan."),
-      horizonStart: z.string().optional().nullable().describe("Plan start date (ISO format)"),
-      horizonEnd: z.string().optional().nullable().describe("Plan end date (ISO format)"),
-      status: z.enum(["draft", "active", "archived"]).optional().nullable().describe("Plan status"),
+      planId: z.string().optional().nullable().describe("Plan UUID (defaults to active)"),
+      title: z.string().optional().nullable().describe("New title"),
+      content: z.string().optional().nullable().describe("New content (markdown)"),
+      horizonStart: z.string().optional().nullable().describe("Start date ISO"),
+      horizonEnd: z.string().optional().nullable().describe("End date ISO"),
+      status: z.enum(["draft", "active", "archived"]).optional().nullable().describe("Status"),
     }),
   }
 );

@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Task {
   id: string
@@ -114,6 +115,7 @@ export async function createUserTask(
       return { task: null, error: data.error || 'Failed to create task' }
     }
 
+    trackEvent('task_created', 'engagement', { task_id: data.task?.id })
     return { task: data.task, error: null }
   } catch (error) {
     console.error('Error creating task:', error)
@@ -225,6 +227,7 @@ export async function completeUserTask(
       return { task: null, error: data.error || 'Failed to complete task' }
     }
 
+    trackEvent('task_completed', 'engagement', { task_id: taskId })
     return { task: data.task, error: null }
   } catch (error) {
     console.error('Error completing task:', error)

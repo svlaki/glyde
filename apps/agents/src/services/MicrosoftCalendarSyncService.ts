@@ -28,6 +28,8 @@ interface MicrosoftEvent {
   recurrence?: MicrosoftRecurrence;
   isAllDay?: boolean;
   isCancelled?: boolean;
+  type?: string; // 'singleInstance' | 'occurrence' | 'exception' | 'seriesMaster'
+  seriesMasterId?: string;
   '@removed'?: { reason: string };
 }
 
@@ -40,6 +42,12 @@ interface GraphResponse {
 /**
  * Microsoft Calendar Sync Service - mirrors GoogleCalendarSyncService
  * for Outlook/Office 365 calendar sync via Microsoft Graph API.
+ *
+ * IMPORTANT: Microsoft Graph's /events/delta endpoint returns SPARSE objects
+ * (missing subject, body, location, recurrence, etc.). So we use:
+ *   - Initial sync: plain /events endpoint (full objects, supports $filter)
+ *   - Delta link: established via /events/delta after initial sync
+ *   - Incremental sync: /events/delta + individual GET /events/{id} for full data
  */
 export class MicrosoftCalendarSyncService {
   private connectionService = getConnectionService();
@@ -47,7 +55,10 @@ export class MicrosoftCalendarSyncService {
   private calendarMappingService = getCalendarMappingService();
 
   /**
-   * Perform initial full sync for a specific calendar
+   * Perform initial full sync for a specific calendar.
+   * Uses plain /events endpoint which returns full event objects (including
+   * subject, body, recurrence, etc.) unlike /events/delta which is sparse.
+   * Then establishes a delta link for future incremental syncs.
    */
   async performInitialSyncForCalendar(
     connection: UserConnection,
@@ -59,35 +70,22 @@ export class MicrosoftCalendarSyncService {
 
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
+      const encodedCalId = encodeURIComponent(calendarId);
 
-      // Get events from last 3 months
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      const startFilter = threeMonthsAgo.toISOString();
-
-      // Use delta query for initial sync to get a deltaLink for future syncs
-      let url = `https://graph.microsoft.com/v1.0/me/calendars/${encodeURIComponent(calendarId)}/events/delta?$filter=start/dateTime ge '${startFilter}'&$select=id,subject,start,end,body,location,recurrence,isAllDay,isCancelled&$top=100`;
-
+      // Step 1: Fetch all events using plain /events (returns full objects).
+      // This endpoint supports $orderby and returns series masters with recurrence.
+      let eventsUrl: string = `https://graph.microsoft.com/v1.0/me/calendars/${encodedCalId}/events?$top=250&$orderby=lastModifiedDateTime`;
       const allEvents: MicrosoftEvent[] = [];
-      let deltaLink: string | null = null;
 
-      // Paginate through all events
-      while (url) {
-        const response = await this.graphFetch(accessToken, url);
-
+      while (eventsUrl) {
+        const response = await this.graphFetch(accessToken, eventsUrl);
         allEvents.push(...response.value);
-
-        if (response['@odata.nextLink']) {
-          url = response['@odata.nextLink'];
-        } else {
-          deltaLink = response['@odata.deltaLink'] || null;
-          url = '';
-        }
+        eventsUrl = response['@odata.nextLink'] || '';
       }
 
-      logger.info(`[MicrosoftCalendarSyncService] Fetched ${allEvents.length} events from calendar ${calendarId}`);
+      logger.info(`[MicrosoftCalendarSyncService] Fetched ${allEvents.length} events from /events`);
 
-      // Process events
+      // Step 2: Process events
       const result = await this.processCalendarEvents(
         allEvents,
         connection.user_id,
@@ -95,7 +93,22 @@ export class MicrosoftCalendarSyncService {
         aspectId
       );
 
-      // Store the delta link as the sync token for future delta syncs
+      // Step 3: Establish delta link by calling /events/delta and paginating
+      // through to the end. We skip processing these events (already done above).
+      let deltaUrl: string = `https://graph.microsoft.com/v1.0/me/calendars/${encodedCalId}/events/delta`;
+      let deltaLink: string | null = null;
+
+      while (deltaUrl) {
+        const response = await this.graphFetch(accessToken, deltaUrl);
+        if (response['@odata.nextLink']) {
+          deltaUrl = response['@odata.nextLink'];
+        } else {
+          deltaLink = response['@odata.deltaLink'] || null;
+          deltaUrl = '';
+        }
+      }
+
+      // Store the delta link for future incremental syncs
       await this.calendarMappingService.updateSyncToken(mappingId, deltaLink);
 
       logger.info('[MicrosoftCalendarSyncService] Calendar sync completed:', result);
@@ -107,7 +120,9 @@ export class MicrosoftCalendarSyncService {
   }
 
   /**
-   * Perform delta sync using a stored delta link
+   * Perform delta sync using a stored delta link.
+   * Since /events/delta returns sparse objects (missing subject, etc.),
+   * we fetch the full event by ID for each changed event.
    */
   async performDeltaSyncForCalendar(
     connection: UserConnection,
@@ -121,15 +136,14 @@ export class MicrosoftCalendarSyncService {
     try {
       const accessToken = await this.connectionService.getValidAccessToken(connection);
 
-      const allEvents: MicrosoftEvent[] = [];
+      const deltaEvents: MicrosoftEvent[] = [];
       let url: string = deltaLink;
       let newDeltaLink: string | null = null;
 
-      // Paginate through changed events
+      // Paginate through changed events from delta
       while (url) {
         const response = await this.graphFetch(accessToken, url);
-
-        allEvents.push(...response.value);
+        deltaEvents.push(...response.value);
 
         if (response['@odata.nextLink']) {
           url = response['@odata.nextLink'];
@@ -139,11 +153,32 @@ export class MicrosoftCalendarSyncService {
         }
       }
 
-      logger.info(`[MicrosoftCalendarSyncService] Delta sync: ${allEvents.length} changed events from ${calendarId}`);
+      logger.info(`[MicrosoftCalendarSyncService] Delta sync: ${deltaEvents.length} changed events from ${calendarId}`);
 
-      // Process events
+      // For non-removed events, fetch full event data by ID (delta is sparse)
+      const fullEvents: MicrosoftEvent[] = [];
+      for (const ev of deltaEvents) {
+        if (ev['@removed'] || ev.isCancelled) {
+          // Keep removal markers as-is
+          fullEvents.push(ev);
+          continue;
+        }
+
+        try {
+          const fullEvent = await this.graphFetchSingle(accessToken, ev.id);
+          fullEvents.push(fullEvent);
+        } catch (fetchError) {
+          logger.warn('[MicrosoftCalendarSyncService] Could not fetch full event, using sparse data:', {
+            eventId: ev.id,
+            error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+          });
+          fullEvents.push(ev);
+        }
+      }
+
+      // Process events with full data
       const result = await this.processCalendarEvents(
-        allEvents,
+        fullEvents,
         connection.user_id,
         connection.id,
         aspectId
@@ -174,6 +209,10 @@ export class MicrosoftCalendarSyncService {
 
     try {
       const mappings = await this.calendarMappingService.getSyncedMappings(connection.id);
+
+      if (mappings.length === 0) {
+        logger.warn('[MicrosoftCalendarSyncService] No synced calendar mappings found for connection:', connection.id);
+      }
 
       for (const mapping of mappings) {
         try {
@@ -208,7 +247,9 @@ export class MicrosoftCalendarSyncService {
   }
 
   /**
-   * Process calendar events from Microsoft Graph and sync to database
+   * Process calendar events from Microsoft Graph and sync to database.
+   * Skips expanded recurring instances (type='occurrence') — we only want
+   * series masters (with RRULE) and single instances.
    */
   private async processCalendarEvents(
     events: MicrosoftEvent[],
@@ -219,12 +260,23 @@ export class MicrosoftCalendarSyncService {
     let eventsCreated = 0;
     let eventsUpdated = 0;
     let eventsDeleted = 0;
+    let eventsSkipped = 0;
 
     const supabase = this.supabaseService.getClient();
+
+    // Date threshold: skip non-recurring events older than 3 months
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
     for (const msEvent of events) {
       try {
         if (!msEvent.id) continue;
+
+        // Skip expanded recurring instances — we only want series masters.
+        if (msEvent.type === 'occurrence' || msEvent.seriesMasterId) {
+          eventsSkipped++;
+          continue;
+        }
 
         // Handle deleted events (Microsoft uses @removed property)
         if (msEvent['@removed'] || msEvent.isCancelled) {
@@ -244,6 +296,12 @@ export class MicrosoftCalendarSyncService {
         const eventData = this.parseMicrosoftEvent(msEvent, userId);
         if (!eventData) continue;
 
+        // Skip old non-recurring events
+        if (!eventData.is_recurring && new Date(eventData.start_time) < threeMonthsAgo) {
+          eventsSkipped++;
+          continue;
+        }
+
         // Check if event already exists
         const { data: existingEvent } = await supabase
           .from('events')
@@ -262,6 +320,7 @@ export class MicrosoftCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             updated_at: new Date().toISOString()
           };
 
@@ -276,6 +335,8 @@ export class MicrosoftCalendarSyncService {
 
           if (!error) {
             eventsUpdated++;
+          } else {
+            logger.warn('[MicrosoftCalendarSyncService] Failed to update event:', { eventId: msEvent.id, error });
           }
         } else {
           // Create new event
@@ -289,6 +350,7 @@ export class MicrosoftCalendarSyncService {
             location: eventData.location,
             recurrence_rule: eventData.recurrence_rule,
             is_recurring: eventData.is_recurring,
+            is_all_day: eventData.is_all_day || false,
             source: 'outlook_calendar',
             connection_id: connectionId
           };
@@ -303,6 +365,8 @@ export class MicrosoftCalendarSyncService {
 
           if (!error) {
             eventsCreated++;
+          } else {
+            logger.warn('[MicrosoftCalendarSyncService] Failed to insert event:', { eventId: msEvent.id, error });
           }
         }
       } catch (error) {
@@ -314,6 +378,10 @@ export class MicrosoftCalendarSyncService {
       }
     }
 
+    if (eventsSkipped > 0) {
+      logger.info(`[MicrosoftCalendarSyncService] Skipped ${eventsSkipped} events (old or recurring instances)`);
+    }
+
     return { eventsCreated, eventsUpdated, eventsDeleted };
   }
 
@@ -322,8 +390,8 @@ export class MicrosoftCalendarSyncService {
    */
   private parseMicrosoftEvent(
     msEvent: MicrosoftEvent,
-    userId: string
-  ): { title: string; start_time: string; end_time: string; description?: string; location?: string; recurrence_rule?: string | null; is_recurring: boolean } | null {
+    _userId: string
+  ): { title: string; start_time: string; end_time: string; description?: string; location?: string; recurrence_rule?: string | null; is_recurring: boolean; is_all_day: boolean } | null {
     if (!msEvent.start?.dateTime || !msEvent.end?.dateTime) {
       return null;
     }
@@ -357,7 +425,8 @@ export class MicrosoftCalendarSyncService {
       description: description || undefined,
       location: msEvent.location?.displayName || undefined,
       recurrence_rule: recurrenceRule,
-      is_recurring: !!recurrenceRule
+      is_recurring: !!recurrenceRule,
+      is_all_day: msEvent.isAllDay === true
     };
   }
 
@@ -427,14 +496,14 @@ export class MicrosoftCalendarSyncService {
   }
 
   /**
-   * Make an authenticated request to the Microsoft Graph API
+   * Make an authenticated request to the Microsoft Graph API (paginated list)
    */
   private async graphFetch(accessToken: string, url: string): Promise<GraphResponse> {
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        'Prefer': 'odata.maxpagesize=100'
+        'Prefer': 'odata.maxpagesize=250'
       }
     });
 
@@ -447,6 +516,29 @@ export class MicrosoftCalendarSyncService {
     }
 
     return response.json() as Promise<GraphResponse>;
+  }
+
+  /**
+   * Fetch a single event by ID with full properties
+   */
+  private async graphFetchSingle(accessToken: string, eventId: string): Promise<MicrosoftEvent> {
+    const url = `https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(eventId)}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      const error: any = new Error(`Graph API error: ${response.status} ${response.statusText}`);
+      error.status = response.status;
+      error.body = errorBody;
+      throw error;
+    }
+
+    return response.json() as Promise<MicrosoftEvent>;
   }
 }
 

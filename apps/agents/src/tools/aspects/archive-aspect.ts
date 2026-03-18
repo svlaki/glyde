@@ -25,7 +25,7 @@ export const archiveAspectTool = tool(
   },
   {
     name: "archive_aspect",
-    description: "Archive an aspect instead of deleting it. The aspect will be hidden from active use but can be restored later. Use this when the user wants to remove an aspect without permanently deleting it.",
+    description: "Archive an aspect (hidden but restorable).",
     schema: z.object({
       name: z.string().describe("Aspect name to archive"),
     }),

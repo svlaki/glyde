@@ -23,10 +23,10 @@ export const addFriendAspectTool = tool(
   },
   {
     name: "add_friend_aspect",
-    description: "Tag an aspect to a friendship. Use list_aspects to find aspect IDs and list_friends to find the friendshipId.",
+    description: "Tag an aspect to a friendship.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID to tag the aspect to"),
-      aspectId: z.string().uuid().describe("The aspect ID to tag"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
+      aspectId: z.string().uuid().describe("Aspect UUID"),
     }),
   }
 );

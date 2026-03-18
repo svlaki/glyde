@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Aspect {
   id: string
@@ -98,6 +99,7 @@ export async function createUserAspect(
       return { aspect: null, error: data.error || 'Failed to create aspect' }
     }
 
+    trackEvent('aspect_created', 'engagement', { aspect_id: data.aspect?.id })
     return { aspect: data.aspect, error: null }
   } catch (error) {
     console.error('Error creating aspect:', error)

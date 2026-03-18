@@ -33,9 +33,9 @@ export const getEventMembersTool = tool(
   },
   {
     name: "get_event_members",
-    description: "List all members of a shared event with their roles. Shows memberId needed for remove/update operations.",
+    description: "List members of a shared event.",
     schema: z.object({
-      eventId: z.string().uuid().describe("The event ID to list members for"),
+      eventId: z.string().uuid().describe("Event UUID"),
     }),
   }
 );

@@ -357,6 +357,7 @@ export class SupabaseService {
         user_role: event.user_role || 'owner',
         project_id: event.project_id || null,
         project_name: event.project_name || null,
+        is_all_day: event.is_all_day || false,
         google_event_id: event.google_event_id || null,
         outlook_event_id: event.outlook_event_id || null,
         local_notes: event.local_notes || null
@@ -1128,10 +1129,18 @@ export class SupabaseService {
       }
 
       // Determine start/end times for the override event
-      const instanceStartDate = updates.start_time
-        ? new Date(updates.start_time)
-        : new Date(instanceDate);
+      // When start_time is not provided, compute the correct instance time by
+      // combining the instance date with the parent's UTC time-of-day. Using just
+      // new Date(instanceDate) would produce midnight UTC (= wrong local time).
       const duration = new Date(parent.end_time).getTime() - new Date(parent.start_time).getTime();
+      let instanceStartDate: Date;
+      if (updates.start_time) {
+        instanceStartDate = new Date(updates.start_time);
+      } else {
+        const parentStart = new Date(parent.start_time);
+        const parentTimeOfDay = parentStart.toISOString().split('T')[1]; // e.g. "16:00:00.000Z"
+        instanceStartDate = new Date(instanceDate.split('T')[0] + 'T' + parentTimeOfDay);
+      }
       const instanceEndDate = updates.end_time
         ? new Date(updates.end_time)
         : new Date(instanceStartDate.getTime() + duration);
@@ -1737,7 +1746,7 @@ export class SupabaseService {
 
       const { data, error } = await this.client
         .from('user_interactions')
-        .select('id, question, interaction_type, status, created_at, metadata, interaction_responses(response, created_at)')
+        .select('id, question, interaction_type, status, created_at, metadata, interaction_responses(response, responded_at)')
         .eq('user_id', userId)
         .gte('created_at', cutoffTime)
         .order('created_at', { ascending: false })
@@ -2283,9 +2292,7 @@ export class SupabaseService {
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
-      milestones?: any[];
-      milestoneType?: 'dated' | 'ordered';
-      goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
+      goalType?: 'SMART' | 'OKR' | 'habit' | 'project' | 'milestone';
       parentGoalId?: string;
       keyResults?: any[];
       blockers?: any[];
@@ -2295,6 +2302,8 @@ export class SupabaseService {
       energyRequirement?: 'low' | 'medium' | 'high';
       reviewFrequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly';
       timeHorizon?: 'long_term' | 'short_term';
+      milestones?: any[];
+      milestoneType?: 'dated' | 'ordered';
     },
     options?: { source?: ActivitySource; agentType?: string }
   ): Promise<any> {
@@ -2314,8 +2323,6 @@ export class SupabaseService {
           target_date: goalData.targetDate,
           status: goalData.status || 'active',
           progress: goalData.progress || 0,
-          milestones: goalData.milestones,
-          milestone_type: goalData.milestoneType || 'dated',
           goal_type: goalData.goalType || 'SMART',
           parent_goal_id: goalData.parentGoalId,
           key_results: goalData.keyResults || [],
@@ -2325,7 +2332,9 @@ export class SupabaseService {
           priority_score: goalData.priorityScore || 5,
           energy_requirement: goalData.energyRequirement,
           review_frequency: goalData.reviewFrequency || 'weekly',
-          time_horizon: goalData.timeHorizon || 'short_term'
+          time_horizon: goalData.timeHorizon || 'short_term',
+          milestones: goalData.milestones || null,
+          milestone_type: goalData.milestoneType || 'dated',
         })
         .select()
         .single();
@@ -2432,9 +2441,7 @@ export class SupabaseService {
       targetDate?: string;
       status?: 'active' | 'completed' | 'paused' | 'abandoned';
       progress?: number;
-      milestones?: any[];
-      milestoneType?: 'dated' | 'ordered';
-      goalType?: 'SMART' | 'OKR' | 'milestone' | 'habit' | 'project';
+      goalType?: 'SMART' | 'OKR' | 'habit' | 'project' | 'milestone';
       parentGoalId?: string;
       keyResults?: any[];
       blockers?: any[];
@@ -2473,8 +2480,6 @@ export class SupabaseService {
       if (updates.targetDate !== undefined) updateData.target_date = updates.targetDate;
       if (updates.status !== undefined) updateData.status = updates.status;
       if (updates.progress !== undefined) updateData.progress = updates.progress;
-      if (updates.milestones !== undefined) updateData.milestones = updates.milestones;
-      if (updates.milestoneType !== undefined) updateData.milestone_type = updates.milestoneType;
       if (updates.goalType !== undefined) updateData.goal_type = updates.goalType;
       if (updates.parentGoalId !== undefined) updateData.parent_goal_id = updates.parentGoalId;
       if (updates.keyResults !== undefined) updateData.key_results = updates.keyResults;
@@ -2848,11 +2853,172 @@ export class SupabaseService {
   }
 
   // ============================================================================
-  // LIFE PLAN MANAGEMENT METHODS
+  // NOTES MANAGEMENT METHODS
   // ============================================================================
 
   /**
-   * Get the active life plan for a user
+   * Get all active notes for a user with aspect data
+   */
+  async getAllNotes(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .rpc('get_notes_with_aspects', { p_user_id: userId });
+
+      if (error) {
+        console.error('Error fetching notes:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching notes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get a single note by ID with aspect data
+   */
+  async getNoteById(userId: string, noteId: string): Promise<any | null> {
+    try {
+      if (!this.isValidUUID(noteId)) {
+        console.error('Invalid note ID:', noteId);
+        return null;
+      }
+
+      const { data, error } = await this.client
+        .from('notes')
+        .select('*, aspects!fk_notes_aspect(name, color, icon)')
+        .eq('id', noteId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Error fetching note by ID:', error);
+        return null;
+      }
+
+      if (!data) return null;
+
+      const aspect = (data as any).aspects;
+      return {
+        ...data,
+        aspect_name: aspect?.name,
+        aspect_color: aspect?.color,
+        aspect_icon: aspect?.icon,
+        aspects: undefined,
+      };
+    } catch (error) {
+      console.error('Exception fetching note by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create new notes for a user (requires aspect_id)
+   */
+  async createNotes(userId: string, notesData: {
+    title?: string;
+    content?: string;
+    aspectId: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      if (!this.isValidUUID(notesData.aspectId)) {
+        console.error('Invalid aspect ID:', notesData.aspectId);
+        return null;
+      }
+
+      const { data, error } = await this.client
+        .from('notes')
+        .insert({
+          user_id: userId,
+          title: notesData.title || 'Notes',
+          content: notesData.content || '',
+          aspect_id: notesData.aspectId,
+          horizon_start: notesData.horizonStart,
+          horizon_end: notesData.horizonEnd,
+          status: notesData.status || 'active'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating notes:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception creating notes:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update notes
+   */
+  async updateNotes(userId: string, notesId: string, updates: {
+    title?: string;
+    content?: string;
+    aspectId?: string;
+    horizonStart?: string;
+    horizonEnd?: string;
+    status?: 'draft' | 'active' | 'archived';
+  }): Promise<any | null> {
+    try {
+      if (!this.isValidUUID(notesId)) {
+        console.error('Invalid notes ID:', notesId);
+        return null;
+      }
+
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.content !== undefined) updateData.content = updates.content;
+      if (updates.aspectId !== undefined) updateData.aspect_id = updates.aspectId;
+      if (updates.horizonStart !== undefined) updateData.horizon_start = updates.horizonStart;
+      if (updates.horizonEnd !== undefined) updateData.horizon_end = updates.horizonEnd;
+      if (updates.status !== undefined) updateData.status = updates.status;
+
+      const { data, error } = await this.client
+        .from('notes')
+        .update(updateData)
+        .eq('id', notesId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating notes:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception updating notes:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete notes
+   */
+  async deleteNotes(userId: string, notesId: string): Promise<{ success: boolean; error: string | null }> {
+    return this.deleteRecord('notes', userId, notesId, 'notes');
+  }
+
+  // ==================== LIFE PLANS ====================
+
+  /**
+   * Get the user's active life plan
    */
   async getPlan(userId: string): Promise<any | null> {
     try {
@@ -2864,10 +3030,7 @@ export class SupabaseService {
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows returned - user has no plan yet
-          return null;
-        }
+        if (error.code === 'PGRST116') return null; // No rows
         console.error('Error fetching plan:', error);
         return null;
       }
@@ -2880,32 +3043,25 @@ export class SupabaseService {
   }
 
   /**
-   * Create a new life plan for a user
+   * Create a new life plan
    */
   async createPlan(userId: string, planData: {
-    title?: string;
+    title: string;
     content?: string;
     horizonStart?: string;
     horizonEnd?: string;
-    status?: 'draft' | 'active' | 'archived';
+    status?: string;
   }): Promise<any | null> {
     try {
-      // Archive any existing active plan
-      await this.client
-        .from('life_plans')
-        .update({ status: 'archived' })
-        .eq('user_id', userId)
-        .eq('status', 'active');
-
       const { data, error } = await this.client
         .from('life_plans')
         .insert({
           user_id: userId,
-          title: planData.title || 'My Life Plan',
+          title: planData.title,
           content: planData.content || '',
-          horizon_start: planData.horizonStart,
-          horizon_end: planData.horizonEnd,
-          status: planData.status || 'active'
+          horizon_start: planData.horizonStart || null,
+          horizon_end: planData.horizonEnd || null,
+          status: planData.status || 'active',
         })
         .select()
         .single();
@@ -2915,7 +3071,6 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('Plan created:', data.id);
       return data;
     } catch (error) {
       console.error('Exception creating plan:', error);
@@ -2924,25 +3079,17 @@ export class SupabaseService {
   }
 
   /**
-   * Update a life plan
+   * Update an existing life plan
    */
   async updatePlan(userId: string, planId: string, updates: {
     title?: string;
     content?: string;
     horizonStart?: string;
     horizonEnd?: string;
-    status?: 'draft' | 'active' | 'archived';
+    status?: string;
   }): Promise<any | null> {
     try {
-      if (!this.isValidUUID(planId)) {
-        console.error('Invalid plan ID:', planId);
-        return null;
-      }
-
-      const updateData: any = {
-        updated_at: new Date().toISOString()
-      };
-
+      const updateData: any = {};
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.content !== undefined) updateData.content = updates.content;
       if (updates.horizonStart !== undefined) updateData.horizon_start = updates.horizonStart;
@@ -2962,19 +3109,11 @@ export class SupabaseService {
         return null;
       }
 
-      console.log('Plan updated:', planId);
       return data;
     } catch (error) {
       console.error('Exception updating plan:', error);
       return null;
     }
-  }
-
-  /**
-   * Delete a life plan
-   */
-  async deletePlan(userId: string, planId: string): Promise<{ success: boolean; error: string | null }> {
-    return this.deleteRecord('life_plans', userId, planId, 'plan');
   }
 }
 

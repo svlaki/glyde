@@ -28,7 +28,7 @@ export const listAspectsTool = tool(
   },
   {
     name: "list_aspects",
-    description: "List all available aspects. ALWAYS use this before creating events/tasks/goals to see what aspects exist. All aspects are universal and can be used for events, tasks, and goals.",
+    description: "List all aspects.",
     schema: z.object({}),
   }
 );

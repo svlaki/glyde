@@ -42,11 +42,11 @@ export const listRemindersTool = tool(
   },
   {
     name: "list_reminders",
-    description: "List the user's reminders. By default shows only pending/snoozed. Set includeHistory=true to see delivered/dismissed ones too.",
+    description: "List reminders.",
     schema: z.object({
       status: z.enum(["pending", "delivered", "snoozed", "dismissed"]).optional().nullable().describe("Filter by status"),
       aspectId: z.string().uuid().optional().nullable().describe("Filter by aspect"),
-      includeHistory: z.boolean().optional().nullable().describe("Include delivered/dismissed reminders. Default: false."),
+      includeHistory: z.boolean().optional().nullable().describe("Include history"),
     }),
   }
 );

@@ -192,10 +192,10 @@ export const deleteEventTool = tool(
   },
   {
     name: "delete_event",
-    description: "Delete a calendar event by searching for it with a text query. Finds the event using fuzzy matching on title and description.",
+    description: "Delete an event by ID or search query.",
     schema: z.object({
-      eventId: z.string().optional().nullable().describe("Event ID to delete (optional - rarely used, prefer searchQuery)"),
-      searchQuery: z.string().describe("Search query to find and delete the event. Examples: 'cs 221', 'meeting with john', 'workout'. The tool will fuzzy match against event titles and descriptions."),
+      eventId: z.string().optional().nullable().describe("Event UUID (optional)"),
+      searchQuery: z.string().describe("Fuzzy search to find and delete event"),
     }),
   }
 );

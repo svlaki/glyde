@@ -1,10 +1,12 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
+import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateTaskTool = tool(
   async ({ taskId, searchQuery, title, description, dueDate, priority, status, aspect, energyRequired, estimatedDuration }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
     if (!userId) {
       return "User ID required";
     }
@@ -86,7 +88,7 @@ export const updateTaskTool = tool(
       // The LLM often sends null for fields it doesn't intend to change.
       if (title != null && title.trim() !== '') updates.title = title;
       if (description != null) updates.description = description;
-      if (dueDate !== undefined) updates.dueDate = dueDate; // null is valid here (clears due date)
+      if (dueDate !== undefined) updates.dueDate = dueDate && timezone ? convertToUTC(dueDate, timezone) : dueDate; // null clears due date
       if (priority != null) updates.priority = priority;
       if (status != null) updates.status = status;
       if (aspect != null) updates.aspect = aspect;
@@ -140,18 +142,18 @@ export const updateTaskTool = tool(
   },
   {
     name: "update_task",
-    description: "Update an existing task by searching for it with a text query. Finds the task using fuzzy matching on title and description. Use this to modify task details, change priority, reschedule, or update status.",
+    description: "Update a task by ID or search query.",
     schema: z.object({
-      taskId: z.string().optional().nullable().describe("Task ID to update (optional - rarely used, prefer searchQuery)"),
-      searchQuery: z.string().optional().nullable().describe("Search query to find and update the task. Examples: 'cs 221', 'grocery shopping', 'workout'. The tool will fuzzy match against task titles and descriptions."),
-      title: z.string().nullable().optional().describe("New task title"),
-      description: z.string().nullable().optional().describe("New task description"),
-      dueDate: z.string().nullable().optional().describe("New due date (ISO format)"),
-      priority: z.enum(["low", "medium", "high", "urgent"]).nullable().optional().describe("New priority level"),
+      taskId: z.string().optional().nullable().describe("Task UUID (optional)"),
+      searchQuery: z.string().optional().nullable().describe("Fuzzy search to find task"),
+      title: z.string().nullable().optional().describe("New title"),
+      description: z.string().nullable().optional().describe("New description"),
+      dueDate: z.string().nullable().optional().describe("New due date/time in ISO format (local timezone, no Z suffix)"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).nullable().optional().describe("New priority"),
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).nullable().optional().describe("New status"),
-      aspect: z.string().nullable().optional().describe("New aspect name"),
-      energyRequired: z.enum(["low", "medium", "high"]).nullable().optional().describe("Energy level required"),
-      estimatedDuration: z.number().nullable().optional().describe("Estimated duration in minutes"),
+      aspect: z.string().nullable().optional().describe("New aspect"),
+      energyRequired: z.enum(["low", "medium", "high"]).nullable().optional().describe("Energy level"),
+      estimatedDuration: z.number().nullable().optional().describe("Duration in minutes"),
     }),
   }
 );

@@ -22,11 +22,11 @@ export const tagToProjectTool = tool(
   },
   {
     name: "tag_to_project",
-    description: "Tag a task or event to a project, or unlink it by passing null as project_id. This groups related items under a project.",
+    description: "Tag a task or event to a project.",
     schema: z.object({
-      entity_type: z.enum(["task", "event"]).describe("Type of entity to tag"),
-      entity_id: z.string().describe("UUID of the task or event"),
-      project_id: z.string().nullable().describe("UUID of the project to tag to, or null to unlink"),
+      entity_type: z.enum(["task", "event"]).describe("Entity type"),
+      entity_id: z.string().describe("Entity UUID"),
+      project_id: z.string().nullable().describe("Project UUID (null to unlink)"),
     }),
   }
 );

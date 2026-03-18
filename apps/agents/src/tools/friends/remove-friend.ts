@@ -23,9 +23,9 @@ export const removeFriendTool = tool(
   },
   {
     name: "remove_friend",
-    description: "Remove an existing friend. Use list_friends first to find the friendshipId.",
+    description: "Remove a friend.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID of the friend to remove"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
     }),
   }
 );

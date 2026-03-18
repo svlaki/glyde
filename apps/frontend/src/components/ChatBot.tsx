@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardR
 import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '../lib/authContext'
+import { trackEvent } from '../lib/analytics'
 import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
 import { useGeolocation } from '../hooks/useGeolocation'
@@ -136,7 +137,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     if (currentPageOverride) return currentPageOverride
     const path = location.pathname
     if (path === '/' || path === '/dashboard') return 'dashboard'
-    if (path === '/plan') return 'plan'
+    if (path === '/notes') return 'notes'
     if (path.startsWith('/goals')) return 'goals'
     if (path.startsWith('/tasks')) return 'tasks'
     return 'dashboard'
@@ -652,6 +653,10 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
       saveMessageToAPI(botMessage)
       refreshAspects()
 
+      // Notify other components (Calendar, TodoList, Goals) to refetch data
+      // since the agent may have created/updated/deleted events, tasks, or goals
+      window.dispatchEvent(new CustomEvent('agent-data-changed'))
+
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         // Stream was aborted - don't process queue
@@ -711,6 +716,7 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
     setInput('')
 
     saveMessageToAPI(userMessage)
+    trackEvent('chat_message_sent', 'agent')
 
     if (inputRef.current) {
       inputRef.current.style.height = mobileEmbedded ? '32px' : '36px'

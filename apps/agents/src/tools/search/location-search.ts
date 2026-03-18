@@ -220,22 +220,12 @@ export const locationSearchTool = tool(
   },
   {
     name: "location_search",
-    description: `Search for location-specific information using Google Maps. Provides accurate drive times, venue details, directions, and nearby places.
-
-Use this tool when:
-- User asks "how long to drive to X?" or "how far is X?" -> infoType "drive_time" with fromLocation + toLocation
-- User wants venue details (address, hours, phone, rating) -> infoType "venue_info"
-- User needs directions between two locations -> infoType "directions" with fromLocation + toLocation
-- User asks "where am I?" -> infoType "reverse_geocode" with their coords as query
-- User asks about nearby places -> infoType "general" with fromLocation as their coords
-
-All results come from Google Maps (accurate, real-time).
-Prefer this over web_search for ANY location/travel/venue query.`,
+    description: "Search locations via Google Maps (drive times, venues, directions).",
     schema: z.object({
-      query: z.string().describe("The location query. For reverse_geocode, pass 'lat,lng'. For venue/general, pass place name (e.g., 'Philz Coffee Palo Alto')"),
-      fromLocation: z.string().optional().describe("Origin coords or address. For nearby searches, pass user's coords (e.g., '37.4221,-122.1725')"),
-      toLocation: z.string().optional().describe("Destination for drive time/directions (e.g., 'SFO Airport' or '1115 Campus Drive, Stanford, CA')"),
-      infoType: z.enum(['drive_time', 'venue_info', 'directions', 'reverse_geocode', 'general']).default('general').describe("Type of location info needed"),
+      query: z.string().describe("Location query or 'lat,lng' for reverse geocode"),
+      fromLocation: z.string().optional().describe("Origin coords or address"),
+      toLocation: z.string().optional().describe("Destination for directions"),
+      infoType: z.enum(['drive_time', 'venue_info', 'directions', 'reverse_geocode', 'general']).default('general').describe("Info type"),
     }),
   }
 );

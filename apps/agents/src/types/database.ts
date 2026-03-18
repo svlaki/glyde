@@ -43,6 +43,9 @@ export interface DatabaseEvent {
   // Reminder field
   reminder_minutes?: number | null;  // Minutes before event to fire a reminder (null = no reminder)
 
+  // All-day event flag
+  is_all_day?: boolean;
+
   // Calendar sync fields
   google_event_id?: string;
   outlook_event_id?: string;

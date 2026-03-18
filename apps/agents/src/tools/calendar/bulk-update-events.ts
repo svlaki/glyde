@@ -189,14 +189,14 @@ export const bulkUpdateEventsTool = tool(
   },
   {
     name: "bulk_update_events",
-    description: "Update multiple events at once based on search criteria or event IDs. Perfect for bulk aspect changes, mass edits, or moving groups of events to an aspect. IMPORTANT: Includes both past and future events in the search.",
+    description: "Update multiple events at once by search or IDs.",
     schema: z.object({
-      searchQuery: z.string().optional().nullable().describe("Search query to find events to update (e.g., 'mendicants', 'workout', 'meeting'). Searches in title, description, and location. Includes BOTH past and future events."),
-      eventIds: z.array(z.string()).optional().nullable().describe("Optional: Array of specific event IDs to update instead of using search"),
-      aspect: z.string().optional().nullable().describe("New aspect to assign to all matching events. MUST be an existing aspect - call list_aspects first or create_aspect BEFORE this tool."),
-      title: z.string().optional().nullable().describe("Optional: New title for all matching events (use cautiously)"),
-      location: z.string().optional().nullable().describe("Optional: New location for all matching events"),
-      description: z.string().optional().nullable().describe("Optional: New description for all matching events"),
+      searchQuery: z.string().optional().nullable().describe("Search query to find events"),
+      eventIds: z.array(z.string()).optional().nullable().describe("Event UUIDs to update"),
+      aspect: z.string().optional().nullable().describe("New aspect name"),
+      title: z.string().optional().nullable().describe("New title"),
+      location: z.string().optional().nullable().describe("New location"),
+      description: z.string().optional().nullable().describe("New description"),
     }),
   }
 );

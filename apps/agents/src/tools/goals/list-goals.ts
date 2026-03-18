@@ -54,11 +54,11 @@ export const listGoalsTool = tool(
   },
   {
     name: "list_goals",
-    description: "List goals with optional filters. Use this to show the user their goals, check progress, or find specific objectives.",
+    description: "List goals with optional filters.",
     schema: z.object({
       status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("Filter by status"),
       aspect: z.string().optional().nullable().describe("Filter by aspect"),
-      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Filter by goal type"),
+      goalType: z.enum(["SMART", "OKR", "milestone", "habit", "project"]).optional().nullable().describe("Filter by type"),
     }),
   }
 );

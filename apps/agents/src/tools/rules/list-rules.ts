@@ -38,9 +38,9 @@ export const listRulesTool = tool(
   },
   {
     name: "list_rules",
-    description: "List all active rules that guide agent behavior. Use this to check what rules are currently in effect before creating new ones or when user asks about their rules.",
+    description: "List active behavioral rules.",
     schema: z.object({
-      include_disabled: z.boolean().optional().nullable().describe("Whether to include disabled rules. Default is false (only show enabled rules)."),
+      include_disabled: z.boolean().optional().nullable().describe("Include disabled rules"),
     }),
   }
 );

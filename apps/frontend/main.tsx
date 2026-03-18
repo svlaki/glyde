@@ -1,8 +1,8 @@
 import "./src/styles/globals.css"
-import React from 'react'
+import React, { Suspense, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './src/lib/authContext'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AuthProvider, useAuth } from './src/lib/authContext'
 import { AspectProvider } from './src/lib/aspectContext'
 import { ThemeProvider } from './src/lib/themeContext'
 import { RuleProvider } from './src/lib/ruleContext'
@@ -13,17 +13,80 @@ import { ProfilePage } from './src/pages/ProfilePage'
 import { ProfileEditPage } from './src/pages/ProfileEditPage'
 import { AspectsPage } from './src/pages/AspectsPage'
 import { ConnectionsPage } from './src/pages/ConnectionsPage'
-import { PlanPage } from './src/pages/PlanPage'
+import { NotesPage } from './src/pages/NotesPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
 import { RatingsPage } from './src/pages/RatingsPage'
 import { RemindersPage } from './src/pages/RemindersPage'
+const AdminAnalyticsPage = React.lazy(() => import('./src/pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })))
 import { ProjectProvider } from './src/lib/projectContext'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
 import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
 import { KeyboardProvider } from './src/hooks/useKeyboard'
+import { initAnalytics, trackPageView, trackEvent, shutdownAnalytics } from './src/lib/analytics'
+
+function AnalyticsTracker() {
+  const { user } = useAuth()
+  const location = useLocation()
+  const initialized = useRef(false)
+  const currentUserId = useRef<string | null>(null)
+
+  useEffect(() => {
+    const uid = user?.id ?? null
+    if (uid && uid !== currentUserId.current) {
+      if (initialized.current) shutdownAnalytics()
+      initAnalytics(uid)
+      initialized.current = true
+      currentUserId.current = uid
+      // Capture the initial page view immediately so it isn't dropped
+      trackPageView(location.pathname)
+    }
+    if (!uid && initialized.current) {
+      shutdownAnalytics()
+      initialized.current = false
+      currentUserId.current = null
+    }
+    return () => {
+      if (initialized.current) {
+        shutdownAnalytics()
+        initialized.current = false
+        currentUserId.current = null
+      }
+    }
+  }, [user?.id])
+
+  // Skip the first run — the user-id effect already tracks the initial page view
+  const isFirstPageViewEffect = useRef(true)
+  useEffect(() => {
+    if (isFirstPageViewEffect.current) {
+      isFirstPageViewEffect.current = false
+      return
+    }
+    if (initialized.current) {
+      trackPageView(location.pathname)
+    }
+  }, [location.pathname])
+
+  return null
+}
+
+// Global error tracking — use addEventListener to avoid overwriting other handlers
+window.addEventListener('error', (event) => {
+  trackEvent('frontend_error', 'error', {
+    message: String(event.message),
+    source: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  })
+})
+
+window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  trackEvent('unhandled_rejection', 'error', {
+    reason: String(event.reason),
+  })
+})
 
 function App() {
   return (
@@ -35,6 +98,7 @@ function App() {
             <ConnectionProvider>
             <AspectProvider>
             <ProjectProvider>
+              <AnalyticsTracker />
               <Routes>
                 <Route path="/" element={<Auth />} />
                 <Route
@@ -120,11 +184,11 @@ function App() {
                   }
                 />
                 <Route
-                  path="/plan"
+                  path="/notes"
                   element={
                     <ProtectedRoute>
                       <OnboardingCheck>
-                        <PlanPage />
+                        <NotesPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }
@@ -146,6 +210,16 @@ function App() {
                       <OnboardingCheck>
                         <RemindersPage />
                       </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/analytics"
+                  element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<div style={{ padding: '64px', textAlign: 'center' }}>Loading...</div>}>
+                        <AdminAnalyticsPage />
+                      </Suspense>
                     </ProtectedRoute>
                   }
                 />

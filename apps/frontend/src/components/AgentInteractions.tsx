@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../lib/authContext'
+import { trackEvent } from '../lib/analytics'
 import { useTheme } from '../lib/themeContext'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight, lineHeight } from '../styles/typography'
@@ -41,7 +42,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
   const [interactions, setInteractions] = useState<Interaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [respondingTo, setRespondingTo] = useState<string | null>(null)
+  const [respondingTo, setRespondingTo] = useState<Set<string>>(new Set())
   const [textInputs, setTextInputs] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [showCustomTimeInput, setShowCustomTimeInput] = useState<string | null>(null) // interaction ID showing custom time input
@@ -61,6 +62,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
   // Dismiss an interaction - remove from UI and mark as dismissed in backend
   const dismissInteraction = useCallback(async (interactionId: string) => {
     setInteractions(prev => prev.filter(i => i.id !== interactionId))
+    trackEvent('interaction_dismissed', 'agent', { interaction_id: interactionId })
 
     if (!session) return
     try {
@@ -196,9 +198,9 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
 
   // Respond to an interaction
   const handleRespond = async (interactionId: string, response: string) => {
-    if (!user || !session || respondingTo) return
+    if (!user || !session || respondingTo.has(interactionId)) return
 
-    setRespondingTo(interactionId)
+    setRespondingTo(prev => new Set([...prev, interactionId]))
 
     try {
       const res = await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
@@ -218,6 +220,8 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
       }
 
       const responseData = await res.json()
+
+      trackEvent('interaction_responded', 'agent', { interaction_id: interactionId, response })
 
       // Remove the interaction from the list
       setInteractions(prev => prev.filter(i => i.id !== interactionId))
@@ -244,7 +248,11 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
       console.error('Error responding to interaction:', err)
       setError('Failed to submit response')
     } finally {
-      setRespondingTo(null)
+      setRespondingTo(prev => {
+        const next = new Set(prev)
+        next.delete(interactionId)
+        return next
+      })
     }
   }
 
@@ -327,7 +335,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
 
   // Render response options based on interaction type
   const renderResponseOptions = (interaction: Interaction) => {
-    const isResponding = respondingTo === interaction.id
+    const isResponding = respondingTo.has(interaction.id)
 
     switch (interaction.interaction_type) {
       case 'yes_no':
@@ -1149,7 +1157,7 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
               )}
 
               {/* Loading overlay */}
-              {respondingTo === interaction.id && (
+              {respondingTo.has(interaction.id) && (
                 <div style={{
                   position: 'absolute',
                   inset: 0,

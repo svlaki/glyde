@@ -18,6 +18,7 @@ export abstract class BaseAgent {
       modelName,
       temperature: 0.1,
       apiKey: env.OPENAI_API_KEY,
+      streamUsage: true,
     });
     this.supabaseService = new SupabaseService();
     this.zepService = new ZepMemoryService();

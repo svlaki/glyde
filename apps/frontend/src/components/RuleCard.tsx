@@ -1,7 +1,7 @@
 import { useTheme } from '../lib/themeContext'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight, lineHeight } from '../styles/typography'
-import { Rule } from '../lib/ruleService'
+import type { Rule } from '../lib/ruleService'
 
 interface RuleCardProps {
   rule: Rule

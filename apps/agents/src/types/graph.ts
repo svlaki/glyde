@@ -45,7 +45,7 @@ export interface TaskEntity {
  */
 export interface GoalEntity {
   title: string;
-  goal_type: 'short_term' | 'long_term' | 'habit' | 'milestone';
+  goal_type: 'short_term' | 'long_term' | 'habit';
   deadline?: string; // ISO 8601 timestamp
   progress_percentage: number; // 0-100
   status: 'active' | 'completed' | 'paused' | 'abandoned';
@@ -118,7 +118,6 @@ export interface PursuingGoalEdge {
   started_at: string; // ISO 8601 timestamp
   progress_percentage: number; // 0-100
   last_updated: string; // ISO 8601 timestamp
-  milestones_completed?: number;
 }
 
 /**

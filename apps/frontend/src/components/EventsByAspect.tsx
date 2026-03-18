@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
-import { fetchUserEvents, CalendarEvent } from '../lib/calendarService'
+import { fetchUserEvents } from '../lib/calendarService'
+import type { CalendarEvent } from '../lib/calendarService'
 import type { Aspect } from '../lib/aspectService'
 import { EmptyState } from './EmptyState'
 

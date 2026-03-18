@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Rating {
   id: string
@@ -116,6 +117,7 @@ export async function createUserRating(
       return { rating: null, error: data.error || 'Failed to create rating' }
     }
 
+    trackEvent('rating_created', 'engagement', { topic: ratingData.topic, score: ratingData.score })
     return { rating: data.rating, error: null }
   } catch (error) {
     return { rating: null, error: 'Failed to create rating' }

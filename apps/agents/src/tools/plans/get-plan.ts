@@ -34,7 +34,7 @@ export const getPlanTool = tool(
   },
   {
     name: "get_plan",
-    description: "Get the user's current life plan. Returns the plan content, title, and metadata. Use this before updating the plan to see its current state.",
+    description: "Get the user's life plan.",
     schema: z.object({}),
   }
 );

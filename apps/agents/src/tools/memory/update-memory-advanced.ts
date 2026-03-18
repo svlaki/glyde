@@ -80,34 +80,13 @@ I've recorded ${insights.length} insight${insights.length > 1 ? 's' : ''} about 
   },
   {
     name: "update_memory_advanced",
-    description: `Proactively save important insights, preferences, and patterns to user memory.
-
-**Use this tool when:**
-- User reveals important preferences (e.g., "I hate morning meetings")
-- Breakthrough insights about goals or values (e.g., "I want to prioritize health over work")
-- Significant behavioral patterns discovered (e.g., "User consistently reschedules Friday meetings")
-- Major life events or context changes (e.g., "Starting new job next month")
-
-**Don't use for:**
-- Routine calendar/task operations (use specific tools)
-- Temporary/one-time information
-- Information already captured in events/tasks/goals
-
-**Importance levels:**
-- "high": Core preferences, values, major insights that should influence all recommendations
-- "medium": Useful patterns and preferences that improve personalization
-- "low": Minor observations that may be helpful context
-
-**Early persistence:**
-- Set triggerEarlyPersistence=true for critical insights that should save immediately
-- Leave false (default) for insights that can wait until conversation end`,
-
+    description: "Save insights and preferences to user memory.",
     schema: z.object({
-      insights: z.array(z.string()).describe("List of key insights to persist (e.g., ['Prefers morning deep work 9-11am', 'Dislikes meetings after 4pm'])"),
-      importance: z.enum(["low", "medium", "high"]).describe("How important these insights are for future personalization"),
-      category: z.string().describe("Category of insights (e.g., 'preferences', 'goals', 'patterns', 'scheduling', 'productivity', 'wellness')"),
-      triggerEarlyPersistence: z.boolean().default(false).nullable().describe("If true, save immediately. If false, queue for batch save at conversation end."),
-      metadata: z.record(z.any()).optional().nullable().describe("Optional additional context (e.g., {confidence: 0.95, detectedFrom: 'repeated behavior'})")
+      insights: z.array(z.string()).describe("Insights to persist"),
+      importance: z.enum(["low", "medium", "high"]).describe("Importance level"),
+      category: z.string().describe("Category (e.g., preferences, patterns)"),
+      triggerEarlyPersistence: z.boolean().default(false).nullable().describe("Save immediately if true"),
+      metadata: z.record(z.any()).optional().nullable().describe("Additional context (JSON)")
     }),
   }
 );

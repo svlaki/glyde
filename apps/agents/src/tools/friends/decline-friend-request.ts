@@ -25,10 +25,10 @@ export const declineFriendRequestTool = tool(
   },
   {
     name: "decline_friend_request",
-    description: "Decline a pending friend request. Optionally block the user to prevent future requests.",
+    description: "Decline a friend request.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID of the request to decline"),
-      block: z.boolean().default(false).describe("Set to true to also block the user from sending future requests"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
+      block: z.boolean().default(false).describe("Also block user"),
     }),
   }
 );

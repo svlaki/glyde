@@ -23,9 +23,9 @@ export const acceptFriendRequestTool = tool(
   },
   {
     name: "accept_friend_request",
-    description: "Accept a pending friend request. Use get_pending_friend_requests first to find the friendshipId.",
+    description: "Accept a friend request.",
     schema: z.object({
-      friendshipId: z.string().uuid().describe("The friendship ID from the pending request to accept"),
+      friendshipId: z.string().uuid().describe("Friendship UUID"),
     }),
   }
 );

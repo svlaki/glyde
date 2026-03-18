@@ -18,9 +18,9 @@ export const archiveProjectTool = tool(
   },
   {
     name: "archive_project",
-    description: "Archive a project. The project and its linked tasks/events are preserved but hidden from active views.",
+    description: "Archive a project (hidden but restorable).",
     schema: z.object({
-      project_id: z.string().describe("UUID of the project to archive"),
+      project_id: z.string().describe("Project UUID"),
     }),
   }
 );

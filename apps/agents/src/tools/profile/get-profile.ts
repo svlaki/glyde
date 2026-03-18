@@ -34,9 +34,9 @@ export const getProfileTool = tool(
   },
   {
     name: "get_profile",
-    description: "Get user profile information. Use this to understand the user's context, preferences, work hours, productivity patterns, and other personal info the AI has learned.",
+    description: "Get user profile information.",
     schema: z.object({
-      section: z.enum(["life", "work", "productivity", "health", "relationships", "routines", "decisionMaking", "communication", "learning", "agentPreferences", "rules"]).optional().nullable().describe("Specific profile section to retrieve (optional)"),
+      section: z.enum(["life", "work", "productivity", "health", "relationships", "routines", "decisionMaking", "communication", "learning", "agentPreferences", "rules"]).optional().nullable().describe("Profile section"),
     }),
   }
 );

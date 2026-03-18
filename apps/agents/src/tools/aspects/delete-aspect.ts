@@ -26,7 +26,7 @@ export const deleteAspectTool = tool(
   },
   {
     name: "delete_aspect",
-    description: "Delete an aspect. WARNING: Only use this if the user explicitly requests deletion. This may affect existing events/tasks/goals using this aspect.",
+    description: "Delete an aspect permanently.",
     schema: z.object({
       name: z.string().describe("Aspect name to delete"),
     }),

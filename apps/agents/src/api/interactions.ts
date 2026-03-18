@@ -148,6 +148,8 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     const interactionType = interaction.interaction_type || 'unknown';
     const metadata = (interaction.metadata || {}) as any;
     const metadataContext = metadata.context ? ` Context: ${metadata.context}.` : '';
+    const eventIdContext = metadata.eventId ? ` Event ID to update: ${metadata.eventId}.` : '';
+    const eventTitleContext = metadata.eventTitle ? ` Event title: ${metadata.eventTitle}.` : '';
 
     // Calculate response time
     let responseTimeContext = '';
@@ -164,7 +166,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       }
     }
 
-    const agentMessage = `INTERACTION RESPONSE - The user was asked: "${interaction.question}" (type: ${interactionType}, options: ${JSON.stringify(interaction.options || [])}).${metadataContext}
+    const agentMessage = `INTERACTION RESPONSE - The user was asked: "${interaction.question}" (type: ${interactionType}, options: ${JSON.stringify(interaction.options || [])}).${metadataContext}${eventIdContext}${eventTitleContext}
 
 The user responded: "${trimmedResponse}"${responseTimeContext}
 
@@ -174,6 +176,7 @@ Based on this response, take the appropriate action using your tools. For exampl
 - If they picked a time option, create an event at that time
 - If they gave a rating (1-10), the rating is already stored automatically. No action needed.
 - If they said "no" or "skip", do nothing
+- If they gave a text response about what to focus on during a focus block or event, UPDATE that event's description using the update_event tool with their response as the description
 - If they gave a text response (reflection, journal), acknowledge it and store useful insights
 
 Act on what the user wants. Do NOT create new interaction questions - just execute the action.`;

@@ -94,6 +94,34 @@ router.post('/:friendshipId/decline', authenticateRequest, async (req: Request, 
 })
 
 /**
+ * Search/discover users to add as friends
+ * GET /friends/search?q=<optional search query>
+ */
+router.get('/search', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+
+    const query = typeof req.query.q === 'string' ? req.query.q : undefined
+    if (query && query.length > 200) {
+      return res.status(400).json({ success: false, error: 'Search query too long' })
+    }
+
+    const supabase = getSupabaseClient()
+    const friendshipService = new FriendshipService(supabase)
+
+    const result = await friendshipService.searchUsers(userId, query)
+    const statusCode = result.success ? 200 : 500
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error searching users:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
  * Get all accepted friends for authenticated user
  * GET /friends
  */

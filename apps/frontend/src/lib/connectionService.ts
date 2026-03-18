@@ -1,4 +1,5 @@
 import { User } from '@supabase/supabase-js'
+import { trackEvent } from './analytics'
 
 export interface Connection {
   id: string
@@ -177,6 +178,7 @@ export async function handleGoogleCallback(
     const data = await response.json()
 
     if (data.success) {
+      trackEvent('calendar_connected', 'engagement', { provider: 'google' })
       return { connection: data.connection, error: null }
     } else {
       return { connection: null, error: data.error || 'Unknown error' }
@@ -274,6 +276,7 @@ export async function handleMicrosoftCallback(
     const data = await response.json()
 
     if (data.success) {
+      trackEvent('calendar_connected', 'engagement', { provider: 'microsoft' })
       return { connection: data.connection, error: null }
     } else {
       return { connection: null, error: data.error || 'Unknown error' }

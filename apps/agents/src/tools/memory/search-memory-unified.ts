@@ -125,12 +125,12 @@ export const searchMemoryUnifiedTool = tool(
   },
   {
     name: "search_memory_unified",
-    description: "Search user's memory, behavioral patterns, and community insights. Unified interface for all memory search needs. Use 'personal' mode for user-specific patterns, 'community' for cross-user insights, or 'all' for comprehensive search.",
+    description: "Search user memory and behavioral patterns.",
     schema: z.object({
-      query: z.string().describe("Search query (e.g., 'work habits', 'meeting preferences', 'productivity patterns', 'goal progress')"),
-      mode: z.enum(["personal", "community", "all"]).default("all").nullable().describe("Search mode: 'personal' (user patterns only), 'community' (shared patterns only), or 'all' (comprehensive search)"),
-      entityType: z.enum(["calendar", "task", "goal", "pattern"]).optional().nullable().describe("Filter by entity type when using 'personal' mode"),
-      minFactRating: z.number().min(0).max(1).optional().nullable().describe("Minimum confidence rating for facts (0-1). Higher = more confident. Defaults to 0.6")
+      query: z.string().describe("Search query"),
+      mode: z.enum(["personal", "community", "all"]).default("all").nullable().describe("Search mode"),
+      entityType: z.enum(["calendar", "task", "goal", "pattern"]).optional().nullable().describe("Filter by entity type"),
+      minFactRating: z.number().min(0).max(1).optional().nullable().describe("Min confidence 0-1")
     }),
   }
 );

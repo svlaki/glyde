@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/themeContext'
-import { Rule } from '../lib/ruleService'
+import type { Rule } from '../lib/ruleService'
 import { getColors } from '../styles/colors'
 import { fontSize, fontWeight } from '../styles/typography'
 import { Modal } from './Modal'

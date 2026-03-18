@@ -139,17 +139,17 @@ export const createRecurringEventTool = tool(
   },
   {
     name: "create_recurring_event",
-    description: "Create a recurring calendar event with a recurrence pattern. Supports natural language patterns like 'every Monday and Friday' or direct RFC 5545 RRULE format.",
+    description: "Create a recurring calendar event.",
     schema: z.object({
-      title: z.string().describe("Event title (e.g., 'Team standup', 'Weekly review', 'Gym session')"),
-      startTime: z.string().describe("Start time for the first occurrence in ISO format. Examples: '2024-01-15T10:00:00', 'Monday at 2pm', '10:30am'"),
-      endTime: z.string().describe("End time for the first occurrence in ISO format. This determines the duration of each recurring instance."),
-      recurrence: z.string().optional().describe("Natural language recurrence pattern. Examples: 'every Monday at 10am', 'daily for 30 days', 'every Tuesday and Thursday at 2pm', 'weekly for 12 weeks', 'monthly on the 15th'"),
-      rrule: z.string().optional().describe("RFC 5545 RRULE format string (e.g., 'FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=12'). Use if you have a specific RRULE. Either 'recurrence' or 'rrule' is required."),
-      aspect: z.string().optional().describe("Aspect for this event. MUST be an existing aspect - call list_aspects first. Will NOT be auto-created."),
-      description: z.string().optional().describe("Description for the recurring event"),
-      location: z.string().optional().describe("Location for the recurring event"),
-      endDate: z.string().optional().describe("End date for the recurrence in ISO format (e.g., '2024-03-15'). Optional - omit for indefinite recurrence."),
+      title: z.string().describe("Event title"),
+      startTime: z.string().describe("First occurrence start time ISO"),
+      endTime: z.string().describe("First occurrence end time ISO"),
+      recurrence: z.string().optional().describe("Natural language pattern (e.g., 'every Monday')"),
+      rrule: z.string().optional().describe("RFC 5545 RRULE string"),
+      aspect: z.string().optional().describe("Aspect name (must exist)"),
+      description: z.string().optional().describe("Description"),
+      location: z.string().optional().describe("Location"),
+      endDate: z.string().optional().describe("Recurrence end date ISO"),
     }),
   }
 );

@@ -318,7 +318,7 @@ export function Section3HabitsGoals() {
                           goal,
                           description: e.target.value,
                         })}
-                        placeholder="Add details: timeline, milestones, what success looks like... (optional)"
+                        placeholder="Add details: timeline, what success looks like... (optional)"
                         rows={2}
                         style={{
                           width: '100%',

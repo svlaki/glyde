@@ -2,10 +2,12 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateGoalTool = tool(
   async ({ goalId, title, description, targetDate, status, progress, aspect, priorityScore, milestones }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone;
     if (!userId) {
       return "User ID required";
     }
@@ -18,17 +20,26 @@ export const updateGoalTool = tool(
       const goals = await supabaseService.getGoals(userId);
       const originalGoal = goals.find((g: any) => g.id === goalId);
 
+      // Convert dates from local timezone to UTC
+      const targetDateUTC = targetDate && timezone ? convertToUTC(targetDate, timezone) : targetDate;
+
+      // Convert milestone due_dates to UTC
+      const convertedMilestones = milestones?.map((m: any) => ({
+        ...m,
+        due_date: m.due_date && timezone ? convertToUTC(m.due_date, timezone) : m.due_date,
+      }));
+
       const updates: any = {};
 
       // Only include fields that are actually provided with non-empty values
       if (title !== undefined && title !== null && title.trim() !== '') updates.title = title;
       if (description !== undefined && description !== null && description.trim() !== '') updates.description = description;
-      if (targetDate !== undefined && targetDate !== null && targetDate.trim() !== '') updates.targetDate = targetDate;
+      if (targetDateUTC !== undefined && targetDateUTC !== null && targetDateUTC.trim() !== '') updates.targetDate = targetDateUTC;
       if (status !== undefined && status !== null) updates.status = status;
       if (progress !== undefined && progress !== null) updates.progress = progress;
       if (aspect !== undefined && aspect !== null && aspect.trim() !== '') updates.aspect = aspect;
       if (priorityScore !== undefined && priorityScore !== null) updates.priorityScore = priorityScore;
-      if (milestones !== undefined && milestones !== null) updates.milestones = milestones;
+      if (convertedMilestones !== undefined && convertedMilestones !== null) updates.milestones = convertedMilestones;
 
       const goal = await supabaseService.updateGoal(userId, goalId, updates, { source: 'agent', agentType: 'conversation' });
 
@@ -98,22 +109,22 @@ export const updateGoalTool = tool(
   },
   {
     name: "update_goal",
-    description: "Update an existing goal. Use this to modify goal details, update progress, change status, or reschedule target dates.",
+    description: "Update a goal by ID.",
     schema: z.object({
-      goalId: z.string().describe("Goal ID to update"),
-      title: z.string().optional().nullable().describe("New goal title"),
-      description: z.string().optional().nullable().describe("New goal description"),
-      targetDate: z.string().optional().nullable().describe("New target date (ISO format)"),
+      goalId: z.string().describe("Goal UUID"),
+      title: z.string().optional().nullable().describe("New title"),
+      description: z.string().optional().nullable().describe("New description"),
+      targetDate: z.string().optional().nullable().describe("New target date in ISO format (local timezone, no Z suffix)"),
       status: z.enum(["active", "completed", "paused", "abandoned"]).optional().nullable().describe("New status"),
-      progress: z.number().min(0).max(100).optional().nullable().describe("Progress percentage (0-100)"),
-      aspect: z.string().optional().nullable().describe("New aspect name"),
-      priorityScore: z.number().min(1).max(10).optional().nullable().describe("New priority score (1-10)"),
+      progress: z.number().min(0).max(100).optional().nullable().describe("Progress 0-100"),
+      aspect: z.string().optional().nullable().describe("New aspect"),
+      priorityScore: z.number().min(1).max(10).optional().nullable().describe("Priority 1-10"),
       milestones: z.array(z.object({
-        title: z.string().describe("Milestone title"),
-        description: z.string().optional().nullable().describe("Milestone description"),
-        due_date: z.string().optional().nullable().describe("Target date for milestone (ISO format)"),
-        status: z.enum(["pending", "in_progress", "completed"]).optional().nullable().describe("Milestone status"),
-      })).optional().nullable().describe("Updated list of milestones. This replaces existing milestones. Include all milestones (existing and new) when updating."),
+        title: z.string().describe("Title"),
+        description: z.string().optional().nullable().describe("Description"),
+        due_date: z.string().optional().nullable().describe("Due date ISO"),
+        status: z.enum(["pending", "in_progress", "completed"]).optional().nullable().describe("Status"),
+      })).optional().nullable().describe("Replaces all milestones"),
     }),
   }
 );

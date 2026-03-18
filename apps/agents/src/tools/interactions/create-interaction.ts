@@ -83,14 +83,14 @@ export const createInteractionTool = tool(
   },
   {
     name: "create_interaction",
-    description: "Create an interactive prompt for the user. The user's response will be routed back to you for processing with tools. Keep metadata.context descriptive so you have context when processing the response.",
+    description: "Create an interactive prompt card for the user.",
     schema: z.object({
-      question: z.string().describe("The question or prompt to show the user"),
+      question: z.string().describe("Question to show"),
       type: z.enum(["yes_no", "multiple_choice", "text", "rating", "time_suggestion"]).describe("Interaction type"),
-      options: z.array(z.string()).optional().nullable().describe("Options for the user to choose from"),
-      priority: z.number().min(1).max(5).optional().nullable().describe("Priority 1-5 (5 highest). Default 3"),
-      metadata: z.record(z.any()).optional().nullable().describe("Context for processing the response later. Include 'context' (why this was suggested), 'ratingTopic' (for ratings), 'eventTitle' and 'duration' (for scheduling), 'eventId'/'taskId' (for updates)."),
-      aspectId: z.string().uuid().optional().nullable().describe("Aspect UUID for card color. ALWAYS provide this."),
+      options: z.array(z.string()).optional().nullable().describe("Choices"),
+      priority: z.number().min(1).max(5).optional().nullable().describe("Priority 1-5"),
+      metadata: z.record(z.any()).optional().nullable().describe("Context for response processing (JSON)"),
+      aspectId: z.string().uuid().optional().nullable().describe("Aspect UUID"),
     }),
   }
 );

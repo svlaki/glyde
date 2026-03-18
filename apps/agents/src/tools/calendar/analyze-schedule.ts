@@ -158,11 +158,11 @@ ${loadAssessment}`;
   },
   {
     name: "analyze_schedule",
-    description: "Analyze the user's schedule and provide insights about time allocation, meeting density, aspect breakdown, and work-life balance. Use when users ask about their schedule patterns or workload.",
+    description: "Analyze schedule patterns and time allocation.",
     schema: z.object({
-      period: z.enum(["today", "week", "next-week"]).optional().nullable().describe("Time period to analyze (default: 'week' for current week)"),
-      startDate: z.string().optional().nullable().describe("Custom start date (ISO format) - overrides period"),
-      endDate: z.string().optional().nullable().describe("Custom end date (ISO format) - overrides period"),
+      period: z.enum(["today", "week", "next-week"]).optional().nullable().describe("Period (default: week)"),
+      startDate: z.string().optional().nullable().describe("Custom start date ISO"),
+      endDate: z.string().optional().nullable().describe("Custom end date ISO"),
     }),
   }
 );

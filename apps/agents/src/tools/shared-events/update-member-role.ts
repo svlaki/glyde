@@ -23,11 +23,11 @@ export const updateMemberRoleTool = tool(
   },
   {
     name: "update_member_role",
-    description: "Change a member's role on a shared event. Only the event owner can change roles. Use get_event_members to find the memberId.",
+    description: "Change a member's role on a shared event.",
     schema: z.object({
-      eventId: z.string().uuid().describe("The event ID"),
-      memberId: z.string().uuid().describe("The member record ID to update"),
-      role: z.enum(['editor', 'viewer']).describe("The new role for the member"),
+      eventId: z.string().uuid().describe("Event UUID"),
+      memberId: z.string().uuid().describe("Member UUID"),
+      role: z.enum(['editor', 'viewer']).describe("New role"),
     }),
   }
 );

@@ -34,13 +34,13 @@ export const createProjectTool = tool(
   },
   {
     name: "create_project",
-    description: "Create a new project to group related tasks and events. Projects belong to an aspect and can have a deadline. Use this when a user mentions a multi-step endeavor like 'Kitchen Renovation', 'Q2 Launch', or 'Thesis Research'.",
+    description: "Create a project to group tasks and events.",
     schema: z.object({
-      name: z.string().describe("Project name (e.g., 'Kitchen Renovation', 'Q2 Product Launch')"),
-      aspect_id: z.string().describe("UUID of the aspect this project belongs to"),
-      description: z.string().optional().nullable().describe("Description of the project"),
-      deadline: z.string().optional().nullable().describe("Project deadline in ISO format"),
-      details: z.record(z.any()).optional().nullable().describe("Additional project details as JSON"),
+      name: z.string().describe("Project name"),
+      aspect_id: z.string().describe("Aspect UUID"),
+      description: z.string().optional().nullable().describe("Description"),
+      deadline: z.string().optional().nullable().describe("Deadline ISO"),
+      details: z.record(z.any()).optional().nullable().describe("Details (JSON)"),
     }),
   }
 );

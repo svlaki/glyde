@@ -55,13 +55,20 @@ export const createEventTool = tool(
 
     console.log(`[CREATE-EVENT TOOL] Converted times - Local: ${startTime} -> UTC: ${startTimeUTC}`);
 
-    // Check for conflicts using UTC times
+    // Check for conflicts using UTC times — only fetch events in a narrow window around the new event
     try {
-      const existingEvents = await supabaseService.getEvents(userId);
       const startDateTime = new Date(startTimeUTC);
       const endDateTime = new Date(endTimeUTC);
 
-      const conflictingEvents = existingEvents.filter(event => {
+      // Only fetch events within +/- 1 day of the new event to avoid loading the entire calendar
+      const windowStart = new Date(startDateTime.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const windowEnd = new Date(endDateTime.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const existingEvents = await supabaseService.getEvents(userId, windowStart, windowEnd);
+
+      const conflictingEvents = existingEvents.filter((event: any) => {
+        // Skip all-day events — they don't represent actual time blocks
+        if (event.is_all_day) return false;
+
         const eventStart = new Date(event.start_time);
         const eventEnd = new Date(event.end_time);
 
@@ -74,6 +81,7 @@ export const createEventTool = tool(
 
       if (conflictingEvents.length > 0) {
         const conflictingEvent = conflictingEvents[0] as any;
+        console.log(`[CREATE-EVENT TOOL] Conflict detected with "${conflictingEvent.title}" (${conflictingEvent.start_time} - ${conflictingEvent.end_time}), replaceConflicting=${replaceConflicting}`);
 
         // If replaceConflicting is true, delete the conflicting event and continue
         if (replaceConflicting) {
@@ -181,18 +189,18 @@ export const createEventTool = tool(
   },
   {
     name: "create_event",
-    description: "Create a new calendar event. ALWAYS call list_aspects first to check existing aspects. For specific entities (classes, projects, clients), you MUST create a specific aspect first using create_aspect. Generic aspects should only be used for truly generic activities.",
+    description: "Create a calendar event.",
     schema: z.object({
-      title: z.string().describe("Event title extracted from user input or inferred from context. Make it descriptive and clear."),
-      startTime: z.string().describe("Start time in ISO format. Parse relative dates like 'tomorrow', '1pm', 'Friday' into proper timestamps. Use intelligent time defaults: breakfast=morning, lunch=midday, dinner=evening, meetings=business hours"),
-      endTime: z.string().describe("End time in ISO format. If not specified, add 1 hour to start time"),
-      location: z.string().optional().nullable().describe("Event location. Leave empty if not specified"),
-      description: z.string().optional().nullable().describe("Event description. Leave empty if not specified"),
-      category: z.string().optional().nullable().describe("Aspect name for this event. MUST be an existing aspect - call list_aspects first. Will NOT be auto-created. For classes/projects/clients, create a SPECIFIC aspect first using create_aspect."),
-      visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("Event visibility. 'private' = only you, 'friends' = visible to friends, 'public' = visible to everyone. Defaults to 'private'."),
-      replaceConflicting: z.boolean().default(false).nullable().describe("Set to true if user explicitly wants to cancel/reschedule/replace a conflicting event. Examples: 'cancel rehearsal and schedule dinner instead', 'move the meeting and add this', 'replace my 3pm with this'. DO NOT set to true if user just asks about scheduling - only when they explicitly want to override/cancel/replace an existing event."),
-      projectId: z.string().optional().nullable().describe("UUID of a project to link this event to. Use list_projects to find project IDs."),
-      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Minutes before the event to send a reminder notification. Common values: 5, 10, 15, 30, 60 (1hr), 1440 (1 day). Null or omit for no reminder."),
+      title: z.string().describe("Event title"),
+      startTime: z.string().describe("Start time in ISO format (local timezone, no Z)"),
+      endTime: z.string().describe("End time in ISO format. Default: start + 1 hour"),
+      location: z.string().optional().nullable().describe("Event location"),
+      description: z.string().optional().nullable().describe("Event description"),
+      category: z.string().optional().nullable().describe("Aspect name (must exist)"),
+      visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("private|friends|public. Default: private"),
+      replaceConflicting: z.boolean().default(false).nullable().describe("True to replace conflicting event"),
+      projectId: z.string().optional().nullable().describe("Project UUID to link to"),
+      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Minutes before event for reminder (0-10080)"),
     }),
   }
 );

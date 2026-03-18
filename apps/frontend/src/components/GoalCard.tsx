@@ -20,8 +20,6 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
 
   const aspectColor = goal.aspect ? getAspectColor(goal.aspect) : undefined
   const goalAny = goal as any
-  const completedMilestones = goal.milestones?.filter(m => m.completed).length ?? 0
-  const totalMilestones = goal.milestones?.length ?? 0
 
   const formatDueDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -56,8 +54,8 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
         {goal.title}
       </div>
 
-      {/* Meta row: aspect badge + milestone progress + due date */}
-      {(goal.aspect || totalMilestones > 0 || goalAny.due_date) && (
+      {/* Meta row: aspect badge + due date */}
+      {(goal.aspect || goalAny.due_date) && (
         <div style={{
           display: 'flex',
           gap: '8px',
@@ -81,11 +79,6 @@ export function GoalCard({ goal, isSelected, onClick }: GoalCardProps) {
                 flexShrink: 0,
               }} />
               {goal.aspect}
-            </span>
-          )}
-          {totalMilestones > 0 && (
-            <span style={{ fontSize: '12px', color: colors.textTertiary }}>
-              {completedMilestones}/{totalMilestones} {goal.milestone_type === 'ordered' ? 'steps' : 'milestones'}
             </span>
           )}
           {goalAny.due_date && (

@@ -37,13 +37,13 @@ export const updateAspectTool = tool(
   },
   {
     name: "update_aspect",
-    description: "Update an existing aspect's properties. Use this to change aspect colors, descriptions, or AI context based on user preferences or learned patterns.",
+    description: "Update an aspect's properties.",
     schema: z.object({
-      name: z.string().describe("Current aspect name to update"),
-      newName: z.string().optional().nullable().describe("New name for the aspect"),
+      name: z.string().describe("Current aspect name"),
+      newName: z.string().optional().nullable().describe("New name"),
       color: z.string().optional().nullable().describe("New hex color code"),
       description: z.string().optional().nullable().describe("New description"),
-      context: z.record(z.any()).optional().nullable().describe("Updated AI context object"),
+      context: z.record(z.any()).optional().nullable().describe("Updated AI context (JSON)"),
     }),
   }
 );
