@@ -196,12 +196,31 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
     return () => clearInterval(interval)
   }, [user, session, generateIfNeeded])
 
-  // Respond to an interaction
+  // Respond to an interaction (optimistic UI - remove immediately)
   const handleRespond = async (interactionId: string, response: string) => {
     if (!user || !session || respondingTo.has(interactionId)) return
 
+    // Prevent double-submit
     setRespondingTo(prev => new Set([...prev, interactionId]))
 
+    // Optimistically remove the interaction immediately
+    const removedInteraction = interactions.find(i => i.id === interactionId)
+    setInteractions(prev => prev.filter(i => i.id !== interactionId))
+
+    // Clear any inputs for this interaction
+    setTextInputs(prev => {
+      const updated = { ...prev }
+      delete updated[interactionId]
+      return updated
+    })
+    setCustomTimeInputs(prev => {
+      const updated = { ...prev }
+      delete updated[interactionId]
+      return updated
+    })
+    setShowCustomTimeInput(null)
+
+    // Fire API call in the background
     try {
       const res = await fetch(`${AGENT_SERVICE_URL}/api/interactions/respond`, {
         method: 'POST',
@@ -223,29 +242,17 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
 
       trackEvent('interaction_responded', 'agent', { interaction_id: interactionId, response })
 
-      // Remove the interaction from the list
-      setInteractions(prev => prev.filter(i => i.id !== interactionId))
-
       // If there's a follow-up interaction, refetch to show it
       if (responseData.hasFollowUp) {
         console.log('[AgentInteractions] Follow-up created, refetching interactions')
         await fetchInteractions()
       }
-
-      // Clear any inputs for this interaction
-      setTextInputs(prev => {
-        const updated = { ...prev }
-        delete updated[interactionId]
-        return updated
-      })
-      setCustomTimeInputs(prev => {
-        const updated = { ...prev }
-        delete updated[interactionId]
-        return updated
-      })
-      setShowCustomTimeInput(null)
     } catch (err) {
       console.error('Error responding to interaction:', err)
+      // Restore the interaction on failure so user can retry
+      if (removedInteraction) {
+        setInteractions(prev => [...prev, removedInteraction])
+      }
       setError('Failed to submit response')
     } finally {
       setRespondingTo(prev => {
@@ -1156,44 +1163,6 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
                 )
               )}
 
-              {/* Loading overlay */}
-              {respondingTo.has(interaction.id) && (
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: hexToRgba(colors.bgSecondary, 0.7),
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: colors.textSecondary,
-                      animation: 'bounce 1.4s infinite ease-in-out both',
-                      animationDelay: '-0.32s'
-                    }} />
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: colors.textSecondary,
-                      animation: 'bounce 1.4s infinite ease-in-out both',
-                      animationDelay: '-0.16s'
-                    }} />
-                    <div style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: colors.textSecondary,
-                      animation: 'bounce 1.4s infinite ease-in-out both'
-                    }} />
-                  </div>
-                </div>
-              )}
             </div>
           )})
         )}
@@ -1201,22 +1170,6 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
 
       {/* CSS Animations */}
       <style>{`
-        @keyframes bounce {
-          0%, 80%, 100% {
-            transform: scale(0);
-          }
-          40% {
-            transform: scale(1.0);
-          }
-        }
-        @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
         @keyframes pulse {
           0%, 100% {
             opacity: 1;

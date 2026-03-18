@@ -10,6 +10,7 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/ios": "^8.0.0",
     "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.2",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@llm-ui/markdown": "^0.13.3",

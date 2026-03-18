@@ -60,13 +60,16 @@ import {
 import { getChatHistory, saveChatMessage, saveChatMessagesBatch, clearChatHistory } from './chat.js';
 import { getUserReminders, createUserReminder, updateUserReminder, deleteUserReminder, snoozeUserReminder, dismissEventReminders } from './reminders.js';
 import { processAgentMessage, addStartTime } from './agent.js';
+import { registerDeviceToken, unregisterDeviceToken } from './push.js';
 import { streamAgentMessage } from './stream.js';
 import friendshipRouter from './friendships.js';
 import sharedAspectsRouter from './shared-aspects.js';
 import sharedEventsRouter from './shared-events.js';
 import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { startReminderCheckerJob } from '../jobs/reminder-checker.js';
+import { startNotificationSchedulerJob } from '../jobs/notification-scheduler.js';
 import { authenticateRequest } from './middleware/auth.js';
+import pushNotificationService from '../services/PushNotificationService.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
 import analyticsRouter from './analytics.js';
 import {
@@ -461,6 +464,10 @@ app.post('/api/reminders/delete', deleteUserReminder);
 app.post('/api/reminders/snooze', snoozeUserReminder);
 app.post('/api/reminders/dismiss-event', dismissEventReminders);
 
+// Push notification endpoints
+app.post('/api/push/register', registerDeviceToken);
+app.post('/api/push/unregister', unregisterDeviceToken);
+
 // Chat endpoints - persistent storage in user schema
 app.post('/api/chat/history', getChatHistory);
 app.post('/api/chat/message', saveChatMessage);
@@ -558,11 +565,16 @@ if (process.env.NODE_ENV !== 'test') {
     // Start background jobs
     startWatchRenewalJob();
     startReminderCheckerJob();
+    startNotificationSchedulerJob();
+
+    // Initialize push notification service
+    pushNotificationService.initialize();
   });
 
   // Graceful shutdown
   const shutdown = (signal: string) => {
     console.log(`[SERVER] Received ${signal}, shutting down gracefully...`);
+    pushNotificationService.shutdown();
     server.close(() => {
       console.log('[SERVER] HTTP server closed');
       process.exit(0);

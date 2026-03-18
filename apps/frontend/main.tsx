@@ -26,6 +26,7 @@ import { Onboarding } from './src/components/onboarding'
 import { OnboardingCheck } from './src/components/OnboardingCheck'
 import { KeyboardProvider } from './src/hooks/useKeyboard'
 import { initAnalytics, trackPageView, trackEvent, shutdownAnalytics } from './src/lib/analytics'
+import { PushNotificationInitializer } from './src/components/PushNotificationInitializer'
 
 function AnalyticsTracker() {
   const { user } = useAuth()
@@ -99,6 +100,7 @@ function App() {
             <AspectProvider>
             <ProjectProvider>
               <AnalyticsTracker />
+              <PushNotificationInitializer />
               <Routes>
                 <Route path="/" element={<Auth />} />
                 <Route

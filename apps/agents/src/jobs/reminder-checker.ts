@@ -1,6 +1,7 @@
 import reminderService from '../services/ReminderService.js';
 import { getSupabaseService } from '../services/SupabaseService.js';
 import { expandRecurrence } from '../utils/rrule.js';
+import pushNotificationService from '../services/PushNotificationService.js';
 
 const DELIVERY_INTERVAL_MS = 60 * 1000; // Check for due reminders every 60s
 const RECURRING_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // Top up recurring reminders every 6 hours
@@ -54,6 +55,17 @@ export async function deliverDueReminders(): Promise<void> {
         if (interaction) {
           await reminderService.markDelivered(reminder.user_id, reminder.id, interaction.id);
           console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} as interaction ${interaction.id}`);
+
+          try {
+            await pushNotificationService.sendToUser(reminder.user_id, {
+              title: isEventReminder ? 'Upcoming Event' : 'Reminder',
+              body: reminder.message,
+              data: { type: 'reminder', reminderId: reminder.id, interactionId: interaction.id },
+              sound: 'default',
+            });
+          } catch (pushError) {
+            console.error(`[REMINDER-CHECKER] Push failed for ${reminder.id}:`, pushError);
+          }
         }
       } catch (error) {
         console.error(`[REMINDER-CHECKER] Failed to deliver reminder ${reminder.id}:`, error);

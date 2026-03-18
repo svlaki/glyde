@@ -39,6 +39,7 @@
     "redis": "^5.10.0",
     "rrule": "^2.8.1",
     "uuid": "^9.0.1",
+    "@parse/node-apn": "^7.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
