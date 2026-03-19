@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createInteractionTool = tool(
-  async ({ question, type, options, priority, metadata, aspectId }, config) => {
+  async ({ question, type, options, priority, metadata, aspectId, expiresAt }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "Error: User ID required";
@@ -68,6 +68,7 @@ export const createInteractionTool = tool(
         priority: priority || 3,
         aspectId: resolvedAspectId || undefined,
         metadata: metadata || undefined,
+        expiresAt: expiresAt || undefined,
       });
 
       if (!interaction) {
@@ -91,6 +92,7 @@ export const createInteractionTool = tool(
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority 1-5"),
       metadata: z.record(z.any()).optional().nullable().describe("Context for response processing (JSON)"),
       aspectId: z.string().uuid().optional().nullable().describe("Aspect UUID"),
+      expiresAt: z.string().optional().nullable().describe("Expiry time ISO. Interactions expire and disappear after this time."),
     }),
   }
 );

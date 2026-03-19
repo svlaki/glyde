@@ -127,7 +127,7 @@ export class InteractionAgentGerald extends BaseAgent {
       // Fetch recent interactions to avoid repetition
       let recentInteractions: any[] = [];
       try {
-        recentInteractions = await supabaseService.getRecentUserInteractions(context.userId, 30, 120);
+        recentInteractions = await supabaseService.getRecentUserInteractions(context.userId, 50, 336);
       } catch (error) {
         console.warn('[GERALD] Failed to fetch recent interactions:', error);
       }
@@ -497,7 +497,7 @@ export class InteractionAgentGerald extends BaseAgent {
       return '\nRECENT INTERACTION HISTORY: No recent interactions.';
     }
 
-    const lines = interactions.slice(0, 20).map(i => {
+    const lines = interactions.slice(0, 40).map(i => {
       const status = i.status === 'responded' ? 'responded'
         : i.status === 'dismissed' || i.status === 'expired' || i.status === 'cancelled' ? 'DISMISSED'
         : i.status === 'pending' || i.status === 'active' ? 'still pending'
@@ -523,7 +523,7 @@ export class InteractionAgentGerald extends BaseAgent {
     const dismissedTopics = interactions
       .filter(i => ['dismissed', 'expired', 'cancelled'].includes(i.status))
       .map(i => i.question)
-      .slice(0, 10);
+      .slice(0, 20);
 
     const dismissedSection = dismissedTopics.length > 0
       ? `\nDISMISSED TOPICS (NEVER revisit these in any form):\n${dismissedTopics.map(q => `  - "${q}"`).join('\n')}`
@@ -537,9 +537,17 @@ DEDUPLICATION RULES (CRITICAL):
 - Topics that were DISMISSED must NEVER be brought up again in ANY form.
 - If you already asked about exercise, do NOT ask about workouts, gym, fitness, etc.
 - If you already asked about studying, do NOT ask about focus time, homework, review, etc.
+- If two questions cover the SAME TOPIC even with different wording (e.g. "key challenge" and "biggest concern"), that counts as a repeat. Ask about DIFFERENT subjects entirely.
 - Generate COMPLETELY NEW topics not covered above.
 - Use DIFFERENT interaction types than the last 3 interactions.
-- Vary the CATEGORY (scheduling vs reflection vs check-in vs progress).`;
+- Vary the CATEGORY (scheduling vs reflection vs check-in vs progress).
+
+LEARN FROM RESPONSE PATTERNS:
+- History shows what users ACCEPTED (responded "yes", gave detailed answers) vs DISMISSED (skipped, cancelled, expired).
+- If user consistently dismisses scheduling suggestions, ask fewer. Focus on reflections or ratings instead.
+- If user responds quickly to ratings, lean into quick-answer formats.
+- If user ignores text prompts, prefer multiple-choice or time_suggestion.
+- Lean into what the user engages with and away from what they ignore.`;
   }
 
   /**

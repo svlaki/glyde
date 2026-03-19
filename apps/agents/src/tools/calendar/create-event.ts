@@ -59,6 +59,7 @@ export const createEventTool = tool(
     console.log(`[CREATE-EVENT TOOL] Converted times - Local: ${startTime} -> UTC: ${startTimeUTC}`);
 
     // Check for conflicts using UTC times — only fetch events in a narrow window around the new event
+    let overlapNote = '';
     try {
       const startDateTime = new Date(startTimeUTC);
       const endDateTime = new Date(endTimeUTC);
@@ -135,8 +136,11 @@ export const createEventTool = tool(
             });
           }
         } else {
+          // Don't block creation — overlapping events are normal (e.g. focus blocks over meetings).
+          // Just log the overlap so the agent can mention it in the response.
           const isRecurring = conflictingEvent.is_instance ? ' (recurring)' : '';
-          return `Time conflict detected! You already have "${conflictingEvent.title}"${isRecurring} scheduled at ${formatEventTime(conflictingEvent.start_time, timezone)}. Please choose a different time or let me know if you'd like to reschedule the existing event.`;
+          console.log(`[CREATE-EVENT TOOL] Overlap with "${conflictingEvent.title}"${isRecurring} — proceeding with creation anyway`);
+          overlapNote = ` (Note: overlaps with "${conflictingEvent.title}" at the same time)`;
         }
       }
     } catch (error) {
@@ -188,7 +192,7 @@ export const createEventTool = tool(
       ? ` in aspect "${validatedAspect}"`
       : '';
 
-    return `Event created successfully: "${title}" at ${formatEventTime(startTimeUTC, timezone)}${aspectContext}`;
+    return `Event created successfully: "${title}" at ${formatEventTime(startTimeUTC, timezone)}${aspectContext}${overlapNote}`;
   },
   {
     name: "create_event",

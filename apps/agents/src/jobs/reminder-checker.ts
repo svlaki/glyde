@@ -29,44 +29,23 @@ export async function deliverDueReminders(): Promise<void> {
         const metadata = (reminder.metadata || {}) as Record<string, any>;
         const isEventReminder = !!metadata.event_reminder_id;
 
-        const question = isEventReminder
-          ? `Upcoming: ${reminder.message}`
-          : `Reminder: ${reminder.message}`;
-
-        const options = isEventReminder
-          ? ['Got it', 'Snooze 15min']
-          : ['Got it', 'Snooze 15min', 'Snooze 1hr', 'Snooze tomorrow'];
-
-        const interaction = await supabaseService.createUserInteraction(reminder.user_id, {
-          agentId: 'interaction',
-          question,
-          interactionType: 'multiple_choice',
-          options,
-          priority: 4,
-          aspectId: reminder.aspect_id || undefined,
-          metadata: {
-            context: 'reminder_delivery',
-            reminderId: reminder.id,
-            originalTriggerAt: reminder.trigger_at,
-            ...(metadata.event_reminder_id ? { eventId: metadata.event_reminder_id } : {}),
-          },
-        });
-
-        if (interaction) {
-          await reminderService.markDelivered(reminder.user_id, reminder.id, interaction.id);
-          console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} as interaction ${interaction.id}`);
-
-          try {
-            await pushNotificationService.sendToUser(reminder.user_id, {
-              title: isEventReminder ? 'Upcoming Event' : 'Reminder',
-              body: reminder.message,
-              data: { type: 'reminder', reminderId: reminder.id, interactionId: interaction.id },
-              sound: 'default',
-            });
-          } catch (pushError) {
-            console.error(`[REMINDER-CHECKER] Push failed for ${reminder.id}:`, pushError);
-          }
+        // Deliver reminders via push notification only — NOT as interaction cards.
+        // Interaction cards clutter the panel with "Got it/Snooze" noise.
+        // Reminders belong as toast notifications and are shown on the Reminders page.
+        try {
+          await pushNotificationService.sendToUser(reminder.user_id, {
+            title: isEventReminder ? 'Upcoming Event' : 'Reminder',
+            body: reminder.message,
+            data: { type: 'reminder', reminderId: reminder.id },
+            sound: 'default',
+          });
+        } catch (pushError) {
+          console.error(`[REMINDER-CHECKER] Push failed for ${reminder.id}:`, pushError);
         }
+
+        // Mark as delivered (no interaction card ID needed)
+        await reminderService.markDelivered(reminder.user_id, reminder.id);
+        console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} via push notification`);
       } catch (error) {
         console.error(`[REMINDER-CHECKER] Failed to deliver reminder ${reminder.id}:`, error);
       }
