@@ -202,7 +202,10 @@ export function buildActivityContext(
   }
 
   return '\n\n' + parts.join('\n\n') + `
-ACTIVITY GUIDANCE: Check for deletions (item no longer exists). Verify items exist in context before referencing. Don't repeat recent actions.`;
+ACTIVITY GUIDANCE:
+- CHECK FOR DELETIONS: If activity log shows user DELETED something, it NO LONGER EXISTS.
+- Before saying "you already have X" — verify it actually exists in YOUR GOALS/TASKS/CALENDAR context above.
+- Don't repeat actions you recently performed. Don't suggest changes the user just manually made.`;
 }
 
 // ============================================================
@@ -287,6 +290,7 @@ TOOL USAGE:
 - Act directly with tools rather than describing actions. Execute without confirmation if intent is clear.
 - For multi-action requests, call ALL relevant tools before responding.
 - NEVER tell the user you completed an action unless you actually called the tool and it succeeded. If you haven't called the tool yet, call it now — do not just describe what you would do.
+- When user asks about their schedule/events/tasks, use the data in context below. If the data doesn't cover the time range asked about, use search_events or list_events to look it up — do NOT guess or make up events.
 
 YOUR CALENDAR:${eventContext}
 

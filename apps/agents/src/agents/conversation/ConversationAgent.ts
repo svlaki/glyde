@@ -220,11 +220,11 @@ export class ConversationAgent extends BaseAgent {
 
       console.log(`[CONVERSATION AGENT] Loaded: ${userEvents.length} events (${recentPastEvents.length} past + ${futureEvents.length} future), ${userTasks.length} tasks, ${userGoals.length} goals, ${userAspects?.length || 0} aspects`);
 
-      // Build conversation history — 6 messages (3 exchanges) instead of 10
+      // Build conversation history — 10 messages (5 exchanges) for adequate context
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        const recentHistory = context.conversationHistory.slice(-6);
+        const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
@@ -235,7 +235,7 @@ export class ConversationAgent extends BaseAgent {
           } else if (msg.role === 'assistant') {
             // Truncate long assistant messages in history
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
+            const truncated = textContent.length > 500 ? textContent.slice(0, 500) + '...' : textContent;
             messages.push(new AIMessage(truncated));
           }
         }
@@ -458,11 +458,11 @@ IMPORTANT INSTRUCTIONS:
       const userTasks = allTasks.slice(0, 10);
       const userGoals = allGoals.slice(0, 8);
 
-      // Build conversation history — 6 messages (3 exchanges) instead of 10
+      // Build conversation history — 10 messages (5 exchanges) for adequate context
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        const recentHistory = context.conversationHistory.slice(-6);
+        const recentHistory = context.conversationHistory.slice(-10);
         for (const msg of recentHistory) {
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
@@ -472,7 +472,7 @@ IMPORTANT INSTRUCTIONS:
             }
           } else if (msg.role === 'assistant') {
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
+            const truncated = textContent.length > 500 ? textContent.slice(0, 500) + '...' : textContent;
             messages.push(new AIMessage(truncated));
           }
         }

@@ -18,10 +18,10 @@ Return JSON with these fields:
 - prompt_sections: string[] from [core, calendar_detail, goal_creation, recurring_events, friends_sharing, location_search, memory_management, plans_detail, reminders]
 
 Rules for needs_tools:
-- false: greetings, questions about schedule/tasks/goals, status checks, advice, chat, "how are my goals", "what's on my schedule"
-- true: "create", "add", "schedule", "delete", "remove", "cancel", "update", "change", "remind me", "remember", "save", "search for [place]", "complete", "mark done", "find free time", "when am I free", "analyze my schedule", "clear my calendar", "tag", "share", "send friend request"
+- false: ONLY pure greetings ("hey", "hi", "good morning", "how are you"), general advice/chat unrelated to calendar/tasks/goals
+- true: ANY question about schedule/events/tasks/goals ("what's on my calendar", "what events", "how are my goals", "what tasks do I have", "what's on my schedule"), status checks, AND all action verbs: "create", "add", "schedule", "delete", "remove", "cancel", "update", "change", "remind me", "remember", "save", "search for [place]", "complete", "mark done", "find free time", "when am I free", "analyze my schedule", "clear my calendar", "tag", "share", "send friend request"
 - IMPORTANT: If the message contains BOTH a greeting/question AND an action verb (e.g. "Good morning! Schedule...", "What's on my schedule? Also add a task..."), set needs_tools=true
-- "schedule" as a VERB (e.g., "schedule a meeting") → true. "schedule" as a NOUN (e.g., "what's on my schedule") → false.
+- "schedule" as a VERB (e.g., "schedule a meeting") → true. "schedule" as a NOUN (e.g., "what's on my schedule") → true (needs tools to look up data).
 
 Rules for tools (specific tool names, only when needs_tools=true):
 - "create a meeting/event" → ["create_event"]
@@ -60,6 +60,9 @@ Rules for tool_categories:
 - Add "profile" if user mentions their settings, preferences
 - Add "projects" if user mentions projects
 - Add "plans" if user mentions life plan
+- Questions about events/schedule → tool_categories: ["calendar_core"]
+- Questions about tasks → tool_categories: ["tasks"]
+- Questions about goals → tool_categories: ["goals"]
 - For greetings/general chat with needs_tools=false: tool_categories=[], context_sections all false except events+tasks+goals
 
 Rules for context_sections:
