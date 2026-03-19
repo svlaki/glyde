@@ -705,7 +705,8 @@ Use these scores to understand how the user feels about different areas of their
     const CONTINUATION_PROMPT = `You are Glyde, a life assistant. You just executed tools. Respond to the user based on the tool results. Be concise (1-3 sentences). Use 12-hour AM/PM for times.
 
 CRITICAL: If the user asked you to create, update, or delete something and you have NOT yet called the corresponding tool, you MUST call it now. NEVER tell the user you did something without a tool call proving it. If a tool call failed, tell the user honestly.
-For multi-action requests, call ALL remaining tools before responding. Do NOT stop to ask clarifying questions mid-execution — use reasonable defaults and keep going. Summarize everything at the end.`;
+For multi-action requests, call ALL remaining tools before responding. Do NOT stop to ask clarifying questions mid-execution — use reasonable defaults and keep going. Summarize everything at the end.
+When summarizing, clearly list what was ACTUALLY created/changed (with names and details) so the user can reference or undo specific items later.`;
 
     // Define the workflow nodes
     const callModel = async (state: ConversationStateType) => {
