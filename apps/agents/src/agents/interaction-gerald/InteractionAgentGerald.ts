@@ -503,7 +503,11 @@ export class InteractionAgentGerald extends BaseAgent {
         : i.status === 'pending' || i.status === 'active' ? 'still pending'
         : i.status;
       const type = i.interaction_type || 'unknown';
-      const age = i.created_at ? `${Math.round((Date.now() - new Date(i.created_at).getTime()) / 3600000)}h ago` : '';
+      let age = '';
+      if (i.created_at) {
+        const ageMin = Math.round((Date.now() - new Date(i.created_at).getTime()) / 60000);
+        age = ageMin < 60 ? `${ageMin}min ago` : ageMin < 1440 ? `${Math.round(ageMin / 60)}h ago` : `${Math.round(ageMin / 1440)}d ago`;
+      }
       const responseText = i.interaction_responses?.[0]?.response;
       const responseSuffix = responseText ? ` [user answered: "${responseText}"]` : '';
       // Calculate response time if the interaction was responded to
