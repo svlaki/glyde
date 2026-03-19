@@ -98,8 +98,31 @@ export const deleteEventTool = tool(
         }
 
         if (matchingEvents.length > 1) {
-          // Multiple matches - ask for clarification
-          const eventsList = matchingEvents.slice(0, 5).map(e => {
+          // Check if all matches are instances of the same recurring series
+          const parentIds = new Set(
+            matchingEvents
+              .map((e: any) => e.parent_event_id || (e.is_recurring ? e.id : null))
+              .filter(Boolean)
+          );
+
+          if (parentIds.size === 1) {
+            // All matches belong to one recurring series — delete the entire series
+            const parentId = Array.from(parentIds)[0] as string;
+            console.log(`[DELETE-EVENT TOOL] All ${matchingEvents.length} matches belong to recurring series ${parentId}, deleting entire series`);
+
+            const success = await supabaseService.deleteRecurringEventSeries(userId, parentId);
+            if (!success) {
+              throw new Error('Failed to delete recurring event series');
+            }
+
+            // Fire-and-forget graph cleanup
+            zepGraphService.deleteCalendarEvent(userId, parentId, matchingEvents[0].title).catch(() => {});
+
+            return `EVENT: Deleted recurring series "${matchingEvents[0].title}" and all ${matchingEvents.length} instances.`;
+          }
+
+          // Multiple matches from different events - ask for clarification
+          const eventsList = matchingEvents.slice(0, 5).map((e: any) => {
             const eventDate = new Date(e.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             return `- ${e.title} on ${eventDate} at ${new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
           }).join('\n');

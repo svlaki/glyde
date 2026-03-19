@@ -64,27 +64,31 @@ export const createRecurringEventTool = tool(
       throw new Error("Either 'recurrence' (natural language) or 'rrule' (RFC 5545 format) is required");
     }
 
-    // Validate that aspect exists - do NOT auto-create
+    // Validate aspect — auto-create if it doesn't exist (handles parallel tool calls)
     let validatedAspect = aspect;
     if (aspect && aspect.trim().length > 0) {
-      console.log(`[CREATE-RECURRING-EVENT TOOL] Validating aspect: "${aspect}"`);
+      const trimmedAspect = aspect.trim();
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Validating aspect: "${trimmedAspect}"`);
 
-      const existingAspect = await aspectService.getAspectByName(userId, aspect.trim());
+      let existingAspect = await aspectService.getAspectByName(userId, trimmedAspect);
 
       if (!existingAspect) {
-        // Aspect doesn't exist - get all available aspects and throw error
-        const allAspects = await aspectService.getAspects(userId);
-        const aspectNames = allAspects.map(a => a.name).join(', ');
-
-        throw new Error(
-          `Aspect "${aspect}" does not exist. ` +
-          `Available aspects: [${aspectNames}]. ` +
-          `Use an existing aspect or ask the user to create one first with create_aspect.`
-        );
+        // Aspect doesn't exist yet — auto-create it so parallel tool calls work
+        console.log(`[CREATE-RECURRING-EVENT TOOL] Aspect "${trimmedAspect}" not found, auto-creating`);
+        try {
+          existingAspect = await aspectService.createAspect(userId, { name: trimmedAspect, color: '#6B7280' });
+          console.log(`[CREATE-RECURRING-EVENT TOOL] Auto-created aspect "${trimmedAspect}"`);
+        } catch (createErr: any) {
+          // May have been created by parallel create_aspect call — retry lookup
+          existingAspect = await aspectService.getAspectByName(userId, trimmedAspect);
+          if (!existingAspect) {
+            throw new Error(`Failed to create or find aspect "${trimmedAspect}": ${createErr.message}`);
+          }
+        }
       }
 
-      console.log(`[CREATE-RECURRING-EVENT TOOL] Aspect "${aspect}" validated successfully`);
-      validatedAspect = aspect.trim();
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Aspect "${trimmedAspect}" validated successfully`);
+      validatedAspect = trimmedAspect;
     }
 
     // Convert local times to UTC

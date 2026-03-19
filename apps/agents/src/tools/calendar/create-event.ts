@@ -26,27 +26,30 @@ export const createEventTool = tool(
     const zepGraphService = new ZepGraphService();
     const aspectService = new AspectService();
 
-    // Validate that aspect exists - do NOT auto-create
+    // Validate aspect — auto-create if it doesn't exist (handles parallel tool calls)
     let validatedAspect = category;
     if (category && category.trim().length > 0) {
-      console.log(`[CREATE-EVENT TOOL] Validating aspect: "${category}"`);
+      const trimmedAspect = category.trim();
+      console.log(`[CREATE-EVENT TOOL] Validating aspect: "${trimmedAspect}"`);
 
-      const existingAspect = await aspectService.getAspectByName(userId, category.trim());
+      let existingAspect = await aspectService.getAspectByName(userId, trimmedAspect);
 
       if (!existingAspect) {
-        // Aspect doesn't exist - get all available aspects and throw error
-        const allAspects = await aspectService.getAspects(userId);
-        const aspectNames = allAspects.map(a => a.name).join(', ');
-
-        throw new Error(
-          `Aspect "${category}" does not exist. ` +
-          `Available aspects: [${aspectNames}]. ` +
-          `Use an existing aspect or ask the user to create one first with create_aspect.`
-        );
+        console.log(`[CREATE-EVENT TOOL] Aspect "${trimmedAspect}" not found, auto-creating`);
+        try {
+          existingAspect = await aspectService.createAspect(userId, { name: trimmedAspect, color: '#6B7280' });
+          console.log(`[CREATE-EVENT TOOL] Auto-created aspect "${trimmedAspect}"`);
+        } catch (createErr: any) {
+          // May have been created by parallel create_aspect call — retry lookup
+          existingAspect = await aspectService.getAspectByName(userId, trimmedAspect);
+          if (!existingAspect) {
+            throw new Error(`Failed to create or find aspect "${trimmedAspect}": ${createErr.message}`);
+          }
+        }
       }
 
-      console.log(`[CREATE-EVENT TOOL] Aspect "${category}" validated successfully`);
-      validatedAspect = category.trim();
+      console.log(`[CREATE-EVENT TOOL] Aspect "${trimmedAspect}" validated successfully`);
+      validatedAspect = trimmedAspect;
     }
 
     // Convert local times to UTC for storage

@@ -58,11 +58,22 @@ export const updateRecurringEventTool = tool(
 
       return `Updated recurring event series: "${updated.title}"`;
     } else if (scope === 'this_instance') {
-      // Update single instance - would need to know which instance
-      // For now, require more specific handling
-      throw new Error(
-        "Updating single instances is not yet fully supported via this tool. Please contact support for instance-specific modifications."
+      // Update single instance via exception override
+      const parentId = event.parent_event_id || eventId;
+      console.log('[UPDATE-RECURRING-EVENT TOOL] Updating single instance:', eventId, 'parent:', parentId);
+
+      const updated = await supabaseService.updateRecurringEventInstance(
+        userId,
+        parentId,
+        event.start_time,
+        updateData
       );
+
+      if (!updated) {
+        throw new Error('Failed to update recurring event instance');
+      }
+
+      return `Updated this instance of "${event.title}"`;
     } else {
       throw new Error(`Invalid scope: ${scope}. Use 'entire_series' or 'this_instance'`);
     }
