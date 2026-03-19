@@ -221,11 +221,16 @@ export class ConversationAgent extends BaseAgent {
       console.log(`[CONVERSATION AGENT] Loaded: ${userEvents.length} events (${recentPastEvents.length} past + ${futureEvents.length} future), ${userTasks.length} tasks, ${userGoals.length} goals, ${userAspects?.length || 0} aspects`);
 
       // Build conversation history — 10 messages (5 exchanges) for adequate context
+      // Recent assistant messages are kept full so the agent can see what it just did.
+      // Older assistant messages are truncated to save tokens.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
         const recentHistory = context.conversationHistory.slice(-10);
-        for (const msg of recentHistory) {
+        const totalMsgs = recentHistory.length;
+        for (let i = 0; i < totalMsgs; i++) {
+          const msg = recentHistory[i];
+          const isRecent = i >= totalMsgs - 4; // last 4 messages (2 exchanges) kept full
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
@@ -233,10 +238,16 @@ export class ConversationAgent extends BaseAgent {
               messages.push(new HumanMessage(msg.content));
             }
           } else if (msg.role === 'assistant') {
-            // Truncate long assistant messages in history
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 500 ? textContent.slice(0, 500) + '...' : textContent;
-            messages.push(new AIMessage(truncated));
+            if (isRecent) {
+              // Keep recent assistant messages full so agent can see its own actions
+              const truncated = textContent.length > 1500 ? textContent.slice(0, 1500) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            } else {
+              // Older messages get heavier truncation
+              const truncated = textContent.length > 400 ? textContent.slice(0, 400) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            }
           }
         }
       }
@@ -459,11 +470,15 @@ IMPORTANT INSTRUCTIONS:
       const userGoals = allGoals.slice(0, 8);
 
       // Build conversation history — 10 messages (5 exchanges) for adequate context
+      // Recent assistant messages are kept full so the agent can see what it just did.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
         const recentHistory = context.conversationHistory.slice(-10);
-        for (const msg of recentHistory) {
+        const totalMsgs = recentHistory.length;
+        for (let i = 0; i < totalMsgs; i++) {
+          const msg = recentHistory[i];
+          const isRecent = i >= totalMsgs - 4; // last 4 messages (2 exchanges) kept full
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
@@ -472,8 +487,13 @@ IMPORTANT INSTRUCTIONS:
             }
           } else if (msg.role === 'assistant') {
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 500 ? textContent.slice(0, 500) + '...' : textContent;
-            messages.push(new AIMessage(truncated));
+            if (isRecent) {
+              const truncated = textContent.length > 1500 ? textContent.slice(0, 1500) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            } else {
+              const truncated = textContent.length > 400 ? textContent.slice(0, 400) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            }
           }
         }
       }
