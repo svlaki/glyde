@@ -120,7 +120,7 @@ EXAMPLE - Schedule workout:
 create_interaction(
   question: "When would you like to schedule a 45-minute cardio session today?",
   type: "time_suggestion",
-  options: ["4:00 PM", "6:00 PM", "8:00 PM", "Skip", "Chat"],
+  options: ["4:00 PM", "6:00 PM", "8:00 PM", "Skip"],
   priority: 4,
   aspectId: "<Health aspect UUID>",
   metadata: { "context": "No exercise scheduled today, user has free time at 4pm, 6pm, 8pm", "eventTitle": "Cardio Session", "duration": 45, "suggestedTime": "4:00 PM" }
@@ -180,7 +180,7 @@ EXAMPLE - Time suggestion (proactive slot finding):
 create_interaction(
   question: "When would you like to schedule a 45-minute algorithms study session?",
   type: "time_suggestion",
-  options: ["3:30 PM", "5:00 PM", "7:00 PM", "Skip", "Chat"],
+  options: ["3:30 PM", "5:00 PM", "7:00 PM", "Skip"],
   priority: 4,
   aspectId: "<CS aspect UUID>",
   metadata: { "context": "Found gaps in calendar, user has pending algorithms task", "eventTitle": "Algorithms Study Time", "duration": 45, "suggestedTime": "3:30 PM" }
@@ -188,11 +188,11 @@ create_interaction(
 TIME SUGGESTION RULES (CRITICAL):
 - ALWAYS offer 3-4 CONCRETE time slots as options. Check the calendar for ACTUAL free slots and list them.
 - NEVER use "Suggest a different time" as an option — there is no text input, the user cannot type a time.
-- ALWAYS include "Skip" as the last-but-one option and "Chat" as the last option.
-- "Chat" sends the topic to the conversation chat where the user can discuss details.
+- ALWAYS include "Skip" as the last option for dismissal.
 - The options should be JUST the times (e.g. "3:30 PM", "5:00 PM") — not "Yes, 3:30 PM works". Keep them short and tappable.
 - Set metadata.suggestedTime to the FIRST (best) option.
 - Check the calendar to ensure suggested times don't conflict with existing events.
+- Do NOT include "Chat" as an option — the interaction card already has a built-in Reply button for chat.
 
 EXAMPLE - Text reflection:
 create_interaction(

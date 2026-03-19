@@ -710,80 +710,63 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
           </div>
         )
 
-      case 'time_suggestion':
+      case 'time_suggestion': {
+        const timeOptions = (interaction.options || []).filter(
+          (opt: string) => !['skip', 'chat', 'dismiss'].includes(opt.toLowerCase())
+        )
+        const _hasChat = false // Chat handled by built-in Reply button
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {timeOptions.map((opt: string) => (
+                <button
+                  key={opt}
+                  onClick={() => handleRespond(interaction.id, opt)}
+                  disabled={isResponding}
+                  style={{
+                    flex: '1 1 auto',
+                    minWidth: '80px',
+                    padding: '8px 12px',
+                    fontSize: fontSize.sm,
+                    fontWeight: fontWeight.medium,
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: isResponding ? 'not-allowed' : 'pointer',
+                    background: isDarkMode ? '#4ade80' : '#22c55e',
+                    color: '#fff',
+                    opacity: isResponding ? 0.6 : 1,
+                    transition: 'opacity 0.15s'
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Chat is handled by the built-in Reply button on the card */}
               <button
-                onClick={() => handleRespond(interaction.id, 'accept')}
+                onClick={() => dismissInteraction(interaction.id)}
                 disabled={isResponding}
                 style={{
                   flex: 1,
                   padding: '8px 12px',
                   fontSize: fontSize.sm,
-                  fontWeight: fontWeight.medium,
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: isResponding ? 'not-allowed' : 'pointer',
-                  background: isDarkMode ? '#4ade80' : '#22c55e',
-                  color: '#fff',
-                  opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => handleRespond(interaction.id, 'reschedule')}
-                disabled={isResponding}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  fontSize: fontSize.sm,
-                  fontWeight: fontWeight.medium,
+                  fontWeight: fontWeight.normal,
                   border: `1px solid ${colors.border}`,
                   borderRadius: '6px',
                   cursor: isResponding ? 'not-allowed' : 'pointer',
                   background: colors.bgTertiary,
-                  color: colors.textPrimary,
+                  color: colors.textTertiary,
                   opacity: isResponding ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
+                  transition: 'background 0.15s'
                 }}
               >
-                Suggest Different
+                Dismiss
               </button>
             </div>
-            {/* Dismiss button for time_suggestion */}
-            <button
-              onClick={() => dismissInteraction(interaction.id)}
-              disabled={isResponding}
-              style={{
-                padding: '8px 12px',
-                fontSize: fontSize.sm,
-                fontWeight: fontWeight.normal,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                cursor: isResponding ? 'not-allowed' : 'pointer',
-                background: colors.bgTertiary,
-                color: colors.textTertiary,
-                opacity: isResponding ? 0.6 : 1,
-                transition: 'background 0.15s'
-              }}
-              onMouseEnter={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = hexToRgba(colors.textTertiary, 0.1)
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isResponding) {
-                  e.currentTarget.style.background = colors.bgTertiary
-                }
-              }}
-            >
-              Dismiss
-            </button>
           </div>
         )
+      }
 
       default:
         return (

@@ -74,7 +74,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       return res.status(404).json({ error: 'Interaction not found' });
     }
 
-    // Auto-store rating scores before routing to Gerald
+    // Auto-store rating scores — do NOT route to Gerald (it would create a duplicate)
     if (interaction.interaction_type === 'rating') {
       const score = parseInt(trimmedResponse, 10);
       if (!isNaN(score) && score >= 1 && score <= 10) {
@@ -94,6 +94,8 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       } else {
         console.warn(`[INTERACTION RESPONSE] Invalid rating score from response: "${trimmedResponse}"`);
       }
+      // Short-circuit — rating is stored, no need for Gerald to process
+      return res.json({ success: true, message: 'Rating recorded' });
     }
 
     // Handle reminder-specific responses (snooze/acknowledge)
