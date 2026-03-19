@@ -166,18 +166,25 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       }
     }
 
+    // Short-circuit: "Skip", "Chat", "No", "No thanks" need no agent processing
+    const skipResponses = ['skip', 'no', 'no thanks', 'chat', 'dismiss'];
+    if (skipResponses.includes(trimmedResponse.toLowerCase())) {
+      console.log(`[INTERACTION RESPONSE] User said "${trimmedResponse}" — no action needed`);
+      return res.json({ success: true, message: 'Response recorded, no action taken' });
+    }
+
     const agentMessage = `INTERACTION RESPONSE - The user was asked: "${interaction.question}" (type: ${interactionType}, options: ${JSON.stringify(interaction.options || [])}).${metadataContext}${eventIdContext}${eventTitleContext}
 
 The user responded: "${trimmedResponse}"${responseTimeContext}
 
-Based on this response, take the appropriate action using your tools. For example:
-- If they said "yes" to scheduling something, create the event at a sensible time
-- If they said "yes" to adding a task, create the task
-- If they picked a time option, create an event at that time
+Based on this response, take the appropriate action using your tools:
+- If they picked a TIME (e.g. "3:30 PM", "5:00 PM"), create an event at that time using metadata.eventTitle and metadata.duration
+- If they said "yes" or "accept", create the event using metadata.suggestedTime and metadata.duration
 - If they gave a rating (1-10), the rating is already stored automatically. No action needed.
-- If they said "no" or "skip", do nothing
-- If they gave a text response about what to focus on during a focus block or event, UPDATE that event's description using the update_event tool with their response as the description
-- If they gave a text response (reflection, journal), acknowledge it and store useful insights
+- If they gave a text response about an existing event (metadata.eventId), UPDATE that event's description
+- If they gave a text response about a goal (metadata.goalId), UPDATE that goal's description
+- If they gave a text response about an aspect, UPDATE that aspect's description
+- Text responses MUST be saved to a visible entity (event/goal/aspect/task). The user NEVER sees your text replies.
 
 Act on what the user wants. Do NOT create new interaction questions - just execute the action.`;
 
