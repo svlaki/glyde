@@ -95,19 +95,24 @@ function ProfilePageDesktop() {
       <div style={{
         flex: 1,
         overflow: 'auto',
-        padding: '24px',
+        padding: '28px 32px',
         marginLeft: `${SIDEBAR_WIDTH}px`,
       }}>
-        <div style={{
+        <div className="page-enter" style={{
+          maxWidth: '1100px',
+          margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '24px',
+          gap: '20px',
         }}>
-          <ProfileHero />
+          {/* Hero spans full width */}
+          <div className="card-reveal card-reveal-1">
+            <ProfileHero />
+          </div>
 
           {data.loading ? (
             <div style={{
-              padding: '40px',
+              padding: '60px',
               textAlign: 'center',
               color: colors.textSecondary,
               ...typography.bodyMd,
@@ -115,20 +120,37 @@ function ProfilePageDesktop() {
               Loading...
             </div>
           ) : (
-            <>
-              {/* All cards in 2-column grid */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '16px',
-              }}>
-                <ProfileCompletenessCard summary={data.profileSummary} profile={data.profile} />
+            /* Bento grid - 2 column layout with proper spacing */
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+            }}>
+              {/* About/Profile info */}
+              <div className="card-reveal card-reveal-2">
+                <ProfileCompletenessCard summary={data.profileSummary} profile={data.profile} onProfileUpdated={data.refreshProfile} />
+              </div>
+
+              {/* Activity insights */}
+              <div className="card-reveal card-reveal-3">
                 <ActivityInsightsCard taskInsights={data.taskInsights} />
+              </div>
+
+              {/* Aspect breakdown - full width for pie chart + legend */}
+              <div className="card-reveal card-reveal-4" style={{ gridColumn: 'span 2' }}>
                 <AspectBreakdownCard breakdown={data.aspectBreakdown} />
+              </div>
+
+              {/* Connections - full width */}
+              <div className="card-reveal card-reveal-5" style={{ gridColumn: 'span 2' }}>
                 <ConnectionsStatusCard connections={data.connections} onConnectionChanged={data.refreshConnections} />
+              </div>
+
+              {/* Rules - full width */}
+              <div className="card-reveal card-reveal-6" style={{ gridColumn: 'span 2' }}>
                 <RulesSection />
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

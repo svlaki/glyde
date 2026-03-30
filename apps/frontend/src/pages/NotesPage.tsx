@@ -55,6 +55,11 @@ function NotesPageDesktop() {
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteAspectId, setNewNoteAspectId] = useState('')
 
+  // Title editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
   // Resizable panel state
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('notes-left-width')
@@ -278,6 +283,29 @@ function NotesPageDesktop() {
     })
   }
 
+  const handleStartEditTitle = () => {
+    if (!selectedNote) return
+    setEditTitle(selectedNote.title)
+    setIsEditingTitle(true)
+    setTimeout(() => titleInputRef.current?.focus(), 0)
+  }
+
+  const handleSaveTitle = async () => {
+    setIsEditingTitle(false)
+    if (!user || !session?.access_token || !selectedNote) return
+    const trimmed = editTitle.trim()
+    if (!trimmed || trimmed === selectedNote.title) return
+
+    await updateUserNotes(user, session.access_token, selectedNote.id, {
+      title: trimmed
+    })
+    // Refresh notes list to reflect new title
+    const notesResult = await fetchUserNotes(user, session.access_token)
+    if (!notesResult.error) {
+      setAllNotes(notesResult.notes)
+    }
+  }
+
   const selectNote = (noteId: string) => {
     // Save current edits before switching
     if (isEditingRef.current && selectedNote) {
@@ -286,6 +314,7 @@ function NotesPageDesktop() {
     setSelectedNoteId(noteId)
     setDropdownOpen(false)
     setIsEditing(false)
+    setIsEditingTitle(false)
   }
 
   const formatUpdatedAt = (dateStr: string) => {
@@ -337,6 +366,7 @@ function NotesPageDesktop() {
 
       <div
         ref={containerRef}
+        className="page-enter"
         style={{
           flex: 1,
           display: 'flex',
@@ -677,7 +707,7 @@ function NotesPageDesktop() {
                   </span>
                 </div>
 
-                {/* Title */}
+                {/* Editable Title */}
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -685,17 +715,54 @@ function NotesPageDesktop() {
                   marginBottom: '12px',
                   flexShrink: 0
                 }}>
-                  <h2 style={{
-                    ...typography.headingLg,
-                    margin: 0,
-                    fontWeight: 600,
-                    color: colors.textPrimary
-                  }}>
-                    {selectedNote.title}
-                  </h2>
+                  {isEditingTitle ? (
+                    <input
+                      ref={titleInputRef}
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      onBlur={handleSaveTitle}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveTitle()
+                        if (e.key === 'Escape') setIsEditingTitle(false)
+                      }}
+                      style={{
+                        ...typography.headingLg,
+                        margin: 0,
+                        fontWeight: 600,
+                        color: colors.textPrimary,
+                        background: 'transparent',
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        outline: 'none',
+                        flex: 1,
+                        marginRight: '12px',
+                      }}
+                    />
+                  ) : (
+                    <h2
+                      className="editable-title"
+                      onClick={handleStartEditTitle}
+                      style={{
+                        ...typography.headingLg,
+                        margin: 0,
+                        fontWeight: 600,
+                        color: colors.textPrimary,
+                        padding: '4px 8px',
+                        cursor: 'text',
+                        flex: 1,
+                        marginRight: '12px',
+                      }}
+                      title="Click to rename"
+                    >
+                      {selectedNote.title}
+                    </h2>
+                  )}
                   <span style={{
                     ...typography.labelSm,
-                    color: colors.textTertiary
+                    color: colors.textTertiary,
+                    flexShrink: 0,
                   }}>
                     {isEditing ? 'Editing...' : 'Click to edit'}
                   </span>
@@ -836,6 +903,10 @@ function NotesPageMobile() {
   // Create form
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteAspectId, setNewNoteAspectId] = useState('')
+
+  // Title editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
 
   const selectedNote = allNotes.find(n => n.id === selectedNoteId) || null
 
@@ -1000,7 +1071,29 @@ function NotesPageMobile() {
     const note = allNotes.find(n => n.id === noteId)
     setEditContent(note?.content || '')
     setIsEditing(false)
+    setIsEditingTitle(false)
     setMobileView('edit')
+  }
+
+  const handleStartEditTitle = () => {
+    if (!selectedNote) return
+    setEditTitle(selectedNote.title)
+    setIsEditingTitle(true)
+  }
+
+  const handleSaveTitle = async () => {
+    setIsEditingTitle(false)
+    if (!user || !session?.access_token || !selectedNote) return
+    const trimmed = editTitle.trim()
+    if (!trimmed || trimmed === selectedNote.title) return
+
+    await updateUserNotes(user, session.access_token, selectedNote.id, {
+      title: trimmed
+    })
+    const notesResult = await fetchUserNotes(user, session.access_token)
+    if (!notesResult.error) {
+      setAllNotes(notesResult.notes)
+    }
   }
 
   const formatUpdatedAt = (dateStr: string) => {
@@ -1121,9 +1214,10 @@ function NotesPageMobile() {
     return (
       <div style={mobileStyles.fullHeight}>
         <MobileHeader
-          title={selectedNote.title}
+          title={isEditingTitle ? '' : selectedNote.title}
           onBack={() => {
             handleBlur()
+            setIsEditingTitle(false)
             setMobileView('list')
           }}
         />
@@ -1135,6 +1229,50 @@ function NotesPageMobile() {
           paddingTop: mobileSpacing.paddingTop,
           paddingBottom: mobileSpacing.paddingBottomNoTabs
         }}>
+          {/* Editable title */}
+          {isEditingTitle ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleSaveTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveTitle()
+                if (e.key === 'Escape') setIsEditingTitle(false)
+              }}
+              autoFocus
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: colors.textPrimary,
+                background: 'transparent',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                padding: '8px 12px',
+                outline: 'none',
+                width: '100%',
+                marginBottom: '12px',
+              }}
+            />
+          ) : (
+            <h2
+              onClick={handleStartEditTitle}
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: colors.textPrimary,
+                margin: '0 0 12px 0',
+                padding: '4px 0',
+                cursor: 'text',
+              }}
+              title="Tap to rename"
+            >
+              {selectedNote.title}
+            </h2>
+          )}
+
           {/* Aspect badge */}
           <div style={{
             display: 'flex',

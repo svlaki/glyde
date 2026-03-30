@@ -40,7 +40,7 @@ import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfi
 import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor, archiveUserAspect, unarchiveUserAspect, getArchivedAspects } from './aspects.js';
 import { getUserProjects, createUserProject, updateUserProject, deleteUserProject, archiveUserProject, unarchiveUserProject, getArchivedProjects as getArchivedUserProjects, getProjectDetail, tagEntityToProject } from './projects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
-import { getUserRatings, getRatingSummary, createRating } from './ratings.js';
+import { getUserRatings, getRatingSummary, createRating, deleteRatingTopic, updateRatingTopic, reorderRatingTopics } from './ratings.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
   getConnections,
@@ -418,6 +418,9 @@ app.post('/api/interactions/clear', clearUserInteractions);
 app.post('/api/ratings', getUserRatings);
 app.post('/api/ratings/summary', getRatingSummary);
 app.post('/api/ratings/create', createRating);
+app.post('/api/ratings/delete', deleteRatingTopic);
+app.post('/api/ratings/update', updateRatingTopic);
+app.post('/api/ratings/reorder', reorderRatingTopics);
 
 // Rules endpoints
 app.post('/api/rules', getUserRules);

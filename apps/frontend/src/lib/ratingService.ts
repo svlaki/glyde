@@ -123,3 +123,105 @@ export async function createUserRating(
     return { rating: null, error: 'Failed to create rating' }
   }
 }
+
+export async function deleteRatingTopic(
+  user: User,
+  accessToken: string,
+  topic: string
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/ratings/delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ user_id: user.id, topic }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to delete rating' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    return { success: false, error: 'Failed to delete rating' }
+  }
+}
+
+export async function updateRatingTopic(
+  user: User,
+  accessToken: string,
+  oldTopic: string,
+  updates: {
+    topic?: string
+    description?: string
+  }
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    // Build body explicitly to avoid JSON.stringify dropping undefined values
+    const body: Record<string, string> = { user_id: user.id, old_topic: oldTopic }
+    if (updates.topic !== undefined) body.topic = updates.topic
+    if (updates.description !== undefined) body.description = updates.description
+
+    const response = await fetch(`${API_URL}/api/ratings/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to update rating' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    return { success: false, error: 'Failed to update rating' }
+  }
+}
+
+export async function reorderRatingTopics(
+  user: User,
+  accessToken: string,
+  topicOrder: string[]
+): Promise<{ success: boolean, error: string | null }> {
+  try {
+    if (!user || !accessToken) {
+      return { success: false, error: 'User not authenticated' }
+    }
+
+    const response = await fetch(`${API_URL}/api/ratings/reorder`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ user_id: user.id, topic_order: topicOrder }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to reorder ratings' }
+    }
+
+    return { success: true, error: null }
+  } catch (error) {
+    return { success: false, error: 'Failed to reorder ratings' }
+  }
+}

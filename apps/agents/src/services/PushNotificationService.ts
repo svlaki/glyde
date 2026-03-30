@@ -46,7 +46,9 @@ class PushNotificationService {
   }
 
   async sendToUser(userId: string, notification: PushPayload): Promise<SendResult> {
+    console.log(`[PUSH] sendToUser called for ${userId}, initialized: ${this.initialized}`);
     if (!this.initialized || !this.provider) {
+      console.log('[PUSH] Provider not initialized, skipping');
       return { sent: 0, failed: 0 };
     }
 
@@ -56,6 +58,8 @@ class PushNotificationService {
       .select('token')
       .eq('user_id', userId)
       .eq('platform', 'ios');
+
+    console.log(`[PUSH] Found ${tokens?.length ?? 0} token(s) for user ${userId}`, error ? `error: ${error.message}` : '');
 
     if (error || !tokens || tokens.length === 0) {
       return { sent: 0, failed: 0 };
@@ -76,6 +80,7 @@ class PushNotificationService {
     for (const { token } of tokens) {
       try {
         const result = await this.provider.send(note, token);
+        console.log(`[PUSH] APNs result — sent: ${result.sent.length}, failed: ${result.failed.length}`);
 
         if (result.sent.length > 0) {
           sent++;
@@ -85,6 +90,7 @@ class PushNotificationService {
           failed++;
           const status = failure.status;
           const reason = failure.response?.reason;
+          console.error(`[PUSH] APNs failure — status: ${status}, reason: ${reason}, device: ${failure.device?.slice(0, 8)}...`);
 
           if (status === 410 || reason === 'BadDeviceToken' || reason === 'Unregistered') {
             staleTokens.push(token);

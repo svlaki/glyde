@@ -109,14 +109,15 @@ export function ActivityInsightsCard({ taskInsights }: ActivityInsightsCardProps
   const colors = getColors(theme)
   const typography = getTypography(isMobile)
 
-  const borderColor = isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-
   return (
     <div style={{
-      background: colors.bgPrimary,
-      border: `1px solid ${borderColor}`,
-      borderRadius: '6px',
+      background: colors.bgSecondary,
+      border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+      borderRadius: '10px',
       overflow: 'hidden',
+      boxShadow: isDarkMode
+        ? '0 2px 8px rgba(0,0,0,0.3)'
+        : '0 1px 4px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.03)',
     }}>
       <div style={{
         padding: isMobile ? '14px 16px 10px' : '16px 20px 12px',
@@ -130,24 +131,24 @@ export function ActivityInsightsCard({ taskInsights }: ActivityInsightsCardProps
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
       }}>
-        <div style={{ borderRight: `1px solid ${borderColor}`, borderTop: `1px solid ${borderColor}` }}>
+        <div style={{ borderRight: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <StatCell
             label="Completed"
             value={taskInsights.completedTasks}
             detail={`${taskInsights.tasksCompletedThisWeek} this week`}
           />
         </div>
-        <div style={{ borderTop: `1px solid ${borderColor}` }}>
+        <div style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <CompletionRateCell rate={taskInsights.completionRate} taskInsights={taskInsights} />
         </div>
-        <div style={{ borderRight: `1px solid ${borderColor}`, borderTop: `1px solid ${borderColor}` }}>
+        <div style={{ borderRight: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <StatCell
             label="Active Tasks"
             value={taskInsights.pendingTasks}
             detail={`${taskInsights.highPriorityPending} high priority`}
           />
         </div>
-        <div style={{ borderTop: `1px solid ${borderColor}` }}>
+        <div style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}>
           <StatCell
             label="Overdue"
             value={taskInsights.overdueTasks}

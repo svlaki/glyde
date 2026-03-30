@@ -137,16 +137,39 @@ const MoonIcon = () => (
   </svg>
 )
 
-const navItems: NavItem[] = [
-  { path: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
-  { path: '/notes', label: 'Notes', icon: <NotesIcon /> },
-  { path: '/aspects', label: 'Aspects', icon: <AspectsIcon /> },
-  { path: '/projects', label: 'Projects', icon: <ProjectsIcon /> },
-  { path: '/ratings', label: 'Ratings', icon: <RatingsIcon /> },
-  { path: '/reminders', label: 'Reminders', icon: <RemindersIcon /> },
-  { path: '/friends', label: 'Friends', icon: <FriendsIcon /> },
+interface NavGroup {
+  label?: string
+  items: NavItem[]
+}
 
-  { path: '/profile', label: 'Profile', icon: <ProfileIcon /> },
+const navGroups: NavGroup[] = [
+  {
+    items: [
+      { path: '/calendar', label: 'Calendar', icon: <CalendarIcon /> },
+    ]
+  },
+  {
+    label: 'Organize',
+    items: [
+      { path: '/notes', label: 'Notes', icon: <NotesIcon /> },
+      { path: '/aspects', label: 'Aspects', icon: <AspectsIcon /> },
+      { path: '/projects', label: 'Projects', icon: <ProjectsIcon /> },
+    ]
+  },
+  {
+    label: 'Track',
+    items: [
+      { path: '/ratings', label: 'Ratings', icon: <RatingsIcon /> },
+      { path: '/reminders', label: 'Reminders', icon: <RemindersIcon /> },
+    ]
+  },
+  {
+    label: 'Connect',
+    items: [
+      { path: '/friends', label: 'Friends', icon: <FriendsIcon /> },
+      { path: '/profile', label: 'Profile', icon: <ProfileIcon /> },
+    ]
+  },
 ]
 
 interface VerticalSidebarProps {
@@ -236,18 +259,18 @@ export function VerticalSidebar({
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: isExpanded ? '10px 16px' : '10px 8px',
-    borderRadius: '8px',
-    background: active ? colors.bgHover : 'transparent',
+    padding: isExpanded ? '9px 14px' : '9px 8px',
+    borderRadius: '10px',
+    background: active ? (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : 'transparent',
     border: 'none',
     color: active ? colors.textPrimary : colors.textSecondary,
     cursor: 'pointer',
-    transition: 'all 0.15s',
+    transition: 'all 0.18s ease',
     textDecoration: 'none',
     width: '100%',
-    fontWeight: active ? 500 : 400,
-    borderLeft: active ? `3px solid ${colors.textPrimary}` : '3px solid transparent',
+    fontWeight: active ? 600 : 400,
     justifyContent: isExpanded ? 'flex-start' : 'center',
+    position: 'relative' as const,
   })
 
   return (
@@ -386,36 +409,112 @@ export function VerticalSidebar({
         {/* Navigation items */}
         <nav style={{
           flex: 1,
-          padding: isExpanded ? '12px 8px' : '8px 0',
+          padding: isExpanded ? '8px 8px' : '8px 0',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          gap: '2px',
           overflow: 'auto',
         }}>
-          {navItems.map((item) => (
-            <a
-              key={item.path}
-              href={item.path}
-              style={navItemStyle(isActive(item.path))}
-              onMouseEnter={(e) => {
-                if (!isActive(item.path)) {
-                  e.currentTarget.style.background = colors.bgHover
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive(item.path)) {
-                  e.currentTarget.style.background = 'transparent'
-                }
-              }}
-              title={isExpanded ? undefined : item.label}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px' }}>
-                {item.icon}
-              </span>
-              {isExpanded && (
-                <span style={{ ...typography.bodyMd }}>{item.label}</span>
+          {navGroups.map((group, gi) => (
+            <div key={gi} style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              marginTop: gi > 0 ? '8px' : 0,
+            }}>
+              {/* Section label - only when expanded and group has a label */}
+              {isExpanded && group.label && (
+                <div style={{
+                  padding: '4px 14px',
+                  marginBottom: '2px',
+                  ...typography.labelSm,
+                  color: colors.textTertiary,
+                  fontSize: '10px',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  userSelect: 'none',
+                }}>
+                  {group.label}
+                </div>
               )}
-            </a>
+              {/* Collapsed separator dot */}
+              {!isExpanded && gi > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  padding: '4px 0',
+                }}>
+                  <div style={{
+                    width: '3px',
+                    height: '3px',
+                    borderRadius: '50%',
+                    background: colors.border,
+                  }} />
+                </div>
+              )}
+              {group.items.map((item) => (
+                <a
+                  key={item.path}
+                  href={item.path}
+                  className="sidebar-nav-item"
+                  style={navItemStyle(isActive(item.path))}
+                  onMouseEnter={(e) => {
+                    if (!isActive(item.path)) {
+                      e.currentTarget.style.background = isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive(item.path)) {
+                      e.currentTarget.style.background = 'transparent'
+                    }
+                  }}
+                  title={isExpanded ? undefined : item.label}
+                >
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '20px',
+                    opacity: isActive(item.path) ? 1 : 0.7,
+                    transition: 'opacity 0.15s',
+                  }}>
+                    {item.icon}
+                  </span>
+                  {isExpanded && (
+                    <span style={{
+                      ...typography.bodySm,
+                      fontWeight: isActive(item.path) ? 600 : 400,
+                      letterSpacing: '-0.01em',
+                    }}>{item.label}</span>
+                  )}
+                  {/* Active indicator dot */}
+                  {isActive(item.path) && !isExpanded && (
+                    <div style={{
+                      position: 'absolute',
+                      left: '2px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '3px',
+                      height: '16px',
+                      borderRadius: '2px',
+                      background: colors.accent,
+                    }} />
+                  )}
+                  {isActive(item.path) && isExpanded && (
+                    <div style={{
+                      position: 'absolute',
+                      left: '0px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '3px',
+                      height: '16px',
+                      borderRadius: '0 2px 2px 0',
+                      background: colors.accent,
+                    }} />
+                  )}
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
 

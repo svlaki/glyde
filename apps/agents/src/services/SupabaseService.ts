@@ -1941,7 +1941,7 @@ export class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('user_ratings')
-        .select('topic, score, description, aspect_id, created_at')
+        .select('topic, score, description, aspect_id, display_order, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -1973,13 +1973,102 @@ export class SupabaseService {
           totalEntries: entries.length,
           lastAsked: latest.created_at,
           aspectId: latest.aspect_id,
+          displayOrder: latest.display_order ?? 999,
         });
       }
+
+      // Sort by display_order (lower = first), then alphabetical as tiebreaker
+      summaries.sort((a, b) => a.displayOrder - b.displayOrder || a.topic.localeCompare(b.topic));
 
       return summaries;
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception fetching rating summary:', error);
       return [];
+    }
+  }
+
+  /**
+   * Delete all ratings for a specific topic
+   */
+  async deleteRatingTopic(userId: string, topic: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('user_ratings')
+        .delete()
+        .eq('user_id', userId)
+        .eq('topic', topic);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error deleting rating topic:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception deleting rating topic:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update a rating topic (rename topic, update description)
+   */
+  async updateRatingTopic(userId: string, oldTopic: string, updates: {
+    topic?: string;
+    description?: string;
+  }): Promise<boolean> {
+    try {
+      const updateData: any = {};
+      if (updates.topic !== undefined) updateData.topic = updates.topic;
+      // Allow clearing description by setting to null when empty string is passed
+      if (updates.description !== undefined) {
+        updateData.description = updates.description || null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return true; // Nothing to update
+      }
+
+      const { error } = await this.client
+        .from('user_ratings')
+        .update(updateData)
+        .eq('user_id', userId)
+        .eq('topic', oldTopic);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error updating rating topic:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception updating rating topic:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reorder rating topics by setting display_order on all rows for each topic
+   */
+  async reorderRatingTopics(userId: string, topicOrder: string[]): Promise<boolean> {
+    try {
+      // Update display_order for each topic (all rows with that topic get the same order)
+      const updates = topicOrder.map((topic, index) =>
+        this.client
+          .from('user_ratings')
+          .update({ display_order: index })
+          .eq('user_id', userId)
+          .eq('topic', topic)
+      );
+
+      const results = await Promise.all(updates);
+      const hasError = results.some(r => r.error);
+      if (hasError) {
+        console.error('[SUPABASE SERVICE] Error reordering rating topics');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception reordering rating topics:', error);
+      return false;
     }
   }
 

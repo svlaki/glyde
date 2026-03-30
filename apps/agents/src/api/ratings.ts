@@ -78,3 +78,93 @@ export async function createRating(req: Request, res: Response): Promise<void> {
     res.status(500).json({ error: 'Failed to create rating' });
   }
 }
+
+export async function deleteRatingTopic(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { topic } = req.body;
+    if (!topic) {
+      res.status(400).json({ error: 'topic is required' });
+      return;
+    }
+
+    const supabaseService = getSupabaseService();
+    const success = await supabaseService.deleteRatingTopic(userId, topic);
+
+    if (!success) {
+      res.status(500).json({ error: 'Failed to delete rating topic' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[RATINGS] Error deleting rating topic:', error);
+    res.status(500).json({ error: 'Failed to delete rating topic' });
+  }
+}
+
+export async function updateRatingTopic(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { old_topic, topic, description } = req.body;
+    if (!old_topic) {
+      res.status(400).json({ error: 'old_topic is required' });
+      return;
+    }
+
+    const supabaseService = getSupabaseService();
+    const success = await supabaseService.updateRatingTopic(userId, old_topic, {
+      topic,
+      description,
+    });
+
+    if (!success) {
+      res.status(500).json({ error: 'Failed to update rating topic' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[RATINGS] Error updating rating topic:', error);
+    res.status(500).json({ error: 'Failed to update rating topic' });
+  }
+}
+
+export async function reorderRatingTopics(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { topic_order } = req.body;
+    if (!Array.isArray(topic_order)) {
+      res.status(400).json({ error: 'topic_order must be an array of topic strings' });
+      return;
+    }
+
+    const supabaseService = getSupabaseService();
+    const success = await supabaseService.reorderRatingTopics(userId, topic_order);
+
+    if (!success) {
+      res.status(500).json({ error: 'Failed to reorder ratings' });
+      return;
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[RATINGS] Error reordering ratings:', error);
+    res.status(500).json({ error: 'Failed to reorder ratings' });
+  }
+}
