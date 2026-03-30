@@ -179,15 +179,18 @@ export class ReminderService {
     }
   }
 
-  async markDelivered(userId: string, reminderId: string, interactionId: string): Promise<boolean> {
+  async markDelivered(userId: string, reminderId: string, interactionId?: string): Promise<boolean> {
     try {
+      const updatePayload: Record<string, any> = {
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+      };
+      if (interactionId) {
+        updatePayload.interaction_id = interactionId;
+      }
       const { error } = await this.client
         .from('reminders')
-        .update({
-          status: 'delivered',
-          delivered_at: new Date().toISOString(),
-          interaction_id: interactionId,
-        })
+        .update(updatePayload)
         .eq('id', reminderId)
         .eq('user_id', userId)
         .in('status', ['pending', 'snoozed']);

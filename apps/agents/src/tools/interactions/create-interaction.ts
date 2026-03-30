@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
 
 export const createInteractionTool = tool(
-  async ({ question, type, options, priority, metadata, aspectId }, config) => {
+  async ({ question, type, options, priority, metadata, aspectId, expiresAt }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       return "Error: User ID required";
@@ -12,15 +12,35 @@ export const createInteractionTool = tool(
     try {
       const supabaseService = getSupabaseService();
 
-      // Dedup check: reject if a pending interaction with similar topic already exists
+      // Dedup check: reject if a similar interaction exists (pending OR recently responded)
       const pendingInteractions = await supabaseService.getPendingUserInteractions(userId, 'interaction');
+      const recentInteractions = await supabaseService.getRecentUserInteractions(userId, 20, 6);
+      const allRecentInteractions = [...pendingInteractions, ...recentInteractions];
+
+      // Deduplicate the combined list by ID
+      const seenIds = new Set<string>();
+      const uniqueInteractions = allRecentInteractions.filter((i: any) => {
+        if (seenIds.has(i.id)) return false;
+        seenIds.add(i.id);
+        return true;
+      });
+
       const questionLower = question.toLowerCase();
       const questionWords = questionLower.split(/\s+/).filter((w: string) => w.length > 3);
-      const isDuplicate = pendingInteractions.some((existing: any) => {
+      const newEventTitle = (metadata?.eventTitle || '').toLowerCase();
+
+      const isDuplicate = uniqueInteractions.some((existing: any) => {
         const existingLower = (existing.question || '').toLowerCase();
+
+        // Exact match
         if (existingLower === questionLower) return true;
+
+        // Same eventTitle in metadata = same topic
+        const existingEventTitle = (existing.metadata?.eventTitle || '').toLowerCase();
+        if (newEventTitle && existingEventTitle && newEventTitle === existingEventTitle) return true;
+
+        // Word overlap check
         const existingWords = existingLower.split(/\s+/).filter((w: string) => w.length > 3);
-        // Skip overlap check for very short questions to avoid false positives
         if (questionWords.length < 3 || existingWords.length < 3) return false;
         const overlapA = questionWords.filter((w: string) => existingWords.includes(w)).length;
         const overlapB = existingWords.filter((w: string) => questionWords.includes(w)).length;
@@ -31,7 +51,7 @@ export const createInteractionTool = tool(
 
       if (isDuplicate) {
         console.log(`[create-interaction] BLOCKED duplicate: "${question}"`);
-        return `Skipped: A similar interaction is already pending. Choose a completely different topic.`;
+        return `Skipped: A similar interaction was already asked recently. Choose a completely different topic.`;
       }
 
       // Rating cooldown check: block rating interactions if the same topic was rated within 5 days
@@ -68,6 +88,7 @@ export const createInteractionTool = tool(
         priority: priority || 3,
         aspectId: resolvedAspectId || undefined,
         metadata: metadata || undefined,
+        expiresAt: expiresAt || undefined,
       });
 
       if (!interaction) {
@@ -91,6 +112,7 @@ export const createInteractionTool = tool(
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority 1-5"),
       metadata: z.record(z.any()).optional().nullable().describe("Context for response processing (JSON)"),
       aspectId: z.string().uuid().optional().nullable().describe("Aspect UUID"),
+      expiresAt: z.string().optional().nullable().describe("Expiry time ISO. Interactions expire and disappear after this time."),
     }),
   }
 );

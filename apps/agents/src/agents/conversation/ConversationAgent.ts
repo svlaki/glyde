@@ -220,12 +220,17 @@ export class ConversationAgent extends BaseAgent {
 
       console.log(`[CONVERSATION AGENT] Loaded: ${userEvents.length} events (${recentPastEvents.length} past + ${futureEvents.length} future), ${userTasks.length} tasks, ${userGoals.length} goals, ${userAspects?.length || 0} aspects`);
 
-      // Build conversation history — 6 messages (3 exchanges) instead of 10
+      // Build conversation history — 10 messages (5 exchanges) for adequate context
+      // Recent assistant messages are kept full so the agent can see what it just did.
+      // Older assistant messages are truncated to save tokens.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        const recentHistory = context.conversationHistory.slice(-6);
-        for (const msg of recentHistory) {
+        const recentHistory = context.conversationHistory.slice(-10);
+        const totalMsgs = recentHistory.length;
+        for (let i = 0; i < totalMsgs; i++) {
+          const msg = recentHistory[i];
+          const isRecent = i >= totalMsgs - 4; // last 4 messages (2 exchanges) kept full
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
@@ -233,10 +238,16 @@ export class ConversationAgent extends BaseAgent {
               messages.push(new HumanMessage(msg.content));
             }
           } else if (msg.role === 'assistant') {
-            // Truncate long assistant messages in history
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
-            messages.push(new AIMessage(truncated));
+            if (isRecent) {
+              // Keep recent assistant messages full so agent can see its own actions
+              const truncated = textContent.length > 1500 ? textContent.slice(0, 1500) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            } else {
+              // Older messages get heavier truncation
+              const truncated = textContent.length > 400 ? textContent.slice(0, 400) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            }
           }
         }
       }
@@ -458,12 +469,16 @@ IMPORTANT INSTRUCTIONS:
       const userTasks = allTasks.slice(0, 10);
       const userGoals = allGoals.slice(0, 8);
 
-      // Build conversation history — 6 messages (3 exchanges) instead of 10
+      // Build conversation history — 10 messages (5 exchanges) for adequate context
+      // Recent assistant messages are kept full so the agent can see what it just did.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
-        const recentHistory = context.conversationHistory.slice(-6);
-        for (const msg of recentHistory) {
+        const recentHistory = context.conversationHistory.slice(-10);
+        const totalMsgs = recentHistory.length;
+        for (let i = 0; i < totalMsgs; i++) {
+          const msg = recentHistory[i];
+          const isRecent = i >= totalMsgs - 4; // last 4 messages (2 exchanges) kept full
           if (msg.role === 'user') {
             if (Array.isArray(msg.content)) {
               messages.push(new HumanMessage({ content: msg.content as any }));
@@ -472,8 +487,13 @@ IMPORTANT INSTRUCTIONS:
             }
           } else if (msg.role === 'assistant') {
             const textContent = typeof msg.content === 'string' ? msg.content : '';
-            const truncated = textContent.length > 300 ? textContent.slice(0, 300) + '...' : textContent;
-            messages.push(new AIMessage(truncated));
+            if (isRecent) {
+              const truncated = textContent.length > 1500 ? textContent.slice(0, 1500) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            } else {
+              const truncated = textContent.length > 400 ? textContent.slice(0, 400) + '...' : textContent;
+              messages.push(new AIMessage(truncated));
+            }
           }
         }
       }
@@ -705,7 +725,9 @@ Use these scores to understand how the user feels about different areas of their
     const CONTINUATION_PROMPT = `You are Glyde, a life assistant. You just executed tools. Respond to the user based on the tool results. Be concise (1-3 sentences). Use 12-hour AM/PM for times.
 
 CRITICAL: If the user asked you to create, update, or delete something and you have NOT yet called the corresponding tool, you MUST call it now. NEVER tell the user you did something without a tool call proving it. If a tool call failed, tell the user honestly.
-For multi-action requests, call ALL remaining tools before responding.`;
+For multi-action requests, call ALL remaining tools before responding. Do NOT stop to ask clarifying questions mid-execution — use reasonable defaults and keep going.
+CHECK YOUR WORK: If the user's message contained schedule info (lecture times, class times, meeting patterns) and you have NOT yet called create_recurring_event or create_event, you are NOT done — call them now. Creating an aspect without the corresponding events is incomplete.
+When summarizing, clearly list what was ACTUALLY created/changed (with names and details) so the user can reference or undo specific items later.`;
 
     // Define the workflow nodes
     const callModel = async (state: ConversationStateType) => {

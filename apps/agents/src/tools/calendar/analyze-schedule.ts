@@ -1,7 +1,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { startOfWeek, endOfWeek, isWithinInterval, differenceInMinutes, format, parseISO } from "date-fns";
+import { startOfWeek, endOfWeek, differenceInMinutes, format, parseISO } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 /**
@@ -31,9 +31,8 @@ export const analyzeScheduleTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
-      const allEvents = await supabaseService.getEvents(userId);
 
-      // Determine date range
+      // Determine date range FIRST so we can pass it to getEvents
       let rangeStart: Date;
       let rangeEnd: Date;
       const now = toZonedTime(new Date(), timezone);
@@ -58,13 +57,12 @@ export const analyzeScheduleTool = tool(
         rangeEnd = endOfWeek(now, { weekStartsOn: 1 });
       }
 
-      // Filter events within range
-      const events = allEvents.filter(event => {
-        const eventStart = new Date(event.start_time);
-        const eventEnd = new Date(event.end_time);
-        return isWithinInterval(eventStart, { start: rangeStart, end: rangeEnd }) ||
-               isWithinInterval(eventEnd, { start: rangeStart, end: rangeEnd });
-      });
+      // Pass date range to getEvents so it only expands recurring events within range
+      const events = await supabaseService.getEvents(
+        userId,
+        rangeStart.toISOString(),
+        rangeEnd.toISOString()
+      );
 
       if (events.length === 0) {
         return `No events scheduled for ${period || 'the selected period'}. Your calendar is completely free!`;

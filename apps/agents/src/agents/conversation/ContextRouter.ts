@@ -18,10 +18,11 @@ Return JSON with these fields:
 - prompt_sections: string[] from [core, calendar_detail, goal_creation, recurring_events, friends_sharing, location_search, memory_management, plans_detail, reminders]
 
 Rules for needs_tools:
-- false: greetings, questions about schedule/tasks/goals, status checks, advice, chat, "how are my goals", "what's on my schedule"
-- true: "create", "add", "schedule", "delete", "remove", "cancel", "update", "change", "remind me", "remember", "save", "search for [place]", "complete", "mark done", "find free time", "when am I free", "analyze my schedule", "clear my calendar", "tag", "share", "send friend request"
+- false: ONLY pure greetings ("hey", "hi", "good morning", "how are you"), general advice/chat unrelated to calendar/tasks/goals
+- true: ANY question about schedule/events/tasks/goals ("what's on my calendar", "what events", "how are my goals", "what tasks do I have", "what's on my schedule"), status checks, AND all action verbs: "create", "add", "schedule", "delete", "remove", "cancel", "update", "change", "remind me", "remember", "save", "search for [place]", "complete", "mark done", "find free time", "when am I free", "analyze my schedule", "clear my calendar", "tag", "share", "send friend request"
+- true: ANY pasted text containing schedule information — syllabi, course pages, meeting agendas, event flyers, conference schedules, invitations, or any document with times/dates/recurring patterns (e.g. "TuTh 3:00-4:20PM", "MWF 10:00", "Lectures:", "Office Hours:", "every Monday", dates like "March 25"). These ALWAYS need calendar tools. Set tools=["create_recurring_event", "create_aspect", "create_event"] and tool_categories=["calendar_core", "calendar_advanced", "aspects"].
 - IMPORTANT: If the message contains BOTH a greeting/question AND an action verb (e.g. "Good morning! Schedule...", "What's on my schedule? Also add a task..."), set needs_tools=true
-- "schedule" as a VERB (e.g., "schedule a meeting") → true. "schedule" as a NOUN (e.g., "what's on my schedule") → false.
+- "schedule" as a VERB (e.g., "schedule a meeting") → true. "schedule" as a NOUN (e.g., "what's on my schedule") → true (needs tools to look up data).
 
 Rules for tools (specific tool names, only when needs_tools=true):
 - "create a meeting/event" → ["create_event"]
@@ -60,6 +61,9 @@ Rules for tool_categories:
 - Add "profile" if user mentions their settings, preferences
 - Add "projects" if user mentions projects
 - Add "plans" if user mentions life plan
+- Questions about events/schedule → tool_categories: ["calendar_core"]
+- Questions about tasks → tool_categories: ["tasks"]
+- Questions about goals → tool_categories: ["goals"]
 - For greetings/general chat with needs_tools=false: tool_categories=[], context_sections all false except events+tasks+goals
 
 Rules for context_sections:
@@ -98,8 +102,62 @@ export class ContextRouter {
    * @param recentMessages Last 2 messages for context (optional)
    * @returns RoutingDecision with tool categories, context sections, and prompt sections
    */
+  /**
+   * Deterministic check for pasted schedule/document content.
+   * The nano router can't reliably detect these — it sees a wall of text
+   * and classifies as needs_tools=false. This catches it before the LLM.
+   */
+  private detectScheduleContent(message: string): boolean {
+    const lower = message.toLowerCase();
+    const len = message.length;
+
+    // Short messages are never pasted documents
+    if (len < 150) return false;
+
+    // Schedule time patterns: "TuTh 3:00-4:20PM", "MWF 10:00-11:00AM", "Monday 2:00 PM"
+    const timePatterns = [
+      /\b(?:MWF|MW|TuTh|TTh|MoWeFr|TuTh?)\s+\d{1,2}[:.]\d{2}/i,
+      /\blectures?[:\s]+(?:mon|tue|wed|thu|fri|sat|sun|MWF|MW|TuTh|TTh)/i,
+      /\b(?:mon|tue|wed|thu|fri|sat|sun)(?:day)?s?\s+(?:and\s+)?(?:mon|tue|wed|thu|fri|sat|sun)(?:day)?s?\s+\d{1,2}[:.]\d{2}/i,
+    ];
+
+    // Document structure keywords (multiple must match to avoid false positives)
+    const docKeywords = [
+      'instructor', 'teaching assistant', 'office hours', 'syllabus',
+      'grading', 'problem sets', 'examinations', 'prerequisites',
+      'textbook', 'lectures', 'midterm', 'final exam', 'course',
+      'collaboration policy', 'attendance', 'schedule', 'recitation',
+      'lab section', 'section', 'quarter', 'semester',
+    ];
+
+    const hasTimePattern = timePatterns.some(p => p.test(message));
+    const matchingKeywords = docKeywords.filter(k => lower.includes(k));
+    const hasDocStructure = matchingKeywords.length >= 3;
+
+    return hasTimePattern || (hasDocStructure && len > 300);
+  }
+
   async route(userMessage: string, recentMessages?: string[]): Promise<RoutingDecision> {
     try {
+      // Force needs_tools=true — the nano router is unreliable at detecting
+      // implicit tool needs (pasted schedules, documents with dates, etc.)
+      // The main model can decide not to call tools if none are needed.
+      const forceTools = true;
+
+      // Deterministic pre-check: pasted schedule/document content
+      const isScheduleContent = this.detectScheduleContent(userMessage);
+      if (isScheduleContent) {
+        console.log('[CONTEXT ROUTER] Detected pasted schedule content — forcing calendar tools');
+        return this.normalizeDecision({
+          needs_tools: true,
+          tools: ['create_recurring_event', 'create_aspect', 'create_event'],
+          tool_categories: ['calendar_core', 'calendar_advanced', 'aspects'],
+          context_mode: 'full',
+          context_sections: { events: true, tasks: true, goals: true, friends: false, rules: false, activity_logs: false, ratings: false, projects: false },
+          prompt_sections: ['core', 'calendar_detail', 'recurring_events'],
+        });
+      }
+
       const contextStr = recentMessages?.length
         ? `\nRecent context:\n${recentMessages.map((m, i) => {
             const truncated = m.length > 200 ? m.slice(0, 200) + '...' : m;
@@ -121,6 +179,11 @@ export class ContextRouter {
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
+      // Force tools always available — main model decides whether to call them
+      if (forceTools) {
+        parsed.needs_tools = true;
+        parsed.context_mode = 'full';
+      }
       return this.normalizeDecision(parsed);
     } catch (error) {
       console.error('[CONTEXT ROUTER] Error routing message, using defaults:', error);
