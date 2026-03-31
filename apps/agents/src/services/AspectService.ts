@@ -108,17 +108,27 @@ export class AspectService {
    */
   async getAspectByName(userId: string, name: string): Promise<Aspect | null> {
     try {
-      // 1. Check user's own aspects first
+      // Escape ILIKE wildcards so user input is treated as literal text
+      const escaped = name.replace(/[%_\\]/g, '\\$&');
+
+      // Helper: pick best match — exact match first, then shortest name (most specific)
+      const pickBest = (candidates: Aspect[]): Aspect | null => {
+        if (!candidates || candidates.length === 0) return null;
+        const exact = candidates.find(c => c.name.toLowerCase() === name.toLowerCase());
+        if (exact) return exact;
+        const sorted = [...candidates].sort((a, b) => a.name.length - b.name.length);
+        return sorted[0];
+      };
+
+      // 1. Check user's own aspects first (fuzzy substring match)
       const { data: ownData, error: ownError } = await this.supabase
         .from('aspects')
         .select(ASPECT_COLUMNS)
         .eq('user_id', userId)
-        .ilike('name', name)
-        .maybeSingle();
+        .ilike('name', `%${escaped}%`);
 
-      if (ownData) {
-        return ownData as Aspect;
-      }
+      const ownMatch = pickBest((ownData || []) as Aspect[]);
+      if (ownMatch) return ownMatch;
 
       // 2. Check shared aspects (where user is a member but not owner)
       const { data: memberRows } = await this.supabase
@@ -132,12 +142,10 @@ export class AspectService {
           .from('aspects')
           .select(ASPECT_COLUMNS)
           .in('id', sharedIds)
-          .ilike('name', name)
-          .maybeSingle();
+          .ilike('name', `%${escaped}%`);
 
-        if (sharedData) {
-          return sharedData as Aspect;
-        }
+        const sharedMatch = pickBest((sharedData || []) as Aspect[]);
+        if (sharedMatch) return sharedMatch;
       }
 
       if (ownError) {

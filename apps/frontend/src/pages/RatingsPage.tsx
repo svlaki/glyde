@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { usePlatform } from '../hooks/usePlatform'
-import { fetchRatingSummary, fetchUserRatings, createUserRating } from '../lib/ratingService'
+import { fetchRatingSummary, fetchUserRatings, createUserRating, deleteRatingTopic, updateRatingTopic, reorderRatingTopics } from '../lib/ratingService'
 import type { RatingSummary, Rating } from '../lib/ratingService'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { MobileHeader } from '../components/mobile/MobileHeader'
@@ -21,51 +21,104 @@ export function RatingsPage() {
 }
 
 // Score dot component for the 1-10 scale
-function ScoreDots({ score, onSelect, size = 28, interactive = false, colors }: {
+function ScoreDots({ score, onSelect, size = 28, interactive = false, colors, hoverPreview = false }: {
   score: number
   onSelect?: (score: number) => void
   size?: number
   interactive?: boolean
   colors: ReturnType<typeof getColors>
+  hoverPreview?: boolean
 }) {
+  const [hoverValue, setHoverValue] = useState(0)
+  const displayScore = hoverPreview && hoverValue > 0 ? hoverValue : score
+
   return (
-    <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => (
-        <button
-          key={value}
-          onClick={() => onSelect?.(value)}
-          disabled={!interactive}
-          style={{
-            width: `${size}px`,
-            height: `${size}px`,
-            borderRadius: '50%',
-            border: value <= score
-              ? `2px solid ${getScoreColor(score)}`
-              : `2px solid ${colors.border}`,
-            background: value <= score
-              ? getScoreColor(score)
-              : 'transparent',
-            color: value <= score ? '#fff' : colors.textTertiary,
-            fontSize: `${Math.max(10, size * 0.4)}px`,
-            fontWeight: 600,
-            cursor: interactive ? 'pointer' : 'default',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.15s',
-            padding: 0,
-          }}
-          onMouseEnter={(e) => {
-            if (interactive) e.currentTarget.style.transform = 'scale(1.15)'
-          }}
-          onMouseLeave={(e) => {
-            if (interactive) e.currentTarget.style.transform = 'scale(1)'
-          }}
-        >
-          {value}
-        </button>
-      ))}
+    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(value => {
+        const isFilled = value <= displayScore
+        const fillColor = getScoreColor(displayScore || value)
+        return (
+          <button
+            key={value}
+            onClick={() => onSelect?.(value)}
+            disabled={!interactive}
+            onMouseEnter={(e) => {
+              if (interactive) {
+                e.currentTarget.style.transform = 'scale(1.2)'
+                if (hoverPreview) setHoverValue(value)
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (interactive) {
+                e.currentTarget.style.transform = 'scale(1)'
+                if (hoverPreview) setHoverValue(0)
+              }
+            }}
+            style={{
+              width: `${size}px`,
+              height: `${size}px`,
+              borderRadius: '50%',
+              border: isFilled
+                ? `2px solid ${fillColor}`
+                : `1.5px solid ${colors.border}`,
+              background: isFilled ? fillColor : 'transparent',
+              color: isFilled ? '#fff' : colors.textTertiary,
+              fontSize: `${Math.max(10, size * 0.38)}px`,
+              fontWeight: 600,
+              cursor: interactive ? 'pointer' : 'default',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.18s ease',
+              padding: 0,
+            }}
+          >
+            {value}
+          </button>
+        )
+      })}
     </div>
+  )
+}
+
+// Mini sparkline SVG for rating history
+function Sparkline({ history, color, width = 120, height = 32 }: {
+  history: { score: number }[]
+  color: string
+  width?: number
+  height?: number
+}) {
+  if (history.length < 2) return null
+  const points = history.slice(-12).reverse() // Last 12 entries, chronological
+  const max = 10
+  const min = 0
+  const stepX = width / (points.length - 1)
+  const pathPoints = points.map((p, i) => {
+    const x = i * stepX
+    const y = height - ((p.score - min) / (max - min)) * (height - 4) - 2
+    return `${x},${y}`
+  })
+  const pathD = `M ${pathPoints.join(' L ')}`
+
+  return (
+    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.6}
+      />
+      {/* Latest point dot */}
+      {points.length > 0 && (() => {
+        const lastI = points.length - 1
+        const lx = lastI * stepX
+        const ly = height - ((points[lastI].score - min) / (max - min)) * (height - 4) - 2
+        return <circle cx={lx} cy={ly} r="3" fill={color} />
+      })()}
+    </svg>
   )
 }
 
@@ -109,49 +162,85 @@ function TrendBadge({ trend, colors }: { trend: number, colors: ReturnType<typeo
 }
 
 // Rating card for the summary list
-function RatingCard({ summary, isSelected, onClick, colors, isMobile }: {
+function RatingCard({ summary, isSelected, onClick, colors, isMobile, history }: {
   summary: RatingSummary
   isSelected: boolean
   onClick: () => void
   colors: ReturnType<typeof getColors>
   isMobile?: boolean
+  history?: { score: number }[]
 }) {
   const daysSince = Math.round((Date.now() - new Date(summary.lastAsked).getTime()) / 86400000)
   const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince}d ago`
+  const scoreColor = getScoreColor(summary.latestScore)
 
   return (
     <div
       onClick={onClick}
+      className="card-reveal"
       style={{
+        flex: 1,
+        minWidth: 0,
         padding: isMobile ? '16px' : '14px 16px',
-        background: isSelected ? hexToRgba(colors.textPrimary, 0.08) : colors.bgTertiary,
-        borderRadius: '8px',
+        background: isSelected ? hexToRgba(colors.textPrimary, 0.06) : colors.bgPrimary,
+        borderRadius: '10px',
         cursor: 'pointer',
-        transition: 'all 0.15s',
-        borderLeft: isSelected ? `3px solid ${colors.textPrimary}` : '3px solid transparent',
+        transition: 'all 0.18s ease',
+        border: isSelected ? `1px solid ${hexToRgba(colors.textPrimary, 0.15)}` : `1px solid ${colors.border}`,
       }}
       onMouseEnter={(e) => {
         if (!isSelected) e.currentTarget.style.background = colors.bgHover
       }}
       onMouseLeave={(e) => {
-        if (!isSelected) e.currentTarget.style.background = colors.bgTertiary
+        if (!isSelected) e.currentTarget.style.background = isSelected ? hexToRgba(colors.textPrimary, 0.06) : colors.bgPrimary
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-        <span style={{
-          fontSize: isMobile ? '15px' : '14px',
-          fontWeight: 500,
-          color: colors.textPrimary,
-          flex: 1,
-        }}>
-          {summary.topic}
-        </span>
-        <TrendBadge trend={summary.trend} colors={colors} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+          {/* Large score circle */}
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '50%',
+            background: scoreColor,
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '16px',
+            fontWeight: 700,
+            flexShrink: 0,
+          }}>
+            {summary.latestScore}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: isMobile ? '15px' : '14px',
+              fontWeight: 600,
+              color: colors.textPrimary,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {summary.topic}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+              <span style={{ fontSize: '11px', color: colors.textTertiary }}>
+                {summary.totalEntries} {summary.totalEntries === 1 ? 'entry' : 'entries'}
+              </span>
+              <TrendBadge trend={summary.trend} colors={colors} />
+            </div>
+          </div>
+        </div>
+        {/* Mini sparkline if history exists */}
+        {history && history.length >= 2 && (
+          <Sparkline history={history} color={scoreColor} width={80} height={24} />
+        )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <ScoreDots score={summary.latestScore} size={20} colors={colors} />
-        <span style={{ fontSize: '11px', color: colors.textTertiary }}>
-          {summary.totalEntries} {summary.totalEntries === 1 ? 'entry' : 'entries'} / last: {timeAgo}
+        <ScoreDots score={summary.latestScore} size={18} colors={colors} />
+        <span style={{ fontSize: '11px', color: colors.textTertiary, flexShrink: 0, marginLeft: '8px' }}>
+          {timeAgo}
         </span>
       </div>
     </div>
@@ -271,13 +360,20 @@ function NewRatingForm({ onSave, onCancel, colors, isMobile }: {
 }
 
 // Detail panel showing history for a selected rating
-function RatingDetailPanel({ summary, history, onUpdateScore, colors, isMobile }: {
+function RatingDetailPanel({ summary, history, onUpdateScore, onDelete, onEdit, colors, isMobile }: {
   summary: RatingSummary | null
   history: Rating[]
   onUpdateScore: (score: number) => void
+  onDelete?: (topic: string) => void
+  onEdit?: (oldTopic: string, newTopic: string, newDescription: string) => void
   colors: ReturnType<typeof getColors>
   isMobile?: boolean
 }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editTopic, setEditTopic] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   if (!summary) {
     return (
       <div style={{
@@ -293,22 +389,185 @@ function RatingDetailPanel({ summary, history, onUpdateScore, colors, isMobile }
     )
   }
 
+  const handleStartEdit = () => {
+    setEditTopic(summary.topic)
+    setEditDescription(summary.description || '')
+    setIsEditing(true)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editTopic.trim()) return
+    onEdit?.(summary.topic, editTopic.trim(), editDescription.trim())
+    setIsEditing(false)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header */}
+      {/* Header with edit/delete actions */}
       <div>
-        <h2 style={{
-          fontSize: isMobile ? '20px' : '22px',
-          fontWeight: 600,
-          color: colors.textPrimary,
-          margin: '0 0 4px 0',
-        }}>
-          {summary.topic}
-        </h2>
-        {summary.description && (
-          <p style={{ fontSize: '14px', color: colors.textSecondary, margin: 0 }}>
-            {summary.description}
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {isEditing ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', marginRight: '12px' }}>
+              <input
+                type="text"
+                value={editTopic}
+                onChange={(e) => setEditTopic(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setIsEditing(false) }}
+                autoFocus
+                style={{
+                  fontSize: isMobile ? '18px' : '20px',
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  background: 'transparent',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  outline: 'none',
+                }}
+              />
+              <input
+                type="text"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Description (optional)"
+                style={{
+                  fontSize: '14px',
+                  color: colors.textSecondary,
+                  background: 'transparent',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={!editTopic.trim()}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    background: colors.textPrimary,
+                    color: colors.bgPrimary,
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    background: 'transparent',
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ flex: 1 }}>
+                <h2 style={{
+                  fontSize: isMobile ? '20px' : '22px',
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  margin: '0 0 4px 0',
+                }}>
+                  {summary.topic}
+                </h2>
+                {summary.description && (
+                  <p style={{ fontSize: '14px', color: colors.textSecondary, margin: 0 }}>
+                    {summary.description}
+                  </p>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button
+                  onClick={handleStartEdit}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: 'transparent',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    color: colors.textSecondary,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    background: 'transparent',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '6px',
+                    color: colors.error,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Delete confirmation */}
+        {confirmDelete && (
+          <div style={{
+            marginTop: '12px',
+            padding: '12px',
+            borderRadius: '8px',
+            background: hexToRgba(colors.error, 0.06),
+            border: `1px solid ${hexToRgba(colors.error, 0.2)}`,
+          }}>
+            <div style={{ fontSize: '13px', color: colors.textPrimary, marginBottom: '8px' }}>
+              Delete &ldquo;{summary.topic}&rdquo; and all {summary.totalEntries} entries? This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={() => { onDelete?.(summary.topic); setConfirmDelete(false) }}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  background: colors.error,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  background: 'transparent',
+                  color: colors.textSecondary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -347,6 +606,7 @@ function RatingDetailPanel({ summary, history, onUpdateScore, colors, isMobile }
             onSelect={onUpdateScore}
             size={36}
             interactive
+            hoverPreview
             colors={colors}
           />
         </div>
@@ -496,6 +756,55 @@ function RatingsPageDesktop() {
     }
   }
 
+  const handleDeleteTopic = async (topic: string) => {
+    if (!user || !session) return
+    const result = await deleteRatingTopic(user, session.access_token, topic)
+    if (!result.success) {
+      console.error('Failed to delete rating:', result.error)
+      return
+    }
+    setSelectedTopic(null)
+    setHistory([])
+    await loadSummaries()
+  }
+
+  const handleEditTopic = async (oldTopic: string, newTopic: string, newDescription: string) => {
+    if (!user || !session) return
+    const updates: { topic?: string; description?: string } = {}
+    if (newTopic !== oldTopic) updates.topic = newTopic
+    updates.description = newDescription
+    const result = await updateRatingTopic(user, session.access_token, oldTopic, updates)
+    if (!result.success) {
+      console.error('Failed to update rating:', result.error)
+      return
+    }
+    await loadSummaries()
+    const lookupTopic = updates.topic ?? oldTopic
+    const { summary } = await fetchRatingSummary(user, session.access_token)
+    const updated = summary.find(s => s.topic === lookupTopic)
+    if (updated) {
+      setSelectedTopic(updated)
+      loadHistory(lookupTopic)
+    }
+  }
+
+  const handleMoveRating = async (index: number, direction: 'up' | 'down') => {
+    if (!user || !session) return
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= summaries.length) return
+
+    const reordered = [...summaries]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(newIndex, 0, moved)
+
+    // Optimistic update
+    setSummaries(reordered)
+
+    // Persist
+    const topicOrder = reordered.map(s => s.topic)
+    await reorderRatingTopics(user, session.access_token, topicOrder)
+  }
+
   return (
     <div style={{
       height: '100vh',
@@ -505,7 +814,7 @@ function RatingsPageDesktop() {
     }}>
       <VerticalSidebar />
 
-      <div style={{
+      <div className="page-enter" style={{
         flex: 1,
         display: 'flex',
         overflow: 'hidden',
@@ -514,7 +823,7 @@ function RatingsPageDesktop() {
       }}>
         {/* Left panel - rating list */}
         <div style={{
-          width: '350px',
+          width: '380px',
           borderRight: `1px solid ${colors.border}`,
           background: colors.bgSecondary,
           display: 'flex',
@@ -532,7 +841,7 @@ function RatingsPageDesktop() {
               alignItems: 'center',
             }}>
               <h2 style={{
-                ...typography.headingLg,
+                ...typography.displaySm,
                 fontWeight: 600,
                 color: colors.textPrimary,
                 margin: 0,
@@ -547,10 +856,13 @@ function RatingsPageDesktop() {
                   background: colors.textPrimary,
                   color: colors.bgPrimary,
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
                   fontWeight: 500,
+                  transition: 'all 0.15s',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.85' }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
               >
                 + New
               </button>
@@ -558,7 +870,7 @@ function RatingsPageDesktop() {
             <p style={{
               ...typography.bodySm,
               color: colors.textSecondary,
-              margin: '6px 0 0 0',
+              margin: '8px 0 0 0',
             }}>
               Track how you feel about areas of your life
             </p>
@@ -594,14 +906,74 @@ function RatingsPageDesktop() {
                 </div>
               </div>
             ) : (
-              summaries.map(s => (
-                <RatingCard
-                  key={s.topic}
-                  summary={s}
-                  isSelected={selectedTopic?.topic === s.topic}
-                  onClick={() => handleSelectTopic(s)}
-                  colors={colors}
-                />
+              summaries.map((s, idx) => (
+                <div key={s.topic} style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+                  <RatingCard
+                    summary={s}
+                    isSelected={selectedTopic?.topic === s.topic}
+                    onClick={() => handleSelectTopic(s)}
+                    colors={colors}
+                  />
+                  {/* Reorder arrows */}
+                  {summaries.length > 1 && (
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      gap: '2px',
+                      flexShrink: 0,
+                    }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMoveRating(idx, 'up') }}
+                        disabled={idx === 0}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: idx === 0 ? colors.border : colors.textTertiary,
+                          cursor: idx === 0 ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          padding: 0,
+                          transition: 'color 0.15s',
+                        }}
+                        title="Move up"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="18 15 12 9 6 15" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleMoveRating(idx, 'down') }}
+                        disabled={idx === summaries.length - 1}
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: idx === summaries.length - 1 ? colors.border : colors.textTertiary,
+                          cursor: idx === summaries.length - 1 ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          padding: 0,
+                          transition: 'color 0.15s',
+                        }}
+                        title="Move down"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))
             )}
           </div>
@@ -624,6 +996,8 @@ function RatingsPageDesktop() {
               summary={selectedTopic}
               history={history}
               onUpdateScore={handleUpdateScore}
+              onDelete={handleDeleteTopic}
+              onEdit={handleEditTopic}
               colors={colors}
             />
           )}
@@ -691,6 +1065,52 @@ function RatingsPageMobile() {
     }
   }
 
+  const handleDeleteTopic = async (topic: string) => {
+    if (!user || !session) return
+    const result = await deleteRatingTopic(user, session.access_token, topic)
+    if (!result.success) {
+      console.error('Failed to delete rating:', result.error)
+      return
+    }
+    setSelectedTopic(null)
+    setHistory([])
+    await loadSummaries()
+  }
+
+  const handleEditTopic = async (oldTopic: string, newTopic: string, newDescription: string) => {
+    if (!user || !session) return
+    const updates: { topic?: string; description?: string } = {}
+    if (newTopic !== oldTopic) updates.topic = newTopic
+    updates.description = newDescription
+    const result = await updateRatingTopic(user, session.access_token, oldTopic, updates)
+    if (!result.success) {
+      console.error('Failed to update rating:', result.error)
+      return
+    }
+    await loadSummaries()
+    const lookupTopic = updates.topic ?? oldTopic
+    const { summary } = await fetchRatingSummary(user, session.access_token)
+    const updated = summary.find(s => s.topic === lookupTopic)
+    if (updated) {
+      setSelectedTopic(updated)
+      loadHistory(lookupTopic)
+    }
+  }
+
+  const handleMoveRating = async (index: number, direction: 'up' | 'down') => {
+    if (!user || !session) return
+    const newIndex = direction === 'up' ? index - 1 : index + 1
+    if (newIndex < 0 || newIndex >= summaries.length) return
+
+    const reordered = [...summaries]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(newIndex, 0, moved)
+    setSummaries(reordered)
+
+    const topicOrder = reordered.map(s => s.topic)
+    await reorderRatingTopics(user, session.access_token, topicOrder)
+  }
+
   const handleBack = () => {
     setSelectedTopic(null)
     setShowNewForm(false)
@@ -713,6 +1133,8 @@ function RatingsPageMobile() {
             summary={selectedTopic}
             history={history}
             onUpdateScore={handleUpdateScore}
+            onDelete={(topic) => { handleDeleteTopic(topic); handleBack() }}
+            onEdit={handleEditTopic}
             colors={colors}
             isMobile
           />
@@ -791,15 +1213,68 @@ function RatingsPageMobile() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {summaries.map(s => (
-              <RatingCard
-                key={s.topic}
-                summary={s}
-                isSelected={false}
-                onClick={() => setSelectedTopic(s)}
-                colors={colors}
-                isMobile
-              />
+            {summaries.map((s, idx) => (
+              <div key={s.topic} style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+                <RatingCard
+                  summary={s}
+                  isSelected={false}
+                  onClick={() => setSelectedTopic(s)}
+                  colors={colors}
+                  isMobile
+                />
+                {summaries.length > 1 && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    flexShrink: 0,
+                  }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleMoveRating(idx, 'up') }}
+                      disabled={idx === 0}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
+                        border: `1px solid ${colors.border}`,
+                        background: 'transparent',
+                        color: idx === 0 ? colors.border : colors.textTertiary,
+                        cursor: idx === 0 ? 'default' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleMoveRating(idx, 'down') }}
+                      disabled={idx === summaries.length - 1}
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '6px',
+                        border: `1px solid ${colors.border}`,
+                        background: 'transparent',
+                        color: idx === summaries.length - 1 ? colors.border : colors.textTertiary,
+                        cursor: idx === summaries.length - 1 ? 'default' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

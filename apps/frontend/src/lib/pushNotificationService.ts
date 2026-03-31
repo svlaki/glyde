@@ -4,10 +4,12 @@ import { getApiUrl } from './apiConfig'
 import { trackEvent } from './analytics'
 
 export async function initializePushNotifications(accessToken: string): Promise<void> {
+  console.log('[PUSH] initializePushNotifications called, isNative:', Capacitor.isNativePlatform())
   if (!Capacitor.isNativePlatform()) return
 
   try {
     const permStatus = await PushNotifications.checkPermissions()
+    console.log('[PUSH] Current permission status:', permStatus.receive)
 
     if (permStatus.receive === 'prompt') {
       const result = await PushNotifications.requestPermissions()

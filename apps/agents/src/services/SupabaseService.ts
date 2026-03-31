@@ -71,15 +71,28 @@ export class SupabaseService {
     if (aspect_id) return aspect_id;
     if (!aspect) return null;
 
-    // 1. Check user's own aspects
+    // Escape ILIKE wildcards so user input is treated as literal text
+    const escaped = aspect.replace(/[%_\\]/g, '\\$&');
+
+    // Helper: pick best match from candidates — exact match first, then shortest name
+    const pickBest = (candidates: { id: string; name: string }[]): string | null => {
+      if (!candidates || candidates.length === 0) return null;
+      const exact = candidates.find(c => c.name.toLowerCase() === aspect!.toLowerCase());
+      if (exact) return exact.id;
+      // Shortest name = most specific match
+      const sorted = [...candidates].sort((a, b) => a.name.length - b.name.length);
+      return sorted[0].id;
+    };
+
+    // 1. Check user's own aspects (fuzzy substring match)
     const { data: ownData } = await this.client
       .from('aspects')
-      .select('id')
+      .select('id, name')
       .eq('user_id', userId)
-      .ilike('name', aspect)
-      .maybeSingle();
+      .ilike('name', `%${escaped}%`);
 
-    if (ownData?.id) return ownData.id;
+    const ownMatch = pickBest(ownData || []);
+    if (ownMatch) return ownMatch;
 
     // 2. Check shared aspects (where user is a member)
     const { data: memberRows } = await this.client
@@ -91,12 +104,12 @@ export class SupabaseService {
       const sharedIds = memberRows.map(r => r.aspect_id);
       const { data: sharedData } = await this.client
         .from('aspects')
-        .select('id')
+        .select('id, name')
         .in('id', sharedIds)
-        .ilike('name', aspect)
-        .maybeSingle();
+        .ilike('name', `%${escaped}%`);
 
-      if (sharedData?.id) return sharedData.id;
+      const sharedMatch = pickBest(sharedData || []);
+      if (sharedMatch) return sharedMatch;
     }
 
     return null;
@@ -1941,7 +1954,7 @@ export class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('user_ratings')
-        .select('topic, score, description, aspect_id, created_at')
+        .select('topic, score, description, aspect_id, display_order, created_at')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -1973,13 +1986,102 @@ export class SupabaseService {
           totalEntries: entries.length,
           lastAsked: latest.created_at,
           aspectId: latest.aspect_id,
+          displayOrder: latest.display_order ?? 999,
         });
       }
+
+      // Sort by display_order (lower = first), then alphabetical as tiebreaker
+      summaries.sort((a, b) => a.displayOrder - b.displayOrder || a.topic.localeCompare(b.topic));
 
       return summaries;
     } catch (error) {
       console.error('[SUPABASE SERVICE] Exception fetching rating summary:', error);
       return [];
+    }
+  }
+
+  /**
+   * Delete all ratings for a specific topic
+   */
+  async deleteRatingTopic(userId: string, topic: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('user_ratings')
+        .delete()
+        .eq('user_id', userId)
+        .eq('topic', topic);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error deleting rating topic:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception deleting rating topic:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update a rating topic (rename topic, update description)
+   */
+  async updateRatingTopic(userId: string, oldTopic: string, updates: {
+    topic?: string;
+    description?: string;
+  }): Promise<boolean> {
+    try {
+      const updateData: any = {};
+      if (updates.topic !== undefined) updateData.topic = updates.topic;
+      // Allow clearing description by setting to null when empty string is passed
+      if (updates.description !== undefined) {
+        updateData.description = updates.description || null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return true; // Nothing to update
+      }
+
+      const { error } = await this.client
+        .from('user_ratings')
+        .update(updateData)
+        .eq('user_id', userId)
+        .eq('topic', oldTopic);
+
+      if (error) {
+        console.error('[SUPABASE SERVICE] Error updating rating topic:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception updating rating topic:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Reorder rating topics by setting display_order on all rows for each topic
+   */
+  async reorderRatingTopics(userId: string, topicOrder: string[]): Promise<boolean> {
+    try {
+      // Update display_order for each topic (all rows with that topic get the same order)
+      const updates = topicOrder.map((topic, index) =>
+        this.client
+          .from('user_ratings')
+          .update({ display_order: index })
+          .eq('user_id', userId)
+          .eq('topic', topic)
+      );
+
+      const results = await Promise.all(updates);
+      const hasError = results.some(r => r.error);
+      if (hasError) {
+        console.error('[SUPABASE SERVICE] Error reordering rating topics');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('[SUPABASE SERVICE] Exception reordering rating topics:', error);
+      return false;
     }
   }
 
