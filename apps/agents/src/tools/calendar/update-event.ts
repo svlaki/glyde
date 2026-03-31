@@ -152,6 +152,19 @@ export const updateEventTool = tool(
       targetEventId = originalEvent.parent_event_id;
     }
 
+    // Validate that aspect exists before updating (prevent silent null writes)
+    if (aspect && aspect.trim().length > 0) {
+      console.log(`[UPDATE-EVENT TOOL] Validating aspect: "${aspect}"`);
+      const existingAspect = await aspectService.getAspectByName(userId, aspect.trim());
+
+      if (!existingAspect) {
+        const allAspects = await aspectService.getAspects(userId);
+        const aspectNames = allAspects.map(a => a.name).join(', ');
+        return `Aspect "${aspect}" does not exist. Available aspects: [${aspectNames}]. Use an existing aspect or ask the user to create one first with create_aspect.`;
+      }
+      console.log(`[UPDATE-EVENT TOOL] Aspect "${aspect}" validated successfully`);
+    }
+
     // Convert local times to UTC for storage (same as create-event)
     const startTimeUTC = startTime ? convertToUTC(startTime, timezone) : undefined;
     const endTimeUTC = endTime ? convertToUTC(endTime, timezone) : undefined;

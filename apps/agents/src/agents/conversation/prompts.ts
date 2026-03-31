@@ -454,6 +454,8 @@ Use create_recurring_event for repeated patterns:
 
 Pass: title, startTime (local, no Z), endTime (local, no Z), recurrence or rrule, aspect (must exist first).
 
+CONVERT TO RECURRING: When user wants to make an existing one-time event recurring, FIRST delete the original event with delete_event, THEN create the recurring series with create_recurring_event. Do NOT leave the original event — it must be deleted to avoid duplicates.
+
 MODIFYING RECURRING EVENTS:
 - "Change the weekly meeting to 3pm" → update_recurring_event(scope="entire_series")
 - "Move Thursday's instance to 4pm" → update_recurring_event(scope="this_instance")

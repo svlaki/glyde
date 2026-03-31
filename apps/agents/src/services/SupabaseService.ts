@@ -71,15 +71,28 @@ export class SupabaseService {
     if (aspect_id) return aspect_id;
     if (!aspect) return null;
 
-    // 1. Check user's own aspects
+    // Escape ILIKE wildcards so user input is treated as literal text
+    const escaped = aspect.replace(/[%_\\]/g, '\\$&');
+
+    // Helper: pick best match from candidates — exact match first, then shortest name
+    const pickBest = (candidates: { id: string; name: string }[]): string | null => {
+      if (!candidates || candidates.length === 0) return null;
+      const exact = candidates.find(c => c.name.toLowerCase() === aspect!.toLowerCase());
+      if (exact) return exact.id;
+      // Shortest name = most specific match
+      const sorted = [...candidates].sort((a, b) => a.name.length - b.name.length);
+      return sorted[0].id;
+    };
+
+    // 1. Check user's own aspects (fuzzy substring match)
     const { data: ownData } = await this.client
       .from('aspects')
-      .select('id')
+      .select('id, name')
       .eq('user_id', userId)
-      .ilike('name', aspect)
-      .maybeSingle();
+      .ilike('name', `%${escaped}%`);
 
-    if (ownData?.id) return ownData.id;
+    const ownMatch = pickBest(ownData || []);
+    if (ownMatch) return ownMatch;
 
     // 2. Check shared aspects (where user is a member)
     const { data: memberRows } = await this.client
@@ -91,12 +104,12 @@ export class SupabaseService {
       const sharedIds = memberRows.map(r => r.aspect_id);
       const { data: sharedData } = await this.client
         .from('aspects')
-        .select('id')
+        .select('id, name')
         .in('id', sharedIds)
-        .ilike('name', aspect)
-        .maybeSingle();
+        .ilike('name', `%${escaped}%`);
 
-      if (sharedData?.id) return sharedData.id;
+      const sharedMatch = pickBest(sharedData || []);
+      if (sharedMatch) return sharedMatch;
     }
 
     return null;
