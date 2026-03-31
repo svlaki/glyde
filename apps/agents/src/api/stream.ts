@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
+import { OnboardingEnrichmentAgent } from '../agents/onboarding-enrichment/OnboardingEnrichmentAgent.js';
 import { ImageContent } from '../types/agents.js';
 import pdfParse from 'pdf-parse';
 
@@ -13,6 +14,10 @@ async function initializeAgents(): Promise<void> {
   if (!agentRegistry.hasAgent('conversation')) {
     const conversationAgent = new ConversationAgent();
     await agentRegistry.registerAgent(conversationAgent);
+  }
+  if (!agentRegistry.hasAgent('onboarding')) {
+    const onboardingAgent = new OnboardingEnrichmentAgent();
+    await agentRegistry.registerAgent(onboardingAgent);
   }
 }
 
@@ -176,13 +181,15 @@ export async function streamAgentMessage(req: Request, res: Response): Promise<v
       location: context.location || undefined,
     };
 
-    // Get conversation agent
-    const agent = agentRegistry.getAgent('conversation') as ConversationAgent;
+    // Route to the appropriate agent
+    const agentType = targetAgent === 'onboarding' ? 'onboarding' : 'conversation';
+    const agent = agentRegistry.getAgent(agentType) as ConversationAgent | OnboardingEnrichmentAgent;
     if (!agent) {
       res.write(`3:"Agent not available"\n`);
       res.end();
       return;
     }
+    console.log(`🌊 [STREAM] Using ${agentType} agent`);
 
     // Check if agent supports streaming
     if (typeof agent.streamMessage !== 'function') {

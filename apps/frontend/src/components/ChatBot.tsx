@@ -37,6 +37,7 @@ interface ChatBotProps {
   mobileEmbedded?: boolean;  // When true: no sparkle icon, reduced header gap, mobile-optimized layout
   currentPageOverride?: string;  // Override getCurrentPage() for embedded contexts (e.g., onboarding)
   autoSendMessage?: string;  // Auto-send this message after initialization
+  targetAgent?: string;  // Route to a specific agent (e.g., 'onboarding')
 }
 
 // Export ClearIcon for use in external headers
@@ -123,7 +124,7 @@ const SUGGESTIONS = [
   { label: "Find free time", icon: "" },
 ]
 
-export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false, currentPageOverride, autoSendMessage }, ref) {
+export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot({ hideHeader = false, compact = false, mobileEmbedded = false, currentPageOverride, autoSendMessage, targetAgent }, ref) {
   const { user, session, preferredName } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const { refreshAspects } = useAspects()
@@ -597,7 +598,8 @@ export const ChatBot = forwardRef<ChatBotHandle, ChatBotProps>(function ChatBot(
             conversationHistory,
             currentPage: getCurrentPage(),
             location: currentLocation ?? undefined
-          }
+          },
+          ...(targetAgent ? { targetAgent } : {})
         }),
         signal: abortControllerRef.current.signal
       })

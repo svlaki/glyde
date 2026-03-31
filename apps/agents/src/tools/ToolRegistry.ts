@@ -184,6 +184,28 @@ export class ToolRegistry {
     return allTools;
   }
 
+  // Get tools for OnboardingEnrichmentAgent — curated set for setup
+  getOnboardingAgentTools(): any[] {
+    const onboardingToolNames = new Set([
+      // Aspects
+      'create_aspect', 'update_aspect', 'list_aspects',
+      // Goals
+      'create_goal', 'update_goal',
+      // Calendar
+      'create_event', 'create_recurring_event', 'list_events',
+      // Tasks
+      'create_task',
+      // Profile
+      'update_profile', 'get_profile',
+      // Notes
+      'create_notes', 'update_notes', 'get_notes',
+    ]);
+
+    const tools = Array.from(this.tools.values()).filter((t: any) => onboardingToolNames.has(t.name));
+    console.log(`[ONBOARDING TOOLS] Loaded ${tools.length} tools (curated set)`);
+    return tools;
+  }
+
   // Get tools for multiple categories (used by ContextRouter)
   getToolsForCategories(categories: ToolCategory[]): any[] {
     const toolNames = new Set<string>();

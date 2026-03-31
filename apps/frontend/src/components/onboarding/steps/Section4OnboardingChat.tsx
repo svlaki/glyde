@@ -81,7 +81,8 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
           hideHeader
           compact
           currentPageOverride="onboarding-enrichment"
-          autoSendMessage="I just finished setting up my Glyde account. Help me personalize my aspects and goals."
+          targetAgent="onboarding"
+          autoSendMessage="Let's get my life organized. I'm ready to tell you about what I have going on."
         />
       </div>
 

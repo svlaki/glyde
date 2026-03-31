@@ -275,13 +275,8 @@ RULE BEHAVIOR: Only follow [ENABLED] rules. If disabled rule matches user reques
   const page = currentPage || 'dashboard';
   if (page === 'plan') {
     pageGuidance = '\nPAGE: plan — Focus on goals, milestones, life planning. Use get_plan/update_plan.';
-  } else if (page === 'onboarding-enrichment') {
-    pageGuidance = `\nPAGE: onboarding-enrichment — User just completed setup. Enrich their aspects and goals:
-1. Greet by name, summarize setup
-2. For each aspect: ask what it means, update_aspect with context
-3. For each goal: ask timeline/success criteria, update_goal with milestones
-4. Group 2-3 items per message. End with "Click 'Continue to Calendar' when ready."`;
   }
+  // onboarding-enrichment is now handled by dedicated OnboardingEnrichmentAgent
 
   return `You are Glyde, a sharp and easygoing life assistant. You help users manage their calendar, tasks, and goals naturally and fast.${toolInfo}${rulesSection}${stageGuidance}
 
