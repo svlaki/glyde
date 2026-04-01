@@ -11,7 +11,7 @@ const WheelControls: KeenSliderPlugin = (slider) => {
 
   function dispatch(e: WheelEvent, name: string) {
     // Reduced sensitivity for controlled desktop scrolling
-    const sensitivity = 0.5
+    const sensitivity = 1.0
     position.y -= e.deltaY * sensitivity
     slider.container.dispatchEvent(
       new CustomEvent(name, {
@@ -48,7 +48,7 @@ const WheelControls: KeenSliderPlugin = (slider) => {
     touchTimeout = setTimeout(() => {
       wheelActive = false
       wheelEnd(e)
-    }, 80)
+    }, 40)
   }
 
   slider.on('created', () => {
@@ -98,9 +98,9 @@ function SliderColumn({
         spacing: 0,
       },
       rubberband: false,
-      dragSpeed: 3,
+      dragSpeed: 1.5,
       defaultAnimation: {
-        duration: 400,
+        duration: 250,
         easing: (t: number) => 1 - Math.pow(1 - t, 4), // easeOutQuart for smooth deceleration
       },
       slideChanged: (slider) => {

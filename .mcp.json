@@ -2,10 +2,8 @@
   "mcpServers": {
     "supabase": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@supabase/mcp-server-supabase@latest",
         "--project-ref=furwuyjptohobrvyyzfy"
@@ -16,20 +14,16 @@
     },
     "sequential-thinking": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
     },
     "memory-bank": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@allpepper/memory-bank-mcp@latest"
       ],
@@ -39,30 +33,24 @@
     },
     "playwright": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@playwright/mcp@latest"
       ]
     },
     "docker": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "docker-mcp"
       ]
     },
     "postgresql": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@henkey/postgres-mcp-server",
         "--connection-string",
@@ -71,10 +59,8 @@
     },
     "context7": {
       "type": "stdio",
-      "command": "cmd",
+      "command": "npx",
       "args": [
-        "/c",
-        "npx",
         "-y",
         "@upstash/context7-mcp@latest"
       ]

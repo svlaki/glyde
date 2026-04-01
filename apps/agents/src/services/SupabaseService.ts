@@ -373,7 +373,8 @@ export class SupabaseService {
         is_all_day: event.is_all_day || false,
         google_event_id: event.google_event_id || null,
         outlook_event_id: event.outlook_event_id || null,
-        local_notes: event.local_notes || null
+        local_notes: event.local_notes || null,
+        reminder_minutes: event.reminder_minutes ?? null
       }));
 
       return transformedEvents;
@@ -1096,7 +1097,8 @@ export class SupabaseService {
         recurrence_rule: data.recurrence_rule,
         recurrence_end: data.recurrence_end,
         parent_event_id: data.parent_event_id,
-        is_recurring: data.is_recurring
+        is_recurring: data.is_recurring,
+        reminder_minutes: data.reminder_minutes ?? null
       };
 
       return createdEvent;
@@ -1322,6 +1324,7 @@ export class SupabaseService {
       if (updates.recurrence_rule) updateData.recurrence_rule = updates.recurrence_rule;
       if (updates.recurrence_end !== undefined) updateData.recurrence_end = updates.recurrence_end;
       if (updates.visibility !== undefined) updateData.visibility = updates.visibility;
+      if (updates.reminder_minutes !== undefined) updateData.reminder_minutes = updates.reminder_minutes;
       if (updates.aspect_id !== undefined || updates.aspect !== undefined) {
         updateData.aspect_id = await this.resolveAspectId(userId, updates.aspect, updates.aspect_id);
       }

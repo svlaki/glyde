@@ -3,8 +3,13 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package.json only (fresh install for correct platform binaries)
-COPY package.json ./
+# Copy package.json and lockfile for deterministic installs
+COPY package.json package-lock.json* ./
+
+# Strip electron packages from package.json (not needed for web/Docker build, saves ~200MB)
+RUN apk add --no-cache jq \
+    && jq 'del(.devDependencies["electron"], .devDependencies["electron-builder"], .devDependencies["electron-vite"], .devDependencies["@electron-toolkit/preload"], .devDependencies["@electron-toolkit/utils"], .devDependencies["@capacitor/cli"], .devDependencies["@capacitor/core"], .devDependencies["@capacitor/ios"], .devDependencies["@capacitor/app"], .devDependencies["@capacitor/keyboard"], .devDependencies["@capacitor/push-notifications"])' package.json > package.tmp.json \
+    && mv package.tmp.json package.json
 
 # Install dependencies with legacy peer deps to handle React version conflicts
 RUN npm install --legacy-peer-deps
