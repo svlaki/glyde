@@ -71,6 +71,10 @@ class PushNotificationService {
     note.alert = { title: notification.title, body: notification.body };
     note.sound = notification.sound || 'default';
     note.topic = bundleId;
+    note.pushType = 'alert';
+    // iOS 15+ properties for banner/sound presentation (supported by @parse/node-apn at runtime)
+    (note as any).interruptionLevel = 'time-sensitive';
+    (note as any).relevanceScore = 1.0;
     note.payload = notification.data || {};
 
     let sent = 0;

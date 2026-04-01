@@ -47,6 +47,13 @@ export async function initializePushNotifications(accessToken: string): Promise<
       trackEvent('push_registration_error', 'push', { error: String(error) })
     })
 
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('[PUSH] Notification received in foreground:', notification)
+      trackEvent('push_notification_received', 'push', {
+        type: notification.data?.type || 'unknown',
+      })
+    })
+
     PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
       // Navigate to reminders page when notification is tapped
       window.location.href = '/reminders'
