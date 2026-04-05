@@ -108,7 +108,7 @@ router.post('/:aspectId/members', authenticateRequest, async (req: Request, res:
       return res.status(400).json({ success: false, error: 'Missing required fields' })
     }
 
-    if (!['editor', 'viewer'].includes(role)) {
+    if (!['member', 'viewer'].includes(role)) {
       return res.status(400).json({ success: false, error: 'Invalid role' })
     }
 
@@ -138,7 +138,7 @@ router.put('/:aspectId/members/:memberId', authenticateRequest, async (req: Requ
     const { aspectId, memberId } = req.params
     const { role } = req.body
 
-    if (!role || !['editor', 'viewer'].includes(role)) {
+    if (!role || !['member', 'viewer'].includes(role)) {
       return res.status(400).json({ success: false, error: 'Invalid role' })
     }
 
@@ -178,6 +178,54 @@ router.delete('/:aspectId/members/:memberId', authenticateRequest, async (req: R
     return res.status(statusCode).json(result)
   } catch (error) {
     console.error('Error removing member:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Accept aspect invite
+ * POST /shared-aspects/:aspectId/accept
+ */
+router.post('/:aspectId/accept', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { aspectId } = req.params
+
+    const supabase = getSupabaseClient()
+    const service = new SharedAspectService(supabase)
+
+    const result = await service.acceptInvite(aspectId, userId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error accepting aspect invite:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Decline aspect invite
+ * POST /shared-aspects/:aspectId/decline
+ */
+router.post('/:aspectId/decline', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { aspectId } = req.params
+
+    const supabase = getSupabaseClient()
+    const service = new SharedAspectService(supabase)
+
+    const result = await service.declineInvite(aspectId, userId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error declining aspect invite:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

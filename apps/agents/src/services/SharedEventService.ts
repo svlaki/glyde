@@ -6,7 +6,8 @@ export interface SharedEventMember {
   id: string
   event_id: string
   user_id: string
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'declined'
   joined_at: string
   user?: {
     id: string
@@ -23,7 +24,7 @@ export class SharedEventService {
     eventId: string,
     userId: string,
     invitedUserId: string,
-    role: 'editor' | 'viewer'
+    role: 'member' | 'viewer'
   ): Promise<ApiResponse<SharedEventMember>> {
     try {
       // Verify event exists and user is owner or editor
@@ -46,7 +47,7 @@ export class SharedEventService {
           .eq('user_id', userId)
           .single()
 
-        if (!userMember || (userMember.role !== 'owner' && userMember.role !== 'editor')) {
+        if (!userMember || (userMember.role !== 'owner' && userMember.role !== 'member')) {
           return { success: false, error: 'You do not have permission to add members' }
         }
       }
@@ -70,14 +71,6 @@ export class SharedEventService {
         return { success: false, error: 'User is already a member of this event' }
       }
 
-      // Set event visibility to shared if not already
-      if (event.visibility !== 'shared') {
-        await this.supabase
-          .from('events')
-          .update({ visibility: 'shared' })
-          .eq('id', eventId)
-      }
-
       // Add owner as member if not already (first time sharing)
       if (isOwner) {
         const { data: ownerMember } = await this.supabase
@@ -90,14 +83,14 @@ export class SharedEventService {
         if (!ownerMember) {
           await this.supabase
             .from('event_members')
-            .insert({ event_id: eventId, user_id: userId, role: 'owner' })
+            .insert({ event_id: eventId, user_id: userId, role: 'owner', status: 'accepted' })
         }
       }
 
-      // Insert member
+      // Insert member as pending (they must accept the invite)
       const { data: newMember, error: insertError } = await this.supabase
         .from('event_members')
-        .insert({ event_id: eventId, user_id: invitedUserId, role })
+        .insert({ event_id: eventId, user_id: invitedUserId, role, status: 'pending' })
         .select()
         .single()
 
@@ -116,7 +109,7 @@ export class SharedEventService {
     eventId: string,
     userId: string,
     memberId: string,
-    newRole: 'editor' | 'viewer'
+    newRole: 'member' | 'viewer'
   ): Promise<ApiResponse<SharedEventMember>> {
     try {
       // Only owner can change roles
@@ -233,6 +226,98 @@ export class SharedEventService {
     }
   }
 
+  async acceptInvite(
+    eventId: string,
+    userId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      const { data: member, error: findError } = await this.supabase
+        .from('event_members')
+        .select('id, status')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (findError || !member) {
+        return { success: false, error: 'No pending invite found for this event' }
+      }
+
+      const { error: updateError } = await this.supabase
+        .from('event_members')
+        .update({ status: 'accepted' })
+        .eq('id', member.id)
+
+      if (updateError) {
+        return { success: false, error: 'Failed to accept invite' }
+      }
+
+      // Set event visibility to shared if not already
+      await this.supabase
+        .from('events')
+        .update({ visibility: 'shared' })
+        .eq('id', eventId)
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error accepting event invite:', error)
+      return { success: false, error: 'Failed to accept invite' }
+    }
+  }
+
+  async declineInvite(
+    eventId: string,
+    userId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      const { data: member, error: findError } = await this.supabase
+        .from('event_members')
+        .select('id, status')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (findError || !member) {
+        return { success: false, error: 'No pending invite found for this event' }
+      }
+
+      const { error: deleteError } = await this.supabase
+        .from('event_members')
+        .delete()
+        .eq('id', member.id)
+
+      if (deleteError) {
+        return { success: false, error: 'Failed to decline invite' }
+      }
+
+      // If no non-owner members left, revert to private
+      const { data: remaining } = await this.supabase
+        .from('event_members')
+        .select('id')
+        .eq('event_id', eventId)
+        .neq('role', 'owner')
+
+      if (!remaining || remaining.length === 0) {
+        await this.supabase
+          .from('event_members')
+          .delete()
+          .eq('event_id', eventId)
+          .eq('role', 'owner')
+
+        await this.supabase
+          .from('events')
+          .update({ visibility: 'private' })
+          .eq('id', eventId)
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error declining event invite:', error)
+      return { success: false, error: 'Failed to decline invite' }
+    }
+  }
+
   async getEventMembers(
     eventId: string,
     userId: string
@@ -270,6 +355,7 @@ export class SharedEventService {
           event_id,
           user_id,
           role,
+          status,
           joined_at,
           user:profile!event_members_profile_fkey(id, email, display_name, avatar_url)
         `)

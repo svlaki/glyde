@@ -27,7 +27,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
   const [members, setMembers] = useState<SharedEventMember[]>([])
   const [friends, setFriends] = useState<Friend[]>([])
   const [selectedFriendId, setSelectedFriendId] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('editor')
+  const [selectedRole, setSelectedRole] = useState<'member' | 'viewer'>('member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -81,7 +81,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
     setLoading(false)
   }
 
-  async function handleUpdateRole(memberId: string, role: 'editor' | 'viewer') {
+  async function handleUpdateRole(memberId: string, role: 'member' | 'viewer') {
     if (!accessToken || !eventId) return
     const result = await updateEventMemberRole(eventId, memberId, role, accessToken)
     if (result.success) {
@@ -139,7 +139,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
 
           <select
             value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
+            onChange={(e) => setSelectedRole(e.target.value as 'member' | 'viewer')}
             style={{
               padding: '8px 10px',
               fontSize: fontSize.sm,
@@ -150,7 +150,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
               width: '90px',
             }}
           >
-            <option value="editor">Editor</option>
+            <option value="member">Member</option>
             <option value="viewer">Viewer</option>
           </select>
 
@@ -171,7 +171,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
               whiteSpace: 'nowrap',
             }}
           >
-            Add
+            Invite
           </button>
         </div>
       )}
@@ -237,15 +237,31 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
                 }}>
                   {member.user?.display_name || member.user?.email || 'Unknown'}
+                  {member.status === 'pending' && (
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: fontWeight.medium,
+                      color: '#f59e0b',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                      flexShrink: 0,
+                    }}>
+                      Pending
+                    </span>
+                  )}
                 </span>
 
                 {/* Role badge / selector */}
                 {isOwner ? (
                   <select
                     value={member.role}
-                    onChange={(e) => handleUpdateRole(member.id, e.target.value as 'editor' | 'viewer')}
+                    onChange={(e) => handleUpdateRole(member.id, e.target.value as 'member' | 'viewer')}
                     style={{
                       padding: '2px 6px',
                       fontSize: '11px',
@@ -255,7 +271,7 @@ export function EventMembersSection({ eventId, isOwner = true }: EventMembersSec
                       borderRadius: '4px',
                     }}
                   >
-                    <option value="editor">Editor</option>
+                    <option value="member">Member</option>
                     <option value="viewer">Viewer</option>
                   </select>
                 ) : (

@@ -13,7 +13,8 @@ export interface SharedAspectMember {
   id: string
   aspect_id: string
   user_id: string
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'declined'
   joined_at: string
   user?: {
     id: string
@@ -115,7 +116,7 @@ export async function getAspectMembers(
 export async function addMember(
   aspectId: string,
   userId: string,
-  role: 'editor' | 'viewer',
+  role: 'member' | 'viewer',
   accessToken: string
 ): Promise<ApiResponse<SharedAspectMember>> {
   try {
@@ -144,7 +145,7 @@ export async function addMember(
 export async function updateMemberRole(
   aspectId: string,
   memberId: string,
-  role: 'editor' | 'viewer',
+  role: 'member' | 'viewer',
   accessToken: string
 ): Promise<ApiResponse<SharedAspectMember>> {
   try {

@@ -611,7 +611,7 @@ export class SupabaseService {
           .eq('user_id', userId)
           .single();
 
-        if (membership?.role === 'editor' || membership?.role === 'owner') {
+        if (membership?.role === 'member' || membership?.role === 'owner') {
           const { data: sharedEvent } = await this.client
             .from('events')
             .select('*')
@@ -619,7 +619,7 @@ export class SupabaseService {
             .single();
           oldEvent = sharedEvent;
         } else {
-          // Check if user is an editor/owner on the event's aspect via aspect_members
+          // Check if user is a member/owner on the event's aspect via aspect_members
           const { data: eventForAspect } = await this.client
             .from('events')
             .select('id, aspect_id')
@@ -634,7 +634,7 @@ export class SupabaseService {
               .eq('user_id', userId)
               .single();
 
-            if (aspectMembership?.role === 'editor' || aspectMembership?.role === 'owner') {
+            if (aspectMembership?.role === 'member' || aspectMembership?.role === 'owner') {
               const { data: sharedEvent } = await this.client
                 .from('events')
                 .select('*')
@@ -954,8 +954,30 @@ export class SupabaseService {
 
       const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+      // Exclude events where the user is an accepted event_member or aspect_member
+      const { data: memberEventIds } = await this.client
+        .from('event_members')
+        .select('event_id')
+        .eq('user_id', userId)
+        .eq('status', 'accepted');
+
+      const { data: memberAspectIds } = await this.client
+        .from('aspect_members')
+        .select('aspect_id')
+        .eq('user_id', userId)
+        .eq('status', 'accepted');
+
+      const excludedEventIds = new Set((memberEventIds || []).map((m: any) => m.event_id));
+      const memberAspectIdSet = new Set((memberAspectIds || []).map((m: any) => m.aspect_id));
+
+      const filteredData = (data || []).filter((event: any) => {
+        if (excludedEventIds.has(event.id)) return false;
+        if (event.aspect_id && memberAspectIdSet.has(event.aspect_id)) return false;
+        return true;
+      });
+
       // Map to include friend event flags
-      return (data || []).map((event: any) => {
+      return filteredData.map((event: any) => {
         const profile = profileMap.get(event.user_id);
         return {
           ...event,

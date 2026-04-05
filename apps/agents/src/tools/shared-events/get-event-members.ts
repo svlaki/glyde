@@ -26,10 +26,15 @@ export const getEventMembersTool = tool(
 
     const memberList = members.map(m => {
       const name = m.user?.display_name || m.user?.email || 'Unknown';
-      return `- ${name} (${m.role}) | memberId: ${m.id}`;
+      const status = m.status === 'pending' ? ' [PENDING invite]' : '';
+      return `- ${name} (${m.role}${status}) | memberId: ${m.id}`;
     }).join('\n');
 
-    return `Event members (${members.length}):\n${memberList}`;
+    const pending = members.filter(m => m.status === 'pending').length;
+    const accepted = members.filter(m => m.status === 'accepted').length;
+    const summary = pending > 0 ? ` (${accepted} accepted, ${pending} pending)` : '';
+
+    return `Event members (${members.length}${summary}):\n${memberList}`;
   },
   {
     name: "get_event_members",

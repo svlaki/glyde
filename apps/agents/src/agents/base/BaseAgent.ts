@@ -2,13 +2,13 @@ import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/
 import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext, MessageContent } from "../../types/agents.js";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepMemoryService } from "../../services/ZepMemoryService.js";
+import { MemoryService } from "../../services/MemoryService.js";
 import { env } from "../../utils/env.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
   protected supabaseService: SupabaseService;
-  protected zepService: ZepMemoryService;
+  protected memoryService: MemoryService;
   protected agentType: AgentType;
   protected tools: any[] = [];
 
@@ -21,7 +21,7 @@ export abstract class BaseAgent {
       streamUsage: true,
     });
     this.supabaseService = new SupabaseService();
-    this.zepService = new ZepMemoryService();
+    this.memoryService = MemoryService.getInstance();
   }
 
   // Abstract methods that each agent must implement
@@ -30,17 +30,39 @@ export abstract class BaseAgent {
   abstract getSystemPrompt(): string;
   abstract getCapabilities(): string[];
 
-  // Shared utility methods using Zep for memory
+  // Shared utility methods for memory
   protected async loadMemoryContext(context: AgentContext, contextType: 'conversation' | 'task_planning' | 'goal_coaching' = 'conversation'): Promise<MemoryContext> {
     try {
-      // Use Zep's thread.getUserContext() API for memory context loading
-      // sessionId is the threadId created during conversation
-      const zepContext = await this.zepService.getMemoryContext(context.sessionId, context.userId);
-      console.log(`Loaded memory context from Zep for thread ${context.sessionId}`);
-      return zepContext;
+      const contextString = await this.memoryService.getUserContext(context.userId);
+      console.log(`Loaded memory context for user ${context.userId} (${contextString.length} chars)`);
 
+      return {
+        shortTerm: {
+          sessionId: context.sessionId,
+          messages: [],
+          context: contextString,
+          summary: contextString.substring(0, 200),
+          lastUpdated: new Date().toISOString()
+        },
+        longTerm: {
+          userId: context.userId,
+          profile: context.userProfile || {
+            id: context.userId,
+            email: '',
+            preferences: {},
+            goals: [],
+            insights: []
+          },
+          preferences: context.userProfile?.preferences || {},
+          goals: context.userProfile?.goals || [],
+          insights: context.userProfile?.insights || [],
+          lastUpdated: new Date().toISOString()
+        },
+        entity: { entities: {}, relationships: {} },
+        vector: { recentEvents: [], recentChats: [], semanticContext: contextString }
+      };
     } catch (error) {
-      console.warn('Failed to load memory context from Zep, falling back to basic context:', error);
+      console.warn('Failed to load memory context, falling back to basic context:', error);
       return this.loadBasicMemoryContext(context);
     }
   }
@@ -136,10 +158,10 @@ export abstract class BaseAgent {
     });
   }
 
-  // Graphiti memory persistence methods
+  // Memory persistence methods
   protected async persistConversationToMemory(
-    context: AgentContext, 
-    userMessage: string, 
+    context: AgentContext,
+    userMessage: string,
     assistantResponse: string
   ): Promise<void> {
     // Skip persistence for internal messages
@@ -147,20 +169,16 @@ export abstract class BaseAgent {
       console.log(`Skipping persistence for internal message from user ${context.userId}`);
       return;
     }
-    
+
     try {
-      await this.zepService.addConversation(
+      await this.memoryService.persistConversation(
         context.userId,
         userMessage,
-        assistantResponse,
-        {
-          agentType: this.agentType,
-          timestamp: new Date().toISOString()
-        }
+        assistantResponse
       );
-      console.log(`Persisted conversation to Zep for user ${context.userId}`);
+      console.log(`Persisted conversation to memory for user ${context.userId}`);
     } catch (error) {
-      console.error('Failed to persist conversation to Zep:', error);
+      console.error('Failed to persist conversation to memory:', error);
     }
   }
 

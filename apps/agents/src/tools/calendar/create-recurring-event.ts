@@ -1,11 +1,9 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 import { parseNaturalLanguageRecurrence, formatRRuleForDisplay, validateRRule } from "../../utils/rrule.js";
-import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 
 export const createRecurringEventTool = tool(
   async ({ title, startTime, endTime, recurrence, rrule, aspect, description, location, endDate }, config) => {
@@ -31,7 +29,6 @@ export const createRecurringEventTool = tool(
 
     // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
     const aspectService = new AspectService();
 
     // Parse recurrence pattern
@@ -116,23 +113,6 @@ export const createRecurringEventTool = tool(
     }
 
     console.log('[CREATE-RECURRING-EVENT TOOL] Recurring event created successfully:', recurringEvent.id);
-
-    // Sync to Zep (fire and forget, non-blocking)
-    executeZepOperation(
-      {
-        userId,
-        entityType: 'event',
-        entityId: recurringEvent.id,
-        operation: 'create',
-        maxRetries: 2
-      },
-      async () => {
-        await zepGraphService.addCalendarEvent(userId, recurringEvent);
-        return recurringEvent.id;
-      }
-    ).catch(err => {
-      console.warn('[CREATE-RECURRING-EVENT TOOL] Non-critical: Failed to sync to Zep:', err);
-    });
 
     const aspectContext = validatedAspect ? ` in aspect "${validatedAspect}"` : '';
     const recurrenceDescription = formatRRuleForDisplay(finalRRule);

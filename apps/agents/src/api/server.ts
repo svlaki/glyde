@@ -44,6 +44,7 @@ import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, g
 import { getUserProjects, createUserProject, updateUserProject, deleteUserProject, archiveUserProject, unarchiveUserProject, getArchivedProjects as getArchivedUserProjects, getProjectDetail, tagEntityToProject } from './projects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { listUserSuggestions, createUserSuggestion, updateUserSuggestion, listUserSlots, createUserSlot, moveUserSlot, resizeUserSlot, swapUserSlot, confirmUserSlot, dismissUserSlot, replenishUserSlots, generateSuggestionsBatch } from './suggestions.js';
+import { getInboxItems } from './inbox.js';
 import { getUserRatings, getRatingSummary, createRating, deleteRatingTopic, updateRatingTopic, reorderRatingTopics } from './ratings.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
@@ -438,6 +439,9 @@ app.post('/api/calendar/google/callback', handleGoogleCallback);
 app.post('/api/calendar/google/import', importGoogleCalendar);
 app.post('/api/calendar/upload', uploadMiddleware, uploadCalendarFile);
 app.get('/api/calendar/analysis/:jobId', getAnalysisStatus);
+
+// Inbox endpoint (unified: interactions + event invites + friend requests)
+app.post('/api/inbox', getInboxItems);
 
 // Interaction endpoints
 app.post('/api/interactions/pending', getPendingInteractions);

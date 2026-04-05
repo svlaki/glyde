@@ -49,7 +49,6 @@ export function buildEvalContext(
     toolCount: 55,
     rulesContext: rulesContext || undefined,
     recentInteractionContext: buildRecentInteractionContext(mergedInteractions),
-    ratingContext: buildRatingContext(userData.ratingSummary as any[]),
     recentActivityContext: buildRecentActivityContext(userData.recentPastEvents as Record<string, any>[], timezone),
   };
 }

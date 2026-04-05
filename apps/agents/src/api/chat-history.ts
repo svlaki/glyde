@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ZepMemoryService } from '../services/ZepMemoryService.js';
+import { MemoryService } from '../services/MemoryService.js';
 
 export async function getChatHistory(req: Request, res: Response): Promise<void> {
   const { user_id, session_id, limit = 50 } = req.body;
@@ -13,17 +13,12 @@ export async function getChatHistory(req: Request, res: Response): Promise<void>
   }
 
   try {
-    const zepService = new ZepMemoryService();
+    const memoryService = MemoryService.getInstance();
+    const context = await memoryService.getUserContext(user_id);
 
-    // Get context for the thread (session_id is the threadId)
-    // Zep's thread.getUserContext() returns structured context including conversation history
-    const context = await zepService.getThreadContext(session_id);
-
-    // For now, return a simple message with the context
-    // In a full implementation, you'd parse Zep's structured response
     const message = {
       id: `context_${Date.now()}`,
-      content: context || 'No context found for this thread',
+      content: context || 'No context found for this user',
       sender: 'system',
       timestamp: new Date().toISOString()
     };

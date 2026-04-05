@@ -26,6 +26,7 @@ import { createPlacementSlotTool } from './suggestions/create-placement-slot.js'
 import { swapSlotRandomTool } from './suggestions/swap-slot-random.js';
 import { confirmSlotTool } from './suggestions/confirm-slot.js';
 import { dismissSlotTool } from './suggestions/dismiss-slot.js';
+import { sharedAspectTools } from './shared-aspects/index.js';
 // NOTE: interactionTools imported but NOT registered in default tools
 // Interactions should only be created by Gerald (InteractionAgentGerald), not ConversationAgent
 // This prevents accidental duplicate/proactive suggestions from the conversation flow
@@ -126,6 +127,11 @@ export class ToolRegistry {
     this.tools.set(updateNotesTool.name, updateNotesTool);
     this.tools.set(scribeResearchTool.name, scribeResearchTool);
 
+    // Register shared aspect tools
+    sharedAspectTools.forEach(tool => {
+      this.tools.set(tool.name, tool);
+    });
+
     // NOTE: Interaction tools NOT registered here
     // Gerald (InteractionAgentGerald) has its own tool set for proactive suggestions
     // This separation prevents ConversationAgent from accidentally creating interactions
@@ -182,6 +188,7 @@ export class ToolRegistry {
       friends: ['list_friends', 'get_pending_friend_requests', 'send_friend_request', 'accept_friend_request', 'decline_friend_request', 'remove_friend', 'update_friend_notes', 'add_friend_aspect', 'remove_friend_aspect'],
       'shared-events': ['add_event_member', 'remove_event_member', 'get_event_members', 'update_member_role'],
       suggestions: ['create_action_suggestion', 'list_action_suggestions', 'create_placement_slot', 'swap_slot_random', 'confirm_slot', 'dismiss_slot'],
+      'shared-aspects': ['share_aspect', 'get_aspect_members', 'remove_aspect_member', 'update_aspect_member_role'],
     };
 
     const toolNames = categoryPrefixes[category] || [];
@@ -229,7 +236,7 @@ export class ToolRegistry {
     return tools;
   }
 
-  // Get tools for multiple categories (used by ContextRouter)
+  // Get tools for multiple categories
   getToolsForCategories(categories: ToolCategory[]): any[] {
     const toolNames = new Set<string>();
     for (const cat of categories) {
@@ -264,7 +271,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events' | 'suggestions'): string[] {
+  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events' | 'shared-aspects' | 'suggestions'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

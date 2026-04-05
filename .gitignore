@@ -44,10 +44,12 @@ dist/
 .roo/
 .clinerules/
 AGENTS.md
-CLAUDE.md
 .trae/
 .roomodes
-/.claude
+
+# Claude Code (commit shared config, ignore personal)
+/.claude/settings.local.json
+/.claude/plans/
 
 # Electron
 out/

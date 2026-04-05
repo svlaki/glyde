@@ -11,7 +11,7 @@ export interface Aspect {
   context?: Record<string, any>
   display_order?: number
   visibility?: 'private' | 'shared'
-  member_role?: 'owner' | 'editor' | 'viewer'
+  member_role?: 'owner' | 'member' | 'viewer'
   archived_at?: string | null
   created_at?: string
   updated_at?: string

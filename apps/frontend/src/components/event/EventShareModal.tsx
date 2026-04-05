@@ -39,7 +39,7 @@ export function EventShareModal({
   const [members, setMembers] = useState<SharedEventMember[]>([])
   const [friends, setFriends] = useState<Friend[]>([])
   const [selectedFriendId, setSelectedFriendId] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('editor')
+  const [selectedRole, setSelectedRole] = useState<'member' | 'viewer'>('member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -100,7 +100,7 @@ export function EventShareModal({
     }
   }
 
-  async function handleUpdateRole(memberId: string, newRole: 'editor' | 'viewer') {
+  async function handleUpdateRole(memberId: string, newRole: 'member' | 'viewer') {
     if (!eventId || !accessToken) return
 
     const response = await updateEventMemberRole(eventId, memberId, newRole, accessToken)
@@ -183,10 +183,10 @@ export function EventShareModal({
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select
                     value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
+                    onChange={(e) => setSelectedRole(e.target.value as 'member' | 'viewer')}
                     style={{ ...inputStyle, width: isMobile ? undefined : '100px', flex: isMobile ? 1 : undefined }}
                   >
-                    <option value="editor">Editor</option>
+                    <option value="member">Member</option>
                     <option value="viewer">Viewer</option>
                   </select>
                   <button
@@ -205,7 +205,7 @@ export function EventShareModal({
                       minHeight: isMobile ? '44px' : 'auto'
                     }}
                   >
-                    Add
+                    Invite
                   </button>
                 </div>
               </div>
@@ -269,9 +269,24 @@ export function EventShareModal({
                           <div style={{
                             fontSize: fontSize.sm,
                             fontWeight: fontWeight.medium,
-                            color: colors.textPrimary
+                            color: colors.textPrimary,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                           }}>
                             {member.user?.display_name || 'Unknown'}
+                            {member.status === 'pending' && (
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: fontWeight.medium,
+                                color: colors.warning || '#f59e0b',
+                                background: hexToRgba(colors.warning || '#f59e0b', 0.15),
+                                padding: '1px 6px',
+                                borderRadius: '3px'
+                              }}>
+                                Pending
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>
                             {member.user?.email}
@@ -281,7 +296,7 @@ export function EventShareModal({
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <select
                           value={member.role}
-                          onChange={(e) => handleUpdateRole(member.id, e.target.value as 'editor' | 'viewer')}
+                          onChange={(e) => handleUpdateRole(member.id, e.target.value as 'member' | 'viewer')}
                           style={{
                             padding: '4px 8px',
                             fontSize: fontSize.xs,
@@ -292,7 +307,7 @@ export function EventShareModal({
                             cursor: 'pointer'
                           }}
                         >
-                          <option value="editor">Editor</option>
+                          <option value="member">Member</option>
                           <option value="viewer">Viewer</option>
                         </select>
                         <button

@@ -2,82 +2,21 @@
   "mcpServers": {
     "supabase": {
       "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--project-ref=furwuyjptohobrvyyzfy"
-      ],
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest", "--project-ref=furwuyjptohobrvyyzfy"],
       "env": {
         "SUPABASE_ACCESS_TOKEN": "sbp_9a38a2935f739393e072a590546ab18db373ee13"
       }
     },
-    "sequential-thinking": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ]
-    },
-    "memory-bank": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@allpepper/memory-bank-mcp@latest"
-      ],
-      "env": {
-        "MEMORY_BANK_ROOT": "C:\\Users\\pipej\\Projects\\glydeproper\\.memory-bank"
-      }
-    },
     "playwright": {
       "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@playwright/mcp@latest"
-      ]
-    },
-    "docker": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "docker-mcp"
-      ]
-    },
-    "postgresql": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@henkey/postgres-mcp-server",
-        "--connection-string",
-        "postgresql://postgres:postgres@localhost:54322/postgres"
-      ]
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
     },
     "context7": {
       "type": "stdio",
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@upstash/context7-mcp@latest"
-      ]
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
     },
     "zep-docs": {
       "type": "sse",

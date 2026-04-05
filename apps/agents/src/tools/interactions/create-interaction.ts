@@ -54,26 +54,6 @@ export const createInteractionTool = tool(
         return `Skipped: A similar interaction was already asked recently. Choose a completely different topic.`;
       }
 
-      // Rating cooldown check: block rating interactions if the same topic was rated within 5 days
-      if (type === 'rating' && metadata?.ratingTopic) {
-        const ratingSummary = await supabaseService.getRatingSummary(userId);
-        const topicLower = (metadata.ratingTopic as string).toLowerCase();
-        const recentRating = ratingSummary.find((r: any) => {
-          const rTopicLower = (r.topic || '').toLowerCase();
-          return rTopicLower === topicLower;
-        });
-
-        if (recentRating) {
-          const daysSince = Math.round(
-            (Date.now() - new Date(recentRating.lastAsked).getTime()) / 86400000
-          );
-          if (daysSince < 5) {
-            console.log(`[create-interaction] BLOCKED rating cooldown: "${metadata.ratingTopic}" was asked ${daysSince} days ago (minimum 5)`);
-            return `Skipped: Rating topic "${metadata.ratingTopic}" was last asked ${daysSince} day(s) ago. Minimum interval is 5 days. Choose a different topic.`;
-          }
-        }
-      }
-
       // Resolve aspectId from parameter or metadata
       let resolvedAspectId = aspectId || null;
       if (!resolvedAspectId && metadata) {
@@ -107,7 +87,7 @@ export const createInteractionTool = tool(
     description: "Create an interactive prompt card for the user.",
     schema: z.object({
       question: z.string().describe("Question to show"),
-      type: z.enum(["yes_no", "multiple_choice", "text", "rating", "time_suggestion"]).describe("Interaction type"),
+      type: z.enum(["yes_no", "multiple_choice", "text"]).describe("Interaction type (rating and time_suggestion are disabled)"),
       options: z.array(z.string()).optional().nullable().describe("Choices"),
       priority: z.number().min(1).max(5).optional().nullable().describe("Priority 1-5"),
       metadata: z.record(z.any()).optional().nullable().describe("Context for response processing (JSON)"),

@@ -11,10 +11,11 @@
     "lint": "eslint src --ext .ts --fix",
     "lint:check": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
-    "quality": "npm run lint:check && npm run type-check && npm run test"
+    "quality": "npm run lint:check && npm run type-check && npm run test",
+    "feedback": "vitest run src/agents/conversation/__tests__/behavior/feedback-loop.test.ts",
+    "feedback:watch": "vitest src/agents/conversation/__tests__/behavior/feedback-loop.test.ts --watch"
   },
   "dependencies": {
-    "@getzep/zep-cloud": "^3.4.1",
     "@langchain/core": "^0.2.27",
     "@langchain/langgraph": "^0.0.34",
     "@langchain/openai": "^0.2.7",

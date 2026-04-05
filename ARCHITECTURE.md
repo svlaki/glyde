@@ -6,7 +6,7 @@
 User (Browser) --> Frontend (React/Vite :3000) --> Agent API (Express :8000) --> Supabase (PostgreSQL)
                                                         |                            |
                                                         +--> OpenAI GPT-5.1          +--> RLS Policies
-                                                        +--> Zep Cloud (Memory)
+                                                        +--> pgvector (Memory)
                                                         +--> Tavily (Web Search)
                                                         +--> Google Calendar API
                                                         +--> Microsoft Calendar API
@@ -96,9 +96,10 @@ Gerald gets a restricted tool set via `getGeraldAgentTools()`.
 
 ### Memory System
 
-- **Zep Cloud**: Graph-based persistent memory. Stores user facts, preferences, patterns across sessions.
-- **ZepMemoryService**: Thread-based conversation memory with context retrieval.
-- **ZepGraphService**: Knowledge graph for user entities and relationships.
+- **pgvector**: Vector-based persistent memory via Supabase. Stores extracted facts, patterns, preferences with semantic search.
+- **MemoryService**: Unified memory service handling fact extraction (gpt-4.1-mini), context generation, and vector search.
+- **memory_facts table**: Stores user knowledge with embeddings (1536-dim, text-embedding-3-small).
+- **user_context_cache table**: Pre-built user context summaries, rebuilt periodically.
 - Fallback: Supabase `chat_messages` table for conversation history.
 
 ### Agent Prompt System
@@ -178,6 +179,6 @@ Frontend calls Agent API (not Supabase directly for writes). Reads use Supabase 
 1. **Public schema + RLS** over per-user schemas (simpler, scales better)
 2. **Aspects as first-class entities** over flat tags (supports context, ordering, archiving)
 3. **LangGraph over simple chains** (supports complex multi-tool workflows with recursion)
-4. **Zep Cloud over local embeddings** (persistent graph memory across sessions)
+4. **pgvector over external memory services** (local vector memory with LLM fact extraction)
 5. **Docker Compose** for consistent dev environment across team
 6. **Agent API as gateway** - frontend doesn't call LLMs directly

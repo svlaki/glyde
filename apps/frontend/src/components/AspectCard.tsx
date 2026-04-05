@@ -67,7 +67,7 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
             </span>
             {isSharedWithMe && (
               <span
-                title={aspect.member_role === 'editor' ? 'Shared - Editor' : 'Shared - Viewer'}
+                title={aspect.member_role === 'member' ? 'Shared - Member' : 'Shared - Viewer'}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -84,7 +84,7 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
                 <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M13.5 3a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM15 3a3 3 0 1 0-5.878.87L6.467 5.54a3 3 0 1 0 0 4.92l2.655 1.67A3 3 0 1 0 12 13.5a3 3 0 0 0-.645-1.87l-2.655-1.67a3.01 3.01 0 0 0 0-.92l2.655-1.67A3 3 0 0 0 15 3zM4.5 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm8 5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
                 </svg>
-                {aspect.member_role === 'editor' ? 'Editor' : 'Viewer'}
+                {aspect.member_role === 'member' ? 'Member' : 'Viewer'}
               </span>
             )}
             {isShared && !isSharedWithMe && (

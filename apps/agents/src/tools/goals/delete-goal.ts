@@ -1,7 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 /**
  * Delete Goal Tool
@@ -78,18 +77,6 @@ export const deleteGoalTool = tool(
             return `Failed to delete goal: ${result.error}`;
           }
 
-          // Remove from Zep knowledge graph (fire-and-forget for speed)
-          const removeFromGraph = async () => {
-            try {
-              const zepGraphService = new ZepGraphService();
-              await zepGraphService.deleteGoal(userId, goalToDelete.id, goalToDelete.title);
-              console.log(`[DELETE-GOAL] Goal removed from Zep graph: ${goalToDelete.id}`);
-            } catch (error) {
-              console.error('[DELETE-GOAL] Failed to remove from Zep (non-critical):', error);
-            }
-          };
-          removeFromGraph();
-
           return `GOAL: "${goalToDelete.title}" has been deleted`;
         } else {
           return `No goal found matching: "${searchQuery}". Available goals: ${goals.map((g: any) => g.title).join(', ')}`;
@@ -116,20 +103,6 @@ export const deleteGoalTool = tool(
 
       if (!result.success) {
         return `Failed to delete goal: ${result.error}`;
-      }
-
-      // Remove from Zep knowledge graph (fire-and-forget for speed)
-      if (goalToDelete) {
-        const removeFromGraph = async () => {
-          try {
-            const zepGraphService = new ZepGraphService();
-            await zepGraphService.deleteGoal(userId, targetGoalId, goalToDelete.title);
-            console.log(`[DELETE-GOAL] Goal removed from Zep graph: ${targetGoalId}`);
-          } catch (error) {
-            console.error('[DELETE-GOAL] Failed to remove from Zep (non-critical):', error);
-          }
-        };
-        removeFromGraph();
       }
 
       // Format response with goal details

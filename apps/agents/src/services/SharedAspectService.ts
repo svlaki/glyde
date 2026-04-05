@@ -17,7 +17,8 @@ export interface SharedAspectMember {
   id: string
   aspect_id: string
   user_id: string
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'declined'
   joined_at: string
   user?: {
     id: string
@@ -74,7 +75,8 @@ export class SharedAspectService {
         .insert({
           aspect_id: aspect.id,
           user_id: ownerId,
-          role: 'owner'
+          role: 'owner',
+          status: 'accepted'
         })
 
       if (memberError) {
@@ -117,7 +119,7 @@ export class SharedAspectService {
     aspectId: string,
     userId: string,
     invitedUserId: string,
-    role: 'editor' | 'viewer'
+    role: 'member' | 'viewer'
   ): Promise<ApiResponse<SharedAspectMember>> {
     try {
       const { data: userMember, error: memberCheckError } = await this.supabase
@@ -127,7 +129,7 @@ export class SharedAspectService {
         .eq('user_id', userId)
         .single()
 
-      if (memberCheckError || !userMember || (userMember.role !== 'owner' && userMember.role !== 'editor')) {
+      if (memberCheckError || !userMember || (userMember.role !== 'owner' && userMember.role !== 'member')) {
         return {
           success: false,
           error: 'You do not have permission to add members'
@@ -162,7 +164,8 @@ export class SharedAspectService {
         .insert({
           aspect_id: aspectId,
           user_id: invitedUserId,
-          role
+          role,
+          status: 'pending'
         })
         .select()
         .single()
@@ -191,7 +194,7 @@ export class SharedAspectService {
     aspectId: string,
     userId: string,
     memberId: string,
-    newRole: 'editor' | 'viewer'
+    newRole: 'member' | 'viewer'
   ): Promise<ApiResponse<SharedAspectMember>> {
     try {
       const { data: userMember, error: ownerCheckError } = await this.supabase
@@ -417,6 +420,7 @@ export class SharedAspectService {
           aspect_id,
           user_id,
           role,
+          status,
           joined_at,
           user:profile!aspect_members_profile_fkey(id, email, display_name, avatar_url)
           `
@@ -441,6 +445,72 @@ export class SharedAspectService {
         success: false,
         error: 'Failed to fetch members'
       }
+    }
+  }
+
+  async acceptInvite(
+    aspectId: string,
+    userId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      const { data: member, error: findError } = await this.supabase
+        .from('aspect_members')
+        .select('id, status')
+        .eq('aspect_id', aspectId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (findError || !member) {
+        return { success: false, error: 'No pending invite found for this aspect' }
+      }
+
+      const { error: updateError } = await this.supabase
+        .from('aspect_members')
+        .update({ status: 'accepted' })
+        .eq('id', member.id)
+
+      if (updateError) {
+        return { success: false, error: 'Failed to accept invite' }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error accepting aspect invite:', error)
+      return { success: false, error: 'Failed to accept invite' }
+    }
+  }
+
+  async declineInvite(
+    aspectId: string,
+    userId: string
+  ): Promise<ApiResponse<void>> {
+    try {
+      const { data: member, error: findError } = await this.supabase
+        .from('aspect_members')
+        .select('id, status')
+        .eq('aspect_id', aspectId)
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (findError || !member) {
+        return { success: false, error: 'No pending invite found for this aspect' }
+      }
+
+      const { error: deleteError } = await this.supabase
+        .from('aspect_members')
+        .delete()
+        .eq('id', member.id)
+
+      if (deleteError) {
+        return { success: false, error: 'Failed to decline invite' }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('Error declining aspect invite:', error)
+      return { success: false, error: 'Failed to decline invite' }
     }
   }
 

@@ -179,9 +179,10 @@ export function Calendar() {
     return event.color || '#3b82f6'
   }
 
-  // Check if an event is a shared event (user is editor/viewer, not owner)
+  // Check if an event is a shared event with viewer-only access (shows with icon/badge)
+  // Member events render normally as the user's own events
   const isSharedEvent = (event: CalendarEvent): boolean => {
-    return event.is_shared === true && event.user_role !== 'owner' && !event.is_friend_event
+    return event.is_shared === true && event.user_role === 'viewer' && !event.is_friend_event
   }
 
   // Check if an event is in the past
@@ -1413,7 +1414,7 @@ export function Calendar() {
                                 color: eventColor,
                                 flexShrink: 0
                               }}>
-                                {event.user_role === 'viewer' ? 'V' : 'E'}
+                                {event.user_role === 'viewer' ? 'V' : 'M'}
                               </span>
                             )}
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.title}</span>

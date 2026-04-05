@@ -1,10 +1,8 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
-import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 import reminderService from "../../services/ReminderService.js";
 
 export const createEventTool = tool(
@@ -23,7 +21,6 @@ export const createEventTool = tool(
 
     // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
     const aspectService = new AspectService();
 
     // Validate aspect — auto-create if it doesn't exist (handles parallel tool calls)
@@ -116,24 +113,6 @@ export const createEventTool = tool(
             }
 
             console.log(`[CREATE-EVENT TOOL] Conflicting event "${conflictingEvent.title}" deleted, proceeding with creation`);
-
-            // Delete from graph with intentional sync tracking
-            // Don't block event creation if graph deletion fails - it's non-critical
-            executeZepOperation(
-              {
-                userId,
-                entityType: 'event',
-                entityId: conflictingEvent.id,
-                operation: 'delete',
-                maxRetries: 2
-              },
-              async () => {
-                await zepGraphService.deleteCalendarEvent(userId, conflictingEvent.id, conflictingEvent.title);
-                return conflictingEvent.id;
-              }
-            ).catch(err => {
-              console.warn('[CREATE-EVENT TOOL] Non-critical: Failed to remove conflicting event from graph:', err);
-            });
           }
         } else {
           // Don't block creation — overlapping events are normal (e.g. focus blocks over meetings).
@@ -181,11 +160,6 @@ export const createEventTool = tool(
         console.warn('[CREATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
       }
     }
-
-    // Note: Automatic graph sync disabled to prevent Zep graph bloat
-    // Individual event creation creates too many nodes
-    // Graph should only contain summary patterns, not every action
-    // TODO: Implement selective sync only for significant events or via periodic aggregation
 
     // Add context about aspect in response
     const aspectContext = validatedAspect

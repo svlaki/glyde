@@ -2,22 +2,19 @@ import { StateGraph, Annotation } from "@langchain/langgraph";
 // ChatOpenAI is imported by BaseAgent
 import { HumanMessage, AIMessage, SystemMessage, BaseMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { tool } from "@langchain/core/tools";
-import { z } from "zod";
 import { SupabaseService, ActivityLogEntry, getSupabaseClient } from '../../services/SupabaseService.js';
 import projectService from '../../services/ProjectService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse, ImageContent } from '../../types/agents.js';
-import { getCurrentTimeInTimezone, isValidTimezone } from '../../utils/timezoneUtils.js';
+import { isValidTimezone } from '../../utils/timezoneUtils.js';
 import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { reverseGeocode } from '../../tools/search/location-search.js';
-import { buildSystemPrompt, buildSummaryContext } from './prompts.js';
-import { DatabaseProfile, DatabaseAspect } from '../../types/database.js';
+import { buildSystemPrompt } from './prompts.js';
+import { DatabaseProfile } from '../../types/database.js';
 import { FriendshipService } from '../../services/FriendshipService.js';
-import { ContextRouter, RoutingDecision } from './ContextRouter.js';
 
 // Define the state structure for our conversation agent
 const ConversationState = Annotation.Root({
@@ -79,11 +76,7 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
-  routingDecision: Annotation<RoutingDecision | null>({
-    reducer: (_existing, update) => update ?? _existing,
-    default: () => null,
-  }),
-  zepContext: Annotation<string>({
+  memoryFactContext: Annotation<string>({
     reducer: (_existing, update) => update || _existing,
     default: () => '',
   }),
@@ -97,11 +90,9 @@ type ConversationStateType = typeof ConversationState.State;
 
 export class ConversationAgent extends BaseAgent {
   private graph: any;
-  private contextRouter: ContextRouter;
 
   constructor() {
     super('conversation', "gpt-5.1"); // Use GPT-5.1 for best intelligence
-    this.contextRouter = new ContextRouter();
     this.graph = this.createGraph();
   }
 
@@ -111,21 +102,11 @@ export class ConversationAgent extends BaseAgent {
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
     try {
-      // Step 1: Route the message to determine what context/tools are needed
-      const recentMsgs = context.conversationHistory?.slice(-2).map(m =>
-        typeof m.content === 'string' ? m.content : ''
-      );
-      const routingDecision = await this.contextRouter.route(message, recentMsgs);
-      console.log(`[ROUTER] needs_tools=${routingDecision.needs_tools} tools=[${routingDecision.tools?.join(', ') || ''}] mode=${routingDecision.context_mode} | Categories: [${routingDecision.tool_categories.join(', ')}] | Prompts: [${routingDecision.prompt_sections.join(', ')}]`);
-
       // Load memory context using Graphiti
       const memoryContext = await this.loadMemoryContext(context, 'conversation');
 
       // Pre-load user data for LangGraph context
       const supabaseService = new SupabaseService();
-
-      // Conditional data fetching based on routing decision
-      const ctx = routingDecision.context_sections;
 
       const reverseGeocodePromise = context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
@@ -133,24 +114,21 @@ export class ConversationAgent extends BaseAgent {
 
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
-      // Always fetch: profile, events, tasks, goals, aspects (core data)
-      // Conditionally fetch: projects, activity, ratings, friends
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, ...conditionalResults] = await Promise.all([
+      // Fetch all user data in parallel
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        // Conditional fetches — return null/[] if not needed
-        ctx.projects ? projectService.getProjects(context.userId) : Promise.resolve([]),
-        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'user', 30, 20) : Promise.resolve([]),
-        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'agent', 60, 5) : Promise.resolve([]),
+        projectService.getProjects(context.userId),
+        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
+        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
-        ctx.ratings ? supabaseService.getRatingSummary(context.userId) : Promise.resolve([]),
-        ctx.friends ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
+        supabaseService.getRatingSummary(context.userId),
+        friendshipService.getFriends(context.userId),
       ]);
 
-      const [userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = conditionalResults;
       const userFriends = (friendsResult as any)?.success ? (friendsResult as any).data || [] : [];
 
       // Resolve timezone with validation
@@ -165,35 +143,25 @@ export class ConversationAgent extends BaseAgent {
 
       console.log(`[CONVERSATION AGENT] Using validated timezone: ${userTimezone}`);
 
-      // Add current message to Zep BEFORE context retrieval so it's included in context
+      // Fetch memory context + rules ONCE here (not inside callModel which loops)
+      let memoryFactCtx = '';
       try {
-        await this.zepService.addUserMessage(context.userId, message);
+        const rawCtx = await this.memoryService.getUserContext(context.userId);
+        // Cap context to ~2000 chars (~500 tokens) to prevent bloat
+        memoryFactCtx = rawCtx.length > 2000 ? rawCtx.slice(0, 2000) + '\n[context truncated]' : rawCtx;
+        console.log(`[CONVERSATION AGENT] Memory context: ${rawCtx.length} chars${rawCtx.length > 2000 ? ' (truncated to 2000)' : ''}`);
       } catch (error) {
-        console.warn('Failed to add user message to Zep:', error);
-      }
-
-      // Fetch Zep + rules ONCE here (not inside callModel which loops)
-      let zepContext = '';
-      try {
-        const threadId = await this.zepService.getOrCreateSession(context.userId);
-        const rawZep = await this.zepService.getThreadContext(threadId);
-        // Cap Zep context to ~2000 chars (~500 tokens) to prevent bloat
-        zepContext = rawZep.length > 2000 ? rawZep.slice(0, 2000) + '\n[context truncated]' : rawZep;
-        console.log(`[CONVERSATION AGENT] Zep context: ${rawZep.length} chars${rawZep.length > 2000 ? ' (truncated to 2000)' : ''}`);
-      } catch (error) {
-        console.warn('Failed to load Zep context:', error);
+        console.warn('Failed to load memory context:', error);
       }
 
       let rulesCtx = '';
-      if (routingDecision.context_sections.rules) {
-        try {
-          const userRules = await ruleService.getRules(context.userId);
-          if (userRules.length > 0) {
-            rulesCtx = ruleService.formatRulesForPrompt(userRules);
-          }
-        } catch (error) {
-          console.warn('Failed to load rules:', error);
+      try {
+        const userRules = await ruleService.getRules(context.userId);
+        if (userRules.length > 0) {
+          rulesCtx = ruleService.formatRulesForPrompt(userRules);
         }
+      } catch (error) {
+        console.warn('Failed to load rules:', error);
       }
 
       // Filter and limit events: future/ongoing (max 15) + recent past 24h (max 5)
@@ -209,20 +177,14 @@ export class ConversationAgent extends BaseAgent {
           return endTime < now && endTime >= twentyFourHoursAgo;
         })
         .sort((a: any, b: any) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime())
-        .slice(0, 5); // 5 most recent past events
+        .slice(0, 5);
       const userEvents = [...recentPastEvents, ...futureEvents];
 
-      // Limit tasks (max 10)
       const userTasks = allTasks.slice(0, 10);
-
-      // Limit goals (max 8)
       const userGoals = allGoals.slice(0, 8);
 
       console.log(`[CONVERSATION AGENT] Loaded: ${userEvents.length} events (${recentPastEvents.length} past + ${futureEvents.length} future), ${userTasks.length} tasks, ${userGoals.length} goals, ${userAspects?.length || 0} aspects`);
 
-      // Build conversation history — 10 messages (5 exchanges) for adequate context
-      // Recent assistant messages are kept full so the agent can see what it just did.
-      // Older assistant messages are truncated to save tokens.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
@@ -273,17 +235,10 @@ export class ConversationAgent extends BaseAgent {
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
         userFriends: userFriends || [],
-        routingDecision: routingDecision,
-        zepContext: zepContext,
+        memoryFactContext: memoryFactCtx,
         rulesContext: rulesCtx,
-        memoryContext: memoryContext.graphiti ? {
-          userNodeUuid: memoryContext.graphiti.userNodeUuid,
-          relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
-          totalFacts: memoryContext.graphiti.totalFacts
-        } : null
       });
 
-      // Get the last AI message
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
 
@@ -325,11 +280,11 @@ export class ConversationAgent extends BaseAgent {
         console.warn('[TOKEN TRACKING] Error extracting usage:', err);
       }
 
-      // Add assistant response to Zep (user message was already added before context retrieval)
+      // Persist conversation to memory (fact extraction happens here)
       try {
-        await this.zepService.addAssistantMessage(context.userId, response);
+        await this.persistConversationToMemory(context, message, response);
       } catch (error) {
-        console.warn('Failed to add assistant message to Zep:', error);
+        console.warn('Failed to persist conversation to memory:', error);
       }
 
       return {
@@ -380,40 +335,30 @@ IMPORTANT INSTRUCTIONS:
       // Immediately yield status so user sees activity
       yield { type: 'status', content: 'Loading your context...' };
 
-      // Step 1: Route the message (cheap GPT-4.1-nano call)
-      const recentMsgs = context.conversationHistory?.slice(-2).map(m =>
-        typeof m.content === 'string' ? m.content : ''
-      );
-      const routingDecision = await this.contextRouter.route(message, recentMsgs);
-      console.log(`[ROUTER] needs_tools=${routingDecision.needs_tools} tools=[${routingDecision.tools?.join(', ') || ''}] mode=${routingDecision.context_mode} | Categories: [${routingDecision.tool_categories.join(', ')}] | Prompts: [${routingDecision.prompt_sections.join(', ')}]`);
-
       const supabaseService = new SupabaseService();
-      const ctx = routingDecision.context_sections;
 
-      // Parallel data fetching — conditional based on routing
       const reverseGeocodePromise = context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, ...conditionalResults] = await Promise.all([
+      // Fetch all user data in parallel
+      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         this.loadMemoryContext(context, 'conversation'),
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        // Conditional fetches
-        ctx.projects ? projectService.getProjects(context.userId) : Promise.resolve([]),
-        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'user', 30, 20) : Promise.resolve([]),
-        ctx.activity_logs ? supabaseService.getRecentActivity(context.userId, 'agent', 60, 5) : Promise.resolve([]),
+        projectService.getProjects(context.userId),
+        supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
+        supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
-        ctx.ratings ? supabaseService.getRatingSummary(context.userId) : Promise.resolve([]),
-        ctx.friends ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
+        supabaseService.getRatingSummary(context.userId),
+        friendshipService.getFriends(context.userId),
       ]);
 
-      const [userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = conditionalResults;
       const userFriends = (friendsResult as any)?.success ? (friendsResult as any).data || [] : [];
 
       // Resolve timezone with validation
@@ -426,27 +371,24 @@ IMPORTANT INSTRUCTIONS:
 
       console.log(`[CONVERSATION AGENT] Streaming with validated timezone: ${userTimezone}`);
 
-      // Fetch Zep + rules ONCE here (not inside callModel which loops)
-      let zepContext = '';
+      // Fetch memory context + rules ONCE here (not inside callModel which loops)
+      let memoryFactCtx = '';
       try {
-        const threadId = await this.zepService.getOrCreateSession(context.userId);
-        const rawZep = await this.zepService.getThreadContext(threadId);
-        zepContext = rawZep.length > 2000 ? rawZep.slice(0, 2000) + '\n[context truncated]' : rawZep;
-        console.log(`[CONVERSATION AGENT] Zep context: ${rawZep.length} chars${rawZep.length > 2000 ? ' (truncated to 2000)' : ''}`);
+        const rawCtx = await this.memoryService.getUserContext(context.userId);
+        memoryFactCtx = rawCtx.length > 2000 ? rawCtx.slice(0, 2000) + '\n[context truncated]' : rawCtx;
+        console.log(`[CONVERSATION AGENT] Memory context: ${rawCtx.length} chars${rawCtx.length > 2000 ? ' (truncated to 2000)' : ''}`);
       } catch (error) {
-        console.warn('Failed to load Zep context:', error);
+        console.warn('Failed to load memory context:', error);
       }
 
       let rulesCtx = '';
-      if (routingDecision.context_sections.rules) {
-        try {
-          const userRules = await ruleService.getRules(context.userId);
-          if (userRules.length > 0) {
-            rulesCtx = ruleService.formatRulesForPrompt(userRules);
-          }
-        } catch (error) {
-          console.warn('Failed to load rules:', error);
+      try {
+        const userRules = await ruleService.getRules(context.userId);
+        if (userRules.length > 0) {
+          rulesCtx = ruleService.formatRulesForPrompt(userRules);
         }
+      } catch (error) {
+        console.warn('Failed to load rules:', error);
       }
 
       // Filter and limit events: future/ongoing (max 15) + recent past 24h (max 5)
@@ -462,15 +404,12 @@ IMPORTANT INSTRUCTIONS:
           return endTime < now && endTime >= twentyFourHoursAgo;
         })
         .sort((a: any, b: any) => new Date(b.end_time).getTime() - new Date(a.end_time).getTime())
-        .slice(0, 5); // 5 most recent past events
+        .slice(0, 5);
       const userEvents = [...recentPastEvents, ...futureEvents];
 
-      // Limit tasks and goals
       const userTasks = allTasks.slice(0, 10);
       const userGoals = allGoals.slice(0, 8);
 
-      // Build conversation history — 10 messages (5 exchanges) for adequate context
-      // Recent assistant messages are kept full so the agent can see what it just did.
       const messages: BaseMessage[] = [];
 
       if (context.conversationHistory && context.conversationHistory.length > 0) {
@@ -533,17 +472,10 @@ IMPORTANT INSTRUCTIONS:
         currentAddress: userAddress || null,
         ratingSummary: ratingSummary || [],
         userFriends: userFriends || [],
-        routingDecision: routingDecision,
-        zepContext: zepContext,
+        memoryFactContext: memoryFactCtx,
         rulesContext: rulesCtx,
-        memoryContext: memoryContext.graphiti ? {
-          userNodeUuid: memoryContext.graphiti.userNodeUuid,
-          relevantFacts: memoryContext.graphiti.relevantFacts.map((f: any) => f.fact).join('\n- '),
-          totalFacts: memoryContext.graphiti.totalFacts
-        } : null
       };
 
-      // Signal that we're about to start generating
       yield { type: 'status', content: 'Thinking...' };
 
       // Stream events from LangGraph
@@ -727,138 +659,71 @@ Use these scores to understand how the user feels about different areas of their
 CRITICAL: If the user asked you to create, update, or delete something and you have NOT yet called the corresponding tool, you MUST call it now. NEVER tell the user you did something without a tool call proving it. If a tool call failed, tell the user honestly.
 For multi-action requests, call ALL remaining tools before responding. Do NOT stop to ask clarifying questions mid-execution — use reasonable defaults and keep going.
 CHECK YOUR WORK: If the user's message contained schedule info (lecture times, class times, meeting patterns) and you have NOT yet called create_recurring_event or create_event, you are NOT done — call them now. Creating an aspect without the corresponding events is incomplete.
+CONFLICT CHECK: If you just created multiple events, check whether any of them land at the same time. A recurring event that fires on weekdays at 9am WILL conflict with a one-off event at 9am on any weekday. If there is an overlap, you MUST say: "Heads up: [event A] and [event B] conflict on [day] at [time] — both are on your calendar."
 When summarizing, clearly list what was ACTUALLY created/changed (with names and details) so the user can reference or undo specific items later.`;
 
     // Define the workflow nodes
+    const modelWithTools = this.model.bindTools(allTools);
+
     const callModel = async (state: ConversationStateType) => {
-      // Detect if this is a re-entry after tool execution
       const lastMsg = state.messages[state.messages.length - 1];
       const isToolReentry = lastMsg?._getType() === 'tool';
-
-      // Dynamic tool binding based on routing decision
-      const routing = state.routingDecision;
-      const needsTools = routing?.needs_tools !== false; // default true for safety
-
-      let selectedTools: any[] = [];
-      if (needsTools) {
-        // Use specific tool names + categories for precise binding
-        if (routing?.tools?.length || routing?.tool_categories?.length) {
-          selectedTools = toolRegistry.getToolsForRouting(routing?.tools, routing?.tool_categories);
-        } else {
-          selectedTools = allTools;
-        }
-      }
-
-      // Zero-tool mode: invoke without bindTools when no tools needed
-      const model = needsTools && selectedTools.length > 0
-        ? this.model.bindTools(selectedTools)
-        : this.model;
 
       let messages: BaseMessage[];
 
       if (isToolReentry) {
         // RE-ENTRY: Use slim continuation prompt (saves ~3K+ tokens)
         messages = [new SystemMessage(CONTINUATION_PROMPT), ...state.messages];
-        console.log(`[AGENT NODE] Tool re-entry: slim prompt, ${messages.length} messages (${selectedTools.length} tools)`);
+        console.log(`[AGENT NODE] Tool re-entry: slim prompt, ${messages.length} messages`);
       } else {
-        // FIRST CALL: Build system prompt based on context mode
-        const contextMode = routing?.context_mode || 'full';
-
+        // FIRST CALL: Build full system prompt with all context
         const nowUtc = new Date();
         const todayFormatted = formatInTimeZone(nowUtc, state.timezone, 'yyyy-MM-dd');
         const tomorrowDayName = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'EEEE');
         const tomorrowFormatted = formatInTimeZone(addDays(nowUtc, 1), state.timezone, 'yyyy-MM-dd');
 
-        if (contextMode === 'summary' && !needsTools) {
-          // SUMMARY MODE: Compact prompt, no tools, minimal context
-          const summaryCtx = buildSummaryContext(
-            state.userEvents || [],
-            state.userTasks || [],
-            state.userGoals || [],
-            state.timezone
-          );
+        const eventContext = this.formatEventContext(state.userEvents || [], state.timezone);
+        const taskContext = this.formatTaskContext(state.userTasks || [], state.timezone);
+        const goalContext = this.formatGoalContext(state.userGoals || [], state.timezone);
 
-          const systemMessage = buildSystemPrompt({
-            timezone: state.timezone,
-            eventContext: '',
-            taskContext: '',
-            goalContext: '',
-            todayFormatted,
-            tomorrowFormatted,
-            tomorrowDayName,
-            messageCount: state.messages.length,
-            zepGraphContext: state.zepContext || '',
-            userProfile: state.userProfile,
-            contextMode: 'summary',
-            summaryContext: summaryCtx,
-          });
-
-          messages = [systemMessage, ...state.messages];
-          console.log(`[AGENT NODE] Summary mode: compact prompt, ${messages.length} messages, 0 tools`);
-        } else {
-          // FULL MODE: Detailed prompt with context
-          let recentEvents: any[] = [];
-          if (state.userEvents && state.userEvents.length > 0) {
-            recentEvents = state.userEvents;
-          } else {
-            try {
-              const supabaseService = new SupabaseService();
-              const now = new Date();
-              const allEventsData = await supabaseService.getEventsForAgent(state.userId);
-              recentEvents = allEventsData.filter(event => new Date(event.end_time) >= now);
-            } catch (error) {
-              console.error('Error loading recent events for context:', error);
-            }
-          }
-
-          const eventContext = this.formatEventContext(recentEvents, state.timezone);
-          const taskContext = this.formatTaskContext(state.userTasks || [], state.timezone);
-          const goalContext = this.formatGoalContext(state.userGoals || [], state.timezone);
-
-          const zepThreadContext = state.zepContext || '';
-          const rulesContext = state.rulesContext || '';
-
-          let locationContext: string | undefined;
-          if (state.currentLocation) {
-            const coords = `${state.currentLocation.latitude}, ${state.currentLocation.longitude}`;
-            locationContext = state.currentAddress
-              ? `${state.currentAddress} (${coords})`
-              : coords;
-          }
-
-          const systemMessage = buildSystemPrompt({
-            timezone: state.timezone,
-            eventContext,
-            taskContext,
-            goalContext,
-            todayFormatted,
-            tomorrowFormatted,
-            tomorrowDayName,
-            toolCount: selectedTools.length,
-            zepGraphContext: zepThreadContext,
-            rulesContext,
-            userAspects: state.userAspects,
-            userProjects: routing?.context_sections.projects ? state.userProjects : [],
-            userProfile: state.userProfile,
-            recentUserActivity: routing?.context_sections.activity_logs ? state.recentUserActivity : [],
-            recentAgentActivity: routing?.context_sections.activity_logs ? state.recentAgentActivity : [],
-            currentPage: state.currentPage,
-            messageCount: state.messages.length,
-            currentLocation: locationContext,
-            ratingContext: routing?.context_sections.ratings && state.ratingSummary?.length
-              ? this.buildRatingContext(state.ratingSummary)
-              : undefined,
-            userFriends: routing?.context_sections.friends ? state.userFriends : [],
-            promptSections: routing?.prompt_sections,
-            contextMode: 'full',
-          });
-
-          messages = [systemMessage, ...state.messages];
-          console.log(`[AGENT NODE] Full mode: ${messages.length} messages (${selectedTools.length} tools)`);
+        let locationContext: string | undefined;
+        if (state.currentLocation) {
+          const coords = `${state.currentLocation.latitude}, ${state.currentLocation.longitude}`;
+          locationContext = state.currentAddress
+            ? `${state.currentAddress} (${coords})`
+            : coords;
         }
+
+        const systemMessage = buildSystemPrompt({
+          timezone: state.timezone,
+          eventContext,
+          taskContext,
+          goalContext,
+          todayFormatted,
+          tomorrowFormatted,
+          tomorrowDayName,
+          toolCount: allTools.length,
+          zepGraphContext: state.memoryFactContext || '',
+          rulesContext: state.rulesContext || '',
+          userAspects: state.userAspects,
+          userProjects: state.userProjects,
+          userProfile: state.userProfile,
+          recentUserActivity: state.recentUserActivity,
+          recentAgentActivity: state.recentAgentActivity,
+          currentPage: state.currentPage,
+          messageCount: state.messages.length,
+          currentLocation: locationContext,
+          ratingContext: state.ratingSummary?.length
+            ? this.buildRatingContext(state.ratingSummary)
+            : undefined,
+          userFriends: state.userFriends,
+        });
+
+        messages = [systemMessage, ...state.messages];
+        console.log(`[AGENT NODE] Full prompt: ${messages.length} messages (${allTools.length} tools)`);
       }
 
-      const response = await model.invoke(messages);
+      const response = await modelWithTools.invoke(messages);
       const toolCalls = (response as any).tool_calls?.length || 0;
       console.log(`[AGENT NODE] Response: ${toolCalls} tool_calls${toolCalls > 0 ? ': ' + (response as any).tool_calls.map((t: any) => t.name || t.tool).join(', ') : ''}`);
 

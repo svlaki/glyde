@@ -4,10 +4,6 @@ import { z } from "zod";
 /**
  * Advanced memory update tool that allows the LLM to proactively persist
  * important insights, preferences, and patterns during conversations.
- *
- * This complements the automatic persistence that happens at the end of
- * every conversation, allowing the agent to save breakthrough insights
- * immediately with rich metadata.
  */
 export const updateMemoryAdvancedTool = tool(
   async ({ insights, importance, category, triggerEarlyPersistence = false, metadata }, config) => {
@@ -17,41 +13,29 @@ export const updateMemoryAdvancedTool = tool(
     }
 
     try {
-      const { ZepGraphService } = await import('../../services/ZepGraphService.js');
-      const graphService = new ZepGraphService();
-      const sessionId = config?.configurable?.sessionId || `session-${userId}`;
+      const { MemoryService } = await import('../../services/MemoryService.js');
+      const memoryService = MemoryService.getInstance();
 
-      // Build memory entry with rich metadata
-      const memoryEntry = {
-        userId,
-        sessionId,
-        insights,
-        importance,
-        category,
-        timestamp: new Date().toISOString(),
-        metadata: metadata || {},
-        source: 'agent_proactive' // Distinguish from automatic persistence
+      const confidenceMap: Record<string, number> = {
+        high: 0.9,
+        medium: 0.7,
+        low: 0.5,
       };
 
-      // If early persistence is requested, save immediately to Zep
       if (triggerEarlyPersistence) {
-        // Create a formatted fact string from insights
-        const factsString = insights
-          .map((insight, i) => `${i + 1}. ${insight}`)
-          .join('\n');
-
-        // Add each insight as a user pattern to the graph
-        // This uses the existing addUserPattern method
+        // Save each insight immediately as a memory fact
         for (const insight of insights) {
-          await graphService.addUserPattern(userId, {
-            pattern_type: category,
-            description: insight,
-            confidence_score: importance === 'high' ? 0.9 : importance === 'medium' ? 0.7 : 0.5,
-            frequency: 'weekly' // Default frequency for manually captured insights
-          });
+          await memoryService.addFact(
+            userId,
+            insight,
+            category === 'patterns' ? 'pattern' : category === 'preferences' ? 'preference' : 'insight',
+            'agent_proactive',
+            confidenceMap[importance] || 0.7,
+            metadata || {}
+          );
         }
 
-        console.log(`💾 [MEMORY ADVANCED] Immediately persisted ${insights.length} insights for user ${userId}`);
+        console.log(`[MEMORY ADVANCED] Persisted ${insights.length} insights for user ${userId}`);
 
         return `**Memory Updated** (${importance} importance)
 Saved ${insights.length} insight${insights.length > 1 ? 's' : ''} to your ${category} memory:
@@ -60,22 +44,26 @@ ${insights.map((insight, i) => `  ${i + 1}. ${insight}`).join('\n')}
 These insights will help me better understand your preferences and provide more personalized assistance.`;
       }
 
-      // Otherwise, queue for batch persistence at conversation end
-      // Store in session metadata for later processing
-      const sessionMetadata = config?.configurable?.sessionMetadata || {};
-      if (!sessionMetadata.queuedInsights) {
-        sessionMetadata.queuedInsights = [];
+      // Queue for batch persistence — store as patterns with lower priority
+      for (const insight of insights) {
+        await memoryService.addFact(
+          userId,
+          insight,
+          category === 'patterns' ? 'pattern' : category === 'preferences' ? 'preference' : 'insight',
+          'agent_proactive',
+          confidenceMap[importance] || 0.7,
+          metadata || {}
+        );
       }
-      sessionMetadata.queuedInsights.push(memoryEntry);
 
-      console.log(`[MEMORY ADVANCED] Queued ${insights.length} insights for batch persistence (user ${userId})`);
+      console.log(`[MEMORY ADVANCED] Saved ${insights.length} insights for user ${userId}`);
 
       return `**Noted** (${importance} importance)
 I've recorded ${insights.length} insight${insights.length > 1 ? 's' : ''} about your ${category} preferences. These will be saved to help personalize future interactions.`;
 
     } catch (error) {
       console.error('Failed to update memory:', error);
-      return `Memory update temporarily unavailable. Your insights were noted for this conversation but may not persist long-term. Please try again later.`;
+      return `Memory update temporarily unavailable. Your insights were noted for this conversation but may not persist long-term.`;
     }
   },
   {

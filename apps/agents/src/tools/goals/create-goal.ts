@@ -1,7 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const createGoalTool = tool(
@@ -14,7 +13,6 @@ export const createGoalTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
-      const zepGraphService = new ZepGraphService();
 
       // Convert dates from local timezone to UTC
       const targetDateUTC = targetDate && timezone ? convertToUTC(targetDate, timezone) : targetDate;

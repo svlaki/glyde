@@ -43,10 +43,6 @@ const GeraldState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
   }),
-  ratingSummary: Annotation<any[]>({
-    reducer: (_existing, update) => update || _existing,
-    default: () => [],
-  }),
   recentPastEvents: Annotation<any[]>({
     reducer: (_existing, update) => update || _existing,
     default: () => [],
@@ -68,7 +64,7 @@ export class InteractionAgentGerald extends BaseAgent {
 
   constructor() {
     // Use 'interaction' as type so it can replace the current interaction agent
-    super('interaction', "gpt-4.1-mini"); // GPT-4.1-mini: solid tool calling, 5x cheaper for structured tasks
+    super('interaction', "gpt-4.1"); // GPT-4.1: strong tool calling + better reasoning than mini
     this.graph = this.createGraph();
   }
 
@@ -94,21 +90,15 @@ export class InteractionAgentGerald extends BaseAgent {
 
       console.log(`[GERALD] Processing for user ${context.userId} in timezone ${userTimezone}`);
 
-      // Add current message to Zep
-      try {
-        await this.zepService.addUserMessage(context.userId, message);
-      } catch (error) {
-        console.warn('[GERALD] Failed to add user message to Zep:', error);
-      }
+      // Memory context is loaded via base class loadMemoryContext()
 
       // Fetch all user context in parallel for efficiency
       const now = new Date();
-      const [allEvents, userTasks, userGoals, userAspects, ratingSummary] = await Promise.all([
+      const [allEvents, userTasks, userGoals, userAspects] = await Promise.all([
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        supabaseService.getRatingSummary(context.userId)
       ]);
 
       // Filter to future/ongoing events
@@ -137,8 +127,7 @@ export class InteractionAgentGerald extends BaseAgent {
         - Tasks: ${activeTasks.length} active (filtered from ${userTasks?.length || 0})
         - Goals: ${activeGoals.length} active (filtered from ${userGoals?.length || 0})
         - Aspects: ${userAspects?.length || 0}
-        - Recent interactions: ${recentInteractions.length}
-        - Rating topics: ${ratingSummary.length}`);
+        - Recent interactions: ${recentInteractions.length}`);
 
       // Build conversation history
       const messages: BaseMessage[] = [];
@@ -168,7 +157,6 @@ export class InteractionAgentGerald extends BaseAgent {
         userProfile: userProfile || null,
         userAspects: userAspects || [],
         recentInteractions: recentInteractions || [],
-        ratingSummary: ratingSummary || [],
         recentPastEvents: recentPastEvents || [],
       }, {
         recursionLimit: 15 // Allow more steps for complex interactions with retries
@@ -183,11 +171,11 @@ export class InteractionAgentGerald extends BaseAgent {
       let response = lastAiMessage?.content || "Gerald processed your request.";
       console.log('[GERALD] Final response:', response?.substring?.(0, 100) || response);
 
-      // Add assistant response to Zep
+      // Persist conversation to memory
       try {
-        await this.zepService.addAssistantMessage(context.userId, response);
+        await this.persistConversationToMemory(context, message, response);
       } catch (error) {
-        console.warn('[GERALD] Failed to add assistant message to Zep:', error);
+        console.warn('[GERALD] Failed to persist conversation to memory:', error);
       }
 
       return {
@@ -277,9 +265,6 @@ export class InteractionAgentGerald extends BaseAgent {
       // Build recent interaction context
       const recentInteractionContext = self.buildRecentInteractionContext(state.recentInteractions);
 
-      // Build rating context
-      const ratingContext = self.buildRatingContext(state.ratingSummary);
-
       // Build recent activity context (past 7 days)
       const recentActivityContext = self.buildRecentActivityContext(state.recentPastEvents, state.timezone);
 
@@ -299,7 +284,6 @@ export class InteractionAgentGerald extends BaseAgent {
         toolCount: tools.length,
         rulesContext,
         recentInteractionContext,
-        ratingContext,
         recentActivityContext,
       };
 

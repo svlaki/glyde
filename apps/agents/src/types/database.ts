@@ -26,7 +26,7 @@ export interface DatabaseEvent {
   visibility?: 'private' | 'friends' | 'public' | 'shared';  // Event visibility setting
 
   // Shared event metadata (populated when user is a member)
-  user_role?: 'owner' | 'editor' | 'viewer';
+  user_role?: 'owner' | 'member' | 'viewer';
   member_count?: number;
 
   // Post-event metadata

@@ -34,7 +34,7 @@ router.get('/:eventId/members', authenticateRequest, async (req: Request, res: R
 })
 
 /**
- * Add member to event
+ * Add member to event (sends invite, status = pending)
  * POST /shared-events/:eventId/members
  * Body: { userId, role }
  */
@@ -51,8 +51,8 @@ router.post('/:eventId/members', authenticateRequest, async (req: Request, res: 
       return res.status(400).json({ success: false, error: 'Missing required fields' })
     }
 
-    if (!['editor', 'viewer'].includes(role)) {
-      return res.status(400).json({ success: false, error: 'Invalid role' })
+    if (!['member', 'viewer'].includes(role)) {
+      return res.status(400).json({ success: false, error: 'Invalid role. Must be "member" or "viewer"' })
     }
 
     const supabase = getSupabaseClient()
@@ -63,6 +63,54 @@ router.post('/:eventId/members', authenticateRequest, async (req: Request, res: 
     return res.status(statusCode).json(result)
   } catch (error) {
     console.error('Error adding event member:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Accept event invite
+ * POST /shared-events/:eventId/accept
+ */
+router.post('/:eventId/accept', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { eventId } = req.params
+
+    const supabase = getSupabaseClient()
+    const service = new SharedEventService(supabase)
+
+    const result = await service.acceptInvite(eventId, userId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error accepting event invite:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * Decline event invite
+ * POST /shared-events/:eventId/decline
+ */
+router.post('/:eventId/decline', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const userId = req.authUserId
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' })
+    }
+    const { eventId } = req.params
+
+    const supabase = getSupabaseClient()
+    const service = new SharedEventService(supabase)
+
+    const result = await service.declineInvite(eventId, userId)
+    const statusCode = result.success ? 200 : 400
+    return res.status(statusCode).json(result)
+  } catch (error) {
+    console.error('Error declining event invite:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -81,8 +129,8 @@ router.put('/:eventId/members/:memberId', authenticateRequest, async (req: Reque
     const { eventId, memberId } = req.params
     const { role } = req.body
 
-    if (!role || !['editor', 'viewer'].includes(role)) {
-      return res.status(400).json({ success: false, error: 'Invalid role' })
+    if (!role || !['member', 'viewer'].includes(role)) {
+      return res.status(400).json({ success: false, error: 'Invalid role. Must be "member" or "viewer"' })
     }
 
     const supabase = getSupabaseClient()

@@ -30,7 +30,7 @@ export interface CalendarEvent {
   // Visibility settings
   visibility?: 'private' | 'friends' | 'public' | 'shared'
   // Shared event metadata
-  user_role?: 'owner' | 'editor' | 'viewer'
+  user_role?: 'owner' | 'member' | 'viewer'
   member_count?: number
   // Post-event metadata
   reflection?: string

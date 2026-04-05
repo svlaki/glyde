@@ -30,8 +30,7 @@ const mockState = {
 const {
   mockSupabaseService,
   mockRuleService,
-  mockZepMemoryService,
-  mockZepGraphService,
+  mockMemoryService,
   mockAspectService,
 } = vi.hoisted(() => {
   // Create mock factories inline to avoid import issues
@@ -176,46 +175,15 @@ const {
     formatRulesForPrompt: vi.fn().mockReturnValue(''),
   };
 
-  const mockZepMemoryService = {
-    getOrCreateSession: vi.fn().mockResolvedValue('test-session-id'),
-    getThreadContext: vi.fn().mockResolvedValue(''),
-    addUserMessage: vi.fn().mockResolvedValue(undefined),
-    addAssistantMessage: vi.fn().mockResolvedValue(undefined),
-    addConversation: vi.fn().mockResolvedValue(undefined),
-    initUser: vi.fn().mockResolvedValue(undefined),
-    getMemoryContext: vi.fn().mockResolvedValue({
-      shortTerm: {
-        sessionId: 'test-session-id',
-        messages: [],
-        context: '',
-        lastUpdated: new Date().toISOString(),
-      },
-      longTerm: {
-        userId: 'test-user-id',
-        profile: { id: 'test-user-id', email: '', timezone: '', preferences: {} },
-        preferences: {},
-        goals: [],
-        insights: [],
-        lastUpdated: new Date().toISOString(),
-      },
-      entity: { entities: {}, relationships: {} },
-      vector: { recentEvents: [], recentChats: [], semanticContext: '' },
-    }),
-  };
-
-  const mockZepGraphService = {
-    addCalendarEvent: vi.fn().mockResolvedValue('graph-event-id'),
-    updateCalendarEvent: vi.fn().mockResolvedValue(undefined),
-    deleteCalendarEvent: vi.fn().mockResolvedValue(undefined),
-    addTask: vi.fn().mockResolvedValue('graph-task-id'),
-    deleteTask: vi.fn().mockResolvedValue(undefined),
-    addGoal: vi.fn().mockResolvedValue('graph-goal-id'),
-    deleteGoal: vi.fn().mockResolvedValue(undefined),
-    searchUserGraphAdvanced: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
-    getEnhancedUserContext: vi.fn().mockResolvedValue({}),
-    searchEntities: vi.fn().mockResolvedValue([]),
-    searchEvents: vi.fn().mockResolvedValue([]),
-    searchTasks: vi.fn().mockResolvedValue([]),
+  const mockMemoryService = {
+    getUserContext: vi.fn().mockResolvedValue(''),
+    persistConversation: vi.fn().mockResolvedValue(undefined),
+    searchFacts: vi.fn().mockResolvedValue([]),
+    addFact: vi.fn().mockResolvedValue(undefined),
+    addFacts: vi.fn().mockResolvedValue(undefined),
+    invalidateFacts: vi.fn().mockResolvedValue(undefined),
+    seedOnboardingData: vi.fn().mockResolvedValue(undefined),
+    rebuildUserContext: vi.fn().mockResolvedValue(''),
   };
 
   const mockAspectService = {
@@ -247,8 +215,7 @@ const {
   return {
     mockSupabaseService,
     mockRuleService,
-    mockZepMemoryService,
-    mockZepGraphService,
+    mockMemoryService,
     mockAspectService,
   };
 });
@@ -270,22 +237,15 @@ vi.mock('../../../../services/RuleService.js', () => ({
   RuleService: vi.fn(() => mockRuleService),
 }));
 
-vi.mock('../../../../services/ZepMemoryService.js', () => ({
-  ZepMemoryService: vi.fn(() => mockZepMemoryService),
-}));
-
-vi.mock('../../../../services/ZepGraphService.js', () => ({
-  ZepGraphService: vi.fn(() => mockZepGraphService),
+vi.mock('../../../../services/MemoryService.js', () => ({
+  MemoryService: {
+    getInstance: () => mockMemoryService,
+  },
 }));
 
 vi.mock('../../../../services/AspectService.js', () => ({
   default: mockAspectService,
   AspectService: vi.fn(() => mockAspectService),
-}));
-
-// Mock Zep sync helper
-vi.mock('../../../../utils/zep-sync-helper.js', () => ({
-  executeZepOperation: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock environment variables
@@ -296,7 +256,6 @@ vi.mock('../../../../utils/env.js', () => ({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'test-openai-key',
     PORT: 8000,
     NODE_ENV: 'test',
-    ZEP_API_KEY: 'test-zep-key',
   },
   isDevelopment: false,
   ENV_PATH: '/test/.env',
@@ -424,7 +383,7 @@ function resetMocks() {
     ) || null;
   });
 
-  mockZepMemoryService.getThreadContext.mockResolvedValue('');
+  mockMemoryService.getUserContext.mockResolvedValue('');
 }
 
 /**

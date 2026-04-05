@@ -13,7 +13,7 @@ export interface Aspect {
   description?: string;
   context: AspectContext;
   display_order: number;
-  member_role?: 'owner' | 'editor' | 'viewer';
+  member_role?: 'owner' | 'member' | 'viewer';
   created_at: string;
   updated_at: string;
 }

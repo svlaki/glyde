@@ -1,156 +1,25 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
+import { formatTimeForUser } from "../../utils/timezoneUtils.js";
 
 export const deleteEventTool = tool(
-  async ({ eventId, searchQuery }, config) => {
+  async ({ eventId }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone || 'America/Los_Angeles';
     if (!userId) {
       throw new Error("User ID is required for deleting events");
     }
 
-    // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
 
-    let targetEventId = eventId;
-
-    // If no eventId provided, search for the event using improved fuzzy search
-    if (!targetEventId) {
-      if (!searchQuery) {
-        throw new Error("Either eventId or searchQuery must be provided");
-      }
-
-      console.log('🔍 [DELETE-EVENT TOOL] Searching for event to delete:', searchQuery);
-
-      try {
-        // Get all events and filter to upcoming ones
-        // We include ALL future events to ensure "tomorrow" events are found regardless of timezone
-        const allEvents = await supabaseService.getEventsForAgent(userId);
-        const now = new Date();
-
-        // Use current UTC time minus 24 hours to ensure we don't miss events
-        // that might appear as "today" in the user's timezone but are technically
-        // "yesterday" in UTC (e.g., late night events in US timezones)
-        const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        console.log(`🔍 [DELETE-EVENT TOOL] Filtering events from ${cutoffTime.toISOString()} onwards`);
-        console.log(`🔍 [DELETE-EVENT TOOL] Total events before filter: ${allEvents.length}`);
-
-        // Include events from cutoff onwards (gives 24h buffer for timezone differences)
-        const recentEvents = allEvents.filter((event: any) => {
-          const eventDate = new Date(event.start_time);
-          return eventDate >= cutoffTime;
-        });
-
-        console.log(`🔍 [DELETE-EVENT TOOL] Searching in ${recentEvents.length} recent events`);
-
-        // Normalize search query - remove common words and split
-        const normalizedQuery = searchQuery.toLowerCase().trim();
-        const queryWords = normalizedQuery.split(/\s+/).filter(word =>
-          word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
-        );
-
-        // Find matching events with fuzzy logic
-        const matchingEvents = recentEvents.filter((event: any) => {
-          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-
-          // Check if any significant query words are in the event text
-          const hasMatch = queryWords.some(word => searchText.includes(word));
-
-          // Or check if the search text contains the full query
-          const hasFullMatch = searchText.includes(normalizedQuery);
-
-          return hasMatch || hasFullMatch;
-        });
-
-        // Sort by relevance - prefer title matches and sooner dates
-        matchingEvents.sort((a, b) => {
-          const aTitle = a.title.toLowerCase();
-          const bTitle = b.title.toLowerCase();
-
-          // Check how many query words match in title
-          const aMatches = queryWords.filter(word => aTitle.includes(word)).length;
-          const bMatches = queryWords.filter(word => bTitle.includes(word)).length;
-
-          // If match counts are equal, sort by date (sooner first)
-          if (bMatches === aMatches) {
-            return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-          }
-          return bMatches - aMatches;
-        });
-
-        if (matchingEvents.length === 0) {
-          // Check if there are older matching events
-          const olderMatches = allEvents.filter((event: any) => {
-            const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-            const hasMatch = queryWords.some(word => searchText.includes(word));
-            const hasFullMatch = searchText.includes(normalizedQuery);
-            return (hasMatch || hasFullMatch) && new Date(event.start_time) < now;
-          });
-
-          if (olderMatches.length > 0) {
-            throw new Error(`No upcoming events found matching "${searchQuery}". I found ${olderMatches.length} older event(s) with that name. Did you mean one of those? Please specify the date if you want to delete an old event.`);
-          }
-
-          throw new Error(`No events found matching: "${searchQuery}". Recent events: ${recentEvents.map(e => e.title).join(', ')}`);
-        }
-
-        if (matchingEvents.length > 1) {
-          // Check if all matches are instances of the same recurring series
-          const parentIds = new Set(
-            matchingEvents
-              .map((e: any) => e.parent_event_id || (e.is_recurring ? e.id : null))
-              .filter(Boolean)
-          );
-
-          if (parentIds.size === 1) {
-            // All matches belong to one recurring series — delete the entire series
-            const parentId = Array.from(parentIds)[0] as string;
-            console.log(`[DELETE-EVENT TOOL] All ${matchingEvents.length} matches belong to recurring series ${parentId}, deleting entire series`);
-
-            const success = await supabaseService.deleteRecurringEventSeries(userId, parentId);
-            if (!success) {
-              throw new Error('Failed to delete recurring event series');
-            }
-
-            // Fire-and-forget graph cleanup
-            zepGraphService.deleteCalendarEvent(userId, parentId, matchingEvents[0].title).catch(() => {});
-
-            return `EVENT: Deleted recurring series "${matchingEvents[0].title}" and all ${matchingEvents.length} instances.`;
-          }
-
-          // Multiple matches from different events - ask for clarification
-          const eventsList = matchingEvents.slice(0, 5).map((e: any) => {
-            const eventDate = new Date(e.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            return `- ${e.title} on ${eventDate} at ${new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-          }).join('\n');
-
-          throw new Error(`Found ${matchingEvents.length} events matching "${searchQuery}". Which one should I delete?\n${eventsList}`);
-        }
-
-        targetEventId = matchingEvents[0].id;
-        console.log('[DELETE-EVENT TOOL] Found event to delete:', matchingEvents[0].title);
-      } catch (error) {
-        console.error('[DELETE-EVENT TOOL] Search error:', error);
-        throw new Error(`Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-
-    if (!targetEventId) {
-      throw new Error("Failed to identify event to delete - this should not happen");
-    }
-
-    // Get event details before deletion for response
+    // Look up the event (expanded) to check if it's a recurring instance
     const allEvents = await supabaseService.getEvents(userId);
-    const eventToDelete = allEvents.find((e: any) => e.id === targetEventId);
-
+    const eventToDelete = allEvents.find((e: any) => e.id === eventId);
     const eventTitle = eventToDelete?.title || 'Unknown event';
 
-    // Check if this is a recurring event instance
+    // Handle recurring event instance — delete just this occurrence
     if (eventToDelete?.is_instance && eventToDelete?.parent_event_id) {
-      // Delete just this instance of the recurring event
       console.log(`[DELETE-EVENT TOOL] Deleting recurring instance for date: ${eventToDelete.instance_date}`);
 
       const instanceDeleted = await supabaseService.deleteRecurringEventInstance(
@@ -160,17 +29,13 @@ export const deleteEventTool = tool(
       );
 
       if (!instanceDeleted) {
-        throw new Error(`Failed to delete recurring event instance`);
+        throw new Error('Failed to delete recurring event instance');
       }
 
-      console.log(`[DELETE-EVENT TOOL] Recurring instance "${eventTitle}" deleted successfully`);
-
-      // Format event time for response
       let timeInfo = '';
-      if (eventToDelete?.start_time) {
-        const startDate = new Date(eventToDelete.start_time);
-        const dateStr = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-        const timeStr = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      if (eventToDelete.start_time) {
+        const dateStr = formatTimeForUser(eventToDelete.start_time, timezone, 'EEEE, MMMM d');
+        const timeStr = formatTimeForUser(eventToDelete.start_time, timezone, 'h:mm a');
         timeInfo = ` on ${dateStr} at ${timeStr}`;
       }
 
@@ -178,36 +43,18 @@ export const deleteEventTool = tool(
     }
 
     // Regular event deletion
-    const deleteResult = await supabaseService.deleteEvent(userId, targetEventId, { source: 'agent', agentType: 'conversation' });
+    const deleteResult = await supabaseService.deleteEvent(userId, eventId, { source: 'agent', agentType: 'conversation' });
 
     if (!deleteResult.success) {
       throw new Error(`Failed to delete event: ${deleteResult.error}`);
     }
 
-    console.log(`[DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully from database`);
+    console.log(`[DELETE-EVENT TOOL] Event "${eventTitle}" deleted successfully`);
 
-    // Remove from knowledge graph asynchronously (fire-and-forget for speed)
-    const removeFromGraph = async () => {
-      try {
-        console.log('[DELETE-EVENT TOOL] Removing from knowledge graph (async)...');
-
-        await zepGraphService.deleteCalendarEvent(userId, targetEventId, eventTitle);
-
-        console.log(`[DELETE-EVENT TOOL] Event removed from knowledge graph`);
-      } catch (error) {
-        console.error('[DELETE-EVENT TOOL] Failed to remove event from knowledge graph (non-critical):', error);
-      }
-    };
-
-    // Fire and forget - don't await this
-    removeFromGraph();
-
-    // Format event time for response
     let timeInfo = '';
     if (eventToDelete?.start_time) {
-      const startDate = new Date(eventToDelete.start_time);
-      const dateStr = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      const timeStr = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const dateStr = formatTimeForUser(eventToDelete.start_time, timezone, 'EEEE, MMMM d');
+      const timeStr = formatTimeForUser(eventToDelete.start_time, timezone, 'h:mm a');
       timeInfo = ` from ${dateStr} at ${timeStr}`;
     }
 
@@ -215,10 +62,9 @@ export const deleteEventTool = tool(
   },
   {
     name: "delete_event",
-    description: "Delete an event by ID or search query.",
+    description: "Delete an event by ID. Get the #ID from your CALENDAR context or from search_events.",
     schema: z.object({
-      eventId: z.string().optional().nullable().describe("Event UUID (optional)"),
-      searchQuery: z.string().describe("Fuzzy search to find and delete event"),
+      eventId: z.string().describe("Event UUID from CALENDAR context (#ID) or search_events results"),
     }),
   }
 );

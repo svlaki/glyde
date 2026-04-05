@@ -28,11 +28,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
 
       console.log(`[MARGARET] Processing for user ${context.userId} in timezone ${userTimezone}`);
 
-      try {
-        await this.zepService.addUserMessage(context.userId, message);
-      } catch (error) {
-        console.warn('[MARGARET] Failed to add user message to Zep:', error);
-      }
+      // Memory context loaded via base class
 
       const [events, tasks, goals, aspects] = await Promise.all([
         supabaseService.getEvents(context.userId),
@@ -72,9 +68,9 @@ export class MaintenanceAgentMargaret extends BaseAgent {
       const response = result.content?.toString?.() || "Margaret completed the maintenance review.";
 
       try {
-        await this.zepService.addAssistantMessage(context.userId, response);
+        await this.persistConversationToMemory(context, message, response);
       } catch (error) {
-        console.warn('[MARGARET] Failed to add assistant message to Zep:', error);
+        console.warn('[MARGARET] Failed to persist conversation to memory:', error);
       }
 
       return {
