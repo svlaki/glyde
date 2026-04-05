@@ -18,6 +18,7 @@ export async function runScheduler(userId: string, character: CharacterSheet): P
     userId,
     sessionId: `eval-${character.id}`,
     timezone: character.onboardingData.timezone,
+    conversationHistory: [],
   };
 
   const result = await agent.processMessage(

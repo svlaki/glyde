@@ -206,14 +206,15 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
     }))
   }, [isPanning, svgPoint])
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    const wasPanning = isPanning
+  const handleMouseUp = useCallback((_e: React.MouseEvent) => {
     setIsPanning(false)
-    if (wasPanning && !didDragRef.current && e.button === 0) {
-      const rect = containerRef.current?.getBoundingClientRect()
-      if (rect) setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, visible: true })
-    }
-  }, [isPanning])
+  }, [])
+
+  const handleBgContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (rect) setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, visible: true })
+  }, [])
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
@@ -253,7 +254,7 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
         onMouseUp={handleMouseUp}
         onMouseLeave={() => setIsPanning(false)}
         onWheel={handleWheel}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={handleBgContextMenu}
       >
         {/* Links */}
         {links.map(link => {
@@ -427,7 +428,7 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
               <div>Drag nodes to rearrange</div>
               <div>Double-click to start linking</div>
               <div>Link existing connection to remove it</div>
-              <div>Click empty space for menu</div>
+              <div>Right-click empty space for menu</div>
               <div>Scroll to zoom</div>
             </div>
           </div>

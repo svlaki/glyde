@@ -11,6 +11,7 @@ export interface SchedulerPromptContext {
   openSuggestions: string;
   activeSlots: string;
   recentFeedback: string;
+  dismissedSuggestions: string;
 }
 
 export function buildSchedulerSystemPrompt(context: SchedulerPromptContext): SystemMessage {
@@ -41,6 +42,9 @@ ${context.openSuggestions}
 ACTIVE SUGGESTION SLOTS (already placed):
 ${context.activeSlots}
 
+RECENTLY DISMISSED/ARCHIVED SUGGESTIONS (DO NOT recreate these or anything similar):
+${context.dismissedSuggestions}
+
 RECENT USER FEEDBACK:
 ${context.recentFeedback}
 
@@ -49,6 +53,8 @@ ${context.recentFeedback}
 If the backlog has fewer than 10 open suggestions, generate new ones FIRST using create_action_suggestion.
 
 CRITICAL: Every suggestion MUST be directly tied to one of the user's existing goals, tasks, aspects, or notes. NEVER generate generic filler suggestions like "watch a TED talk", "read a random article", "go for a walk", or "clean your desk" unless the user has a specific goal or task related to that activity.
+
+CRITICAL: NEVER recreate suggestions listed in DISMISSED/ARCHIVED above. The user rejected those. Do not create suggestions with similar titles or similar activities. If the tool returns "SKIPPED" it means you tried a duplicate -- choose something genuinely different.
 
 How to generate good suggestions:
 - Look at each ACTIVE GOAL. What is the next concrete step to advance it? Create a suggestion for that step.
@@ -65,11 +71,12 @@ For each suggestion you generate:
 - energy_level: "high" for deep focus work, "medium" for moderate tasks, "low" for planning/review
 - suggestion_type: "goal_step" if advancing a goal, "task_step" if completing a task, "habit" if recurring practice, "prep_step" if preparing for an event
 
-DURATION GUIDELINES:
-- Deep work (coding, writing, studying): 90-120 minutes
-- Moderate work (planning, reviewing, organizing): 60-90 minutes
-- Light tasks (scheduling, quick reviews, short reads): 60 minutes (minimum)
-- Only suggest 30-minute activities if they can genuinely fit as a quick task between events
+DURATION GUIDELINES (STRICT — follow these exactly):
+- Deep work (coding, writing, studying, problem sets, research): ALWAYS 90 or 120 minutes. NEVER 60.
+- Moderate work (planning, reviewing, organizing, note-taking): 60 or 90 minutes
+- Light tasks (scheduling, journaling, light admin): 60 minutes (absolute minimum for any suggestion)
+- Physical activity (gym, walking, running): 60 minutes minimum
+- NEVER create a suggestion with estimated_minutes below 60. The tool will reject it.
 
 ===== SLOT PLACEMENT RULES =====
 

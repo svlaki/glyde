@@ -66,7 +66,7 @@ export class SchedulerAgent extends BaseAgent {
 
       // Fetch tasks, notes, and feedback in parallel
       const client = supabaseService.getClient();
-      const [{ data: recentFeedback }, { data: userTasks }, { data: userNotes }] = await Promise.all([
+      const [{ data: recentFeedback }, { data: userTasks }, { data: userNotes }, { data: archivedSuggestions }] = await Promise.all([
         client
           .from('slot_feedback')
           .select('feedback_type, reason, created_at')
@@ -87,6 +87,13 @@ export class SchedulerAgent extends BaseAgent {
           .eq('status', 'active')
           .order('updated_at', { ascending: false })
           .limit(10),
+        client
+          .from('action_suggestions')
+          .select('title')
+          .eq('user_id', context.userId)
+          .eq('status', 'archived')
+          .order('updated_at', { ascending: false })
+          .limit(30),
       ]);
 
       const upcomingEvents = allEvents.filter(e => new Date(e.end_time) >= now);
@@ -157,6 +164,10 @@ export class SchedulerAgent extends BaseAgent {
         ? (recentFeedback || []).map((f: any) => `- ${f.feedback_type}${f.reason ? `: ${f.reason}` : ''}`).join('\n')
         : 'No recent feedback';
 
+      const dismissedContext = (archivedSuggestions || []).length > 0
+        ? (archivedSuggestions || []).map((s: any) => `- "${s.title}"`).join('\n')
+        : 'None dismissed yet';
+
       const systemPrompt = buildSchedulerSystemPrompt({
         timezone: userTimezone,
         currentTime,
@@ -168,6 +179,7 @@ export class SchedulerAgent extends BaseAgent {
         openSuggestions: openSuggestionsContext,
         activeSlots: activeSlotsContext,
         recentFeedback: feedbackContext,
+        dismissedSuggestions: dismissedContext,
       });
 
       const result = await this.graph.invoke(

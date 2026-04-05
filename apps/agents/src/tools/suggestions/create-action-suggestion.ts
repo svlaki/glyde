@@ -8,6 +8,9 @@ export const createActionSuggestionTool = tool(
     if (!userId) return "User ID required";
 
     try {
+      // Enforce minimum 60 minutes
+      const minutes = estimated_minutes && estimated_minutes < 60 ? 60 : estimated_minutes;
+
       const service = new SuggestionService();
       const suggestion = await service.createSuggestion(userId, {
         title,
@@ -16,12 +19,12 @@ export const createActionSuggestionTool = tool(
         source_entity_type,
         source_entity_id,
         aspect_id,
-        estimated_minutes,
+        estimated_minutes: minutes,
         energy_level,
         metadata,
       });
 
-      if (!suggestion) return "Failed to create action suggestion";
+      if (!suggestion) return "SKIPPED: A similar suggestion already exists (open or previously dismissed). Generate a DIFFERENT suggestion with a unique title.";
 
       return `Created action suggestion: "${suggestion.title}" (${suggestion.suggestion_type}, ${suggestion.estimated_minutes || '?'} min)`;
     } catch (error) {

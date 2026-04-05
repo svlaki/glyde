@@ -73,6 +73,29 @@ export class SuggestionService {
 
   async createSuggestion(userId: string, input: CreateSuggestionRequest): Promise<ActionSuggestion | null> {
     try {
+      // Dedup: reject if a suggestion with a very similar title already exists (any status)
+      const { data: existing } = await this.supabase
+        .from('action_suggestions')
+        .select('id, title, status')
+        .eq('user_id', userId)
+        .in('status', ['open', 'archived', 'snoozed']);
+
+      if (existing && existing.length > 0) {
+        const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const inputNorm = normalise(input.title);
+        const duplicate = existing.find(e => {
+          const existNorm = normalise(e.title);
+          // Exact match after normalisation, or one is a substring of the other (>80% overlap)
+          return existNorm === inputNorm
+            || (inputNorm.length > 10 && existNorm.includes(inputNorm))
+            || (existNorm.length > 10 && inputNorm.includes(existNorm));
+        });
+        if (duplicate) {
+          logger.info(`[SuggestionService] Dedup: skipping "${input.title}" — similar to existing "${duplicate.title}" (${duplicate.status})`);
+          return null;
+        }
+      }
+
       const { data, error } = await this.supabase
         .from('action_suggestions')
         .insert({
@@ -171,27 +194,56 @@ export class SuggestionService {
         return null;
       }
 
-      // Check for overlap with calendar events INCLUDING recurring instances
-      // Use getExpandedEvents which resolves recurrence rules
-      const { getSupabaseService } = await import('./SupabaseService.js');
-      const supabaseService = getSupabaseService();
-      const expandedEvents = await supabaseService.getExpandedEvents(
-        userId,
-        input.start_time,
-        input.end_time
-      );
+      // Check for overlap with calendar events using direct overlap query
+      // The RPC get_events_with_aspects uses containment semantics (not overlap),
+      // so we query directly with proper overlap logic: event starts before slot ends AND event ends after slot starts
+      const { data: overlappingEvents } = await this.supabase
+        .from('events')
+        .select('id, title, start_time, end_time, is_recurring, recurrence_rule, recurrence_end')
+        .eq('user_id', userId)
+        .is('parent_event_id', null);
 
       const slotStartMs = new Date(input.start_time).getTime();
       const slotEndMs = new Date(input.end_time).getTime();
-      const hasEventOverlap = expandedEvents.some(e => {
+
+      // Check non-recurring events for direct overlap
+      const nonRecurring = (overlappingEvents || []).filter(e => !e.is_recurring);
+      const hasNonRecurringOverlap = nonRecurring.some(e => {
         const eStart = new Date(e.start_time).getTime();
         const eEnd = new Date(e.end_time).getTime();
         return eStart < slotEndMs && eEnd > slotStartMs;
       });
 
-      if (hasEventOverlap) {
-        logger.warn('[SuggestionService] Slot overlaps with calendar event (including recurring), rejecting');
+      if (hasNonRecurringOverlap) {
+        logger.warn('[SuggestionService] Slot overlaps with non-recurring calendar event, rejecting');
         return null;
+      }
+
+      // Check recurring events by expanding instances around the slot window
+      const recurring = (overlappingEvents || []).filter(e => e.is_recurring && e.recurrence_rule);
+      if (recurring.length > 0) {
+        try {
+          const { expandRecurrenceWithEndTime } = await import('../utils/rrule.js');
+          for (const event of recurring) {
+            // Expand recurring instances up to the slot end time
+            const expandUntil = new Date(slotEndMs + 24 * 60 * 60 * 1000);
+            const instances = expandRecurrenceWithEndTime(
+              event.recurrence_rule,
+              new Date(event.start_time),
+              new Date(event.end_time),
+              expandUntil
+            );
+            const recurringOverlap = instances.some((inst: { start: Date; end: Date }) => {
+              return inst.start.getTime() < slotEndMs && inst.end.getTime() > slotStartMs;
+            });
+            if (recurringOverlap) {
+              logger.warn(`[SuggestionService] Slot overlaps with recurring event "${event.title}", rejecting`);
+              return null;
+            }
+          }
+        } catch (rruleErr) {
+          logger.error('[SuggestionService] Error expanding recurrence for overlap check:', rruleErr);
+        }
       }
 
       const { data, error } = await this.supabase
