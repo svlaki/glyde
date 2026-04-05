@@ -36,10 +36,14 @@ import { getUserEvents, createUserEvent, updateUserEvent, deleteUserEvent, creat
 import { getUserTasks, createUserTask, updateUserTask, deleteUserTask, completeUserTask } from './tasks.js';
 import { getUserGoals, createUserGoal, updateUserGoal, deleteUserGoal, addGoalCheckIn, getGoalCheckIns } from './goals.js';
 import { getUserNotes, createUserNotes, updateUserNotes, deleteUserNotes } from './notes.js';
+import { getNoteGraph, syncNoteLinks, searchNotes, getBacklinks, searchNotesFulltext } from './noteLinks.js';
+import { getNoteTemplates, createNoteTemplate, deleteNoteTemplate } from './noteTemplates.js';
+import { getKnowledgeGraph, createEntityLink, deleteEntityLink, saveGraphPositions } from './knowledgeGraph.js';
 import { getUserProfile, updateUserProfile, updateProfileField, batchUpdateProfileFields } from './profile.js';
 import { getUserAspects, createUserAspect, updateUserAspect, deleteUserAspect, getAspectColor, archiveUserAspect, unarchiveUserAspect, getArchivedAspects } from './aspects.js';
 import { getUserProjects, createUserProject, updateUserProject, deleteUserProject, archiveUserProject, unarchiveUserProject, getArchivedProjects as getArchivedUserProjects, getProjectDetail, tagEntityToProject } from './projects.js';
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
+import { listUserSuggestions, createUserSuggestion, updateUserSuggestion, listUserSlots, createUserSlot, moveUserSlot, resizeUserSlot, swapUserSlot, confirmUserSlot, dismissUserSlot, replenishUserSlots, generateSuggestionsBatch } from './suggestions.js';
 import { getUserRatings, getRatingSummary, createRating, deleteRatingTopic, updateRatingTopic, reorderRatingTopics } from './ratings.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
@@ -367,6 +371,20 @@ app.post('/api/notes', getUserNotes);
 app.post('/api/notes/create', createUserNotes);
 app.post('/api/notes/update', updateUserNotes);
 app.post('/api/notes/delete', deleteUserNotes);
+app.post('/api/notes/graph', getNoteGraph);
+app.post('/api/notes/links/sync', syncNoteLinks);
+app.post('/api/notes/search', searchNotes);
+app.post('/api/notes/backlinks', getBacklinks);
+app.post('/api/notes/search/fulltext', searchNotesFulltext);
+app.post('/api/notes/templates', getNoteTemplates);
+app.post('/api/notes/templates/create', createNoteTemplate);
+app.post('/api/notes/templates/delete', deleteNoteTemplate);
+
+// Knowledge graph endpoints
+app.post('/api/knowledge-graph', getKnowledgeGraph);
+app.post('/api/knowledge-graph/link', createEntityLink);
+app.post('/api/knowledge-graph/link/delete', deleteEntityLink);
+app.post('/api/knowledge-graph/positions', saveGraphPositions);
 
 // Profile endpoints
 app.post('/api/profile', getUserProfile);
@@ -394,6 +412,20 @@ app.post('/api/projects/unarchive', unarchiveUserProject);
 app.post('/api/projects/archived', getArchivedUserProjects);
 app.post('/api/projects/detail', getProjectDetail);
 app.post('/api/projects/tag', tagEntityToProject);
+
+// Suggestion slots endpoints
+app.post('/api/suggestions/list', listUserSuggestions);
+app.post('/api/suggestions/create', createUserSuggestion);
+app.post('/api/suggestions/update', updateUserSuggestion);
+app.post('/api/slots/list', listUserSlots);
+app.post('/api/slots/create', createUserSlot);
+app.post('/api/slots/move', moveUserSlot);
+app.post('/api/slots/resize', resizeUserSlot);
+app.post('/api/slots/swap', swapUserSlot);
+app.post('/api/slots/confirm', confirmUserSlot);
+app.post('/api/slots/dismiss', dismissUserSlot);
+app.post('/api/slots/replenish', replenishUserSlots);
+app.post('/api/suggestions/generate-batch', generateSuggestionsBatch);
 
 // Onboarding endpoints
 app.post('/api/onboarding/complete', completeOnboarding);

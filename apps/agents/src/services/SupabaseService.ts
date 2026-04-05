@@ -3117,6 +3117,407 @@ export class SupabaseService {
     return this.deleteRecord('notes', userId, notesId, 'notes');
   }
 
+  // ==================== NOTE LINKS (Knowledge Graph) ====================
+
+  /**
+   * Get the full note graph (nodes + links) for a user
+   */
+  async getNoteGraph(userId: string): Promise<{ nodes: any[]; links: any[] }> {
+    try {
+      const { data, error } = await this.client
+        .rpc('get_note_graph', { p_user_id: userId });
+
+      if (error) {
+        console.error('Error fetching note graph:', error);
+        return { nodes: [], links: [] };
+      }
+
+      return {
+        nodes: data?.nodes || [],
+        links: data?.links || []
+      };
+    } catch (error) {
+      console.error('Exception fetching note graph:', error);
+      return { nodes: [], links: [] };
+    }
+  }
+
+  /**
+   * Sync wiki-links for a note: resolves titles to IDs, diffs and upserts links
+   */
+  async syncNoteLinks(userId: string, sourceNoteId: string, linkedTitles: string[]): Promise<{ success: boolean; error: string | null }> {
+    try {
+      if (!this.isValidUUID(sourceNoteId)) {
+        return { success: false, error: 'Invalid source note ID' };
+      }
+
+      // Resolve titles to note IDs (case-insensitive)
+      const { data: matchedNotes, error: matchError } = await this.client
+        .from('notes')
+        .select('id, title')
+        .eq('user_id', userId)
+        .neq('id', sourceNoteId)
+        .neq('status', 'archived');
+
+      if (matchError) {
+        console.error('Error resolving note titles:', matchError);
+        return { success: false, error: 'Failed to resolve note titles' };
+      }
+
+      const titleToId = new Map<string, string>();
+      for (const note of matchedNotes || []) {
+        titleToId.set(note.title.toLowerCase(), note.id);
+      }
+
+      const targetIds = linkedTitles
+        .map(t => titleToId.get(t.toLowerCase()))
+        .filter((id): id is string => id !== undefined);
+
+      // Get existing links from this source
+      const { data: existingLinks, error: existError } = await this.client
+        .from('note_links')
+        .select('target_note_id')
+        .eq('source_note_id', sourceNoteId)
+        .eq('user_id', userId);
+
+      if (existError) {
+        console.error('Error fetching existing links:', existError);
+        return { success: false, error: 'Failed to fetch existing links' };
+      }
+
+      const existingTargetIds = new Set((existingLinks || []).map(l => l.target_note_id));
+      const desiredTargetIds = new Set(targetIds);
+
+      // Links to add
+      const toAdd = targetIds.filter(id => !existingTargetIds.has(id));
+      // Links to remove
+      const toRemove = [...existingTargetIds].filter(id => !desiredTargetIds.has(id));
+
+      // Insert new links
+      if (toAdd.length > 0) {
+        const rows = toAdd.map(targetId => ({
+          user_id: userId,
+          source_note_id: sourceNoteId,
+          target_note_id: targetId
+        }));
+
+        const { error: insertError } = await this.client
+          .from('note_links')
+          .insert(rows);
+
+        if (insertError) {
+          console.error('Error inserting note links:', insertError);
+        }
+      }
+
+      // Remove stale links
+      if (toRemove.length > 0) {
+        const { error: deleteError } = await this.client
+          .from('note_links')
+          .delete()
+          .eq('source_note_id', sourceNoteId)
+          .eq('user_id', userId)
+          .in('target_note_id', toRemove);
+
+        if (deleteError) {
+          console.error('Error removing stale note links:', deleteError);
+        }
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Exception syncing note links:', error);
+      return { success: false, error: 'Failed to sync note links' };
+    }
+  }
+
+  /**
+   * Get backlinks: notes that link TO the given note
+   */
+  async getNoteBacklinks(userId: string, noteId: string): Promise<any[]> {
+    try {
+      if (!this.isValidUUID(noteId)) {
+        return [];
+      }
+
+      const { data, error } = await this.client
+        .from('note_links')
+        .select('source_note_id, notes!note_links_source_note_id_fkey(id, title, content, aspect_id, updated_at, aspects!fk_notes_aspect(name, color))')
+        .eq('target_note_id', noteId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error fetching backlinks:', error);
+        // Fallback: query without join
+        const { data: linkData, error: linkError } = await this.client
+          .from('note_links')
+          .select('source_note_id')
+          .eq('target_note_id', noteId)
+          .eq('user_id', userId);
+
+        if (linkError || !linkData || linkData.length === 0) return [];
+
+        const sourceIds = linkData.map(l => l.source_note_id);
+        const { data: noteData } = await this.client
+          .from('notes')
+          .select('id, title, content, aspect_id, updated_at')
+          .in('id', sourceIds)
+          .eq('user_id', userId)
+          .neq('status', 'archived');
+
+        if (!noteData) return [];
+
+        // Get aspect info
+        const aspectIds = [...new Set(noteData.map(n => n.aspect_id).filter(Boolean))];
+        const { data: aspectData } = await this.client
+          .from('aspects')
+          .select('id, name, color')
+          .in('id', aspectIds);
+
+        const aspectMap = new Map((aspectData || []).map(a => [a.id, a]));
+
+        return noteData.map(n => ({
+          id: n.id,
+          title: n.title,
+          content: n.content,
+          aspect_name: aspectMap.get(n.aspect_id)?.name || null,
+          aspect_color: aspectMap.get(n.aspect_id)?.color || null,
+          updated_at: n.updated_at
+        }));
+      }
+
+      // Parse joined data
+      return (data || []).map((row: any) => {
+        const note = row.notes;
+        if (!note) return null;
+        const aspect = note.aspects;
+        return {
+          id: note.id,
+          title: note.title,
+          content: note.content,
+          aspect_name: aspect?.name || null,
+          aspect_color: aspect?.color || null,
+          updated_at: note.updated_at
+        };
+      }).filter(Boolean);
+    } catch (error) {
+      console.error('Exception fetching backlinks:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search notes by title for wiki-link autocomplete
+   */
+  async searchNotesByTitle(userId: string, query: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .rpc('search_notes_by_title', { p_user_id: userId, p_query: query });
+
+      if (error) {
+        console.error('Error searching notes:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception searching notes:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Full-text search across note title and content
+   */
+  async searchNotesFulltext(userId: string, query: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .rpc('search_notes_fulltext', { p_user_id: userId, p_query: query });
+
+      if (error) {
+        console.error('Error in fulltext search:', error);
+        // Fallback to ILIKE if tsvector not yet available
+        return this.searchNotesByTitle(userId, query);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception in fulltext search:', error);
+      return [];
+    }
+  }
+
+  // ==================== NOTE TEMPLATES ====================
+
+  async getNoteTemplates(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await this.client
+        .from('note_templates')
+        .select('*')
+        .or(`user_id.eq.${userId},is_system.eq.true`)
+        .order('is_system', { ascending: false })
+        .order('title');
+
+      if (error) {
+        console.error('Error fetching templates:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Exception fetching templates:', error);
+      return [];
+    }
+  }
+
+  async createNoteTemplate(userId: string, template: { title: string; content: string; aspect_id?: string }): Promise<any | null> {
+    try {
+      const { data, error } = await this.client
+        .from('note_templates')
+        .insert({
+          user_id: userId,
+          title: template.title,
+          content: template.content,
+          aspect_id: template.aspect_id || null,
+          is_system: false,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating template:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception creating template:', error);
+      return null;
+    }
+  }
+
+  async deleteNoteTemplate(userId: string, templateId: string): Promise<{ success: boolean; error: string | null }> {
+    try {
+      if (!this.isValidUUID(templateId)) {
+        return { success: false, error: 'Invalid template ID' };
+      }
+
+      const { error } = await this.client
+        .from('note_templates')
+        .delete()
+        .eq('id', templateId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error deleting template:', error);
+        return { success: false, error: 'Failed to delete template' };
+      }
+
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Exception deleting template:', error);
+      return { success: false, error: 'Failed to delete template' };
+    }
+  }
+
+  // ==================== KNOWLEDGE GRAPH ====================
+
+  async getKnowledgeGraph(userId: string): Promise<{ aspects: any[]; goals: any[]; notes: any[]; links: any[] }> {
+    try {
+      const { data, error } = await this.client
+        .rpc('get_knowledge_graph', { p_user_id: userId });
+
+      if (error) {
+        console.error('Error fetching knowledge graph:', error);
+        return { aspects: [], goals: [], notes: [], links: [] };
+      }
+
+      return {
+        aspects: data?.aspects || [],
+        goals: data?.goals || [],
+        notes: data?.notes || [],
+        links: data?.links || [],
+      };
+    } catch (error) {
+      console.error('Exception fetching knowledge graph:', error);
+      return { aspects: [], goals: [], notes: [], links: [] };
+    }
+  }
+
+  async createEntityLink(userId: string, sourceType: string, sourceId: string, targetType: string, targetId: string): Promise<{ id: string } | null> {
+    try {
+      const { data, error } = await this.client
+        .from('entity_links')
+        .insert({ user_id: userId, source_type: sourceType, source_id: sourceId, target_type: targetType, target_id: targetId })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Error creating entity link:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Exception creating entity link:', error);
+      return null;
+    }
+  }
+
+  async deleteEntityLink(userId: string, linkId: string): Promise<boolean> {
+    try {
+      const { error } = await this.client
+        .from('entity_links')
+        .delete()
+        .eq('id', linkId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error deleting entity link:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Exception deleting entity link:', error);
+      return false;
+    }
+  }
+
+  // ==================== GRAPH POSITIONS ====================
+
+  async getGraphPositions(userId: string): Promise<Record<string, { x: number; y: number }>> {
+    try {
+      const { data, error } = await this.client
+        .from('graph_node_positions')
+        .select('node_id, x, y')
+        .eq('user_id', userId);
+
+      if (error || !data) return {};
+      const result: Record<string, { x: number; y: number }> = {};
+      for (const row of data) result[row.node_id] = { x: row.x, y: row.y };
+      return result;
+    } catch { return {}; }
+  }
+
+  async saveGraphPositions(userId: string, positions: Record<string, { x: number; y: number }>): Promise<boolean> {
+    try {
+      const rows = Object.entries(positions).map(([nodeId, pos]) => ({
+        user_id: userId,
+        node_id: nodeId,
+        x: pos.x,
+        y: pos.y,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await this.client
+        .from('graph_node_positions')
+        .upsert(rows, { onConflict: 'user_id,node_id' });
+
+      return !error;
+    } catch { return false; }
+  }
+
   // ==================== LIFE PLANS ====================
 
   /**

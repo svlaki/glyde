@@ -3,6 +3,8 @@ import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
 import { InteractionAgentGerald } from '../agents/interaction-gerald/InteractionAgentGerald.js';
 import { MaintenanceAgentMargaret } from '../agents/maintenance-margaret/MaintenanceAgentMargaret.js';
+import { PlannerAgent } from '../agents/planner/PlannerAgent.js';
+import { SchedulerAgent } from '../agents/scheduler/SchedulerAgent.js';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 
 // Initialize the agent registry
@@ -19,10 +21,16 @@ async function initializeAgents(): Promise<void> {
 
   const maintenanceAgent = new MaintenanceAgentMargaret();
   await agentRegistry.registerAgent(maintenanceAgent);
+
+  const plannerAgent = new PlannerAgent();
+  await agentRegistry.registerAgent(plannerAgent);
+
+  const schedulerAgent = new SchedulerAgent();
+  await agentRegistry.registerAgent(schedulerAgent);
 }
 
 async function ensureAgentsInitialized(): Promise<void> {
-  if (agentRegistry.hasAgent('conversation') && agentRegistry.hasAgent('interaction') && agentRegistry.hasAgent('maintenance')) {
+  if (agentRegistry.hasAgent('conversation') && agentRegistry.hasAgent('interaction') && agentRegistry.hasAgent('maintenance') && agentRegistry.hasAgent('planner') && agentRegistry.hasAgent('scheduler')) {
     return;
   }
 

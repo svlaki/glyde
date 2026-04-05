@@ -19,6 +19,7 @@ import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
 import { RatingsPage } from './src/pages/RatingsPage'
 import { RemindersPage } from './src/pages/RemindersPage'
+import { GoalsPage } from './src/pages/GoalsPage'
 const AdminAnalyticsPage = React.lazy(() => import('./src/pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })))
 import { ProjectProvider } from './src/lib/projectContext'
 import { ProtectedRoute } from './src/components/ProtectedRoute'
@@ -227,7 +228,13 @@ function App() {
                 />
                 <Route
                   path="/goals"
-                  element={<Navigate to="/profile" replace />}
+                  element={
+                    <ProtectedRoute>
+                      <OnboardingCheck>
+                        <GoalsPage />
+                      </OnboardingCheck>
+                    </ProtectedRoute>
+                  }
                 />
                 <Route
                   path="/dashboard"

@@ -12,6 +12,7 @@ export interface Aspect {
   display_order?: number
   visibility?: 'private' | 'shared'
   member_role?: 'owner' | 'editor' | 'viewer'
+  archived_at?: string | null
   created_at?: string
   updated_at?: string
 }

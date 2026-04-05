@@ -9,6 +9,7 @@ User (Browser) --> Frontend (React/Vite :3000) --> Agent API (Express :8000) -->
                                                         +--> Zep Cloud (Memory)
                                                         +--> Tavily (Web Search)
                                                         +--> Google Calendar API
+                                                        +--> Microsoft Calendar API
 ```
 
 ## Database Schema
@@ -24,7 +25,7 @@ All tables in `public` schema with Row-Level Security (RLS) policies enforcing `
 | `events` | Calendar events | title, start_time, end_time, aspect_id (FK), recurrence_rule, is_public |
 | `tasks` | To-do items | title, status, priority, due_date, aspect_id (FK) |
 | `goals` | Goal tracking | title, description, status, progress, target_date, aspect_id (FK) |
-| `life_plans` | Multi-phase life plans | title, phases (JSONB), reflections |
+| `notes` | User notes (multi per user) | title, content, aspect_id (FK), created_at |
 | `rules` | Agent behavior constraints | rule_text, enabled, conditions |
 
 ### Interaction System
@@ -64,27 +65,32 @@ Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id
 
 | Agent | Class | Model | Purpose |
 |---|---|---|---|
-| Conversation | `ConversationAgent` | GPT-5.1 | Main chat interface, 55+ tools via LangGraph |
+| Conversation | `ConversationAgent` | GPT-5.1 | Main chat interface, 70+ tools via LangGraph |
 | Interaction (Gerald) | `InteractionAgentGerald` | GPT-5.1 | Proactive suggestions with follow-up chaining |
 | Maintenance (Margaret) | `MaintenanceAgentMargaret` | GPT-5.1 | Data hygiene audits, aspect maintenance |
+| Onboarding Enrichment | `OnboardingEnrichmentAgent` | GPT-5.1 | Enriches onboarding context for new users |
 
 ### Tool System
 
-`ToolRegistry` singleton manages 55+ tools across 11 categories:
+`ToolRegistry` singleton manages 70+ tools across 15 categories:
 
-| Category | Tools | Examples |
+| Category | Count | Examples |
 |---|---|---|
-| calendar | 8 | create_event, update_event, delete_event, create_recurring_event |
-| tasks | 6 | create_task, update_task, complete_task, list_tasks |
-| goals | 5 | create_goal, update_goal, check_in_goal |
-| aspects | 5 | create_aspect, update_aspect, list_aspects, archive_aspect |
-| profile | 3 | get_profile, update_profile |
-| memory | 4 | search_memory, add_memory_fact |
-| search | 2 | web_search, search_entities |
-| interactions | 2 | create_interaction, list_interactions |
+| calendar | 12 | create_event, update_event, delete_event, recurring, analyze, find-free-time, bulk |
+| friends | 9 | send-request, accept, decline, list, remove, add/remove-aspect, notes |
+| projects | 7 | create, update, delete, list, archive, unarchive, tag-to-project |
+| tasks | 6 | create_task, update_task, complete_task, list_tasks, search |
+| aspects | 5 | create_aspect, update_aspect, list_aspects, archive, delete |
+| goals | 5 | create_goal, update_goal, delete, check_in_goal, list |
+| shared-events | 4 | add-member, remove-member, get-members, update-role |
+| reminders | 4 | create, update, delete, list |
 | rules | 4 | create_rule, toggle_rule, delete_rule, list_rules |
-| plans | 3 | get_life_plan, update_life_plan |
-| social | 3 | list_friends, get_friend_details |
+| memory | 3 | search-unified, update-advanced, manage-patterns |
+| notes | 3 | create, get, update |
+| interactions | 2 | create_interaction, create_rating |
+| profile | 2 | get_profile, update_profile |
+| plans | 2 | get_plan, update_plan |
+| search | 2 | web_search, location_search |
 
 Gerald gets a restricted tool set via `getGeraldAgentTools()`.
 
@@ -123,7 +129,12 @@ POST /api/goals/*           # Goal CRUD
 POST /api/rules/*           # Rule management
 POST /api/interactions/*    # Interaction management
 POST /api/friends/*         # Social features
-POST /api/plan/*            # Life plan management
+POST /api/notes/*           # Notes management
+POST /api/projects/*        # Project management
+POST /api/reminders/*       # Reminder management
+POST /api/ratings/*         # Ratings
+POST /api/push/*            # Push notifications
+POST /api/analytics/*       # Analytics
 POST /api/connections/*     # OAuth connections
 POST /api/calendar-mappings/* # Calendar sync
 ```
@@ -135,7 +146,7 @@ React 18 + Vite + TypeScript + TailwindCSS.
 ### Context Providers
 
 ```
-AuthProvider > DarkModeProvider > RuleProvider > ConnectionProvider > AspectProvider
+AuthProvider > ThemeProvider > RuleProvider > ConnectionProvider > AspectProvider > ProjectProvider
 ```
 
 ### Key Components
@@ -143,7 +154,7 @@ AuthProvider > DarkModeProvider > RuleProvider > ConnectionProvider > AspectProv
 - `Calendar.tsx` - Main calendar view with day/week/month modes
 - `ChatBot.tsx` - Conversation interface with streaming responses
 - `FriendsSection.tsx` - Friend management, aspect tagging, notes
-- `PlanPage.tsx` - Life plan editor with resizable panels and embedded chat
+- `NotesPage.tsx` - Notes editor with aspect-based organization
 - `AspectBreakdownCard.tsx` - Aspect distribution visualization
 
 ### Data Flow

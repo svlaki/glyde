@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useTheme } from '../lib/themeContext'
 import { useAspects } from '../lib/aspectContext'
-import { createUserAspect, updateUserAspect, deleteUserAspect } from '../lib/aspectService'
+import { createUserAspect, updateUserAspect, deleteUserAspect, archiveUserAspect, unarchiveUserAspect, fetchArchivedAspects } from '../lib/aspectService'
 import type { Aspect } from '../lib/aspectService'
 import { updateEvent, deleteEvent } from '../lib/calendarService'
 import type { CalendarEvent } from '../lib/calendarService'
@@ -47,6 +47,48 @@ function AspectsPageMobile() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active')
+  const [archivedAspects, setArchivedAspects] = useState<Aspect[]>([])
+  const [archivedLoading, setArchivedLoading] = useState(false)
+
+  const loadArchivedAspects = useCallback(async () => {
+    if (!user || !session) return
+    setArchivedLoading(true)
+    const { aspects: archived } = await fetchArchivedAspects(user, session.access_token)
+    setArchivedAspects(archived)
+    setArchivedLoading(false)
+  }, [user, session])
+
+  useEffect(() => {
+    if (activeTab === 'archived') {
+      loadArchivedAspects()
+    }
+  }, [activeTab, loadArchivedAspects])
+
+  const displayedAspects = activeTab === 'active' ? aspects : archivedAspects
+
+  const handleArchiveAspect = async (aspect: Aspect) => {
+    if (!user || !session) return
+    const { success } = await archiveUserAspect(user, aspect.id, session.access_token)
+    if (success) {
+      if (selectedAspect?.id === aspect.id) {
+        setSelectedAspect(null)
+      }
+      await refreshAspects()
+    }
+  }
+
+  const handleUnarchiveAspect = async (aspect: Aspect) => {
+    if (!user || !session) return
+    const { success } = await unarchiveUserAspect(user, aspect.id, session.access_token)
+    if (success) {
+      if (selectedAspect?.id === aspect.id) {
+        setSelectedAspect(null)
+      }
+      await refreshAspects()
+      await loadArchivedAspects()
+    }
+  }
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
@@ -174,9 +216,14 @@ function AspectsPageMobile() {
         }}>
           <GoalsByAspect
             aspect={selectedAspect}
-            onEdit={selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
-            onDelete={selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
-            onDescriptionUpdate={selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
+            onEdit={activeTab === 'active' && selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={activeTab === 'active' && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
+            onArchive={selectedAspect.member_role === 'owner'
+              ? () => activeTab === 'archived'
+                ? handleUnarchiveAspect(selectedAspect)
+                : handleArchiveAspect(selectedAspect)
+              : undefined}
+            onDescriptionUpdate={activeTab === 'active' && selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
             onEditEvent={(event) => setEditingEvent(event)}
             onEditTask={(task) => setEditingTask(task)}
             onEditGoal={(goal) => setEditingGoal(goal)}
@@ -224,7 +271,7 @@ function AspectsPageMobile() {
         title="Aspects"
         showMenu={true}
         showSearch={true}
-        actions={
+        actions={activeTab === 'active' ?
         <button
           onClick={handleCreateAspect}
           className="btn btn-primary"
@@ -241,7 +288,7 @@ function AspectsPageMobile() {
         >
           New
         </button>
-        }
+        : undefined}
       />
 
       <div style={{
@@ -251,7 +298,40 @@ function AspectsPageMobile() {
         paddingTop: '16px',
         paddingBottom: 'calc(20px + env(safe-area-inset-bottom))'
       }}>
-        {loading ? (
+        {/* Active / Archived Tabs */}
+        <div style={{
+          display: 'flex',
+          gap: '0',
+          marginBottom: '16px',
+          borderRadius: '6px',
+          overflow: 'hidden',
+          border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        }}>
+          {(['active', 'archived'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab)
+                setSelectedAspect(null)
+              }}
+              style={{
+                flex: 1,
+                padding: '8px 0',
+                fontSize: '13px',
+                fontWeight: activeTab === tab ? 600 : 400,
+                background: activeTab === tab ? (isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)') : 'transparent',
+                color: activeTab === tab ? colors.textPrimary : colors.textTertiary,
+                border: 'none',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {(activeTab === 'active' ? loading : archivedLoading) ? (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',
@@ -260,7 +340,7 @@ function AspectsPageMobile() {
           }}>
             Loading aspects...
           </div>
-        ) : error ? (
+        ) : error && activeTab === 'active' ? (
           <div style={{
             padding: '20px',
             textAlign: 'center',
@@ -269,17 +349,17 @@ function AspectsPageMobile() {
           }}>
             Error: {error}
           </div>
-        ) : aspects.length === 0 ? (
+        ) : displayedAspects.length === 0 ? (
           <EmptyState
-            title="No aspects yet"
-            description="Create your first aspect to get started"
+            title={activeTab === 'active' ? 'No aspects yet' : 'No archived aspects'}
+            description={activeTab === 'active' ? 'Create your first aspect to get started' : 'Archived aspects will appear here'}
           />
         ) : (
           <DraggableAspectList
-            aspects={aspects}
+            aspects={displayedAspects}
             onSelect={(aspect) => setSelectedAspect(aspect)}
-            onEdit={handleEditAspect}
-            onDelete={handleDeleteAspect}
+            onEdit={activeTab === 'active' ? handleEditAspect : undefined}
+            onDelete={activeTab === 'active' ? handleDeleteAspect : undefined}
             onReorder={handleReorderAspects}
           />
         )}
@@ -315,13 +395,32 @@ function AspectsPageDesktop() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active')
+  const [archivedAspects, setArchivedAspects] = useState<Aspect[]>([])
+  const [archivedLoading, setArchivedLoading] = useState(false)
+
+  const loadArchivedAspects = useCallback(async () => {
+    if (!user || !session) return
+    setArchivedLoading(true)
+    const { aspects: archived } = await fetchArchivedAspects(user, session.access_token)
+    setArchivedAspects(archived)
+    setArchivedLoading(false)
+  }, [user, session])
+
+  useEffect(() => {
+    if (activeTab === 'archived') {
+      loadArchivedAspects()
+    }
+  }, [activeTab, loadArchivedAspects])
+
+  const displayedAspects = activeTab === 'active' ? aspects : archivedAspects
 
   // Auto-select first aspect when aspects load
   useEffect(() => {
-    if (!selectedAspect && aspects.length > 0) {
-      setSelectedAspect(aspects[0])
+    if (!selectedAspect && displayedAspects.length > 0) {
+      setSelectedAspect(displayedAspects[0])
     }
-  }, [aspects, selectedAspect])
+  }, [displayedAspects, selectedAspect])
 
   const handleCreateAspect = () => {
     setEditingAspect(undefined)
@@ -376,6 +475,29 @@ function AspectsPageDesktop() {
     )
     await Promise.all(updates)
   }, [user, session, setAspectsLocal])
+
+  const handleArchiveAspect = async (aspect: Aspect) => {
+    if (!user || !session) return
+    const { success } = await archiveUserAspect(user, aspect.id, session.access_token)
+    if (success) {
+      if (selectedAspect?.id === aspect.id) {
+        setSelectedAspect(null)
+      }
+      await refreshAspects()
+    }
+  }
+
+  const handleUnarchiveAspect = async (aspect: Aspect) => {
+    if (!user || !session) return
+    const { success } = await unarchiveUserAspect(user, aspect.id, session.access_token)
+    if (success) {
+      if (selectedAspect?.id === aspect.id) {
+        setSelectedAspect(null)
+      }
+      await refreshAspects()
+      await loadArchivedAspects()
+    }
+  }
 
   const handleDescriptionUpdate = async (aspectToUpdate: Aspect, description: string) => {
     if (!user || !session) return
@@ -479,30 +601,65 @@ function AspectsPageDesktop() {
               }}>
                 Aspects
               </h2>
-              <button
-                onClick={handleCreateAspect}
-                style={{
-                  padding: '8px 14px',
-                  ...typography.labelLg,
-                  fontWeight: 500,
-                  background: colors.bgTertiary,
-                  color: colors.textSecondary,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = colors.bgHover
-                  e.currentTarget.style.color = colors.textPrimary
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = colors.bgTertiary
-                  e.currentTarget.style.color = colors.textSecondary
-                }}
-              >
-                + New
-              </button>
+              {activeTab === 'active' && (
+                <button
+                  onClick={handleCreateAspect}
+                  style={{
+                    padding: '8px 14px',
+                    ...typography.labelLg,
+                    fontWeight: 500,
+                    background: colors.bgTertiary,
+                    color: colors.textSecondary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = colors.bgHover
+                    e.currentTarget.style.color = colors.textPrimary
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = colors.bgTertiary
+                    e.currentTarget.style.color = colors.textSecondary
+                  }}
+                >
+                  + New
+                </button>
+              )}
+            </div>
+            {/* Active / Archived Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '0',
+              marginTop: '12px',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              border: `1px solid ${colors.border}`,
+            }}>
+              {(['active', 'archived'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setActiveTab(tab)
+                    setSelectedAspect(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '6px 0',
+                    fontSize: '12px',
+                    fontWeight: activeTab === tab ? 600 : 400,
+                    background: activeTab === tab ? colors.bgTertiary : 'transparent',
+                    color: activeTab === tab ? colors.textPrimary : colors.textTertiary,
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -515,7 +672,7 @@ function AspectsPageDesktop() {
             flexDirection: 'column',
             gap: '12px'
           }}>
-            {loading ? (
+            {(activeTab === 'active' ? loading : archivedLoading) ? (
               <div style={{
                 padding: '40px',
                 textAlign: 'center',
@@ -524,7 +681,7 @@ function AspectsPageDesktop() {
               }}>
                 Loading aspects...
               </div>
-            ) : error ? (
+            ) : error && activeTab === 'active' ? (
               <div style={{
                 padding: '20px',
                 textAlign: 'center',
@@ -533,18 +690,18 @@ function AspectsPageDesktop() {
               }}>
                 Error: {error}
               </div>
-            ) : aspects.length === 0 ? (
+            ) : displayedAspects.length === 0 ? (
               <EmptyState
-                title="No aspects yet"
-                description="Create your first aspect to get started"
+                title={activeTab === 'active' ? 'No aspects yet' : 'No archived aspects'}
+                description={activeTab === 'active' ? 'Create your first aspect to get started' : 'Archived aspects will appear here'}
               />
             ) : (
               <DraggableAspectList
-                aspects={aspects}
+                aspects={displayedAspects}
                 selectedAspect={selectedAspect}
                 onSelect={(aspect) => setSelectedAspect(aspect)}
-                onEdit={handleEditAspect}
-                onDelete={handleDeleteAspect}
+                onEdit={activeTab === 'active' ? handleEditAspect : undefined}
+                onDelete={activeTab === 'active' ? handleDeleteAspect : undefined}
                 onReorder={handleReorderAspects}
               />
             )}
@@ -559,10 +716,15 @@ function AspectsPageDesktop() {
         }}>
           <GoalsByAspect
             aspect={selectedAspect}
-            onEdit={selectedAspect && selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
-            onDelete={selectedAspect && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
-            onShare={selectedAspect && selectedAspect.member_role === 'owner' ? () => setSharingAspect(selectedAspect) : undefined}
-            onDescriptionUpdate={selectedAspect && selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
+            onEdit={activeTab === 'active' && selectedAspect && selectedAspect.member_role !== 'viewer' ? () => handleEditAspect(selectedAspect) : undefined}
+            onDelete={activeTab === 'active' && selectedAspect && selectedAspect.member_role === 'owner' ? () => handleDeleteAspect(selectedAspect) : undefined}
+            onArchive={selectedAspect && selectedAspect.member_role === 'owner'
+              ? () => activeTab === 'archived'
+                ? handleUnarchiveAspect(selectedAspect)
+                : handleArchiveAspect(selectedAspect)
+              : undefined}
+            onShare={activeTab === 'active' && selectedAspect && selectedAspect.member_role === 'owner' ? () => setSharingAspect(selectedAspect) : undefined}
+            onDescriptionUpdate={activeTab === 'active' && selectedAspect && selectedAspect.member_role !== 'viewer' ? (desc) => handleDescriptionUpdate(selectedAspect, desc) : undefined}
             onEditEvent={(event) => setEditingEvent(event)}
             onEditTask={(task) => setEditingTask(task)}
             onEditGoal={(goal) => setEditingGoal(goal)}

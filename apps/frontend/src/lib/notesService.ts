@@ -169,3 +169,194 @@ export async function deleteUserNotes(
     return { success: false, error: 'Failed to delete notes' }
   }
 }
+
+export async function fetchNoteGraph(
+  user: User,
+  accessToken: string
+): Promise<{ nodes: any[]; links: any[]; error: string | null }> {
+  if (!user || !accessToken) {
+    return { nodes: [], links: [], error: 'User not authenticated' }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/notes/graph`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ user_id: user.id })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { nodes: [], links: [], error: data.error || 'Failed to fetch note graph' }
+    }
+
+    return { nodes: data.nodes || [], links: data.links || [], error: null }
+  } catch (error) {
+    console.error('Error fetching note graph:', error)
+    return { nodes: [], links: [], error: 'Failed to fetch note graph' }
+  }
+}
+
+export async function syncNoteLinks(
+  user: User,
+  accessToken: string,
+  sourceNoteId: string,
+  linkedTitles: string[]
+): Promise<{ success: boolean; error: string | null }> {
+  if (!user || !accessToken) {
+    return { success: false, error: 'User not authenticated' }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/notes/links/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        source_note_id: sourceNoteId,
+        linked_titles: linkedTitles
+      })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to sync note links' }
+    }
+
+    return { success: data.success, error: data.error }
+  } catch (error) {
+    console.error('Error syncing note links:', error)
+    return { success: false, error: 'Failed to sync note links' }
+  }
+}
+
+export interface Backlink {
+  id: string
+  title: string
+  content?: string
+  aspect_name?: string
+  aspect_color?: string
+  updated_at: string
+}
+
+export async function fetchNoteBacklinks(
+  user: User,
+  accessToken: string,
+  noteId: string
+): Promise<{ backlinks: Backlink[]; error: string | null }> {
+  if (!user || !accessToken) {
+    return { backlinks: [], error: 'User not authenticated' }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/notes/backlinks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        note_id: noteId
+      })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { backlinks: [], error: data.error || 'Failed to fetch backlinks' }
+    }
+
+    return { backlinks: data.backlinks || [], error: null }
+  } catch (error) {
+    return { backlinks: [], error: 'Failed to fetch backlinks' }
+  }
+}
+
+export interface SearchResult {
+  id: string
+  title: string
+  content?: string
+  aspect_id?: string
+  aspect_color?: string
+  aspect_name?: string
+  updated_at: string
+  rank?: number
+}
+
+export async function searchNotesFulltext(
+  user: User,
+  accessToken: string,
+  query: string
+): Promise<{ notes: SearchResult[]; error: string | null }> {
+  if (!user || !accessToken) {
+    return { notes: [], error: 'User not authenticated' }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/notes/search/fulltext`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        query
+      })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { notes: [], error: data.error || 'Failed to search notes' }
+    }
+
+    return { notes: data.notes || [], error: null }
+  } catch (error) {
+    return { notes: [], error: 'Failed to search notes' }
+  }
+}
+
+export async function searchNotesByTitle(
+  user: User,
+  accessToken: string,
+  query: string
+): Promise<{ notes: any[]; error: string | null }> {
+  if (!user || !accessToken) {
+    return { notes: [], error: 'User not authenticated' }
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/notes/search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        user_id: user.id,
+        query
+      })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return { notes: [], error: data.error || 'Failed to search notes' }
+    }
+
+    return { notes: data.notes || [], error: null }
+  } catch (error) {
+    console.error('Error searching notes:', error)
+    return { notes: [], error: 'Failed to search notes' }
+  }
+}

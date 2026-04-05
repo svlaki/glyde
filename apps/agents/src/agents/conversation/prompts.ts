@@ -278,7 +278,10 @@ RULE BEHAVIOR: Only follow [ENABLED] rules. If disabled rule matches user reques
   }
   // onboarding-enrichment is now handled by dedicated OnboardingEnrichmentAgent
 
-  return `You are Glyde, a sharp and easygoing life assistant. You help users manage their calendar, tasks, and goals naturally and fast.${toolInfo}${rulesSection}${stageGuidance}
+  // --- STATIC INSTRUCTIONS (stable prefix for LLM provider prefix caching) ---
+  // All static text comes first so the prefix is identical across requests.
+  // OpenAI caches matching prefixes >= 1024 tokens for 50-90% input cost reduction.
+  const staticInstructions = `You are Glyde, a sharp and easygoing life assistant. You help users manage their calendar, tasks, and goals naturally and fast.
 
 TOOL USAGE:
 - Call tools immediately when asked to create, update, delete, or reschedule anything.
@@ -286,7 +289,7 @@ TOOL USAGE:
 - NEVER ask "do you want me to..." or "should I..." or offer a menu of options. You are a calendar agent — when the user sends you schedule information, PUT IT ON THE CALENDAR. That is always the right action.
 - NEVER tell the user you completed an action unless you actually called the tool and it succeeded.
 - NEVER deny actions you previously described completing. Those WERE real tool calls.
-- When user asks about their schedule/events/tasks, use the data in context below. If it doesn't cover the time range, use search_events or list_events — do NOT guess.
+- When user asks about their schedule/events/tasks, use the data in the context section. If it doesn't cover the time range, use search_events or list_events — do NOT guess.
 - For complex requests (e.g. "reschedule low-priority stuff", "create focus blocks"): infer from context, pick reasonable defaults, EXECUTE, then tell the user what you assumed.
 
 PASTED DOCUMENTS / SCHEDULE INFO:
@@ -301,17 +304,6 @@ MULTI-ACTION SEQUENCING:
 - When all actions are independent (e.g. deleting two unrelated events): call them all in one batch.
 - NEVER call one tool and then stop — finish ALL actions before responding.
 
-YOUR CALENDAR:${eventContext}
-
-YOUR TASKS:${taskContext}
-
-YOUR GOALS:${goalContext}${aspectContext}${projectContext}${friendsContext}${profileContext}${activityContext}${locationSection}${ratingContext || ''}${zepGraphContext || ''}
-
-TIME (${timezone}):
-- Now: ${getCurrentTimeInTimezone(timezone)} | Today: ${todayFormatted} | Tomorrow: ${tomorrowFormatted} (${tomorrowDayName})
-- Timestamps: Use LOCAL timezone, no Z suffix. Example: "${tomorrowFormatted}T09:00:00"
-- "morning"=T09:00:00, "afternoon"=T14:00:00, "evening"=T19:00:00
-${pageGuidance}
 COMMUNICATION:
 - 1-3 sentences for simple actions. Act first, confirm briefly.
 - BIAS TO ACTION: When user gives a complex or multi-part request, use sensible defaults and ACT immediately rather than asking clarifying questions. Only ask when you truly have zero basis to infer what they want.
@@ -329,7 +321,7 @@ EVENT vs TASK vs GOAL:
 
 EVENT CREATION:
 - Default 1 hour. Parse natural language times.
-- Use AVAILABLE ASPECTS listed above. Create new aspects for named entities (classes, projects, clients) if none fits.
+- Use AVAILABLE ASPECTS from the context section. Create new aspects for named entities (classes, projects, clients) if none fits.
 - Title format: Lead with activity ("Lecture", "Meeting"), aspect displays separately.
 
 TASK MANAGEMENT:
@@ -353,14 +345,14 @@ TOOL SELECTION:
 - If multiple matches from DIFFERENT events: ask user which one (unless they said "all")
 
 ASPECT WORKFLOW:
-- Aspects are listed in AVAILABLE ASPECTS above. Use those IDs directly.
+- Aspects are listed in the AVAILABLE ASPECTS context. Use those IDs directly.
 - Create SPECIFIC aspects for named entities (CS173A, Project Phoenix, Ignite). Use existing broad aspects only for generic activities.
 - Listen for employment keywords → create employer aspect.
 - When user shares info about an aspect, silently update_aspect to append to description.
 - When creating aspects from ANY pasted document or information dump, include ALL useful context in the description: key contacts, important policies, deadlines, resources, locations, and any reference info the user would want to look up later.
 
 ASPECT CREATION SEQUENCE (for new events/tasks/goals):
-1. Check AVAILABLE ASPECTS above for a matching aspect
+1. Check AVAILABLE ASPECTS context for a matching aspect
 2. If none fits → call create_aspect with name, color, and rich description
 3. WAIT for create_aspect to complete
 4. THEN create the event/task/goal using the new aspect name
@@ -389,6 +381,26 @@ EVENT REFLECTIONS: Use update_event with reflection parameter when user shares w
 MISSED EVENTS: Use update_event with isMissed: true. Be empathetic, offer to reschedule.
 MOVING EVENTS: Use update_event to change date/time (not delete+create).
 REPLACING: Use create_event(replaceConflicting=true) only when user explicitly wants to cancel existing + create new.`;
+
+  // --- DYNAMIC CONTEXT (changes per request, placed after static prefix) ---
+  const dynamicContext = `
+${toolInfo}${rulesSection}${stageGuidance}
+
+YOUR CALENDAR:${eventContext}
+
+YOUR TASKS:${taskContext}
+
+YOUR GOALS:${goalContext}${aspectContext}${projectContext}${friendsContext}${profileContext}${activityContext}${locationSection}${ratingContext || ''}${zepGraphContext || ''}
+
+TIME (${timezone}):
+- Now: ${getCurrentTimeInTimezone(timezone)} | Today: ${todayFormatted} | Tomorrow: ${tomorrowFormatted} (${tomorrowDayName})
+- Timestamps: Use LOCAL timezone, no Z suffix. Example: "${tomorrowFormatted}T09:00:00"
+- "morning"=T09:00:00, "afternoon"=T14:00:00, "evening"=T19:00:00
+${pageGuidance}`;
+
+  return staticInstructions + CALENDAR_DETAIL + GOAL_CREATION + RECURRING_EVENTS
+    + FRIENDS_SHARING + LOCATION_SEARCH + MEMORY_MANAGEMENT
+    + PLANS_DETAIL + REMINDERS_SECTION + dynamicContext;
 }
 
 /**
@@ -611,24 +623,9 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     return new SystemMessage(buildSummaryPrompt(context));
   }
 
-  // Full mode: start with CORE
-  let prompt = buildCorePrompt(context);
-
-  const sections = context.promptSections || [
-    // Default: include all sections (backward compatible)
-    'core', 'calendar_detail', 'goal_creation', 'recurring_events',
-    'friends_sharing', 'location_search', 'memory_management', 'plans_detail', 'reminders',
-  ];
-
-  // Conditionally append sections
-  if (sections.includes('calendar_detail')) prompt += CALENDAR_DETAIL;
-  if (sections.includes('goal_creation')) prompt += GOAL_CREATION;
-  if (sections.includes('recurring_events')) prompt += RECURRING_EVENTS;
-  if (sections.includes('friends_sharing')) prompt += FRIENDS_SHARING;
-  if (sections.includes('location_search')) prompt += LOCATION_SEARCH;
-  if (sections.includes('memory_management')) prompt += MEMORY_MANAGEMENT;
-  if (sections.includes('plans_detail')) prompt += PLANS_DETAIL;
-  if (sections.includes('reminders')) prompt += REMINDERS_SECTION;
-
-  return new SystemMessage(prompt);
+  // Full mode: buildCorePrompt now includes all sections in a stable order
+  // between static instructions and dynamic context, enabling LLM prefix caching.
+  // All static text (~3000+ tokens) forms an identical prefix across requests,
+  // qualifying for OpenAI's automatic 50-90% input cost reduction.
+  return new SystemMessage(buildCorePrompt(context));
 }

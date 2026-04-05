@@ -19,6 +19,12 @@ import { projectTools } from './projects/index.js';
 import { reminderTools } from './reminders/index.js';
 import { friendTools } from './friends/index.js';
 import { sharedEventTools } from './shared-events/index.js';
+import { createActionSuggestionTool } from './suggestions/create-action-suggestion.js';
+import { listActionSuggestionsTool } from './suggestions/list-action-suggestions.js';
+import { createPlacementSlotTool } from './suggestions/create-placement-slot.js';
+import { swapSlotRandomTool } from './suggestions/swap-slot-random.js';
+import { confirmSlotTool } from './suggestions/confirm-slot.js';
+import { dismissSlotTool } from './suggestions/dismiss-slot.js';
 // NOTE: interactionTools imported but NOT registered in default tools
 // Interactions should only be created by Gerald (InteractionAgentGerald), not ConversationAgent
 // This prevents accidental duplicate/proactive suggestions from the conversation flow
@@ -105,6 +111,14 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
+    // Register suggestion tools (available to ConversationAgent for user-initiated actions)
+    this.tools.set(createActionSuggestionTool.name, createActionSuggestionTool);
+    this.tools.set(listActionSuggestionsTool.name, listActionSuggestionsTool);
+    this.tools.set(createPlacementSlotTool.name, createPlacementSlotTool);
+    this.tools.set(swapSlotRandomTool.name, swapSlotRandomTool);
+    this.tools.set(confirmSlotTool.name, confirmSlotTool);
+    this.tools.set(dismissSlotTool.name, dismissSlotTool);
+
     // NOTE: Interaction tools NOT registered here
     // Gerald (InteractionAgentGerald) has its own tool set for proactive suggestions
     // This separation prevents ConversationAgent from accidentally creating interactions
@@ -159,6 +173,7 @@ export class ToolRegistry {
       reminders: ['create_reminder', 'update_reminder', 'delete_reminder', 'list_reminders'],
       friends: ['list_friends', 'get_pending_friend_requests', 'send_friend_request', 'accept_friend_request', 'decline_friend_request', 'remove_friend', 'update_friend_notes', 'add_friend_aspect', 'remove_friend_aspect'],
       'shared-events': ['add_event_member', 'remove_event_member', 'get_event_members', 'update_member_role'],
+      suggestions: ['create_action_suggestion', 'list_action_suggestions', 'create_placement_slot', 'swap_slot_random', 'confirm_slot', 'dismiss_slot'],
     };
 
     const toolNames = categoryPrefixes[category] || [];
@@ -241,7 +256,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events'): string[] {
+  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events' | 'suggestions'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

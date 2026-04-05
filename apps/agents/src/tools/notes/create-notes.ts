@@ -23,6 +23,16 @@ export const createNotesTool = tool(
         return "Failed to create note";
       }
 
+      // Sync wiki-links if content contains [[links]]
+      const wikiLinkMatches = (content || '').match(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
+      if (wikiLinkMatches && wikiLinkMatches.length > 0) {
+        const linkedTitles = wikiLinkMatches.map((m: string) => {
+          const match = m.match(/\[\[([^\]|]+)/);
+          return match ? match[1].trim() : '';
+        }).filter(Boolean);
+        await supabaseService.syncNoteLinks(userId, notes.id, linkedTitles);
+      }
+
       return `Note created: "${notes.title}" (ID: ${notes.id})`;
     } catch (error) {
       console.error('[create-notes] Error:', error);

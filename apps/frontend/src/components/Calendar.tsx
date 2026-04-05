@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useAspects } from '../lib/aspectContext'
 import { useTheme } from '../lib/themeContext'
@@ -10,6 +10,12 @@ import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typog
 import { EventFormUnified } from './event'
 import { getRecurrenceBadge } from '../lib/recurrenceUtils'
 import { computeDayEventLayouts } from '../lib/calendarLayoutUtils'
+import { fetchUserSlots, fetchUserSuggestions, moveSlot as moveSlotApi, resizeSlot as resizeSlotApi, swapSlot, confirmSlot, dismissSlot, replenishSlots } from '../lib/suggestionService'
+import type { SlotWithSuggestion, ActionSuggestion } from '../lib/suggestionService'
+import { SlotBlock } from './SlotBlock'
+import { useHorizontalWeekScroll } from '../hooks/useHorizontalWeekScroll'
+import { usePointerDrag } from '../hooks/usePointerDrag'
+import type { DropTarget } from '../hooks/usePointerDrag'
 
 type ViewType = 'day' | 'week' | 'month'
 
@@ -33,7 +39,88 @@ export function Calendar() {
   const [draggingEvent, setDraggingEvent] = useState<CalendarEvent | null>(null)
   const [dragPreview, setDragPreview] = useState<{ date: Date; hour: number; quarter: number } | null>(null)
   const [expandedAllDayDates, setExpandedAllDayDates] = useState<Set<string>>(new Set())
+  const [slots, setSlots] = useState<SlotWithSuggestion[]>([])
+  const [allSuggestions, setAllSuggestions] = useState<ActionSuggestion[]>([])
+  const [slotSuggestionIndex, setSlotSuggestionIndex] = useState<Record<string, number>>({})
+  const [draggingSlot, setDraggingSlot] = useState<SlotWithSuggestion | null>(null)
+  const [resizingSlot, setResizingSlot] = useState<SlotWithSuggestion | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const { getBufferedWeekDates } = useHorizontalWeekScroll({
+    scrollRef: scrollContainerRef,
+    currentDate,
+    onDateChange: setCurrentDate,
+    view,
+  })
+
+  // Pointer-based drag and drop for event cards
+  const handlePointerDrop = useCallback(async (eventId: string, target: DropTarget) => {
+    if (!user) return
+
+    const event = events.find(e => e.id === eventId)
+    if (!event) return
+
+    const newStart = new Date(target.date)
+    newStart.setHours(target.hour, target.quarter * 15, 0, 0)
+
+    const originalStart = new Date(event.start_time)
+    const originalEnd = new Date(event.end_time)
+    const duration = originalEnd.getTime() - originalStart.getTime()
+    const newEnd = new Date(newStart.getTime() + duration)
+
+    // Optimistic update
+    setEvents(prev => prev.map(e =>
+      e.id === eventId
+        ? { ...e, start_time: newStart.toISOString(), end_time: newEnd.toISOString() }
+        : e
+    ))
+
+    try {
+      const { error } = await updateEvent(
+        user,
+        eventId,
+        {
+          ...event,
+          start_time: newStart.toISOString(),
+          end_time: newEnd.toISOString(),
+        },
+        session?.access_token,
+      )
+      if (error) {
+        // Revert on failure
+        setEvents(prev => prev.map(e =>
+          e.id === eventId
+            ? { ...e, start_time: event.start_time, end_time: event.end_time }
+            : e
+        ))
+      }
+    } catch {
+      setEvents(prev => prev.map(e =>
+        e.id === eventId
+          ? { ...e, start_time: event.start_time, end_time: event.end_time }
+          : e
+      ))
+    }
+  }, [user, events, session?.access_token])
+
+  const {
+    isDragging: isPointerDragging,
+    dragSourceId,
+    dropPreview: pointerDropPreview,
+    ghostStyle,
+    startDrag,
+    wasDragRef,
+  } = usePointerDrag({
+    scrollContainerRef,
+    onDrop: handlePointerDrop,
+  })
+
+  // Helper: fetch events with a 3-month window for performance
+  const fetchEventsWindowed = async () => {
+    if (!user) return { events: [] as CalendarEvent[], error: null }
+    const n = new Date()
+    return fetchExpandedEvents(user, session?.access_token, new Date(n.getFullYear(), n.getMonth() - 1, 1), new Date(n.getFullYear(), n.getMonth() + 2, 0))
+  }
 
   // Persist friends events toggle
   useEffect(() => {
@@ -43,22 +130,6 @@ export function Calendar() {
   // Combine user events and friends events for display
   const allEvents = showFriendsEvents ? [...events, ...friendsEvents] : events
 
-
-  // Get current week dates
-  const getWeekDates = (date: Date) => {
-    const week = []
-    // Find the Sunday of the week containing 'date'
-    const startOfWeek = new Date(date)
-    startOfWeek.setDate(date.getDate() - date.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-
-    for (let i = 0; i < 7; i++) {
-      const weekDate = new Date(startOfWeek)
-      weekDate.setDate(startOfWeek.getDate() + i)
-      week.push(weekDate)
-    }
-    return week
-  }
 
   // Get single day
   const getDayDate = (date: Date) => {
@@ -168,7 +239,7 @@ export function Calendar() {
       } else {
         // Refresh to get the new override event from the backend
         if (event.is_instance) {
-          const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+          const { events: refreshed } = await fetchEventsWindowed()
           if (refreshed) setEvents(refreshed)
         }
       }
@@ -198,7 +269,7 @@ export function Calendar() {
     }).sort((a, b) => a.title.localeCompare(b.title))
   }
 
-  const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getWeekDates(currentDate) : getMonthDates(currentDate)
+  const displayDates = view === 'day' ? getDayDate(currentDate) : view === 'week' ? getBufferedWeekDates() : getMonthDates(currentDate)
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
   // Compute all-day banner height for day/week views (uniform across columns)
@@ -233,12 +304,35 @@ export function Calendar() {
       if (!user) return
 
       try {
-        const { events: userEvents } = await fetchExpandedEvents(user, session?.access_token)
+        const { events: userEvents } = await fetchEventsWindowed()
         const { events: friendEvents } = await fetchFriendsEvents(user, session?.access_token)
+
+        // Fetch suggestion slots (wide range to cover current view)
+        const now = new Date()
+        const slotStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+        const slotEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
+        const { slots: userSlots } = await fetchUserSlots(user, slotStart, slotEnd, session?.access_token)
+
+        // Fetch all open suggestions for carousel
+        const { suggestions } = await fetchUserSuggestions(user, { status: 'open' }, session?.access_token)
 
         if (isSubscribed) {
           setEvents(userEvents || [])
           setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
+          setSlots(userSlots || [])
+          setAllSuggestions(suggestions || [])
+
+          // Auto-replenish if fewer than 4 active slots
+          const activeSlots = (userSlots || []).filter(s => s.status === 'proposed' || s.status === 'edited')
+          if (activeSlots.length < 4) {
+            replenishSlots(user, session?.access_token).then(() => {
+              const now2 = new Date()
+              const s2 = new Date(now2.getFullYear(), now2.getMonth() - 1, 1).toISOString()
+              const e2 = new Date(now2.getFullYear(), now2.getMonth() + 2, 0).toISOString()
+              fetchUserSlots(user, s2, e2, session?.access_token)
+                .then(({ slots: fresh }) => { if (isSubscribed && fresh) setSlots(fresh) })
+            })
+          }
         }
       } catch (error) {
         console.error('[Calendar] Error loading events:', error)
@@ -347,6 +441,218 @@ export function Calendar() {
       const eventStart = new Date(event.start_time)
       return eventStart.toDateString() === date.toDateString()
     })
+  }
+
+  // Only show 4 slots at a time, sorted by start_time
+  // Show 4 slots with max aspect diversity, spread across days
+  const visibleSlots = (() => {
+    const sorted = [...slots].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    if (sorted.length <= 4) return sorted
+
+    const picked: SlotWithSuggestion[] = []
+    const usedAspects = new Set<string>()
+    const pickedIds = new Set<string>()
+
+    // Pass 1: one per unique aspect (earliest of each)
+    for (const s of sorted) {
+      if (picked.length >= 4) break
+      const key = s.aspect_id || s.aspect_name || 'none'
+      if (!usedAspects.has(key)) {
+        usedAspects.add(key)
+        picked.push(s)
+        pickedIds.add(s.id)
+      }
+    }
+
+    // Pass 2: fill remaining, prefer different days
+    if (picked.length < 4) {
+      const usedDays = new Set(picked.map(p => new Date(p.start_time).toDateString()))
+      for (const s of sorted) {
+        if (picked.length >= 4) break
+        if (pickedIds.has(s.id)) continue
+        const day = new Date(s.start_time).toDateString()
+        if (!usedDays.has(day)) {
+          picked.push(s)
+          pickedIds.add(s.id)
+          usedDays.add(day)
+        }
+      }
+    }
+
+    // Pass 3: just fill
+    for (const s of sorted) {
+      if (picked.length >= 4) break
+      if (!pickedIds.has(s.id)) {
+        picked.push(s)
+        pickedIds.add(s.id)
+      }
+    }
+
+    return picked.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+  })()
+
+  // Get suggestion slots for a specific date
+  const getSlotsForDay = (date: Date): SlotWithSuggestion[] => {
+    return visibleSlots.filter(slot => {
+      const slotStart = new Date(slot.start_time)
+      return slotStart.toDateString() === date.toDateString()
+    })
+  }
+
+  const getSlotsForSlot = (date: Date, hour: number): SlotWithSuggestion[] => {
+    return visibleSlots.filter(slot => {
+      const slotStart = new Date(slot.start_time)
+      return slotStart.toDateString() === date.toDateString() && slotStart.getHours() === hour
+    })
+  }
+
+  // Slot action handlers
+  // Click slot to open event form pre-filled with suggestion data
+  const handleSlotClick = (slot: SlotWithSuggestion) => {
+    const template: any = {
+      title: slot.suggestion_title,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      description: slot.suggestion_description || '',
+      aspect: slot.aspect_name || '',
+      _fromSlotId: slot.id,
+    }
+    setSelectedEvent(template)
+    setIsFormOpen(true)
+  }
+
+  // Build ordered suggestion list for carousel, excluding suggestions on other VISIBLE slots
+  const getCarouselOrder = (currentSlotId: string): ActionSuggestion[] => {
+    const otherVisibleSuggestionIds = new Set(
+      visibleSlots.filter(s => s.id !== currentSlotId).map(s => s.suggestion_id)
+    )
+    return allSuggestions.filter(s => !otherVisibleSuggestionIds.has(s.id))
+  }
+
+  const handleSlotSwapDirection = async (slotId: string, direction: 'prev' | 'next') => {
+    if (!user) return
+    const carousel = getCarouselOrder(slotId)
+    if (carousel.length === 0) return
+
+    const currentSlot = slots.find(s => s.id === slotId)
+    if (!currentSlot) return
+
+    // Find current index
+    const currentIdx = carousel.findIndex(s => s.id === currentSlot.suggestion_id)
+    const prevIdx = slotSuggestionIndex[slotId]
+    const baseIdx = currentIdx >= 0 ? currentIdx : (prevIdx ?? 0)
+
+    const nextIdx = direction === 'next'
+      ? (baseIdx + 1) % carousel.length
+      : (baseIdx - 1 + carousel.length) % carousel.length
+
+    const newSuggestion = carousel[nextIdx]
+    if (!newSuggestion) return
+
+    // Track index for this slot
+    setSlotSuggestionIndex(prev => ({ ...prev, [slotId]: nextIdx }))
+
+    // Resolve aspect details for the new suggestion
+    const aspect = newSuggestion.aspect_id ? getAspectById(newSuggestion.aspect_id) : undefined
+
+    // Optimistic local update
+    setSlots(prev => prev.map(s => {
+      if (s.id !== slotId) return s
+      return {
+        ...s,
+        suggestion_id: newSuggestion.id,
+        suggestion_title: newSuggestion.title,
+        suggestion_description: newSuggestion.description,
+        suggestion_type: newSuggestion.suggestion_type,
+        estimated_minutes: newSuggestion.estimated_minutes,
+        energy_level: newSuggestion.energy_level,
+        aspect_id: newSuggestion.aspect_id,
+        aspect_name: aspect?.name,
+        aspect_color: aspect?.color,
+      }
+    }))
+
+    // Persist to backend with targeted suggestion
+    swapSlot(user, slotId, session?.access_token, newSuggestion.id)
+  }
+
+  const handleSlotConfirm = async (slotId: string) => {
+    if (!user) return
+    const { event_id } = await confirmSlot(user, slotId, session?.access_token)
+    if (event_id) {
+      setSlots(prev => prev.filter(s => s.id !== slotId))
+      const { events: refreshed } = await fetchEventsWindowed()
+      if (refreshed) setEvents(refreshed)
+      // Replenish to maintain 4 active slots
+      replenishSlots(user, session?.access_token).then(() => {
+        const now = new Date()
+        const slotStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+        const slotEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
+        fetchUserSlots(user, slotStart, slotEnd, session?.access_token)
+          .then(({ slots: fresh }) => { if (fresh) setSlots(fresh) })
+      })
+    }
+  }
+
+  const handleSlotDismiss = async (slotId: string) => {
+    if (!user) return
+    const { error } = await dismissSlot(user, slotId, undefined, session?.access_token)
+    if (!error) {
+      setSlots(prev => prev.filter(s => s.id !== slotId))
+      // Replenish to maintain 4 active slots
+      replenishSlots(user, session?.access_token).then(() => {
+        const now = new Date()
+        const slotStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+        const slotEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
+        fetchUserSlots(user, slotStart, slotEnd, session?.access_token)
+          .then(({ slots: fresh }) => { if (fresh) setSlots(fresh) })
+      })
+    }
+  }
+
+  const handleSlotDragStart = (e: React.DragEvent, slot: SlotWithSuggestion) => {
+    setDraggingSlot(slot)
+    e.dataTransfer.setData('application/glyde-slot', slot.id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleSlotDragEnd = () => {
+    setDraggingSlot(null)
+    setDragPreview(null)
+  }
+
+  const handleSlotResizeStart = (e: React.MouseEvent, slot: SlotWithSuggestion) => {
+    setResizingSlot(slot)
+    const startY = e.clientY
+    const originalEnd = new Date(slot.end_time)
+    let latestEndTime = slot.end_time
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY
+      const deltaMinutes = Math.round(deltaY / 1) // 1px per minute (60px per hour)
+      const snappedMinutes = Math.round(deltaMinutes / 15) * 15
+      const newEnd = new Date(originalEnd.getTime() + snappedMinutes * 60 * 1000)
+      // Minimum 60 minutes
+      const minEnd = new Date(new Date(slot.start_time).getTime() + 60 * 60 * 1000)
+      const clampedEnd = newEnd < minEnd ? minEnd : newEnd
+      latestEndTime = clampedEnd.toISOString()
+      // Optimistic local update
+      setSlots(prev => prev.map(s =>
+        s.id === slot.id ? { ...s, end_time: latestEndTime } : s
+      ))
+    }
+
+    const onMouseUp = async () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      setResizingSlot(null)
+      if (user) {
+        await resizeSlotApi(user, slot.id, latestEndTime, session?.access_token)
+      }
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
   }
 
   // Overlap layout now handled by computeDayEventLayouts from calendarLayoutUtils
@@ -472,8 +778,20 @@ export function Calendar() {
           console.error('Failed to create event:', error)
           throw new Error('Failed to create event: ' + error)
         } else if (newEvent) {
-          // Add to local state
           setEvents([...events, newEvent])
+          // If created from a suggestion slot, dismiss the slot and replenish
+          const slotId = (selectedEvent as any)?._fromSlotId
+          if (slotId) {
+            await dismissSlot(user, slotId, 'confirmed via edit', session?.access_token)
+            setSlots(prev => prev.filter(s => s.id !== slotId))
+            replenishSlots(user, session?.access_token).then(() => {
+              const now = new Date()
+              const s2 = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+              const e2 = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
+              fetchUserSlots(user, s2, e2, session?.access_token)
+                .then(({ slots: fresh }) => { if (fresh) setSlots(fresh) })
+            })
+          }
           setSelectedEvent(null)
           setIsFormOpen(false)
         }
@@ -508,18 +826,13 @@ export function Calendar() {
   // State for dragging tasks from TodoList
   const [draggingTask, setDraggingTask] = useState<boolean>(false)
 
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
-    setDraggingEvent(event)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
   // Handle drag over to allow drop and show preview
   const handleDragOver = (e: React.DragEvent, date: Date, hour: number) => {
     e.preventDefault()
 
     // Check if dragging a task from TodoList
     const hasTask = e.dataTransfer.types.includes('application/glyde-task')
+    const hasSlot = e.dataTransfer.types.includes('application/glyde-slot')
     if (hasTask) {
       e.dataTransfer.dropEffect = 'copy'
       setDraggingTask(true)
@@ -527,7 +840,7 @@ export function Calendar() {
       e.dataTransfer.dropEffect = 'move'
     }
 
-    if (!draggingEvent && !hasTask) return
+    if (!draggingEvent && !draggingSlot && !hasTask && !hasSlot) return
 
     // Calculate which 15-minute interval we're hovering over (0, 1, 2, or 3)
     const rect = e.currentTarget.getBoundingClientRect()
@@ -599,6 +912,27 @@ export function Calendar() {
       return
     }
 
+    // Handle slot drag
+    const slotData = e.dataTransfer.getData('application/glyde-slot')
+    if (slotData && draggingSlot) {
+      const originalStart = new Date(draggingSlot.start_time)
+      const originalEnd = new Date(draggingSlot.end_time)
+      const duration = originalEnd.getTime() - originalStart.getTime()
+      const newEndTime2 = new Date(newStartTime.getTime() + duration)
+
+      // Optimistic update
+      setSlots(prev => prev.map(s =>
+        s.id === draggingSlot.id
+          ? { ...s, start_time: newStartTime.toISOString(), end_time: newEndTime2.toISOString() }
+          : s
+      ))
+
+      await moveSlotApi(user, draggingSlot.id, newStartTime.toISOString(), newEndTime2.toISOString(), session?.access_token)
+      setDraggingSlot(null)
+      setDragPreview(null)
+      return
+    }
+
     // Handle normal event drag (existing behavior)
     if (!draggingEvent) return
 
@@ -644,14 +978,6 @@ export function Calendar() {
       setDragPreview(null)
     }
   }
-
-  // Handle drag end to clear preview
-  const handleDragEnd = () => {
-    setDraggingEvent(null)
-    setDraggingTask(false)
-    setDragPreview(null)
-  }
-
 
   return (
     <div style={{
@@ -840,7 +1166,15 @@ export function Calendar() {
       </div>
 
       {/* Calendar Grid */}
-      <div ref={scrollContainerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+      <div
+        ref={scrollContainerRef}
+        className={view === 'week' ? 'calendar-week-scroll' : undefined}
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          position: 'relative',
+        }}
+      >
         {view === 'month' ? (
           // Month View - Mobile-style grid
           <div style={{ padding: '0', height: '100%', overflow: 'hidden' }}>
@@ -1132,11 +1466,37 @@ export function Calendar() {
               ))}
             </div>
 
-            {/* Days Columns */}
-            {displayDates.map((date, dayIndex) => {
+            {/* Days Columns - grouped by week for horizontal scroll */}
+            {(view === 'week'
+              ? Array.from({ length: displayDates.length / 7 }, (_, weekIdx) => ({
+                  key: weekIdx,
+                  dates: displayDates.slice(weekIdx * 7, weekIdx * 7 + 7),
+                  offset: weekIdx * 7,
+                }))
+              : [{ key: 0, dates: displayDates, offset: 0 }]
+            ).map(weekGroup => (
+              <div
+                key={weekGroup.key}
+                style={{
+                  display: 'flex',
+                  ...(view === 'week' ? {
+                    flex: '0 0 calc(100% - 52px)',
+                  } : {
+                    flex: 1,
+                  }),
+                }}
+              >
+            {weekGroup.dates.map((date, i) => {
+              const dayIndex = weekGroup.offset + i
               const isToday = date.toDateString() === new Date().toDateString()
               const dayEvents = getEventsForDay(date)
-              const dayLayouts = computeDayEventLayouts(dayEvents, { minWidthPercent: 50 })
+              const daySlots = getSlotsForDay(date)
+              // Combine events and slots for overlap-aware layout
+              const allDayItems = [
+                ...dayEvents,
+                ...daySlots.map(s => ({ id: s.id, start_time: s.start_time, end_time: s.end_time }))
+              ]
+              const dayLayouts = computeDayEventLayouts(allDayItems, { minWidthPercent: 50 })
               const todayBg = isToday
                 ? (isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)')
                 : 'transparent'
@@ -1324,10 +1684,16 @@ export function Calendar() {
                     const isPreviewSlot = dragPreview &&
                       dragPreview.date.toDateString() === date.toDateString() &&
                       dragPreview.hour === hour
+                    const isPointerPreviewSlot = pointerDropPreview &&
+                      pointerDropPreview.date.toDateString() === date.toDateString() &&
+                      pointerDropPreview.hour === hour
 
                     return (
                       <div
                         key={hour}
+                        data-drop-target=""
+                        data-drop-date={date.toISOString()}
+                        data-drop-hour={hour}
                         style={{ position: 'relative' }}
                         onDragOver={(e) => handleDragOver(e, date, hour)}
                         onDrop={(e) => handleDrop(e, date, hour)}
@@ -1369,8 +1735,8 @@ export function Calendar() {
                           )
                         })}
 
-                        {/* Drag preview indicator */}
-                        {isPreviewSlot && (draggingEvent || draggingTask) && (
+                        {/* Drag preview indicator (native drag - tasks/slots) */}
+                        {isPreviewSlot && (draggingEvent || draggingTask || draggingSlot) && (
                           <div
                             style={{
                               position: 'absolute',
@@ -1378,10 +1744,27 @@ export function Calendar() {
                               left: '0',
                               right: '0',
                               height: '4px',
-                              background: draggingTask ? '#10b981' : '#000', // Green for task drop, black for event move
+                              background: draggingTask ? '#10b981' : '#000',
                               zIndex: 100,
                               pointerEvents: 'none',
                               boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+                            }}
+                          />
+                        )}
+                        {/* Pointer drag preview indicator (event cards) */}
+                        {isPointerPreviewSlot && isPointerDragging && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: `${(pointerDropPreview!.quarter / 4) * 100}%`,
+                              left: '4px',
+                              right: '4px',
+                              height: '3px',
+                              background: colors.accent,
+                              zIndex: 100,
+                              pointerEvents: 'none',
+                              borderRadius: '2px',
+                              boxShadow: `0 0 8px ${hexToRgba(colors.accent, 0.4)}`
                             }}
                           />
                         )}
@@ -1400,13 +1783,22 @@ export function Calendar() {
                           const isShared = isSharedEvent(event)
                           const isViewerEvent = event.user_role === 'viewer'
 
+                          const isDragSource = isPointerDragging && dragSourceId === event.id
+
                           return (
                             <div
                               key={event.id}
-                              draggable={!isFriendEvent && !isViewerEvent}
-                              onDragStart={(e) => !isFriendEvent && !isViewerEvent && handleDragStart(e, event)}
-                              onDragEnd={handleDragEnd}
+                              data-event-id={event.id}
+                              onPointerDown={(e) => {
+                                if (!isFriendEvent && !isViewerEvent) {
+                                  startDrag(e, event.id)
+                                }
+                              }}
                               onClick={(e) => {
+                                if (isPointerDragging || wasDragRef.current) {
+                                  wasDragRef.current = false
+                                  return
+                                }
                                 e.stopPropagation()
                                 setSelectedEvent(event)
                                 setIsFormOpen(true)
@@ -1425,12 +1817,14 @@ export function Calendar() {
                                 padding: '3px 8px',
                                 overflow: 'hidden',
                                 zIndex: layout.zIndex,
-                                cursor: (isFriendEvent || isViewerEvent) ? 'pointer' : (draggingEvent?.id === event.id ? 'grabbing' : 'grab'),
-                                transition: 'background 0.15s ease',
+                                cursor: (isFriendEvent || isViewerEvent) ? 'pointer' : 'grab',
+                                transition: 'background 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '2px',
-                                opacity: isFriendEvent ? 0.7 : 1
+                                opacity: isDragSource ? 0.3 : (isFriendEvent ? 0.7 : 1),
+                                transform: isDragSource ? 'scale(0.97)' : 'none',
+                                touchAction: 'none',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
@@ -1529,22 +1923,51 @@ export function Calendar() {
                             </div>
                           )
                         })}
+
+                        {/* Render suggestion slots */}
+                        {getSlotsForSlot(date, hour).map(slot => {
+                          const slotStart = new Date(slot.start_time)
+                          const slotEnd = new Date(slot.end_time)
+                          const topPos = slotStart.getMinutes()
+                          const heightPos = Math.max((slotEnd.getTime() - slotStart.getTime()) / (1000 * 60), 15)
+                          const layout = dayLayouts.get(slot.id) || { width: '100%', left: '4px', right: '4px', zIndex: 3 }
+
+                          return (
+                            <SlotBlock
+                              key={`slot-${slot.id}`}
+                              slot={slot}
+                              top={topPos}
+                              height={heightPos}
+                              layout={layout}
+                              defaultColor={colors.textSecondary}
+                              onSwapPrev={(id) => handleSlotSwapDirection(id, 'prev')}
+                              onSwapNext={(id) => handleSlotSwapDirection(id, 'next')}
+                              onConfirm={handleSlotConfirm}
+                              onDismiss={handleSlotDismiss}
+                              onClick={handleSlotClick}
+                              onDragStart={handleSlotDragStart}
+                              onDragEnd={handleSlotDragEnd}
+                              onResizeStart={handleSlotResizeStart}
+                            />
+                          )
+                        })}
                       </div>
                     )
                   })}
                 </div>
               )
             })}
+            </div>
+            ))}
 
-            {/* Current Time Indicator - Mobile style (time in gutter + continuous red line) */}
+            {/* Current Time Indicator */}
             {(() => {
               const now = currentTime
               const currentHour = now.getHours()
               const currentMinutes = now.getMinutes()
-              // Position: (hour * 60px) + (minutes as fraction of hour * 60px) + 36px header
               const topPosition = (currentHour * 60) + (currentMinutes / 60 * 60) + 36
+                + allDayBannerInfo.height + 12
 
-              // Only show if today is in the current view
               const todayInView = displayDates.some(date =>
                 date.toDateString() === new Date().toDateString()
               )
@@ -1552,12 +1975,19 @@ export function Calendar() {
               if (!todayInView) return null
 
               return (
-                <>
-                  {/* Time label in gutter - uses error color */}
+                <div style={{
+                  position: 'absolute',
+                  top: `${topPosition}px`,
+                  left: 0,
+                  right: 0,
+                  height: '0px',
+                  zIndex: 25,
+                  pointerEvents: 'none',
+                }}>
+                  {/* Time label in gutter - sticky left */}
                   <div style={{
-                    position: 'absolute',
-                    left: '0',
-                    top: `${topPosition}px`,
+                    position: 'sticky',
+                    left: 0,
                     width: '52px',
                     transform: 'translateY(-50%)',
                     fontSize: fontSize.xs,
@@ -1566,24 +1996,21 @@ export function Calendar() {
                     color: colors.error,
                     background: colors.bgSecondary,
                     textAlign: 'center',
-                    zIndex: 25,
-                    whiteSpace: 'nowrap'
+                    zIndex: 26,
+                    whiteSpace: 'nowrap',
                   }}>
                     {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </div>
-
-                  {/* Continuous red line across all columns */}
+                  {/* Red line across full width */}
                   <div style={{
                     position: 'absolute',
+                    top: 0,
                     left: '52px',
-                    top: `${topPosition}px`,
-                    width: 'calc(100% - 52px)',
+                    right: 0,
                     height: '2px',
                     background: colors.error,
-                    zIndex: 15,
-                    pointerEvents: 'none'
                   }} />
-                </>
+                </div>
               )
             })()}
           </div>
@@ -1623,7 +2050,7 @@ export function Calendar() {
             }
             await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
           }
-          const { events: refreshed } = await fetchExpandedEvents(user, session.access_token)
+          const { events: refreshed } = await fetchEventsWindowed()
           setEvents(refreshed || [])
           setSelectedEvent(null)
           setIsFormOpen(false)
@@ -1633,7 +2060,7 @@ export function Calendar() {
           if (!selectedEvent || !user) return
           if (scope) {
             await deleteRecurringEvent(user, selectedEvent.id, scope, session?.access_token)
-            const { events: refreshed } = await fetchExpandedEvents(user, session?.access_token)
+            const { events: refreshed } = await fetchEventsWindowed()
             setEvents(refreshed || [])
           } else {
             await deleteEvent(user, selectedEvent.id, session?.access_token)
@@ -1645,7 +2072,53 @@ export function Calendar() {
       />
       )
       })()}
+
+      {/* Floating ghost card for pointer drag */}
+      {isPointerDragging && ghostStyle && dragSourceId && (() => {
+        const event = events.find(e => e.id === dragSourceId)
+        if (!event) return null
+        const eventColor = getEventColor(event)
+        const startTime = new Date(event.start_time).toLocaleTimeString('en-US', {
+          hour: 'numeric', minute: '2-digit', hour12: true
+        })
+        return (
+          <div style={ghostStyle}>
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: hexToRgba(eventColor, 0.18),
+              borderLeft: `3px solid ${eventColor}`,
+              borderRadius: '4px',
+              padding: '3px 8px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              backdropFilter: 'blur(4px)',
+            }}>
+              <div style={{
+                ...typography.labelMd,
+                fontWeight: fontWeight.semibold,
+                color: eventColor,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {event.title}
+              </div>
+              <div style={{
+                fontSize: fontSize.xs,
+                fontFamily: fontFamily.sans,
+                color: eventColor,
+                opacity: 0.7,
+              }}>
+                {startTime}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
-}  
+}
 

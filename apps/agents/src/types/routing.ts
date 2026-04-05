@@ -21,7 +21,8 @@ export type ToolCategory =
   | 'search'
   | 'profile'
   | 'projects'
-  | 'plans';
+  | 'plans'
+  | 'suggestions';
 
 /**
  * Prompt section identifiers for conditional prompt assembly.
