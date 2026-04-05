@@ -20,6 +20,7 @@ import { NoteEditor } from '../components/notes/NoteEditor'
 import { NoteGraph } from '../components/notes/NoteGraph'
 import { BacklinksPanel } from '../components/notes/BacklinksPanel'
 import { TemplatePicker } from '../components/notes/TemplatePicker'
+import { FloatingChat } from '../components/FloatingChat'
 import { useKnowledgeGraph } from '../hooks/useKnowledgeGraph'
 import { createEntityLink, deleteEntityLink, saveGraphPositions } from '../lib/knowledgeGraphService'
 import { extractWikiLinks } from '../lib/wikiLinkParser'
@@ -94,10 +95,10 @@ function NotesPageDesktop() {
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Always sort notes by most recently updated
-  const sortedNotes = [...allNotes].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  )
+  // Sort user notes by recent, filtering out scribe notes from the dropdown
+  const sortedNotes = [...allNotes]
+    .filter(n => n.source !== 'scribe')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   const selectedNote = allNotes.find(n => n.id === selectedNoteId) || null
 
@@ -285,12 +286,12 @@ function NotesPageDesktop() {
   }, [allNotes, user, session?.access_token, aspects])
 
   const handleCreateNote = async () => {
-    if (!user || !session?.access_token || !newNoteTitle.trim() || !newNoteAspectId) return
+    if (!user || !session?.access_token || !newNoteTitle.trim()) return
 
     const result = await createUserNotes(user, session.access_token, {
       title: newNoteTitle.trim(),
       content: newNoteContent,
-      aspect_id: newNoteAspectId,
+      aspect_id: newNoteAspectId || undefined,
       status: 'active'
     })
 
@@ -908,15 +909,15 @@ function NotesPageDesktop() {
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={handleCreateNote}
-                  disabled={!newNoteTitle.trim() || !newNoteAspectId}
+                  disabled={!newNoteTitle.trim()}
                   style={{
                     flex: 1,
                     padding: '8px',
-                    background: (!newNoteTitle.trim() || !newNoteAspectId) ? '#6b7280' : '#3b82f6',
+                    background: (!newNoteTitle.trim()) ? '#6b7280' : '#3b82f6',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: (!newNoteTitle.trim() || !newNoteAspectId) ? 'not-allowed' : 'pointer',
+                    cursor: (!newNoteTitle.trim()) ? 'not-allowed' : 'pointer',
                     fontSize: '13px',
                     fontWeight: '500'
                   }}
@@ -1318,6 +1319,8 @@ function NotesPageDesktop() {
           />
         </div>
       </div>
+
+      <FloatingChat currentPageOverride="notes" />
     </div>
   )
 }
@@ -1359,10 +1362,10 @@ function NotesPageMobile() {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editTitle, setEditTitle] = useState('')
 
-  // Always sort notes by most recently updated
-  const sortedNotes = [...allNotes].sort(
-    (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  )
+  // Sort user notes by recent, filtering out scribe notes from the list
+  const sortedNotes = [...allNotes]
+    .filter(n => n.source !== 'scribe')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   const selectedNote = allNotes.find(n => n.id === selectedNoteId) || null
 
@@ -1476,12 +1479,12 @@ function NotesPageMobile() {
   }, [allNotes, user, session?.access_token, aspects])
 
   const handleCreateNote = async () => {
-    if (!user || !session?.access_token || !newNoteTitle.trim() || !newNoteAspectId) return
+    if (!user || !session?.access_token || !newNoteTitle.trim()) return
 
     const result = await createUserNotes(user, session.access_token, {
       title: newNoteTitle.trim(),
       content: newNoteContent,
-      aspect_id: newNoteAspectId,
+      aspect_id: newNoteAspectId || undefined,
       status: 'active'
     })
 
@@ -1726,14 +1729,14 @@ function NotesPageMobile() {
 
             <button
               onClick={handleCreateNote}
-              disabled={!newNoteTitle.trim() || !newNoteAspectId}
+              disabled={!newNoteTitle.trim()}
               style={{
                 padding: '14px',
-                background: (!newNoteTitle.trim() || !newNoteAspectId) ? '#6b7280' : '#3b82f6',
+                background: (!newNoteTitle.trim()) ? '#6b7280' : '#3b82f6',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '10px',
-                cursor: (!newNoteTitle.trim() || !newNoteAspectId) ? 'not-allowed' : 'pointer',
+                cursor: (!newNoteTitle.trim()) ? 'not-allowed' : 'pointer',
                 fontSize: '16px',
                 fontWeight: '500',
                 minHeight: '44px'

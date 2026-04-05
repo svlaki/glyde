@@ -366,7 +366,14 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onArchive, onShare, on
               e.currentTarget.style.borderColor = colors.border
             }}
           >
-            {aspect.description || 'Click to add a description...'}
+            <span style={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical' as const,
+            }}>
+              {aspect.description || 'Click to add a description...'}
+            </span>
           </div>
         )
       ) : (
@@ -378,7 +385,11 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onArchive, onShare, on
             borderRadius: '6px',
             fontSize: fontSize.sm,
             color: colors.textPrimary,
-            lineHeight: lineHeight.normal
+            lineHeight: lineHeight.normal,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical' as const,
           }}>
             {aspect.description}
           </div>

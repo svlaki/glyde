@@ -50,8 +50,8 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
         }
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: aspect.description ? '8px' : '0' }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: aspect.description ? '4px' : '0' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -113,7 +113,10 @@ export function AspectCard({ aspect, isSelected, onClick, onEdit, onDelete }: As
             <div style={{
               ...typography.bodySm,
               color: colors.textSecondary,
-              lineHeight: lineHeight.tight
+              lineHeight: lineHeight.tight,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}>
               {aspect.description}
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '../lib/authContext'
 import { useAspects } from '../lib/aspectContext'
 import { useTheme } from '../lib/themeContext'
@@ -7,10 +7,11 @@ import type { CalendarEvent } from '../lib/calendarService'
 import { supabase } from '../lib/supabase'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography, fontFamily, fontSize, fontWeight } from '../styles/typography'
-import { EventFormUnified } from './event'
+import { EventCard } from './calendar/EventCard'
+import { EventFormWrapper } from './calendar/EventFormWrapper'
 import { getRecurrenceBadge } from '../lib/recurrenceUtils'
 import { computeDayEventLayouts } from '../lib/calendarLayoutUtils'
-import { fetchUserSlots, fetchUserSuggestions, moveSlot as moveSlotApi, resizeSlot as resizeSlotApi, swapSlot, confirmSlot, dismissSlot, replenishSlots } from '../lib/suggestionService'
+import { fetchUserSlots, fetchUserSuggestions, moveSlot as moveSlotApi, resizeSlot as resizeSlotApi, swapSlot, confirmSlot, dismissSlot, replenishSlots, generateSuggestionsBatch } from '../lib/suggestionService'
 import type { SlotWithSuggestion, ActionSuggestion } from '../lib/suggestionService'
 import { SlotBlock } from './SlotBlock'
 import { useHorizontalWeekScroll } from '../hooks/useHorizontalWeekScroll'
@@ -128,7 +129,10 @@ export function Calendar() {
   }, [showFriendsEvents])
 
   // Combine user events and friends events for display
-  const allEvents = showFriendsEvents ? [...events, ...friendsEvents] : events
+  const allEvents = useMemo(
+    () => showFriendsEvents ? [...events, ...friendsEvents] : events,
+    [events, friendsEvents, showFriendsEvents]
+  )
 
 
   // Get single day
@@ -184,6 +188,18 @@ export function Calendar() {
   const isEventPast = (event: CalendarEvent): boolean => {
     return new Date(event.end_time) < new Date()
   }
+
+  // Stable callback for selecting events (used by memoized EventCard)
+  const handleSelectEvent = useCallback((event: CalendarEvent) => {
+    setSelectedEvent(event)
+    setIsFormOpen(true)
+  }, [])
+
+  // Stable callback for closing the event form
+  const handleCloseForm = useCallback(() => {
+    setSelectedEvent(null)
+    setIsFormOpen(false)
+  }, [])
 
   // Toggle missed status for past events
   const handleToggleMissed = async (event: CalendarEvent) => {
@@ -304,34 +320,54 @@ export function Calendar() {
       if (!user) return
 
       try {
-        const { events: userEvents } = await fetchEventsWindowed()
-        const { events: friendEvents } = await fetchFriendsEvents(user, session?.access_token)
-
-        // Fetch suggestion slots (wide range to cover current view)
         const now = new Date()
         const slotStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
         const slotEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
-        const { slots: userSlots } = await fetchUserSlots(user, slotStart, slotEnd, session?.access_token)
 
-        // Fetch all open suggestions for carousel
-        const { suggestions } = await fetchUserSuggestions(user, { status: 'open' }, session?.access_token)
+        // Fetch all data in parallel
+        const [eventsResult, friendsResult, slotsResult, suggestionsResult] = await Promise.all([
+          fetchEventsWindowed(),
+          fetchFriendsEvents(user, session?.access_token),
+          fetchUserSlots(user, slotStart, slotEnd, session?.access_token),
+          fetchUserSuggestions(user, { status: 'open' }, session?.access_token),
+        ])
 
         if (isSubscribed) {
-          setEvents(userEvents || [])
-          setFriendsEvents((friendEvents || []).map(e => ({ ...e, is_friend_event: true })))
-          setSlots(userSlots || [])
-          setAllSuggestions(suggestions || [])
+          setEvents(eventsResult.events || [])
+          setFriendsEvents((friendsResult.events || []).map(e => ({ ...e, is_friend_event: true })))
+          setSlots(slotsResult.slots || [])
+          setAllSuggestions(suggestionsResult.suggestions || [])
 
-          // Auto-replenish if fewer than 4 active slots
-          const activeSlots = (userSlots || []).filter(s => s.status === 'proposed' || s.status === 'edited')
-          if (activeSlots.length < 4) {
-            replenishSlots(user, session?.access_token).then(() => {
+          // If fewer than 5 open suggestions, trigger batch generation (heavy, runs in background)
+          const openSuggestions = suggestionsResult.suggestions || []
+          if (openSuggestions.length < 5) {
+            generateSuggestionsBatch(user, session?.access_token).then(() => {
+              // After batch, refetch slots and suggestions
               const now2 = new Date()
               const s2 = new Date(now2.getFullYear(), now2.getMonth() - 1, 1).toISOString()
               const e2 = new Date(now2.getFullYear(), now2.getMonth() + 2, 0).toISOString()
-              fetchUserSlots(user, s2, e2, session?.access_token)
-                .then(({ slots: fresh }) => { if (isSubscribed && fresh) setSlots(fresh) })
+              Promise.all([
+                fetchUserSlots(user, s2, e2, session?.access_token),
+                fetchUserSuggestions(user, { status: 'open' }, session?.access_token),
+              ]).then(([slotsRes, sugRes]) => {
+                if (isSubscribed) {
+                  if (slotsRes.slots) setSlots(slotsRes.slots)
+                  if (sugRes.suggestions) setAllSuggestions(sugRes.suggestions)
+                }
+              })
             })
+          } else {
+            // Enough suggestions exist — just replenish slots if needed
+            const activeSlots = (slotsResult.slots || []).filter(s => s.status === 'proposed' || s.status === 'edited')
+            if (activeSlots.length < 4) {
+              replenishSlots(user, session?.access_token).then(() => {
+                const now2 = new Date()
+                const s2 = new Date(now2.getFullYear(), now2.getMonth() - 1, 1).toISOString()
+                const e2 = new Date(now2.getFullYear(), now2.getMonth() + 2, 0).toISOString()
+                fetchUserSlots(user, s2, e2, session?.access_token)
+                  .then(({ slots: fresh }) => { if (isSubscribed && fresh) setSlots(fresh) })
+              })
+            }
           }
         }
       } catch (error) {
@@ -723,7 +759,7 @@ export function Calendar() {
   }
 
   // Event save handler
-  const handleSaveEvent = async (eventData: Partial<CalendarEvent>) => {
+  const handleSaveEvent = useCallback(async (eventData: Partial<CalendarEvent>) => {
     if (!user) return
 
     try {
@@ -800,7 +836,47 @@ export function Calendar() {
       console.error('Error saving event:', error)
       throw error
     }
-  }
+  }, [user, session, events, selectedEvent, fetchEventsWindowed, slots])
+
+  // Handle saving recurring events
+  const handleSaveRecurring = useCallback(async (eventData: Partial<CalendarEvent>, scope: 'this_instance' | 'entire_series', recurrenceRule?: string) => {
+    if (!user || !session) return
+    if (eventData.id) {
+      const updates: Record<string, any> = {}
+      if (eventData.title) updates.title = eventData.title
+      if (eventData.start_time) updates.start_time = eventData.start_time
+      if (eventData.end_time) updates.end_time = eventData.end_time
+      if (eventData.description) updates.description = eventData.description
+      if (eventData.aspect) updates.aspect = eventData.aspect
+      if (eventData.visibility) updates.visibility = eventData.visibility
+      if (eventData.reminder_minutes !== undefined) updates.reminder_minutes = eventData.reminder_minutes
+
+      if (recurrenceRule) updates.recurrence_rule = recurrenceRule
+      if (scope === 'this_instance' && selectedEvent?.instance_date) {
+        updates.instance_date = selectedEvent.instance_date
+      }
+      await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
+    }
+    const { events: refreshed } = await fetchEventsWindowed()
+    setEvents(refreshed || [])
+    setSelectedEvent(null)
+    setIsFormOpen(false)
+  }, [user, session, selectedEvent, fetchEventsWindowed])
+
+  // Handle deleting events
+  const handleDeleteEvent = useCallback(async (scope?: 'this_instance' | 'entire_series') => {
+    if (!selectedEvent || !user) return
+    if (scope) {
+      await deleteRecurringEvent(user, selectedEvent.id, scope, session?.access_token)
+      const { events: refreshed } = await fetchEventsWindowed()
+      setEvents(refreshed || [])
+    } else {
+      await deleteEvent(user, selectedEvent.id, session?.access_token)
+      setEvents(prev => prev.filter(e => e.id !== selectedEvent.id))
+    }
+    setSelectedEvent(null)
+    setIsFormOpen(false)
+  }, [user, session, selectedEvent, fetchEventsWindowed])
 
   // Handle clicking on calendar to create new event
   const handleCalendarClick = (date: Date, hour: number, halfHour: number) => {
@@ -1769,158 +1845,32 @@ export function Calendar() {
                           />
                         )}
 
-                        {/* Render events - Mobile-style cards with left border */}
+                        {/* Render events - Memoized event cards */}
                         {slotEvents.map(event => {
                           const { top, height } = getEventStyle(event)
                           const layout = dayLayouts.get(event.id) || { width: '100%', left: '4px', right: '4px', zIndex: 3 }
-                          const eventColor = getEventColor(event)
-                          const startTime = new Date(event.start_time).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })
-                          const isFriendEvent = event.is_friend_event
-                          const isShared = isSharedEvent(event)
-                          const isViewerEvent = event.user_role === 'viewer'
-
-                          const isDragSource = isPointerDragging && dragSourceId === event.id
-
                           return (
-                            <div
+                            <EventCard
                               key={event.id}
-                              data-event-id={event.id}
-                              onPointerDown={(e) => {
-                                if (!isFriendEvent && !isViewerEvent) {
-                                  startDrag(e, event.id)
-                                }
-                              }}
-                              onClick={(e) => {
-                                if (isPointerDragging || wasDragRef.current) {
-                                  wasDragRef.current = false
-                                  return
-                                }
-                                e.stopPropagation()
-                                setSelectedEvent(event)
-                                setIsFormOpen(true)
-                              }}
-                              style={{
-                                position: 'absolute',
-                                top: `${top}px`,
-                                left: layout.left === '2px' ? '4px' : layout.left,
-                                right: layout.right === '2px' ? '4px' : layout.right,
-                                width: layout.width,
-                                height: `${height}px`,
-                                background: hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
-                                borderLeft: `3px solid ${eventColor}`,
-                                color: eventColor,
-                                borderRadius: '4px',
-                                padding: '3px 8px',
-                                overflow: 'hidden',
-                                zIndex: layout.zIndex,
-                                cursor: (isFriendEvent || isViewerEvent) ? 'pointer' : 'grab',
-                                transition: 'background 0.15s ease, opacity 0.15s ease, transform 0.15s ease',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '2px',
-                                opacity: isDragSource ? 0.3 : (isFriendEvent ? 0.7 : 1),
-                                transform: isDragSource ? 'scale(0.97)' : 'none',
-                                touchAction: 'none',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12)
-                              }}
-                              title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
-                            >
-                              <div style={{
-                                ...typography.labelMd,
-                                fontWeight: fontWeight.semibold,
-                                color: eventColor,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}>
-                                {/* Friend avatar indicator */}
-                                {isFriendEvent && (
-                                  <span style={{
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '50%',
-                                    background: hexToRgba(eventColor, 0.3),
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '8px',
-                                    flexShrink: 0,
-                                    overflow: 'hidden'
-                                  }}>
-                                    {event.owner_avatar_url ? (
-                                      <img src={event.owner_avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                      event.owner_display_name?.charAt(0)?.toUpperCase() || 'F'
-                                    )}
-                                  </span>
-                                )}
-                                {/* Shared event role badge */}
-                                {isShared && (
-                                  <span style={{
-                                    fontSize: '7px',
-                                    fontFamily: fontFamily.sans,
-                                    fontWeight: fontWeight.semibold,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.3px',
-                                    padding: '1px 4px',
-                                    borderRadius: '3px',
-                                    background: hexToRgba(eventColor, 0.2),
-                                    color: eventColor,
-                                    flexShrink: 0
-                                  }}>
-                                    {event.user_role === 'viewer' ? 'View' : 'Edit'}
-                                  </span>
-                                )}
-                                <span>{event.title}</span>
-                              </div>
-                              {/* Missed indicator - small red dot */}
-                              {!isFriendEvent && isEventPast(event) && event.is_missed && (
-                                <span style={{
-                                  position: 'absolute',
-                                  top: 4,
-                                  right: 4,
-                                  width: '6px',
-                                  height: '6px',
-                                  borderRadius: '50%',
-                                  background: '#ef4444',
-                                  flexShrink: 0
-                                }} />
-                              )}
-                              {height > 30 && (
-                                <div style={{
-                                  fontSize: fontSize.xs,
-                                  fontFamily: fontFamily.sans,
-                                  color: eventColor,
-                                  opacity: 0.8,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap'
-                                }}>
-                                  {isFriendEvent ? `${event.owner_display_name || 'Friend'} - ${startTime}` : startTime}
-                                </div>
-                              )}
-    
-                              {getRecurrenceBadge(event) && (
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', bottom: 2, right: 4, opacity: 0.5, flexShrink: 0 }}>
-                                  <path d="M21.5 2v6h-6" />
-                                  <path d="M2.5 22v-6h6" />
-                                  <path d="M2.5 11.5a10 10 0 0 1 18.4-4.5" />
-                                  <path d="M21.5 12.5a10 10 0 0 1-18.4 4.5" />
-                                </svg>
-                              )}
-                            </div>
+                              event={event}
+                              eventColor={getEventColor(event)}
+                              layout={layout}
+                              top={top}
+                              height={height}
+                              isFriendEvent={!!event.is_friend_event}
+                              isShared={isSharedEvent(event)}
+                              isViewerEvent={event.user_role === 'viewer'}
+                              isPast={isEventPast(event)}
+                              isDragSource={isPointerDragging && dragSourceId === event.id}
+                              typography={typography}
+                              fontFamily={fontFamily}
+                              fontSize={fontSize}
+                              fontWeight={fontWeight}
+                              onSelect={handleSelectEvent}
+                              onPointerDown={startDrag}
+                              isPointerDragging={isPointerDragging}
+                              wasDragRef={wasDragRef}
+                            />
                           )
                         })}
 
@@ -2017,61 +1967,20 @@ export function Calendar() {
         )}
       </div>
 
-      {/* Unified Event Form */}
-      {(() => {
-        const selectedAspect = selectedEvent?.aspect_id ? getAspectById(selectedEvent.aspect_id) : null
-        // Viewer-only if shared aspect viewer OR shared event viewer
-        const isViewerOnly = selectedAspect?.member_role === 'viewer' || selectedEvent?.user_role === 'viewer'
-        return (
-      <EventFormUnified
-        event={selectedEvent}
-        isOpen={isFormOpen}
-        onClose={() => {
-          setSelectedEvent(null)
-          setIsFormOpen(false)
-        }}
-        isViewerOnly={isViewerOnly}
-        onSave={isViewerOnly ? async () => {} : handleSaveEvent}
-        onSaveRecurring={isViewerOnly ? undefined : async (eventData, scope, recurrenceRule) => {
-          if (!user || !session) return
-          if (eventData.id) {
-            const updates: Record<string, any> = {}
-            if (eventData.title) updates.title = eventData.title
-            if (eventData.start_time) updates.start_time = eventData.start_time
-            if (eventData.end_time) updates.end_time = eventData.end_time
-            if (eventData.description) updates.description = eventData.description
-            if (eventData.aspect) updates.aspect = eventData.aspect
-            if (eventData.visibility) updates.visibility = eventData.visibility
-            if (eventData.reminder_minutes !== undefined) updates.reminder_minutes = eventData.reminder_minutes
-
-            if (recurrenceRule) updates.recurrence_rule = recurrenceRule
-            if (scope === 'this_instance' && selectedEvent?.instance_date) {
-              updates.instance_date = selectedEvent.instance_date
-            }
-            await updateRecurringEvent(user, eventData.id, scope, updates, session.access_token)
-          }
-          const { events: refreshed } = await fetchEventsWindowed()
-          setEvents(refreshed || [])
-          setSelectedEvent(null)
-          setIsFormOpen(false)
-        }}
-        onToggleMissed={isViewerOnly ? undefined : (evt) => handleToggleMissed(evt)}
-        onDelete={isViewerOnly ? undefined : async (scope) => {
-          if (!selectedEvent || !user) return
-          if (scope) {
-            await deleteRecurringEvent(user, selectedEvent.id, scope, session?.access_token)
-            const { events: refreshed } = await fetchEventsWindowed()
-            setEvents(refreshed || [])
-          } else {
-            await deleteEvent(user, selectedEvent.id, session?.access_token)
-            setEvents(events.filter(e => e.id !== selectedEvent.id))
-          }
-          setSelectedEvent(null)
-          setIsFormOpen(false)
-        }}
+      {/* Unified Event Form - extracted to prevent full Calendar re-renders */}
+      <EventFormWrapper
+        selectedEvent={selectedEvent}
+        isFormOpen={isFormOpen}
+        isViewerOnly={
+          (selectedEvent?.aspect_id ? getAspectById(selectedEvent.aspect_id)?.member_role === 'viewer' : false)
+          || selectedEvent?.user_role === 'viewer'
+        }
+        onClose={handleCloseForm}
+        onSave={handleSaveEvent}
+        onSaveRecurring={handleSaveRecurring}
+        onToggleMissed={handleToggleMissed}
+        onDelete={handleDeleteEvent}
       />
-      )
-      })()}
 
       {/* Floating ghost card for pointer drag */}
       {isPointerDragging && ghostStyle && dragSourceId && (() => {

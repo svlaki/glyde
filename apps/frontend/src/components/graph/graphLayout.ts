@@ -59,12 +59,17 @@ export function buildGraphNodes(
     })
   }
 
-  // Notes: near their aspect
+  // Notes: near their aspect, or center if no aspect
   const notesByAspect = new Map<string, KGNote[]>()
+  const unlinkedNotes: KGNote[] = []
   for (const n of notes) {
-    const list = notesByAspect.get(n.aspect_id) || []
-    list.push(n)
-    notesByAspect.set(n.aspect_id, list)
+    if (n.aspect_id && aspectPositions.has(n.aspect_id)) {
+      const list = notesByAspect.get(n.aspect_id) || []
+      list.push(n)
+      notesByAspect.set(n.aspect_id, list)
+    } else {
+      unlinkedNotes.push(n)
+    }
   }
 
   for (const [aspectId, aspectNotes] of notesByAspect) {
@@ -85,9 +90,24 @@ export function buildGraphNodes(
       nodes.push({
         id: n.id, nodeType: 'note', label: n.title, color: n.aspect_color || '#6b7280',
         x: saved?.x ?? defaultX, y: saved?.y ?? defaultY, radius: NOTE_RADIUS, aspectId: n.aspect_id,
+        isScribe: n.source === 'scribe',
       })
     })
   }
+
+  // Aspect-free notes: arrange near center in a loose cluster
+  unlinkedNotes.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(unlinkedNotes.length, 1)
+    const dist = orbitRadius * 0.15 + (i % 3) * 15
+    const defaultX = centerX + dist * Math.cos(angle)
+    const defaultY = centerY + dist * Math.sin(angle)
+    const saved = savedPositions?.get(n.id)
+    nodes.push({
+      id: n.id, nodeType: 'note', label: n.title, color: n.aspect_color || '#9ca3af',
+      x: saved?.x ?? defaultX, y: saved?.y ?? defaultY, radius: NOTE_RADIUS,
+      isScribe: n.source === 'scribe',
+    })
+  })
 
   return nodes
 }

@@ -308,6 +308,14 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
                 <path d={starPath(node.radius)} transform={`translate(${node.x},${node.y})`}
                   fill={node.color} opacity={isDimmed ? 0.15 : 1}
                   stroke={isHovered ? (isDarkMode ? '#fff' : '#000') : 'none'} strokeWidth={isHovered ? 1.5 : 0} />
+              ) : node.isScribe ? (
+                <>
+                  <circle cx={node.x} cy={node.y} r={node.radius + 1}
+                    fill="none" stroke={node.color} strokeWidth={1.2} strokeDasharray="3 2"
+                    opacity={isDimmed ? 0.15 : 0.7} />
+                  <circle cx={node.x} cy={node.y} r={node.radius * 0.6}
+                    fill={node.color} opacity={isDimmed ? 0.1 : 0.5} />
+                </>
               ) : (
                 <circle cx={node.x} cy={node.y} r={node.radius}
                   fill={node.color} opacity={isDimmed ? 0.15 : 1}
@@ -400,6 +408,10 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <svg width="14" height="14"><circle cx="7" cy="7" r="4" fill={colors.textTertiary} /></svg>
               Small circle = Note
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke={colors.textTertiary} strokeWidth="1" strokeDasharray="2 2" /><circle cx="7" cy="7" r="2.5" fill={colors.textTertiary} opacity="0.5" /></svg>
+              Dashed circle = Scribe note
             </div>
             <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 8, marginBottom: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>

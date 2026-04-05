@@ -31,15 +31,10 @@ export async function createUserNotes(req: Request, res: Response): Promise<void
 
     const { title, content, aspect_id, horizon_start, horizon_end, status } = req.body ?? {};
 
-    if (!aspect_id) {
-      res.status(400).json({ error: 'aspect_id is required' });
-      return;
-    }
-
     const notes = await getSupabaseService().createNotes(userId, {
       title,
       content,
-      aspectId: aspect_id,
+      aspectId: aspect_id || undefined,
       horizonStart: horizon_start,
       horizonEnd: horizon_end,
       status

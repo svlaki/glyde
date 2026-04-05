@@ -72,6 +72,7 @@ import sharedEventsRouter from './shared-events.js';
 import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { startReminderCheckerJob } from '../jobs/reminder-checker.js';
 import { startNotificationSchedulerJob } from '../jobs/notification-scheduler.js';
+import { startScribeScheduler } from '../jobs/scribe-scheduler.js';
 import { authenticateRequest } from './middleware/auth.js';
 import pushNotificationService from '../services/PushNotificationService.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
@@ -601,6 +602,7 @@ if (process.env.NODE_ENV !== 'test') {
     startWatchRenewalJob();
     startReminderCheckerJob();
     startNotificationSchedulerJob();
+    startScribeScheduler();
 
     // Initialize push notification service
     pushNotificationService.initialize();

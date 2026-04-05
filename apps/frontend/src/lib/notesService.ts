@@ -11,7 +11,8 @@ export interface Note {
   aspect_icon?: string
   horizon_start?: string
   horizon_end?: string
-  status: 'draft' | 'active' | 'archived'
+  status: 'draft' | 'active' | 'archived' | 'scribe'
+  source?: 'user' | 'scribe' | 'agent'
   created_at: string
   updated_at: string
 }
@@ -55,7 +56,7 @@ export async function createUserNotes(
   notesData: {
     title?: string
     content?: string
-    aspect_id: string
+    aspect_id?: string
     horizon_start?: string
     horizon_end?: string
     status?: 'draft' | 'active' | 'archived'

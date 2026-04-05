@@ -23,6 +23,7 @@ export interface KGNote {
   aspect_color?: string
   aspect_name?: string
   parent_note_id?: string
+  source?: string
   updated_at: string
 }
 

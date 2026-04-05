@@ -148,4 +148,4 @@ export interface VectorMemory {
   semanticContext: string;
 }
 
-export type AgentType = 'conversation' | 'interaction' | 'maintenance' | 'scheduling' | 'pattern_mining' | 'coaching' | 'proactive' | 'onboarding' | 'planner' | 'scheduler';
+export type AgentType = 'conversation' | 'interaction' | 'maintenance' | 'scheduling' | 'pattern_mining' | 'coaching' | 'proactive' | 'onboarding' | 'planner' | 'scheduler' | 'scribe';

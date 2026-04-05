@@ -9,6 +9,7 @@ export interface GraphNode {
   y: number
   radius: number
   aspectId?: string
+  isScribe?: boolean
 }
 
 export interface GraphLink {

@@ -15,6 +15,7 @@ import { memoryTools } from './memory/index.js';
 import { interactionTools } from './interactions/index.js';
 import { rulesTools } from './rules/index.js';
 import { getPlanTool, updatePlanTool } from './plans/index.js';
+import { getNotesTool, createNotesTool, updateNotesTool, scribeResearchTool } from './notes/index.js';
 import { projectTools } from './projects/index.js';
 import { reminderTools } from './reminders/index.js';
 import { friendTools } from './friends/index.js';
@@ -119,6 +120,12 @@ export class ToolRegistry {
     this.tools.set(confirmSlotTool.name, confirmSlotTool);
     this.tools.set(dismissSlotTool.name, dismissSlotTool);
 
+    // Register notes tools (used by Scribe and available to ConversationAgent)
+    this.tools.set(getNotesTool.name, getNotesTool);
+    this.tools.set(createNotesTool.name, createNotesTool);
+    this.tools.set(updateNotesTool.name, updateNotesTool);
+    this.tools.set(scribeResearchTool.name, scribeResearchTool);
+
     // NOTE: Interaction tools NOT registered here
     // Gerald (InteractionAgentGerald) has its own tool set for proactive suggestions
     // This separation prevents ConversationAgent from accidentally creating interactions
@@ -165,7 +172,8 @@ export class ToolRegistry {
       goals: ['create_goal', 'update_goal', 'list_goals', 'check_in_goal', 'delete_goal'],
       profile: ['get_profile', 'update_profile'],
       memory: ['search_memory_unified', 'manage_patterns', 'update_memory_advanced'],
-      search: ['web_search', 'location_search'],
+      search: ['web_search', 'location_search', 'scribe_research'],
+      notes: ['get_notes', 'create_notes', 'update_notes', 'scribe_research'],
       interactions: ['create_interaction', 'create_rating'],
       rules: ['create_rule', 'list_rules', 'delete_rule', 'toggle_rule'],
       plans: ['get_plan', 'update_plan'],

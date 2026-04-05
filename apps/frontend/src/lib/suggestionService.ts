@@ -256,6 +256,28 @@ export async function replenishSlots(
   }
 }
 
+export async function generateSuggestionsBatch(
+  user: User,
+  accessToken?: string
+): Promise<{ error: string | null }> {
+  try {
+    if (!user) return { error: 'User not authenticated' }
+
+    const response = await fetch(`${API_URL}/api/suggestions/generate-batch`, {
+      method: 'POST',
+      headers: buildHeaders(accessToken),
+      body: JSON.stringify({ user_id: user.id }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) return { error: data.error || 'Failed to generate suggestions' }
+
+    return { error: null }
+  } catch {
+    return { error: 'Failed to generate suggestions' }
+  }
+}
+
 export async function dismissSlot(
   user: User,
   slotId: string,

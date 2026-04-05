@@ -3025,13 +3025,15 @@ export class SupabaseService {
   async createNotes(userId: string, notesData: {
     title?: string;
     content?: string;
-    aspectId: string;
+    aspectId?: string;
     horizonStart?: string;
     horizonEnd?: string;
-    status?: 'draft' | 'active' | 'archived';
+    status?: 'draft' | 'active' | 'archived' | 'scribe';
+    source?: 'user' | 'scribe' | 'agent';
   }): Promise<any | null> {
     try {
-      if (!this.isValidUUID(notesData.aspectId)) {
+      // aspect_id is optional -- notes can exist without an aspect
+      if (notesData.aspectId && !this.isValidUUID(notesData.aspectId)) {
         console.error('Invalid aspect ID:', notesData.aspectId);
         return null;
       }
@@ -3042,10 +3044,11 @@ export class SupabaseService {
           user_id: userId,
           title: notesData.title || 'Notes',
           content: notesData.content || '',
-          aspect_id: notesData.aspectId,
+          aspect_id: notesData.aspectId || null,
           horizon_start: notesData.horizonStart,
           horizon_end: notesData.horizonEnd,
-          status: notesData.status || 'active'
+          status: notesData.status || 'active',
+          source: notesData.source || 'user',
         })
         .select()
         .single();
