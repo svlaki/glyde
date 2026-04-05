@@ -7,8 +7,8 @@ import type { OnboardingScheduleEvalConfig } from './types.js';
 export const DEFAULT_EVAL_CONFIG: OnboardingScheduleEvalConfig = {
   characters: ['all'],
   enrichmentTurns: 10,
-  simulatorModel: 'gpt-4o-mini',
-  judgeModel: 'gpt-4o',
+  simulatorModel: 'gpt-5.4-nano',
+  judgeModel: 'gpt-5.4-nano',
   outputDir: 'src/evals/onboarding-schedule/reports',
 };
 

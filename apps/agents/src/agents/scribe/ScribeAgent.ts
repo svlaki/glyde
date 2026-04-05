@@ -19,7 +19,7 @@ import type { ScribePromptContext } from './prompts.js';
  */
 export class ScribeAgent extends BaseAgent {
   constructor() {
-    super('scribe', 'gpt-4.1-mini');
+    super('scribe', 'gpt-5.4-nano');
   }
 
   async initialize(): Promise<void> {
@@ -168,6 +168,9 @@ export class ScribeAgent extends BaseAgent {
         : JSON.stringify(response.content);
 
       console.log(`[SCRIBE] Completed ${mode} for user ${context.userId} in ${rounds} tool rounds`);
+
+      // Track token usage from all messages in the conversation
+      this.trackTokenUsage(context.userId, context.sessionId || `scribe-${Date.now()}`, messages);
 
       return {
         content,

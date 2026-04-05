@@ -92,7 +92,7 @@ export class ConversationAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('conversation', "gpt-5.1"); // Use GPT-5.1 for best intelligence
+    super('conversation', "gpt-5.4-mini"); // gpt-5.4-mini: best cost/intelligence ratio, supports prompt caching
     this.graph = this.createGraph();
   }
 
@@ -247,35 +247,7 @@ export class ConversationAgent extends BaseAgent {
       // Track token usage — aggregate across ALL AI messages (not just the last one)
       // The agent may loop through tools multiple times, each producing an AI message with its own usage
       try {
-        let totalInputTokens = 0;
-        let totalOutputTokens = 0;
-        let modelCallCount = 0;
-        for (const msg of aiMessages) {
-          const usage = msg?.usage_metadata || msg?.response_metadata?.tokenUsage;
-          if (usage) {
-            totalInputTokens += usage.input_tokens ?? usage.promptTokens ?? 0;
-            totalOutputTokens += usage.output_tokens ?? usage.completionTokens ?? 0;
-            modelCallCount++;
-          }
-        }
-        if (totalInputTokens > 0 || totalOutputTokens > 0) {
-          console.log(`[TOKEN TRACKING] processMessage: ${modelCallCount} model calls, input=${totalInputTokens}, output=${totalOutputTokens}`);
-          Promise.resolve(
-            getSupabaseClient()
-              .from('agent_token_usage')
-              .insert({
-                user_id: context.userId,
-                session_id: context.sessionId,
-                model_name: 'gpt-5.1',
-                input_tokens: totalInputTokens,
-                output_tokens: totalOutputTokens,
-                total_tokens: totalInputTokens + totalOutputTokens,
-                model_calls: modelCallCount,
-              })
-          )
-            .then(() => console.log(`[TOKEN TRACKING] Recorded ${totalInputTokens + totalOutputTokens} tokens for user ${context.userId}`))
-            .catch((err: any) => console.warn('[TOKEN TRACKING] Failed to record:', err));
-        }
+        this.trackTokenUsage(context.userId, context.sessionId, aiMessages);
       } catch (err) {
         console.warn('[TOKEN TRACKING] Error extracting usage:', err);
       }
@@ -542,7 +514,7 @@ IMPORTANT INSTRUCTIONS:
             .insert({
               user_id: context.userId,
               session_id: context.sessionId,
-              model_name: 'gpt-5.1',
+              model_name: this.modelName,
               input_tokens: streamInputTokens,
               output_tokens: streamOutputTokens,
               total_tokens: streamInputTokens + streamOutputTokens,

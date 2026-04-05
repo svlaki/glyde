@@ -13,7 +13,7 @@
 import { SupabaseService } from '../services/SupabaseService.js';
 import { ScribeAgent } from '../agents/scribe/ScribeAgent.js';
 
-const CHECK_INTERVAL = 15 * 60 * 1000; // Check every 15 minutes
+const CHECK_INTERVAL = 60 * 60 * 1000; // Check every hour (timezones are hourly)
 const DIGEST_HOUR = 3;                  // 3 AM local time
 const WEEKLY_DAY = 0;                   // Sunday
 const WEEKLY_HOUR = 4;                  // 4 AM local time
@@ -218,7 +218,7 @@ async function checkAndRunJobs(): Promise<void> {
 
 export function startScribeScheduler(): void {
   console.log('[SCRIBE-SCHEDULER] Starting scribe scheduler');
-  console.log(`[SCRIBE-SCHEDULER] Digest: 3 AM user local time (checks every 15min)`);
+  console.log(`[SCRIBE-SCHEDULER] Digest: 3 AM user local time (checks every hour)`);
   console.log(`[SCRIBE-SCHEDULER] Weekly jobs: Sunday 4 AM user local time`);
 
   // Check every 15 minutes

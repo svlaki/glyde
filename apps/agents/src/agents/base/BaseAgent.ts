@@ -1,19 +1,21 @@
 import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { AgentContext, AgentResponse, AgentType, MemoryContext, MessageContent } from "../../types/agents.js";
-import { SupabaseService } from "../../services/SupabaseService.js";
+import { SupabaseService, getSupabaseClient } from "../../services/SupabaseService.js";
 import { MemoryService } from "../../services/MemoryService.js";
 import { env } from "../../utils/env.js";
 
 export abstract class BaseAgent {
   protected model: ChatOpenAI;
+  protected modelName: string;
   protected supabaseService: SupabaseService;
   protected memoryService: MemoryService;
   protected agentType: AgentType;
   protected tools: any[] = [];
 
-  constructor(agentType: AgentType, modelName: string = "gpt-5.1") {
+  constructor(agentType: AgentType, modelName: string = "gpt-5.4-mini") {
     this.agentType = agentType;
+    this.modelName = modelName;
     this.model = new ChatOpenAI({
       modelName,
       temperature: 0.1,
@@ -138,6 +140,61 @@ export abstract class BaseAgent {
     const eventContext = events.map(e => e.content).join(' ');
     const chatContext = chats.map(c => c.content).join(' ');
     return `Recent events: ${eventContext}\nRecent conversations: ${chatContext}`;
+  }
+
+  /**
+   * Track token usage from LangGraph result messages.
+   * Extracts usage_metadata from AI messages and logs to agent_token_usage table.
+   * Fire-and-forget -- never blocks the response.
+   */
+  protected trackTokenUsage(
+    userId: string,
+    sessionId: string,
+    messages: BaseMessage[],
+    toolsUsed?: string[],
+    processingTimeMs?: number,
+  ): void {
+    try {
+      const aiMessages = messages.filter(m => 'usage_metadata' in m || 'response_metadata' in m);
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let cachedTokens = 0;
+      let modelCallCount = 0;
+
+      for (const msg of aiMessages) {
+        const usage = (msg as any)?.usage_metadata || (msg as any)?.response_metadata?.tokenUsage;
+        if (usage) {
+          totalInputTokens += usage.input_tokens ?? usage.promptTokens ?? 0;
+          totalOutputTokens += usage.output_tokens ?? usage.completionTokens ?? 0;
+          cachedTokens += usage.cache_read_input_tokens ?? usage.cachedTokens ?? 0;
+          modelCallCount++;
+        }
+      }
+
+      if (totalInputTokens > 0 || totalOutputTokens > 0) {
+        console.log(`[TOKEN TRACKING] ${this.agentType}: ${modelCallCount} calls, input=${totalInputTokens}, output=${totalOutputTokens}, cached=${cachedTokens}`);
+        Promise.resolve(
+          getSupabaseClient()
+            .from('agent_token_usage')
+            .insert({
+              user_id: userId,
+              session_id: sessionId,
+              model_name: this.modelName,
+              input_tokens: totalInputTokens,
+              output_tokens: totalOutputTokens,
+              total_tokens: totalInputTokens + totalOutputTokens,
+              cached_tokens: cachedTokens,
+              model_calls: modelCallCount,
+              tools_used: toolsUsed || [],
+              processing_time_ms: processingTimeMs || 0,
+            })
+        )
+          .then(() => console.log(`[TOKEN TRACKING] Recorded ${totalInputTokens + totalOutputTokens} tokens (${this.agentType}) for user ${userId}`))
+          .catch((err: any) => console.warn(`[TOKEN TRACKING] Failed to record (${this.agentType}):`, err));
+      }
+    } catch (err) {
+      console.warn(`[TOKEN TRACKING] Error extracting usage (${this.agentType}):`, err);
+    }
   }
 
   protected registerTools(tools: any[]): void {

@@ -6,7 +6,7 @@ Glyde is an AI-native life management system. Monorepo with two apps:
 - `apps/agents` - Node.js/Express backend with LangGraph agents (port 8000)
 - `apps/frontend` - React/Vite frontend with TailwindCSS (port 5173, exposed on 3000)
 
-Database: Supabase PostgreSQL with RLS. Memory: Zep Cloud. AI: OpenAI GPT-5.1.
+Database: Supabase PostgreSQL with RLS. Memory: pgvector + fact extraction. AI: OpenAI GPT-5.4 family (mini for user-facing, nano for background).
 
 ## Critical Rules
 
@@ -50,7 +50,7 @@ apps/agents/src/
     AgentRegistry.ts     # Central registry for all agents
     base/                # BaseAgent abstract class
     conversation/        # Main ConversationAgent (LangGraph, 70+ tools)
-    interaction-gerald/  # Proactive suggestion agent
+    interaction-gerald/  # DISCONNECTED - role eliminated
     maintenance-margaret/ # Data hygiene auditor
     onboarding-enrichment/ # Onboarding context enrichment agent
   api/                   # 26 endpoint modules + middleware
@@ -91,7 +91,7 @@ apps/agents/src/
     rules/ (4)           # create, list, delete, toggle
     search/ (2)          # web-search, location-search
   config/
-    agents.ts            # Agent config (model: gpt-5.1, recursionLimit: 6)
+    agents.ts            # Agent config (model: gpt-5.4-mini, recursionLimit: 10)
   types/                 # 8 type modules
     database.ts, agents.ts, api.ts, graph.ts, profile.ts, routing.ts
     express.d.ts, zep-ontology.ts
@@ -102,7 +102,7 @@ apps/agents/src/
     timeSlotFinder.ts, zep-sync-helper.ts
   jobs/                  # 10 background jobs (Zep maintenance, notifications, reminders)
   scripts/               # Zep cleanup utilities
-  evals/                 # Gerald agent evaluation framework
+  evals/                 # Agent evaluation framework (Gerald evals inactive)
 
 apps/frontend/src/
   pages/                 # 13 pages
@@ -145,7 +145,7 @@ Aspects are color-coded life categories (Work, Health, Personal, etc.). Stored i
 ```typescript
 const registry = ToolRegistry.getInstance();
 const tools = registry.getAllTools();           // ConversationAgent tools
-const geraldTools = registry.getGeraldAgentTools(); // Restricted set for Gerald
+// Gerald disconnected - getGeraldAgentTools() returns empty array
 ```
 
 ### Agent Prompt Pattern

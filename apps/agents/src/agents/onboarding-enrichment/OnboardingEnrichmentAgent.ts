@@ -54,7 +54,7 @@ export class OnboardingEnrichmentAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('onboarding', 'gpt-5.1');
+    super('onboarding', 'gpt-5.4-mini');
     this.graph = this.createGraph();
   }
 
@@ -76,6 +76,9 @@ export class OnboardingEnrichmentAgent extends BaseAgent {
       userId: context.userId,
       timezone: context.timezone || 'UTC',
     });
+
+    // Track token usage
+    this.trackTokenUsage(context.userId, context.sessionId || `onboarding-${Date.now()}`, result.messages);
 
     const lastMessage = result.messages[result.messages.length - 1];
     return {

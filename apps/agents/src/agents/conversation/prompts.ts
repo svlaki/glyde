@@ -211,7 +211,7 @@ ACTIVITY GUIDANCE:
  * CORE section (~150 lines) — Always included.
  * Identity, tool usage, communication style, event/task/goal decision tree, timestamps.
  */
-function buildCorePrompt(context: PromptContext): string {
+function buildCorePrompt(context: PromptContext): { staticInstructions: string; dynamicContext: string } {
   const {
     timezone,
     eventContext,
@@ -414,9 +414,9 @@ TIME (${timezone}):
 - "morning"=T09:00:00, "afternoon"=T14:00:00, "evening"=T19:00:00
 ${pageGuidance}`;
 
-  return staticInstructions + CALENDAR_DETAIL + GOAL_CREATION + RECURRING_EVENTS
-    + FRIENDS_SHARING + LOCATION_SEARCH + MEMORY_MANAGEMENT
-    + PLANS_DETAIL + REMINDERS_SECTION + dynamicContext;
+  // Return static instructions and dynamic context separately for prompt caching.
+  // Static sections come first (cacheable prefix), dynamic context is appended last.
+  return { staticInstructions, dynamicContext };
 }
 
 /**
@@ -583,15 +583,29 @@ REMINDERS:
 /**
  * Builds the full system prompt with all sections included.
  */
+/**
+ * Builds the full system prompt optimized for OpenAI prompt caching.
+ *
+ * Structure: [STATIC PREFIX] + [DYNAMIC CONTEXT]
+ * - Static prefix (~4K+ tokens): identical across all requests for all users.
+ *   OpenAI automatically caches matching prefixes >= 1024 tokens for 50-90% input cost reduction.
+ * - Dynamic context: user-specific data (events, tasks, goals, aspects, etc.)
+ *   appended at the end so it doesn't break the cache prefix.
+ */
 export function buildSystemPrompt(context: PromptContext): SystemMessage {
-  let prompt = buildCorePrompt(context);
-  prompt += CALENDAR_DETAIL;
-  prompt += GOAL_CREATION;
-  prompt += RECURRING_EVENTS;
-  prompt += FRIENDS_SHARING;
-  prompt += LOCATION_SEARCH;
-  prompt += MEMORY_MANAGEMENT;
-  prompt += PLANS_DETAIL;
-  prompt += REMINDERS_SECTION;
-  return new SystemMessage(prompt);
+  const { staticInstructions, dynamicContext } = buildCorePrompt(context);
+
+  // Static sections: identical for every user, every request — forms the cacheable prefix
+  const staticPrefix = staticInstructions
+    + CALENDAR_DETAIL
+    + GOAL_CREATION
+    + RECURRING_EVENTS
+    + FRIENDS_SHARING
+    + LOCATION_SEARCH
+    + MEMORY_MANAGEMENT
+    + PLANS_DETAIL
+    + REMINDERS_SECTION;
+
+  // Dynamic context: changes per user/request — appended after static prefix
+  return new SystemMessage(staticPrefix + dynamicContext);
 }

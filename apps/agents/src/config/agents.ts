@@ -14,7 +14,7 @@ export const AGENT_CONFIG = {
   /**
    * Model to use for the interaction agent (Gerald)
    */
-  model: 'gpt-5.1',
+  model: 'gpt-5.4-mini',
 
   /**
    * Recursion limit for LangGraph

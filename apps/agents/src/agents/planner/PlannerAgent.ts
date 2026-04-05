@@ -27,7 +27,7 @@ export class PlannerAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('planner', "gpt-4.1-mini");
+    super('planner', "gpt-5.4-nano");
     this.graph = this.createGraph();
   }
 
@@ -107,6 +107,9 @@ export class PlannerAgent extends BaseAgent {
           recursionLimit: 6,
         }
       );
+
+      // Track token usage
+      this.trackTokenUsage(context.userId, context.sessionId || `planner-${Date.now()}`, result.messages);
 
       const lastMessage = result.messages[result.messages.length - 1];
       const responseText = typeof lastMessage.content === 'string'

@@ -30,7 +30,7 @@ export class SchedulerAgent extends BaseAgent {
   private graph: any;
 
   constructor() {
-    super('scheduler', "gpt-4.1-mini");
+    super('scheduler', "gpt-5.4-nano");
     this.graph = this.createGraph();
   }
 
@@ -193,9 +193,12 @@ export class SchedulerAgent extends BaseAgent {
             userId: context.userId,
             timezone: userTimezone,
           },
-          recursionLimit: 30,
+          recursionLimit: 10,
         }
       );
+
+      // Track token usage
+      this.trackTokenUsage(context.userId, context.sessionId || `scheduler-${Date.now()}`, result.messages);
 
       const lastMessage = result.messages[result.messages.length - 1];
       const responseText = typeof lastMessage.content === 'string'

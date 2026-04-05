@@ -195,23 +195,10 @@ export class ToolRegistry {
     return this.getTools(toolNames);
   }
 
-  // Get tools for InteractionAgentGerald
-  // Gerald can create interactions AND directly create tasks/events/goals
+  // Gerald (InteractionAgentGerald) disconnected -- role eliminated
+  // Method kept for backwards compatibility but returns empty array
   getGeraldAgentTools(): any[] {
-    // Gerald gets ALL tools (same as conversation agent) so it can act on user responses
-    // Plus interaction-specific tools for creating interactions
-    const allTools = this.getAllTools();
-    const toolNames = new Set(allTools.map(t => t.name));
-
-    // Add interaction tools if not already registered
-    for (const t of interactionTools) {
-      if (!toolNames.has(t.name)) {
-        allTools.push(t);
-      }
-    }
-
-    console.log(`[GERALD TOOLS] Loaded ${allTools.length} tools (full toolset)`);
-    return allTools;
+    return [];
   }
 
   // Get tools for OnboardingEnrichmentAgent — curated set for setup

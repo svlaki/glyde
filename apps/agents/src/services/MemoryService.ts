@@ -164,7 +164,7 @@ export class MemoryService {
     try {
       const openai = getOpenAI();
       const response = await openai.chat.completions.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-nano',
         temperature: 0.1,
         max_tokens: 600,
         messages: [
