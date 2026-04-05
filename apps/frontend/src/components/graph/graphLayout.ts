@@ -95,9 +95,28 @@ export function buildGraphNodes(
     })
   }
 
-  // Aspect-free notes: arrange near center in a loose cluster
-  unlinkedNotes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / Math.max(unlinkedNotes.length, 1)
+  // Separate daily digests from other unlinked notes
+  const digestNotes = unlinkedNotes
+    .filter(n => n.title?.startsWith('Daily Digest'))
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  const otherUnlinked = unlinkedNotes.filter(n => !n.title?.startsWith('Daily Digest'))
+
+  // Daily digests: vertical chain on the left side
+  const digestX = centerX - orbitRadius - 60
+  const digestStartY = centerY - (digestNotes.length - 1) * 18
+  digestNotes.forEach((n, i) => {
+    const saved = savedPositions?.get(n.id)
+    nodes.push({
+      id: n.id, nodeType: 'note', label: n.title, color: '#9ca3af',
+      x: saved?.x ?? digestX, y: saved?.y ?? (digestStartY + i * 36),
+      radius: NOTE_RADIUS,
+      isScribe: true,
+    })
+  })
+
+  // Other aspect-free notes: near center
+  otherUnlinked.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(otherUnlinked.length, 1)
     const dist = orbitRadius * 0.15 + (i % 3) * 15
     const defaultX = centerX + dist * Math.cos(angle)
     const defaultY = centerY + dist * Math.sin(angle)

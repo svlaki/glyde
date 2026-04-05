@@ -129,10 +129,14 @@ export function Calendar() {
   }, [showFriendsEvents])
 
   // Combine user events and friends events for display
-  const allEvents = useMemo(
-    () => showFriendsEvents ? [...events, ...friendsEvents] : events,
-    [events, friendsEvents, showFriendsEvents]
-  )
+  // Viewer events (shared with role='viewer') only show when friends toggle is on
+  const allEvents = useMemo(() => {
+    const userEvents = events.filter(e => e.user_role !== 'viewer')
+    const viewerEvents = events.filter(e => e.user_role === 'viewer')
+    return showFriendsEvents
+      ? [...userEvents, ...viewerEvents, ...friendsEvents]
+      : userEvents
+  }, [events, friendsEvents, showFriendsEvents])
 
 
   // Get single day
@@ -1111,7 +1115,7 @@ export function Calendar() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             Friends
-            {friendsEvents.length > 0 && (
+            {(friendsEvents.length > 0 || events.some(e => e.user_role === 'viewer')) && (
               <span style={{
                 background: showFriendsEvents ? '#10b981' : colors.textTertiary,
                 color: '#fff',
@@ -1122,7 +1126,10 @@ export function Calendar() {
                 minWidth: '18px',
                 textAlign: 'center'
               }}>
-                {new Set(friendsEvents.map(e => (e as any).parent_event_id || e.id)).size}
+                {new Set([
+                  ...friendsEvents.map(e => (e as any).parent_event_id || e.id),
+                  ...events.filter(e => e.user_role === 'viewer').map(e => (e as any).parent_event_id || e.id)
+                ]).size}
               </span>
             )}
           </button>
@@ -1352,8 +1359,8 @@ export function Calendar() {
                             }}
                             style={{
                               background: isAllDay
-                                ? hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
-                                : hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
+                                ? hexToRgba(eventColor, (isFriendEvent || event.user_role === 'viewer') ? 0.12 : 0.2)
+                                : hexToRgba(eventColor, (isFriendEvent || event.user_role === 'viewer') ? 0.08 : 0.12),
                               borderLeft: isAllDay ? 'none' : `2px solid ${eventColor}`,
                               color: isAllDay ? eventColor : colors.textPrimary,
                               fontSize: fontSize.xs,
@@ -1367,7 +1374,7 @@ export function Calendar() {
                               cursor: 'pointer',
                               transition: 'background 0.15s ease',
                               flexShrink: 0,
-                              opacity: isFriendEvent ? 0.7 : 1,
+                              opacity: (isFriendEvent || event.user_role === 'viewer') ? 0.7 : 1,
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px'
@@ -1380,7 +1387,7 @@ export function Calendar() {
                             }}
                             title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''}${isAllDay ? ' (all day)' : ` - ${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}`}
                           >
-                            {isFriendEvent && (
+                            {(isFriendEvent || (isShared && event.owner_avatar_url)) && (
                               <span style={{
                                 width: '12px',
                                 height: '12px',

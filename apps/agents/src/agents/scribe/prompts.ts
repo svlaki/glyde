@@ -13,6 +13,7 @@ export interface ScribePromptContext {
   dayChatSummary?: string;
   existingNotes?: string;
   researchTopic?: string;
+  previousDigestTitle?: string;
 }
 
 export function buildScribeSystemPrompt(context: ScribePromptContext): SystemMessage {
@@ -84,6 +85,8 @@ ${context.dayChatSummary || 'No chat activity today.'}
 
 Existing Notes (for wiki-linking):
 ${context.existingNotes || 'No existing notes.'}
+
+${context.previousDigestTitle ? `IMPORTANT: Link to the previous digest by including [[${context.previousDigestTitle}]] at the bottom of the note. This creates a chain of daily digests in the graph.` : ''}
 
 Daily digests cover multiple life areas. Do NOT set an aspectId.`);
   }

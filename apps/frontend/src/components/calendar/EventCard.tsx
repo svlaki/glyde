@@ -79,7 +79,7 @@ export const EventCard = memo(function EventCard({
         right: layout.right === '2px' ? '4px' : layout.right,
         width: layout.width,
         height: `${height}px`,
-        background: hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12),
+        background: hexToRgba(eventColor, (isFriendEvent || isViewerEvent) ? 0.08 : 0.12),
         borderLeft: `3px solid ${eventColor}`,
         color: eventColor,
         borderRadius: '4px',
@@ -91,15 +91,15 @@ export const EventCard = memo(function EventCard({
         display: 'flex',
         flexDirection: 'column' as const,
         gap: '2px',
-        opacity: isDragSource ? 0.3 : (isFriendEvent ? 0.7 : 1),
+        opacity: isDragSource ? 0.3 : ((isFriendEvent || isViewerEvent) ? 0.7 : 1),
         transform: isDragSource ? 'scale(0.97)' : 'none',
         touchAction: 'none',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.12 : 0.2)
+        e.currentTarget.style.background = hexToRgba(eventColor, (isFriendEvent || isViewerEvent) ? 0.12 : 0.2)
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = hexToRgba(eventColor, isFriendEvent ? 0.08 : 0.12)
+        e.currentTarget.style.background = hexToRgba(eventColor, (isFriendEvent || isViewerEvent) ? 0.08 : 0.12)
       }}
       title={`${event.title}${isFriendEvent ? ` (${event.owner_display_name || 'Friend'})` : ''}${getRecurrenceBadge(event) ? ' (recurring)' : ''}\n${new Date(event.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${new Date(event.end_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
     >
@@ -114,7 +114,7 @@ export const EventCard = memo(function EventCard({
         alignItems: 'center',
         gap: '4px'
       }}>
-        {isFriendEvent && (
+        {(isFriendEvent || (isShared && event.owner_avatar_url)) && (
           <span style={{
             width: '14px',
             height: '14px',

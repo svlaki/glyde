@@ -77,6 +77,7 @@ export class ScribeAgent extends BaseAgent {
       // Determine mode from message
       let mode: ScribePromptContext['mode'] = 'daily-digest';
       let researchTopic: string | undefined;
+      let previousDigestTitle: string | undefined;
 
       if (message.startsWith('PATTERN_SCAN')) {
         mode = 'pattern-scan';
@@ -85,6 +86,12 @@ export class ScribeAgent extends BaseAgent {
       } else if (message.startsWith('RESEARCH:')) {
         mode = 'research';
         researchTopic = message.replace('RESEARCH:', '').trim();
+      }
+
+      // Extract previous digest title if present
+      const prevMatch = message.match(/PREVIOUS_DIGEST_TITLE:\s*(.+)/);
+      if (prevMatch) {
+        previousDigestTitle = prevMatch[1].trim();
       }
 
       // Build context data
@@ -108,6 +115,7 @@ export class ScribeAgent extends BaseAgent {
         aspectContext,
         mode,
         researchTopic,
+        previousDigestTitle,
         ...contextData,
       };
 

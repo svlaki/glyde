@@ -28,6 +28,8 @@ export interface DatabaseEvent {
   // Shared event metadata (populated when user is a member)
   user_role?: 'owner' | 'member' | 'viewer';
   member_count?: number;
+  owner_display_name?: string;  // Display name of event creator (for shared events)
+  owner_avatar_url?: string;    // Avatar URL of event creator (for shared events)
 
   // Post-event metadata
   reflection?: string;  // User's reflection on what happened during the event

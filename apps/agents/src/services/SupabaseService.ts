@@ -368,6 +368,8 @@ export class SupabaseService {
         reflection: event.reflection || null,
         is_missed: event.is_missed || false,
         user_role: event.user_role || 'owner',
+        owner_display_name: event.owner_display_name || null,
+        owner_avatar_url: event.owner_avatar_url || null,
         project_id: event.project_id || null,
         project_name: event.project_name || null,
         is_all_day: event.is_all_day || false,

@@ -389,6 +389,37 @@ export function KnowledgeGraphSVG({ data, isLoading, onCreateLink, onDeleteLink,
         </div>
       )}
 
+      {/* Zoom & pan controls */}
+      <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {[
+          { label: '+', action: () => setViewBox(v => {
+            const cx = v.x + v.w / 2, cy = v.y + v.h / 2, f = 0.8;
+            return { x: cx - (v.w * f) / 2, y: cy - (v.h * f) / 2, w: v.w * f, h: v.h * f };
+          })},
+          { label: '\u2013', action: () => setViewBox(v => {
+            const cx = v.x + v.w / 2, cy = v.y + v.h / 2, f = 1.25;
+            return { x: cx - (v.w * f) / 2, y: cy - (v.h * f) / 2, w: v.w * f, h: v.h * f };
+          })},
+          { label: '\u2302', action: () => setViewBox({ x: 0, y: 0, w: dims.w, h: dims.h }) },
+        ].map(btn => (
+          <button
+            key={btn.label}
+            onClick={btn.action}
+            style={{
+              width: 28, height: 28, borderRadius: '6px',
+              border: `1px solid ${colors.border}`,
+              background: colors.bgSecondary,
+              color: colors.textSecondary,
+              fontSize: '14px', fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
       {/* Help button */}
       <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
         <button onClick={() => setLegendOpen(prev => !prev)}

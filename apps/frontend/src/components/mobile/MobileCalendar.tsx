@@ -142,7 +142,12 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
   }
 
   // Combine user events and friends events for display
-  const allEvents = showFriendsEvents ? [...events, ...friendsEvents] : events
+  // Viewer events (shared with role='viewer') only show when friends toggle is on
+  const userEvents = events.filter(e => e.user_role !== 'viewer')
+  const viewerEvents = events.filter(e => e.user_role === 'viewer')
+  const allEvents = showFriendsEvents
+    ? [...userEvents, ...viewerEvents, ...friendsEvents]
+    : userEvents
 
   // Check if an event is a shared event (user is editor/viewer, not owner)
   const isSharedEvent = (event: CalendarEvent): boolean => {
@@ -1132,13 +1137,13 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
                             fontWeight: 500,
-                            opacity: isFriendEvent ? 0.7 : 1,
+                            opacity: (isFriendEvent || event.user_role === 'viewer') ? 0.7 : 1,
                             display: 'flex',
                             alignItems: 'center',
                             gap: '2px'
                           }}
                         >
-                          {isFriendEvent && (
+                          {(isFriendEvent || (isShared && event.owner_avatar_url)) && (
                             <span style={{
                               width: '10px',
                               height: '10px',
@@ -1499,7 +1504,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           cursor: isDragging ? 'grabbing' : 'pointer',
                           overflow: 'hidden',
                           zIndex: isBeingDragged ? 100 : (eventLayout?.zIndex ?? 5),
-                          opacity: !showInThisColumn ? 0 : (isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1)),
+                          opacity: !showInThisColumn ? 0 : ((isFriendEvent || event.user_role === 'viewer') ? 0.7 : (isBeingDragged ? 0.8 : 1)),
                           transition: isBeingDragged ? 'none' : 'all 0.2s',
                           touchAction: 'none',
                           // Keep pointer events active even when invisible — touchEnd must fire
@@ -1528,7 +1533,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                           alignItems: 'center',
                           gap: '2px'
                         }}>
-                          {isFriendEvent && (
+                          {(isFriendEvent || (isShared && event.owner_avatar_url)) && (
                             <span style={{
                               width: '12px',
                               height: '12px',
@@ -1788,7 +1793,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     cursor: isDragging ? 'grabbing' : 'pointer',
                     overflow: 'hidden',
                     zIndex: isBeingDragged ? 100 : (eventLayout?.zIndex ?? 5),
-                    opacity: isFriendEvent ? 0.7 : (isBeingDragged ? 0.8 : 1),
+                    opacity: (isFriendEvent || event.user_role === 'viewer') ? 0.7 : (isBeingDragged ? 0.8 : 1),
                     transition: isBeingDragged ? 'none' : 'all 0.2s',
                     touchAction: 'none',
                     ...(touchedEvent?.id === event.id && isInEditMode && {
@@ -1812,7 +1817,7 @@ export function MobileCalendar({ view, currentDate, onDateChange, onDisplayDateC
                     alignItems: 'center',
                     gap: '4px'
                   }}>
-                    {isFriendEvent && (
+                    {(isFriendEvent || (isShared && event.owner_avatar_url)) && (
                       <span style={{
                         width: '16px',
                         height: '16px',
