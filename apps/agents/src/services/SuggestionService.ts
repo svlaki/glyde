@@ -524,6 +524,21 @@ export class SuggestionService {
 
       await this.recordFeedback(userId, slotId, 'dismiss', slot.suggestion_id, reason);
 
+      // Archive the suggestion so it never comes back
+      await this.supabase
+        .from('action_suggestions')
+        .update({ status: 'archived', updated_at: new Date().toISOString() })
+        .eq('id', slot.suggestion_id)
+        .eq('user_id', userId);
+
+      // Also dismiss any other slots using the same suggestion
+      await this.supabase
+        .from('placement_slots')
+        .update({ status: 'dismissed', updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('suggestion_id', slot.suggestion_id)
+        .in('status', ['proposed', 'edited']);
+
       return data;
     } catch (error) {
       logger.error('[SuggestionService] Exception dismissing slot:', error);
