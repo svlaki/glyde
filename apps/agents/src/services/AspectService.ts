@@ -36,6 +36,43 @@ export interface AspectCreateInput {
   visibility?: string;
 }
 
+/**
+ * Color palette for auto-assigning aspect colors.
+ * Ordered by visual distinctiveness -- first colors are most distinct from each other.
+ * Must stay in sync with frontend palette in aspectContext.tsx.
+ */
+const ASPECT_COLOR_PALETTE = [
+  '#3b82f6', // Blue
+  '#10b981', // Green
+  '#ef4444', // Red
+  '#f59e0b', // Orange
+  '#8b5cf6', // Purple
+  '#06b6d4', // Cyan
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#84cc16', // Lime
+  '#6366f1', // Indigo
+  '#f97316', // Orange-red
+  '#a855f7', // Light Purple
+  '#22c55e', // Light Green
+  '#0ea5e9', // Sky Blue
+  '#4f46e5', // Dark Indigo
+  '#f43f5e', // Rose
+  '#d946ef', // Fuchsia
+  '#0891b2', // Dark Cyan
+  '#16a34a', // Dark Green
+  '#ea580c', // Dark Orange
+  '#7c3aed', // Violet
+  '#db2777', // Dark Pink
+  '#059669', // Emerald
+  '#2563eb', // Royal Blue
+  '#dc2626', // Crimson
+  '#ca8a04', // Yellow
+  '#7c2d12', // Brown
+  '#4338ca', // Deep Indigo
+  '#be123c', // Dark Rose
+];
+
 export class AspectService {
   private supabase: SupabaseClient;
 
@@ -100,6 +137,41 @@ export class AspectService {
     } catch (error) {
       logger.error('[AspectService] Exception fetching aspects:', error);
       return [];
+    }
+  }
+
+  /**
+   * Get the next unused color from the palette for a user.
+   * Queries existing aspect colors and returns the first palette color not in use.
+   * Falls back to cycling through the palette if all colors are taken.
+   */
+  async getNextAvailableColor(userId: string): Promise<string> {
+    try {
+      const { data: existing } = await this.supabase
+        .from('aspects')
+        .select('color')
+        .eq('user_id', userId)
+        .is('archived_at', null);
+
+      const usedColors = new Set(
+        (existing || []).map((a: any) => a.color?.toLowerCase())
+      );
+
+      // Find first unused color from the palette
+      const available = ASPECT_COLOR_PALETTE.find(
+        c => !usedColors.has(c.toLowerCase())
+      );
+
+      if (available) {
+        return available;
+      }
+
+      // All palette colors used -- cycle based on count
+      const index = usedColors.size % ASPECT_COLOR_PALETTE.length;
+      return ASPECT_COLOR_PALETTE[index];
+    } catch (error) {
+      logger.warn('[AspectService] Error getting available color, using fallback:', error);
+      return ASPECT_COLOR_PALETTE[0];
     }
   }
 

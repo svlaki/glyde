@@ -626,13 +626,21 @@ Use these scores to understand how the user feels about different areas of their
     console.log(`[CONVERSATION AGENT] Loaded ${allTools.length} tools from ToolRegistry`);
 
     // Slim continuation prompt for tool re-entry (saves ~3K tokens per loop)
-    const CONTINUATION_PROMPT = `You are Glyde, a life assistant. You just executed tools. Respond to the user based on the tool results. Be concise (1-3 sentences). Use 12-hour AM/PM for times.
+    const CONTINUATION_PROMPT = `You are Glyde, a life assistant. You just executed tools. Respond based on tool results. Be concise (1-3 sentences). Use 12-hour AM/PM.
 
-CRITICAL: If the user asked you to create, update, or delete something and you have NOT yet called the corresponding tool, you MUST call it now. NEVER tell the user you did something without a tool call proving it. If a tool call failed, tell the user honestly.
-For multi-action requests, call ALL remaining tools before responding. Do NOT stop to ask clarifying questions mid-execution — use reasonable defaults and keep going.
-CHECK YOUR WORK: If the user's message contained schedule info (lecture times, class times, meeting patterns) and you have NOT yet called create_recurring_event or create_event, you are NOT done — call them now. Creating an aspect without the corresponding events is incomplete.
-CONFLICT CHECK: If you just created multiple events, check whether any of them land at the same time. A recurring event that fires on weekdays at 9am WILL conflict with a one-off event at 9am on any weekday. If there is an overlap, you MUST say: "Heads up: [event A] and [event B] conflict on [day] at [time] — both are on your calendar."
-When summarizing, clearly list what was ACTUALLY created/changed (with names and details) so the user can reference or undo specific items later.`;
+TOOL RESULT VERIFICATION (MANDATORY):
+1. READ EVERY tool result message below. Each tool call produced a result.
+2. If ANY result starts with "Error" or contains "failed" or "returned null", that tool call FAILED. The action did NOT happen. Do NOT claim it succeeded.
+3. NEVER claim you created/updated/deleted something unless the tool result confirms success with specific details (event ID, title, time).
+4. Count your successes: if you called 5 tools and only 2 returned success, only 2 actions happened. Tell the user exactly which ones failed.
+
+INCOMPLETE WORK:
+- If the user asked for multiple items and some tool calls failed, RETRY the failed ones NOW before responding.
+- If schedule info was mentioned and you have NOT yet called create_recurring_event or create_event for ALL items, keep going.
+- Creating an aspect without the corresponding events is incomplete.
+
+CONFLICT CHECK: After creating multiple events, check for time overlaps and flag them.
+Summarize ONLY what ACTUALLY succeeded, with names and times.`;
 
     // Define the workflow nodes
     const modelWithTools = this.model.bindTools(allTools);
@@ -697,7 +705,16 @@ When summarizing, clearly list what was ACTUALLY created/changed (with names and
 
       const response = await modelWithTools.invoke(messages);
       const toolCalls = (response as any).tool_calls?.length || 0;
+      const responseText = typeof response.content === 'string' ? response.content : '';
       console.log(`[AGENT NODE] Response: ${toolCalls} tool_calls${toolCalls > 0 ? ': ' + (response as any).tool_calls.map((t: any) => t.name || t.tool).join(', ') : ''}`);
+
+      // Detect hallucinated actions: model claims to have done something without calling tools
+      if (toolCalls === 0 && responseText.length > 0 && !isToolReentry) {
+        const actionClaims = /\b(created|added|scheduled|updated|deleted|moved|removed)\b/i;
+        if (actionClaims.test(responseText)) {
+          console.warn(`[AGENT NODE] WARNING: Model claims actions ("${responseText.slice(0, 100)}...") but made 0 tool calls. Possible hallucination.`);
+        }
+      }
 
       return {
         messages: [response],
@@ -707,16 +724,38 @@ When summarizing, clearly list what was ACTUALLY created/changed (with names and
     const executeTools = async (state: ConversationStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage._getType() === "ai" && (lastMessage as any).tool_calls && (lastMessage as any).tool_calls.length > 0) {
-        console.log(`[TOOLS NODE] Executing ${(lastMessage as any).tool_calls.length} tool calls:`, (lastMessage as any).tool_calls.map((t: any) => t.name || t.tool));
+        const toolCalls = (lastMessage as any).tool_calls;
+        console.log(`[TOOLS NODE] Executing ${toolCalls.length} tool calls:`, toolCalls.map((t: any) => t.name || t.tool));
+
         const toolResults = await toolNode.invoke(state, {
           configurable: {
             userId: state.userId,
             timezone: state.timezone
           }
         });
-        console.log(`[TOOLS NODE] Tool execution completed`);
+
+        // Audit tool results: detect failures so the model can't hallucinate success.
+        // ToolNode catches errors and returns them as ToolMessage content strings.
+        // We log failures loudly and prepend a summary so the model sees them clearly.
+        const resultMessages = toolResults.messages || [];
+        const failures: string[] = [];
+        for (const msg of resultMessages) {
+          const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          const toolName = msg.name || 'unknown';
+          if (content.startsWith('Error:') || content.startsWith('Error ') || content.includes('failed') || content.includes('returned null')) {
+            console.error(`[TOOLS NODE] TOOL FAILED: ${toolName} -> ${content.slice(0, 200)}`);
+            failures.push(`${toolName}: ${content.slice(0, 150)}`);
+          }
+        }
+
+        if (failures.length > 0) {
+          console.error(`[TOOLS NODE] ${failures.length}/${toolCalls.length} tool calls FAILED`);
+        } else {
+          console.log(`[TOOLS NODE] All ${toolCalls.length} tool calls succeeded`);
+        }
+
         return {
-          messages: toolResults.messages,
+          messages: resultMessages,
         };
       }
       return {};

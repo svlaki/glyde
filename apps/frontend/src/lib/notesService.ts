@@ -13,6 +13,8 @@ export interface Note {
   horizon_end?: string
   status: 'draft' | 'active' | 'archived' | 'scribe'
   source?: 'user' | 'scribe' | 'agent'
+  is_shared?: boolean
+  owner_display_name?: string
   created_at: string
   updated_at: string
 }

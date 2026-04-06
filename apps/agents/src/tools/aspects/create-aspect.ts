@@ -51,9 +51,12 @@ export const createAspectTool = tool(
         return await enrichExistingAspect(userId, existing, description, context, color);
       }
 
+      // Auto-assign an unused color if none provided
+      const assignedColor = color || await AspectService.getNextAvailableColor(userId);
+
       const aspect = await AspectService.createAspect(userId, {
         name,
-        color: color || '#3b82f6',
+        color: assignedColor,
         description: description || undefined,
         context: context || undefined,
       });
@@ -62,7 +65,7 @@ export const createAspectTool = tool(
         return "Failed to create aspect";
       }
 
-      return `Created aspect: "${name}" (${color || '#3b82f6'})${description ? ' with description' : ''}`;
+      return `Created aspect: "${name}" (${assignedColor})${description ? ' with description' : ''}`;
     } catch (error: any) {
       // Race condition: parallel tool (e.g. create_recurring_event) auto-created the aspect
       // between our check and our create. Retry lookup and enrich with description/context.

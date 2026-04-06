@@ -1176,6 +1176,15 @@ function NotesPageDesktop() {
                   }}>
                     {selectedNote.aspect_name || 'Uncategorized'}
                   </span>
+                  {selectedNote.is_shared && selectedNote.owner_display_name && (
+                    <span style={{
+                      fontSize: '11px',
+                      color: colors.textTertiary,
+                      marginLeft: 'auto',
+                    }}>
+                      by {selectedNote.owner_display_name}
+                    </span>
+                  )}
                 </div>
 
                 {/* Editable Title */}

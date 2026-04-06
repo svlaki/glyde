@@ -3117,11 +3117,42 @@ export class SupabaseService {
       if (updates.horizonEnd !== undefined) updateData.horizon_end = updates.horizonEnd;
       if (updates.status !== undefined) updateData.status = updates.status;
 
+      // First check if user owns the note or is in the shared aspect
+      const { data: note } = await this.client
+        .from('notes')
+        .select('user_id, aspect_id')
+        .eq('id', notesId)
+        .single();
+
+      if (!note) {
+        console.error('Note not found:', notesId);
+        return null;
+      }
+
+      // Allow if user owns the note OR is a member of its shared aspect
+      if (note.user_id !== userId) {
+        if (!note.aspect_id) {
+          console.error('Cannot edit another user note without shared aspect');
+          return null;
+        }
+        const { data: membership } = await this.client
+          .from('aspect_members')
+          .select('id')
+          .eq('aspect_id', note.aspect_id)
+          .eq('user_id', userId)
+          .eq('status', 'accepted')
+          .limit(1);
+
+        if (!membership || membership.length === 0) {
+          console.error('User not authorized to edit this shared note');
+          return null;
+        }
+      }
+
       const { data, error } = await this.client
         .from('notes')
         .update(updateData)
         .eq('id', notesId)
-        .eq('user_id', userId)
         .select()
         .single();
 
