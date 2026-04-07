@@ -1,23 +1,39 @@
 /**
  * LLM-as-judge scoring for the onboarding-to-schedule pipeline.
- * Uses a separate model (gpt-4o) from the pipeline agents to avoid self-eval bias.
- * Two rubrics: enrichment capture and schedule quality.
+ * Uses a separate model from the pipeline agents to avoid self-eval bias.
+ * Three rubrics: enrichment capture, schedule quality, conversation behavior.
  */
 
 import OpenAI from 'openai';
 import type {
   CharacterSheet,
   EnrichmentTurn,
+  ConversationTurn,
   FinalState,
   EnrichmentScore,
   ScheduleScore,
+  ConversationBehaviorScore,
+  ScenarioResult,
   OnboardingScheduleEvalConfig,
 } from './types.js';
+import { BEHAVIOR_CRITERIA } from './behavior-criteria.js';
 
 function formatConversation(turns: readonly EnrichmentTurn[]): string {
-  return turns.map(t =>
-    `[Turn ${t.turnNumber}]\nUser: ${t.userMessage}\nGlyde: ${t.agentResponse}\nTools: ${t.toolsCalled.length > 0 ? t.toolsCalled.join(', ') : 'none'}`
-  ).join('\n\n');
+  return turns.map(t => {
+    const toolLine = t.toolDetails.length > 0
+      ? `Tools: ${t.toolDetails.map(td => `${td.name}${td.result ? ` -> ${td.result.slice(0, 100)}` : ''}`).join(' | ')}`
+      : 'Tools: none';
+    return `[Turn ${t.turnNumber}]\nUser: ${t.userMessage}\nGlyde: ${t.agentResponse}\n${toolLine}`;
+  }).join('\n\n');
+}
+
+function formatConversationTurns(turns: readonly ConversationTurn[]): string {
+  return turns.map(t => {
+    const toolLine = t.toolDetails.length > 0
+      ? `Tools: ${t.toolDetails.map(td => `${td.name}${td.result ? ` -> ${td.result.slice(0, 100)}` : ''}`).join(' | ')}`
+      : 'Tools: none';
+    return `[${t.scenarioId} | ${t.category}]\nUser: ${t.userMessage}\nGlyde: ${t.agentResponse}\n${toolLine}`;
+  }).join('\n\n');
 }
 
 function formatFinalState(state: FinalState): string {
@@ -71,7 +87,6 @@ function formatExpectedOutcomes(character: CharacterSheet): string {
 }
 
 function parseJsonScore<T>(raw: string, fallback: T): T {
-  // Extract JSON from markdown code blocks if present
   const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/);
   if (!jsonMatch) return fallback;
 
@@ -106,7 +121,13 @@ ${character.enrichmentDetails.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 EXPECTED OUTCOMES:
 ${formatExpectedOutcomes(character)}
 
-CONVERSATION TRANSCRIPT:
+CORRECT BEHAVIOR CRITERIA:
+${BEHAVIOR_CRITERIA.enrichment.map(c => `- ${c}`).join('\n')}
+
+ANTI-PATTERNS TO CHECK FOR:
+${BEHAVIOR_CRITERIA.antiPatterns.map(c => `- ${c}`).join('\n')}
+
+CONVERSATION TRANSCRIPT (with tool calls):
 ${formatConversation(turns)}
 
 RESULTING DATA (what the assistant actually created):
@@ -117,7 +138,7 @@ Score each dimension 1-5:
 1. aspectDiscovery: Did the assistant discover and create aspects for all major life areas? (1=missed most, 5=found all)
 2. scheduleCapture: Were recurring events created for the user's routines (classes, work shifts, gym, etc.)? (1=barely any, 5=comprehensive)
 3. goalExtraction: Were the user's goals captured? (1=none, 5=all goals with good detail)
-4. conversationQuality: Was the conversation natural and efficient? Did it cover all areas without being repetitive? (1=awkward/repetitive, 5=smooth and thorough)
+4. conversationQuality: Was the conversation natural and efficient? Did it avoid anti-patterns? (1=awkward/anti-patterns, 5=smooth and correct)
 5. overall: Overall, would this user have a functional, populated calendar after this enrichment? (1=useless, 5=excellent)
 
 Respond with ONLY a JSON object:
@@ -127,13 +148,13 @@ Respond with ONLY a JSON object:
   "goalExtraction": <number>,
   "conversationQuality": <number>,
   "overall": <number>,
-  "reasoning": "<2-3 sentence explanation>"
+  "reasoning": "<2-3 sentence explanation, mention any anti-patterns observed>"
 }`;
 
   const response = await openai.chat.completions.create({
     model: config.judgeModel,
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 500,
+    max_completion_tokens: 500,
     temperature: 0.2,
   });
 
@@ -172,6 +193,9 @@ ${character.enrichmentDetails.map((d, i) => `${i + 1}. ${d}`).join('\n')}
 EXPECTED SCHEDULE PATTERNS:
 ${character.expectedOutcomes.expectedSchedulePatterns.join(', ')}
 
+CORRECT BEHAVIOR CRITERIA:
+${BEHAVIOR_CRITERIA.scheduler.map(c => `- ${c}`).join('\n')}
+
 RESULTING DATA:
 ${formatFinalState(finalState)}
 
@@ -198,7 +222,7 @@ Respond with ONLY a JSON object:
   const response = await openai.chat.completions.create({
     model: config.judgeModel,
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 500,
+    max_completion_tokens: 500,
     temperature: 0.2,
   });
 
@@ -213,4 +237,131 @@ Respond with ONLY a JSON object:
     overall: 1,
     reasoning: 'Failed to parse judge response',
   });
+}
+
+/**
+ * Deterministic per-scenario pass/fail check based on expected tool behavior.
+ */
+function evaluateScenarios(
+  turns: readonly ConversationTurn[],
+  character: CharacterSheet,
+): ScenarioResult[] {
+  return turns.map(turn => {
+    const scenario = character.conversationScenarios.find(s => s.id === turn.scenarioId);
+    if (!scenario) {
+      return {
+        scenarioId: turn.scenarioId,
+        category: turn.category,
+        passed: false,
+        toolsExpected: [],
+        toolsActual: [...turn.toolsCalled],
+        violations: ['Scenario definition not found'],
+      };
+    }
+
+    const violations: string[] = [];
+    const expected = scenario.expectedBehavior;
+
+    // Check required tools were called
+    for (const tool of expected.shouldCallTools) {
+      if (!turn.toolsCalled.includes(tool)) {
+        violations.push(`Missing expected tool: ${tool}`);
+      }
+    }
+
+    // Check forbidden tools were NOT called
+    if (expected.shouldNotCallTools) {
+      for (const tool of expected.shouldNotCallTools) {
+        if (turn.toolsCalled.includes(tool)) {
+          violations.push(`Called forbidden tool: ${tool}`);
+        }
+      }
+    }
+
+    return {
+      scenarioId: turn.scenarioId,
+      category: turn.category,
+      passed: violations.length === 0,
+      toolsExpected: [...expected.shouldCallTools],
+      toolsActual: [...turn.toolsCalled],
+      violations,
+    };
+  });
+}
+
+/**
+ * Score the conversation agent behavior across all scenarios.
+ * Combines deterministic tool checks with LLM quality judgment.
+ */
+export async function judgeConversation(
+  character: CharacterSheet,
+  turns: readonly ConversationTurn[],
+  finalState: FinalState,
+  config: OnboardingScheduleEvalConfig,
+): Promise<ConversationBehaviorScore> {
+  const scenarioResults = evaluateScenarios(turns, character);
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const prompt = `You are evaluating an AI life management assistant's behavior during a conversation. The user has already set up their account with a populated calendar, goals, and aspects. Now they are using the assistant for day-to-day tasks.
+
+CHARACTER PROFILE:
+Name: ${character.name}
+Occupation: ${character.onboardingData.occupation}
+
+CORRECT BEHAVIOR CRITERIA:
+${BEHAVIOR_CRITERIA.conversation.map(c => `- ${c}`).join('\n')}
+
+ANTI-PATTERNS:
+${BEHAVIOR_CRITERIA.antiPatterns.map(c => `- ${c}`).join('\n')}
+
+CURRENT CALENDAR/DATA STATE:
+${formatFinalState(finalState)}
+
+CONVERSATION SCENARIOS AND RESPONSES (with tool calls):
+${formatConversationTurns(turns)}
+
+DETERMINISTIC TOOL CHECK RESULTS:
+${scenarioResults.map(r => `${r.scenarioId}: ${r.passed ? 'PASS' : 'FAIL'}${r.violations.length > 0 ? ` -- ${r.violations.join(', ')}` : ''}`).join('\n')}
+
+Score each dimension 1-5:
+
+1. toolCorrectness: Did the agent use the right tools for each request? Did it avoid unnecessary tools? (1=wrong tools frequently, 5=perfect tool selection)
+2. responseAccuracy: Were the responses factually correct and relevant? Did they reference actual calendar data? (1=inaccurate, 5=precise and helpful)
+3. duplicateAvoidance: Did the agent check for existing data before creating new entries? Did it avoid duplicates? (1=created duplicates, 5=always checked first)
+4. contextAwareness: Was the agent aware of the user's schedule, goals, and existing data in its responses? (1=ignored context, 5=deeply context-aware)
+5. overall: Overall, is this assistant behaving correctly and helpfully? (1=broken, 5=excellent)
+
+Respond with ONLY a JSON object:
+{
+  "toolCorrectness": <number>,
+  "responseAccuracy": <number>,
+  "duplicateAvoidance": <number>,
+  "contextAwareness": <number>,
+  "overall": <number>,
+  "reasoning": "<2-3 sentence explanation, mention specific anti-patterns if observed>"
+}`;
+
+  const response = await openai.chat.completions.create({
+    model: config.judgeModel,
+    messages: [{ role: 'user', content: prompt }],
+    max_completion_tokens: 500,
+    temperature: 0.2,
+  });
+
+  const raw = response.choices[0]?.message?.content || '';
+
+  const scores = parseJsonScore<Omit<ConversationBehaviorScore, 'scenarioResults'>>(raw, {
+    toolCorrectness: 1,
+    responseAccuracy: 1,
+    duplicateAvoidance: 1,
+    contextAwareness: 1,
+    overall: 1,
+    reasoning: 'Failed to parse judge response',
+  });
+
+  return {
+    ...scores,
+    scenarioResults,
+  };
 }

@@ -45,6 +45,7 @@ export function Calendar() {
   const [slotSuggestionIndex, setSlotSuggestionIndex] = useState<Record<string, number>>({})
   const [draggingSlot, setDraggingSlot] = useState<SlotWithSuggestion | null>(null)
   const [resizingSlot, setResizingSlot] = useState<SlotWithSuggestion | null>(null)
+  const [scrollContainerWidth, setScrollContainerWidth] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const { getBufferedWeekDates } = useHorizontalWeekScroll({
@@ -437,6 +438,19 @@ export function Calendar() {
       setCurrentTime(new Date())
     }, 60000) // Update every minute
     return () => clearInterval(timer)
+  }, [])
+
+  // Measure scroll container width for explicit week group sizing
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) setScrollContainerWidth(entry.contentRect.width)
+    })
+    ro.observe(el)
+    setScrollContainerWidth(el.clientWidth)
+    return () => ro.disconnect()
   }, [])
 
   // Auto-scroll to 9am when view changes to day/week
@@ -1483,11 +1497,12 @@ export function Calendar() {
             {/* Time Column - Mobile-style sticky gutter with timezone */}
             <div style={{
               width: '52px',
+              minWidth: '52px',
               flexShrink: 0,
               position: 'sticky',
               left: 0,
               zIndex: 20,
-              background: colors.bgSecondary
+              background: colors.bgSecondary,
             }}>
               {/* Timezone header - sticky top */}
               <div style={{
@@ -1563,7 +1578,11 @@ export function Calendar() {
                 key={weekGroup.key}
                 style={{
                   display: 'flex',
-                  ...(view === 'week' ? {
+                  ...(view === 'week' && scrollContainerWidth > 0 ? {
+                    width: `${scrollContainerWidth - 52}px`,
+                    minWidth: `${scrollContainerWidth - 52}px`,
+                    flexShrink: 0,
+                  } : view === 'week' ? {
                     flex: '0 0 calc(100% - 52px)',
                   } : {
                     flex: 1,
@@ -1918,7 +1937,7 @@ export function Calendar() {
             </div>
             ))}
 
-            {/* Current Time Indicator */}
+            {/* Current Time Indicator - red line + sticky label */}
             {(() => {
               const now = currentTime
               const currentHour = now.getHours()
@@ -1938,7 +1957,8 @@ export function Calendar() {
                   top: `${topPosition}px`,
                   left: 0,
                   right: 0,
-                  height: '0px',
+                  height: 0,
+                  overflow: 'visible',
                   zIndex: 25,
                   pointerEvents: 'none',
                 }}>
@@ -1954,12 +1974,12 @@ export function Calendar() {
                     color: colors.error,
                     background: colors.bgSecondary,
                     textAlign: 'center',
-                    zIndex: 26,
+                    zIndex: 30,
                     whiteSpace: 'nowrap',
                   }}>
                     {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </div>
-                  {/* Red line across full width */}
+                  {/* Red line across day columns */}
                   <div style={{
                     position: 'absolute',
                     top: 0,
@@ -1967,6 +1987,7 @@ export function Calendar() {
                     right: 0,
                     height: '2px',
                     background: colors.error,
+                    zIndex: 25,
                   }} />
                 </div>
               )

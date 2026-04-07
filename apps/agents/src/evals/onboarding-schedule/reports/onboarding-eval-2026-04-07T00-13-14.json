@@ -1,0 +1,1792 @@
+{
+  "timestamp": "2026-04-07T00:13:14.790Z",
+  "config": {
+    "characters": [
+      "all"
+    ],
+    "enrichmentTurns": 10,
+    "conversationEnabled": true,
+    "simulatorModel": "gpt-5.4-nano",
+    "judgeModel": "gpt-5.4-nano",
+    "outputDir": "src/evals/onboarding-schedule/reports"
+  },
+  "results": [
+    {
+      "characterId": "busy-student",
+      "enrichmentScore": {
+        "aspectDiscovery": 3,
+        "scheduleCapture": 1,
+        "goalExtraction": 4,
+        "conversationQuality": 2,
+        "overall": 1,
+        "reasoning": "The assistant created aspects for most life areas (school, work, health, social) but did not create the required recurring events; it ended up with 0 recurring events and many one-time events with incorrect/irrelevant items (e.g., dentist appointment, coffee chat) and no clear linkage to the stated weekly schedule. Conversation flow was inefficient and repetitive around home/living, and tool usage appears to have over-created aspects without properly scheduling events; goals were captured well (3 goals)."
+      },
+      "scheduleScore": {
+        "suggestionRelevance": 4,
+        "scheduleCompleteness": 2,
+        "timeSlotQuality": 1,
+        "aspectBalance": 3,
+        "descriptionQuality": 4,
+        "overall": 1,
+        "reasoning": "While the suggestion descriptions are mostly tied to real goals (3.8 GPA, half-marathon, $2000) and specific classes, the resulting schedule data shows only 12 one-time events and no clear placement of the 6 suggestions into available free slots. Several suggested activities appear to conflict with or ignore existing calendar blocks (e.g., Problem Sets and other study blocks are already scheduled at odd times), and the schedule lacks the required 60+ minute slots with 30+ minute gaps and a balanced 7-day spread."
+      },
+      "conversationScore": {
+        "toolCorrectness": 3,
+        "responseAccuracy": 3,
+        "duplicateAvoidance": 2,
+        "contextAwareness": 4,
+        "overall": 3,
+        "reasoning": "Tool usage is mixed: schedule queries sometimes call list_events correctly, but the duplicate-avoidance case failed by not using list_events before creating. The assistant also missed the required find_free_time tool for free-time queries. Responses are generally aligned with existing calendar context, but the tool-selection failures and duplicate-handling gaps reduce overall reliability.",
+        "scenarioResults": [
+          {
+            "scenarioId": "query-today",
+            "category": "schedule-query",
+            "passed": true,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "query-tomorrow",
+            "category": "schedule-query",
+            "passed": true,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "query-free-time",
+            "category": "context-awareness",
+            "passed": false,
+            "toolsExpected": [
+              "find_free_time"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": [
+              "Missing expected tool: find_free_time"
+            ]
+          },
+          {
+            "scenarioId": "create-simple-event",
+            "category": "event-create",
+            "passed": true,
+            "toolsExpected": [
+              "create_event"
+            ],
+            "toolsActual": [
+              "create_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "create-with-aspect",
+            "category": "event-create",
+            "passed": true,
+            "toolsExpected": [
+              "create_event"
+            ],
+            "toolsActual": [
+              "create_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "modify-event",
+            "category": "event-modify",
+            "passed": true,
+            "toolsExpected": [
+              "search_events"
+            ],
+            "toolsActual": [
+              "search_events",
+              "update_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "create-task",
+            "category": "task-management",
+            "passed": true,
+            "toolsExpected": [
+              "create_task"
+            ],
+            "toolsActual": [
+              "create_task"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "goal-checkin",
+            "category": "goal-checkin",
+            "passed": true,
+            "toolsExpected": [
+              "list_goals"
+            ],
+            "toolsActual": [
+              "list_goals"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "duplicate-check",
+            "category": "duplicate-avoidance",
+            "passed": false,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "create_event"
+            ],
+            "violations": [
+              "Missing expected tool: list_events"
+            ]
+          },
+          {
+            "scenarioId": "ambiguous-request",
+            "category": "edge-case",
+            "passed": true,
+            "toolsExpected": [],
+            "toolsActual": [
+              "create_action_suggestion"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "suggestion-query",
+            "category": "suggestion-interact",
+            "passed": true,
+            "toolsExpected": [
+              "list_action_suggestions"
+            ],
+            "toolsActual": [
+              "list_action_suggestions"
+            ],
+            "violations": []
+          }
+        ]
+      },
+      "pipelineResult": {
+        "character": {
+          "id": "busy-student",
+          "name": "Marcus Chen",
+          "onboardingData": {
+            "fullName": "Marcus Chen",
+            "preferredName": "Marcus",
+            "birthday": "2004-03-15",
+            "selectedCalendars": [],
+            "occupation": "Student",
+            "fieldOfStudy": "Computer Science",
+            "aspects": [
+              "School",
+              "Work",
+              "Health",
+              "Social"
+            ],
+            "goals": [
+              "Get a 3.8 GPA this semester",
+              "Run a half marathon in October",
+              "Save $2000 by summer"
+            ],
+            "timezone": "America/Los_Angeles"
+          },
+          "personality": "You are Marcus Chen, a 22-year-old CS junior at Stanford. You are friendly but concise -- you answer questions directly without over-explaining. You sometimes use casual language like \"yeah\" and \"nah\". You volunteer schedule details when asked but don't dump everything at once. You're a bit stressed about balancing school and work but generally upbeat.",
+          "enrichmentDetails": [
+            "I take CS 161 (Algorithms) MWF 10:30am-11:20am in Gates B01 with Professor Roughgarden",
+            "I take CS 221 (AI) TTh 1:30pm-2:50pm in Hewlett 200 with Professor Liang",
+            "I take MATH 120 (Groups and Rings) MWF 1:30pm-2:20pm in room 380-380C",
+            "I work at Blue Bottle Coffee on campus, Tuesday and Thursday mornings 6am-10am, and Saturday 7am-1pm",
+            "I go to the gym (lifting) Monday, Wednesday, Friday around 7:30am before class. Usually takes about an hour",
+            "I run on Tuesday and Thursday evenings around 6pm, training for a half marathon",
+            "I have a study group for CS 161 on Sunday afternoons from 2-5pm at Green Library",
+            "I try to do problem sets on weekday evenings, usually 7-10pm",
+            "I wake up around 6:30am on weekdays and go to bed around midnight",
+            "I play pickup basketball with friends on Saturday afternoons"
+          ],
+          "conversationScenarios": [
+            {
+              "id": "query-today",
+              "category": "schedule-query",
+              "userMessage": "what do i have today",
+              "description": "Basic schedule query - should list events, not create anything",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_task",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "mention specific events or say calendar is empty"
+                ],
+                "responseShouldNot": [
+                  "use markdown headers",
+                  "offer to create events unprompted"
+                ]
+              }
+            },
+            {
+              "id": "query-tomorrow",
+              "category": "schedule-query",
+              "userMessage": "what about tomorrow",
+              "description": "Follow-up schedule query with relative time reference",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "reference tomorrows date or events"
+                ]
+              }
+            },
+            {
+              "id": "query-free-time",
+              "category": "context-awareness",
+              "userMessage": "do i have any free time tomorrow afternoon",
+              "description": "Free time query - should check calendar and respond with specific windows",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "find_free_time"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "mention specific available time windows"
+                ]
+              }
+            },
+            {
+              "id": "create-simple-event",
+              "category": "event-create",
+              "userMessage": "add a dentist appointment friday at 2pm for an hour",
+              "description": "Simple one-time event creation",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_event"
+                ],
+                "shouldNotCallTools": [
+                  "create_recurring_event",
+                  "create_task"
+                ],
+                "responseShould": [
+                  "confirm the event was created"
+                ]
+              }
+            },
+            {
+              "id": "create-with-aspect",
+              "category": "event-create",
+              "userMessage": "i have a coffee chat with a colleague next wednesday at 11am",
+              "description": "Event creation that should use an existing aspect",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_event"
+                ],
+                "shouldNotCallTools": [
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "confirm creation"
+                ]
+              }
+            },
+            {
+              "id": "modify-event",
+              "category": "event-modify",
+              "userMessage": "can you move my dentist appointment to 3pm instead",
+              "description": "Event modification - should search then update, not create new",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "search_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "confirm the event was moved or updated"
+                ]
+              }
+            },
+            {
+              "id": "create-task",
+              "category": "task-management",
+              "userMessage": "remind me to buy a birthday gift for my mom",
+              "description": "Task creation for non-time-bound item - should use create_task not create_event",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_task"
+                ],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "confirm the task was created"
+                ]
+              }
+            },
+            {
+              "id": "goal-checkin",
+              "category": "goal-checkin",
+              "userMessage": "how am i doing on my goals",
+              "description": "Goal progress query - should list goals, not create new ones",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_goals"
+                ],
+                "shouldNotCallTools": [
+                  "create_goal",
+                  "create_event"
+                ],
+                "responseShould": [
+                  "mention the users existing goals"
+                ]
+              }
+            },
+            {
+              "id": "duplicate-check",
+              "category": "duplicate-avoidance",
+              "userMessage": "add a gym session for tomorrow morning at 7am",
+              "description": "Should check if a gym event already exists at that time before creating",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "responseShould": [
+                  "either create it or note a conflict exists"
+                ],
+                "responseShouldNot": [
+                  "create without checking for conflicts"
+                ]
+              }
+            },
+            {
+              "id": "ambiguous-request",
+              "category": "edge-case",
+              "userMessage": "i need to study more",
+              "description": "Vague request - should ask for details or create a suggestion, not a scheduled event",
+              "expectedBehavior": {
+                "shouldCallTools": [],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "ask for more details about when or what to study"
+                ]
+              }
+            },
+            {
+              "id": "suggestion-query",
+              "category": "suggestion-interact",
+              "userMessage": "what should i work on next",
+              "description": "Should check suggestions or schedule to recommend next activity",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_action_suggestions"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "suggest a specific activity based on goals or backlog"
+                ]
+              }
+            }
+          ],
+          "expectedOutcomes": {
+            "minAspects": 4,
+            "minRecurringEvents": 6,
+            "minGoals": 3,
+            "expectedAspectNames": [
+              "CS 161",
+              "CS 221",
+              "MATH 120",
+              "Blue Bottle",
+              "Health",
+              "Social"
+            ],
+            "expectedSchedulePatterns": [
+              "MWF morning classes",
+              "TTh afternoon class",
+              "TTh morning work shifts",
+              "Saturday work shift",
+              "MWF gym sessions",
+              "TTh evening runs",
+              "Sunday study group"
+            ]
+          }
+        },
+        "testUserId": "7de005f2-dd0a-4c73-896a-89104549a58d",
+        "onboardingDurationMs": 3756,
+        "enrichmentConversation": [
+          {
+            "turnNumber": 0,
+            "userMessage": "Hey! I just signed up. I'm Marcus.",
+            "agentResponse": "Nice to meet you, Marcus. We’ve covered your basics, calendars, and habits/goals so far — what about finances next?",
+            "toolsCalled": [
+              "get_profile"
+            ],
+            "toolDetails": [
+              {
+                "name": "get_profile",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Profile section \\\"context_data\\\":\\n{\\n  \\\"onboarding\\\": {\\n    \\\"version\\\": \\\"2.0\\\",\\n    \\\"completed_at\\\": \\\"2026-04-07T00:10:32.045Z\\\",\\n    \\\"steps_completed\\\": [\\n      \\\"basic_info\\\",\\n      \\\"calendars\\\",\\n      \\\"habits_goals\\\"\\n    ]\\n  },\\n  \\\"life_aspects\\\": [\\n    \\\"School\\\",\\n    \\\"Work\\\",\\n    \\\"Health\\\",\\n    \\\"Social\\\"\\n  ],\\n  \\\"calendar_imported\\\": false,\\n  \\\"selected_calendars\\\":"
+              }
+            ]
+          },
+          {
+            "turnNumber": 1,
+            "userMessage": "I don’t really have anything super structured to share on finances yet—mostly I just cover things as they come up. I do work part-time on campus a few set mornings (6–10am on Tue/Thu and 7am–1pm on Sat), which helps keep things steady. Beyond that, I’m still figuring out a consistent saving/budget routine while juggling school.",
+            "agentResponse": "Got it, Marcus. I’ve noted your part-time campus work schedule and that finances are still pretty flexible for now. What about school next—what are you studying, and do you have any classes, deadlines, or academic routines you want me to know about?",
+            "toolsCalled": [
+              "create_aspect"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Work\\\" with new details\",\"tool_call_id\":\"call_dscLA5hfLYj2T5h2lUG1COMA\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 2,
+            "userMessage": "Yeah—I'm taking CS 161 (Algorithms) MWF 10:30am–11:20am in Gates B01 with Prof Roughgarden, and CS 221 (AI) TTh 1:30pm–2:50pm in Hewlett 200 with Prof Liang. I also have MATH 120 (Groups and Rings) MWF 1:30pm–2:20pm in room 380-380C. For routines, I usually do problem sets on weekday evenings around 7–10pm, and I’ve got a CS 161 study group on Sundays 2–5pm at Green Library.",
+            "agentResponse": "Thanks, Marcus — I’ve got your classes and study rhythm noted. What about health and wellness next: sleep, exercise, or any routines you want me to know about?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect",
+              "create_aspect"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"CS 161\\\" (#8b5cf6) with description\",\"tool_call_id\":\"call_NUR8XwfZYTlXByDpKTDxifci\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"CS 221\\\" (#8b5cf6) with description\",\"tool_call_id\":\"call_yy23m6hVGD55APbVOt3M98IW\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"MATH 120\\\" (#8b5cf6) with description\",\"tool_call_id\":\"call_rxys2LDQeEc8HYR2KS4Hi2DL\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 3,
+            "userMessage": "I usually wake up around 6:30am on weekdays and go to bed around midnight. I lift around 7:30am on Monday, Wednesday, and Friday, and I run on Tuesday/Thursday evenings around 6pm for half-marathon training. On top of that, I try to keep weekday evenings for problem sets (usually 7–10pm) so I don’t wreck my sleep schedule.",
+            "agentResponse": "Got it, Marcus. I’ve noted your sleep schedule, lifting, and running routine. What about relationships and social life next—any close friends, family, or regular commitments you want me to keep in mind?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"Morning Lifts\\\" (#ef4444) with description\",\"tool_call_id\":\"call_CguiUO6zlyXkePALChIHydyo\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"Running\\\" (#22c55e) with description\",\"tool_call_id\":\"call_kJJmurKYtGR2fPeiGweZ19CH\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 4,
+            "userMessage": "I don’t have anything super formal tracked for relationships—most of my social stuff is pretty routine-based. I play pickup basketball with friends on Saturday afternoons, and I usually see people around my study group on Sundays (2–5pm at Green Library). Beyond that, I’ve mostly just got school + work + training, so my social time tends to cluster around those.",
+            "agentResponse": "Got it, Marcus. I’ve noted your work, classes, training, and social routines. What about home and living situation next—where are you based, and is there anything about roommates, commute, or household routines I should know?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"MATH 120\\\" with new details\",\"tool_call_id\":\"call_RalVc4kED8tG3kfIsvtlCpSW\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Social\\\" with new details\",\"tool_call_id\":\"call_JCXGOQWZHld408CXjhAmSLoC\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Running\\\" with new details\",\"tool_call_id\":\"call_j8JmJR6ACWLoQ6H6dQd2nszG\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Morning Lifts\\\" with new details\",\"tool_call_id\":\"call_9iIBsljWbiOMloweQ3QIpFwo\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Work\\\" with new details\",\"tool_call_id\":\"call_9dTBt1V56vNOd26zJQvbklaN\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 161\\\" with new details\",\"tool_call_id\":\"call_oSrvkFHmSbU1DTGfCYCSdrdh\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 221\\\" with new details\",\"tool_call_id\":\"call_v7RKazRHFVEAJsqcQAdI3aw0\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 5,
+            "userMessage": "I don’t really have anything for home/living situation in my current notes—like roommates or commute details. Mostly I just keep my routine tightly around classes and work, and I don’t track anything specific at home. If you want, I can share commute or housing details if you tell me what format you’re using.",
+            "agentResponse": "Thanks, Marcus — I’ve got your work, classes, training, and social routines noted. What about home and living situation next—anything about housing, roommates, or commute you want me to know?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"MATH 120\\\" with new details\",\"tool_call_id\":\"call_mT4HyvGh85Mno0GvMeCGByuN\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 161\\\" with new details\",\"tool_call_id\":\"call_KQXunlRmx3yGg3ncpxqK7V7L\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Social\\\" with new details\",\"tool_call_id\":\"call_VPNIkuvdS2kiDdOtDVr6QHih\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Morning Lifts\\\" with new details\",\"tool_call_id\":\"call_h5u3kyicFIkgpMBiYzyCb3Yt\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 221\\\" with new details\",\"tool_call_id\":\"call_k9K9p2XkMjI39wRPbBuDXCJc\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Running\\\" with new details\",\"tool_call_id\":\"call_dwYAZ9fuKT6eOWhhyoqN4D0k\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Work\\\" with new details\",\"tool_call_id\":\"call_sa3bKfo1R71cv1iF9g3MNZ0i\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 6,
+            "userMessage": "I don’t really have anything for home/living situation in my current notes—no roommate setup or specific commute details. Mostly I just keep my routine tightly around classes and work, and I don’t track anything specific at home. If you want, I can share commute or housing details in whatever format you’re using.",
+            "agentResponse": "Thanks, Marcus — I’ve got your classes, work shifts, training, and social routines set up. What about home and living situation next—anything about housing, roommates, or commute you want me to know?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_aspect",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Social\\\" with new details\",\"tool_call_id\":\"call_LLGYtI7uXtpa1QuYX3BrjjM3\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"MATH 120\\\" with new details\",\"tool_call_id\":\"call_MYnDivnCaORXnYOIbmblb0BC\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Morning Lifts\\\" with new details\",\"tool_call_id\":\"call_R3dMzWLKfhLkdvVWO0g6L2JP\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Work\\\" with new details\",\"tool_call_id\":\"call_xq4cDAl6evT1Mmz08f1muZST\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 221\\\" with new details\",\"tool_call_id\":\"call_04XgoiWNc7nQr8yUjFmdOzCv\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"Running\\\" with new details\",\"tool_call_id\":\"call_Y6CwVuWnsTmMyujdtCkhqntW\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Updated aspect \\\"CS 161\\\" with new details\",\"tool_call_id\":\"call_gbda5adt4azR9J10znN9OSpp\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem Sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-06-12T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_GK82c1pkHzZHoOWPkcKTC93n\",\"name\":\"create_recurring_event\",\"ad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**MATH 120** in aspect \\\"MATH 120\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-12T235959\\n**Starting:** Mon, Apr 6 at 1:30 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_ECOgk1kmkoo14XKcM7Ce4TP8\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\""
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Running** in aspect \\\"Running\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-12T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_OrCDChHUycUSj2X4zxFXXRIO\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 221** in aspect \\\"CS 221\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-12T235959\\n**Starting:** Tue, Apr 7 at 1:30 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_WBNuthbLErfzEgYNPdK7DIQn\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_met"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-12T235959\\n**Starting:** Mon, Apr 6 at 10:30 AM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_EjWZhNlksDtRO9DssYCQmk7B\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"res"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Morning Lifts** in aspect \\\"Morning Lifts\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-12T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_T1gaedYAice3x5ktethJBJ9B\",\"name\":\"create_recurring_event\",\"additional_kw"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Work Shift** in aspect \\\"Work\\\"\\n**Pattern:** Weekly on Tuesday, Thursday, Saturday until 2026-06-12T235959\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_kgo0n83X57sQW4N9i5WR360k\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\""
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Pickup Basketball** in aspect \\\"Social\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-12T235959\\n**Starting:** Sat, Apr 11 at 3:00 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_cWlhAkp7hObkoQ9ZY4Ff5jP1\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 Study Group** in aspect \\\"Social\\\"\\n**Pattern:** Weekly on Sunday until 2026-06-12T235959\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-06-12T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_ZIwOxrDNzvoHfoZTKwO1xjRE\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              }
+            ]
+          },
+          {
+            "turnNumber": 7,
+            "userMessage": "I don’t really have anything for home/living situation in my current notes—like roommates or commute details. Mostly I just keep my routine tightly around classes and work, and I don’t track anything specific at home.",
+            "agentResponse": "Got it, Marcus. I’ve got enough for now, and I’ll keep your system centered on school, work, health, and social routines.",
+            "toolsCalled": [],
+            "toolDetails": []
+          },
+          {
+            "turnNumber": 8,
+            "userMessage": "Cool, thanks. I’m mostly balancing classes + my campus job + training, so it helps to keep everything time-blocked. If anything else comes up later, I can add details.",
+            "agentResponse": "Your setup looks good, Marcus. I’ve got the main pieces in place, and I didn’t miss anything obvious from what you shared.",
+            "toolsCalled": [],
+            "toolDetails": []
+          },
+          {
+            "turnNumber": 9,
+            "userMessage": "Nice, cool—thanks. Yeah, my schedule is pretty packed but I try to keep weekday evenings for problem sets (around 7–10pm) so I don’t blow up my sleep. If anything new pops up, I’ll add it.",
+            "agentResponse": "Got it, Marcus. I’ve noted that weekday evenings are for problem sets, and your setup still looks good overall.",
+            "toolsCalled": [],
+            "toolDetails": []
+          }
+        ],
+        "enrichmentDurationMs": 71777,
+        "schedulerDurationMs": 18527,
+        "conversationTurns": [
+          {
+            "scenarioId": "query-today",
+            "category": "schedule-query",
+            "userMessage": "what do i have today",
+            "agentResponse": "You have 3 events today: Morning Lifts from 7:30 AM-8:30 AM at Gym, CS 161 from 10:30 AM-11:20 AM at Gates B01, and MATH 120 from 1:30 PM-2:20 PM at 380-380C.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Morning Lifts\\\" Mon 4/6 7:30am-8:30am @Gym [Morning Lifts] (recurring) #9185be59-d9e3-4212-89ae-c8212c449633\\n- \\\"CS 161\\\" Mon 4/6 10:30am-11:20am @Gates B01 [CS 161] (recurring) #d2320425-6c32-4f14-b938-d0546df58453\\n- \\\"MATH 120\\\" Mon 4/6 1:30pm-2:20pm @380-380C [MATH 120] (recurring) #9115883e-c02d-4030-ab6a-13080f9a2920\\n\\nUse the #ID to perform actions on these events.\",\"tool_call"
+              }
+            ],
+            "durationMs": 5723
+          },
+          {
+            "scenarioId": "query-tomorrow",
+            "category": "schedule-query",
+            "userMessage": "what about tomorrow",
+            "agentResponse": "Tomorrow you have 3 events: Work Shift from 6:00 AM-10:00 AM at Campus, CS 221 from 1:30 PM-2:50 PM at Hewlett 200, and Problem Sets from 7:00 PM-10:00 PM at Home or library.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Work Shift\\\" Tue 4/7 6:00am-10:00am @Campus [Work] (recurring) #9a31046a-528a-497e-8f2c-71c646769400\\n- \\\"CS 221\\\" Tue 4/7 1:30pm-2:50pm @Hewlett 200 [CS 221] (recurring) #d1adec9e-ed04-47a5-ac1e-0ee1cf1b9517\\n- \\\"Problem Sets\\\" Tue 4/7 7:00pm-10:00pm @Home or library [School] (recurring) #6df50052-721a-42f6-848c-7f6bdb844748\\n\\nUse the #ID to perform actions on these events.\",\"tool_ca"
+              }
+            ],
+            "durationMs": 6014
+          },
+          {
+            "scenarioId": "query-free-time",
+            "category": "context-awareness",
+            "userMessage": "do i have any free time tomorrow afternoon",
+            "agentResponse": "Yes — tomorrow afternoon looks free; I didn’t find any events between 12:00 PM and 6:00 PM.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"No events found between 4/7/2026 and 4/7/2026\",\"tool_call_id\":\"call_14PMtBHXJpvBUgSHL2mpgxwY\",\"name\":\"list_events\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 4565
+          },
+          {
+            "scenarioId": "create-simple-event",
+            "category": "event-create",
+            "userMessage": "add a dentist appointment friday at 2pm for an hour",
+            "agentResponse": "Done — I added “Dentist Appointment” for Fri, Apr 10 from 2:00 PM-3:00 PM under Health. It overlaps with “MATH 120” at the same time.",
+            "toolsCalled": [
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Dentist Appointment\\\" at Fri, Apr 10 at 2:00 PM in aspect \\\"Health\\\" (Note: overlaps with \\\"MATH 120\\\" at the same time)\",\"tool_call_id\":\"call_9q5I0yW2Mj5oZoI5RprF8oE1\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5520
+          },
+          {
+            "scenarioId": "create-with-aspect",
+            "category": "event-create",
+            "userMessage": "i have a coffee chat with a colleague next wednesday at 11am",
+            "agentResponse": "Done — I added “Coffee Chat” for Wed, Apr 15 from 11:00 AM-12:00 PM under Work. It overlaps with “CS 161” at the same time.",
+            "toolsCalled": [
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Coffee Chat\\\" at Wed, Apr 15 at 11:00 AM in aspect \\\"Work\\\" (Note: overlaps with \\\"CS 161\\\" at the same time)\",\"tool_call_id\":\"call_IJdof8NgPhIiZez2sx2BwTrq\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 4637
+          },
+          {
+            "scenarioId": "modify-event",
+            "category": "event-modify",
+            "userMessage": "can you move my dentist appointment to 3pm instead",
+            "agentResponse": "Moved your Dentist Appointment to Fri, Apr 10 from 3:00 PM-4:00 PM.",
+            "toolsCalled": [
+              "search_events",
+              "update_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "search_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS for \\\"Dentist Appointment\\\":\\n- \\\"Morning Lifts\\\" Fri 4/10 7:30am-8:30am @Gym [Morning Lifts] (recurring) #9185be59-d9e3-4212-89ae-c8212c449633\\n- \\\"CS 161\\\" Fri 4/10 10:30am-11:20am @Gates B01 [CS 161] (recurring) #d2320425-6c32-4f14-b938-d0546df58453\\n- \\\"MATH 120\\\" Fri 4/10 1:30pm-2:20pm @380-380C [MATH 120] (recurring) #9115883e-c02d-4030-ab6a-13080f9a2920\\n- \\\"Dentist Appointment\\\" Fri "
+              },
+              {
+                "name": "update_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENT: \\\"Dentist Appointment\\\" has been updated - moved to Friday, April 10 from 3:00 PM to 4:00 PM, reminder removed\",\"tool_call_id\":\"call_8do7o5f8XFsF8tApLWfDZZlh\",\"name\":\"update_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 6381
+          },
+          {
+            "scenarioId": "create-task",
+            "category": "task-management",
+            "userMessage": "remind me to buy a birthday gift for my mom",
+            "agentResponse": "Done — I created the task “Buy a birthday gift for mom” with medium priority under Personal.",
+            "toolsCalled": [
+              "create_task"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_task",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Task created: \\\"Buy a birthday gift for mom\\\"\",\"tool_call_id\":\"call_dUf8S5gC1P6QAv462mXp6PqL\",\"name\":\"create_task\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 4572
+          },
+          {
+            "scenarioId": "goal-checkin",
+            "category": "goal-checkin",
+            "userMessage": "how am i doing on my goals",
+            "agentResponse": "You have 3 active goals: Save $2000 by summer, Run a half marathon in October, and Get a 3.8 GPA this semester. If you want, I can also check their progress details or help you plan next steps.",
+            "toolsCalled": [
+              "list_goals"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_goals",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Found 3 goal(s):\\n1. Save $2000 by summer [ACTIVE]\\n   ID: 700285a3-38dc-43c0-a49a-d1e5c4aa85da\\n2. Run a half marathon in October [ACTIVE]\\n   ID: c33f8173-9398-4414-b2b4-0cf978d0cf7d\\n3. Get a 3.8 GPA this semester [ACTIVE]\\n   ID: b5df9da5-1d52-4930-bb25-fe4d9604bd8d\",\"tool_call_id\":\"call_mqtOAkhNRMeJTh3e4vjWebHb\",\"name\":\"list_goals\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5012
+          },
+          {
+            "scenarioId": "duplicate-check",
+            "category": "duplicate-avoidance",
+            "userMessage": "add a gym session for tomorrow morning at 7am",
+            "agentResponse": "Done — I added “Gym Session” for Tue, Apr 7 from 7:00 AM-8:00 AM under Health. It overlaps with “Work Shift” at the same time.",
+            "toolsCalled": [
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Gym Session\\\" at Tue, Apr 7 at 7:00 AM in aspect \\\"Health\\\" (Note: overlaps with \\\"Work Shift\\\" at the same time)\",\"tool_call_id\":\"call_OOs0idEb8J5PliqWq76M0an8\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 4739
+          },
+          {
+            "scenarioId": "ambiguous-request",
+            "category": "edge-case",
+            "userMessage": "i need to study more",
+            "agentResponse": "I added a “Study session” suggestion for 90 minutes. If you want, I can also help turn that into a scheduled calendar block.",
+            "toolsCalled": [
+              "create_action_suggestion"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_action_suggestion",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created action suggestion: \\\"Study session\\\" (general, 90 min)\",\"tool_call_id\":\"call_jZjjDFbK5xrs6YevQu1CcDjK\",\"name\":\"create_action_suggestion\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 4846
+          },
+          {
+            "scenarioId": "suggestion-query",
+            "category": "suggestion-interact",
+            "userMessage": "what should i work on next",
+            "agentResponse": "Next up: “Deep-work session: finish/advance tonight’s Problem Sets” for 120 minutes, since it’s the most specific open suggestion. You also have a general “Study session” for 90 minutes if you want something lighter.",
+            "toolsCalled": [
+              "list_action_suggestions"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_action_suggestions",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Found 2 suggestion(s):\\n1. \\\"Study session\\\" (general, 90 min, open)\\n2. \\\"Deep-work session: finish/advance tonight’s Problem Sets\\\" (task_step, 120 min, open)\",\"tool_call_id\":\"call_qOR9cbzKi83rV2NcyM6isx5p\",\"name\":\"list_action_suggestions\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 6027
+          }
+        ],
+        "conversationDurationMs": 63644,
+        "finalState": {
+          "aspects": [
+            {
+              "id": "0ea1af50-ee37-4e57-b29c-cbc1015e7c99",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "CS 161",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "Algorithms with Prof Roughgarden. Meets MWF 10:30am–11:20am in Gates B01.",
+              "context": {
+                "days": [
+                  "Monday",
+                  "Wednesday",
+                  "Friday"
+                ],
+                "type": "class",
+                "title": "Algorithms",
+                "course": "CS 161",
+                "endTime": "11:20",
+                "subject": "Algorithms",
+                "location": "Gates B01",
+                "schedule": "MWF 10:30 AM–11:20 AM",
+                "startTime": "10:30",
+                "instructor": "Prof Roughgarden",
+                "meetingDays": [
+                  "Monday",
+                  "Wednesday",
+                  "Friday"
+                ]
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:50.076683+00:00",
+              "updated_at": "2026-04-07T00:11:30.597595+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "6a768b50-e572-41d5-90b1-65150ddaf1ea",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "CS 221",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "AI with Prof Liang. Meets TTh 1:30pm–2:50pm in Hewlett 200.",
+              "context": {
+                "days": [
+                  "Tuesday",
+                  "Thursday"
+                ],
+                "type": "class",
+                "title": "AI",
+                "course": "CS 221",
+                "endTime": "14:50",
+                "subject": "AI",
+                "location": "Hewlett 200",
+                "schedule": "TTh 1:30 PM–2:50 PM",
+                "startTime": "13:30",
+                "instructor": "Prof Liang",
+                "meetingDays": [
+                  "Tuesday",
+                  "Thursday"
+                ]
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:50.074477+00:00",
+              "updated_at": "2026-04-07T00:11:30.578962+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "9162f198-99cd-49c2-abf6-259c38bb2d24",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "Health",
+              "color": "#ef4444",
+              "icon": null,
+              "description": "Health activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:32.769709+00:00",
+              "updated_at": "2026-04-07T00:10:32.769709+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "2734a626-fe8c-47e0-b4e4-38ee1a38083d",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "MATH 120",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "Groups and Rings. Meets MWF 1:30pm–2:20pm in room 380-380C.",
+              "context": {
+                "days": [
+                  "Monday",
+                  "Wednesday",
+                  "Friday"
+                ],
+                "type": "class",
+                "title": "Groups and Rings",
+                "course": "MATH 120",
+                "endTime": "14:20",
+                "subject": "Groups and Rings",
+                "location": "380-380C",
+                "schedule": "MWF 1:30 PM–2:20 PM",
+                "startTime": "13:30",
+                "meetingDays": [
+                  "Monday",
+                  "Wednesday",
+                  "Friday"
+                ]
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:50.080269+00:00",
+              "updated_at": "2026-04-07T00:11:30.560659+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "cc528efe-610d-4dbb-acdc-37bddfae55cc",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "Morning Lifts",
+              "color": "#ef4444",
+              "icon": null,
+              "description": "Marcus's weekday lifting routine. Lifts on Monday, Wednesday, and Friday around 7:30 AM.",
+              "context": {
+                "days": [
+                  "Monday",
+                  "Wednesday",
+                  "Friday"
+                ],
+                "time": "07:30",
+                "type": "health",
+                "notes": "Weekday morning lifting routine.",
+                "activity": "lifting",
+                "schedule": "Monday, Wednesday, Friday around 7:30 AM",
+                "frequency": "weekly"
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:57.792462+00:00",
+              "updated_at": "2026-04-07T00:11:30.569953+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "e08c05b0-7e60-4543-9d17-9f0b3f1dae89",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "Running",
+              "color": "#22c55e",
+              "icon": null,
+              "description": "Marcus's running routine for half-marathon training. Runs on Tuesday and Thursday evenings around 6:00 PM.",
+              "context": {
+                "days": [
+                  "Tuesday",
+                  "Thursday"
+                ],
+                "goal": "half-marathon training",
+                "time": "18:00",
+                "type": "health",
+                "notes": "Half-marathon training runs.",
+                "activity": "running",
+                "schedule": "Tuesday and Thursday evenings around 6:00 PM",
+                "frequency": "weekly"
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:58.962258+00:00",
+              "updated_at": "2026-04-07T00:11:30.581975+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "School",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "School activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:32.665733+00:00",
+              "updated_at": "2026-04-07T00:10:32.665733+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "796d4bd8-5766-4f7c-b460-c1fc1448a425",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "Social",
+              "color": "#f97316",
+              "icon": null,
+              "description": "Social activities and events\nMarcus's social activities and recurring hangouts, including pickup basketball and study-group social time.",
+              "context": {
+                "type": "social",
+                "activities": [
+                  "pickup basketball",
+                  "study group social time"
+                ]
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:32.801201+00:00",
+              "updated_at": "2026-04-07T00:11:30.55774+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "8f54c3e4-c100-4c57-b6e8-1899ffb0ab83",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "name": "Work",
+              "color": "#3b82f6",
+              "icon": null,
+              "description": "Work activities and events\nMarcus's part-time campus job. Recurring work schedule: Tuesday and Thursday 6:00 AM–10:00 AM, Saturday 7:00 AM–1:00 PM. Use for work shifts and work-related events.",
+              "context": {
+                "role": "part-time campus job",
+                "type": "work",
+                "location": "on campus",
+                "schedule": "Tue/Thu 6:00 AM–10:00 AM, Sat 7:00 AM–1:00 PM"
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:10:32.727331+00:00",
+              "updated_at": "2026-04-07T00:11:30.578461+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            }
+          ],
+          "events": [
+            {
+              "id": "9185be59-d9e3-4212-89ae-c8212c449633",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Morning Lifts",
+              "description": "Weekday lifting routine.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": "Gym",
+              "created_at": "2026-04-07T00:11:30.643153+00:00",
+              "updated_at": "2026-04-07T00:11:30.643153+00:00",
+              "aspect_id": "cc528efe-610d-4dbb-acdc-37bddfae55cc",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "d2320425-6c32-4f14-b938-d0546df58453",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "CS 161",
+              "description": "Algorithms with Prof Roughgarden.",
+              "start_time": "2026-04-06T17:30:00+00:00",
+              "end_time": "2026-04-06T18:20:00+00:00",
+              "location": "Gates B01",
+              "created_at": "2026-04-07T00:11:30.64656+00:00",
+              "updated_at": "2026-04-07T00:11:30.64656+00:00",
+              "aspect_id": "0ea1af50-ee37-4e57-b29c-cbc1015e7c99",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "9115883e-c02d-4030-ab6a-13080f9a2920",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "MATH 120",
+              "description": "Groups and Rings.",
+              "start_time": "2026-04-06T20:30:00+00:00",
+              "end_time": "2026-04-06T21:20:00+00:00",
+              "location": "380-380C",
+              "created_at": "2026-04-07T00:11:30.617223+00:00",
+              "updated_at": "2026-04-07T00:11:30.617223+00:00",
+              "aspect_id": "2734a626-fe8c-47e0-b4e4-38ee1a38083d",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "6df50052-721a-42f6-848c-7f6bdb844748",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Problem Sets",
+              "description": "Weekday evening problem set block.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": "Home or library",
+              "created_at": "2026-04-07T00:11:30.627104+00:00",
+              "updated_at": "2026-04-07T00:11:30.627104+00:00",
+              "aspect_id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "9a31046a-528a-497e-8f2c-71c646769400",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Work Shift",
+              "description": "Marcus's part-time campus job shift.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": "Campus",
+              "created_at": "2026-04-07T00:11:30.634179+00:00",
+              "updated_at": "2026-04-07T00:11:30.634179+00:00",
+              "aspect_id": "8f54c3e4-c100-4c57-b6e8-1899ffb0ab83",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH,SA;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "70c3c909-8568-4114-b76a-9ee7c7cdc4fb",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Gym Session",
+              "description": null,
+              "start_time": "2026-04-07T14:00:00+00:00",
+              "end_time": "2026-04-07T15:00:00+00:00",
+              "location": "Gym",
+              "created_at": "2026-04-07T00:12:55.10996+00:00",
+              "updated_at": "2026-04-07T00:12:55.10996+00:00",
+              "aspect_id": "9162f198-99cd-49c2-abf6-259c38bb2d24",
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "d1adec9e-ed04-47a5-ac1e-0ee1cf1b9517",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "CS 221",
+              "description": "AI with Prof Liang.",
+              "start_time": "2026-04-07T20:30:00+00:00",
+              "end_time": "2026-04-07T21:50:00+00:00",
+              "location": "Hewlett 200",
+              "created_at": "2026-04-07T00:11:30.633558+00:00",
+              "updated_at": "2026-04-07T00:11:30.633558+00:00",
+              "aspect_id": "6a768b50-e572-41d5-90b1-65150ddaf1ea",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bc115e14-8ec1-4f8b-8325-935a28a3b966",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Running",
+              "description": "Half-marathon training run.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": "Outside",
+              "created_at": "2026-04-07T00:11:30.639321+00:00",
+              "updated_at": "2026-04-07T00:11:30.639321+00:00",
+              "aspect_id": "e08c05b0-7e60-4543-9d17-9f0b3f1dae89",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "574ba601-03e4-4c79-a9fa-20d112352030",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Dentist Appointment",
+              "description": null,
+              "start_time": "2026-04-10T22:00:00+00:00",
+              "end_time": "2026-04-10T23:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:12:26.520634+00:00",
+              "updated_at": "2026-04-07T00:12:39.048643+00:00",
+              "aspect_id": "9162f198-99cd-49c2-abf6-259c38bb2d24",
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "d557eafd-b6e7-400f-8710-f340f8d64011",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Pickup Basketball",
+              "description": "Pickup basketball with friends.",
+              "start_time": "2026-04-11T22:00:00+00:00",
+              "end_time": "2026-04-12T00:00:00+00:00",
+              "location": "TBD",
+              "created_at": "2026-04-07T00:11:30.647027+00:00",
+              "updated_at": "2026-04-07T00:11:30.647027+00:00",
+              "aspect_id": "796d4bd8-5766-4f7c-b460-c1fc1448a425",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "287636f2-258f-4a8f-b1a0-4a3b74bc3110",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "CS 161 Study Group",
+              "description": "CS 161 study group time.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:11:30.638028+00:00",
+              "updated_at": "2026-04-07T00:11:30.638028+00:00",
+              "aspect_id": "796d4bd8-5766-4f7c-b460-c1fc1448a425",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20260612T235959",
+              "recurrence_end": "2026-06-12T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "fb4c1886-59fe-41ca-8380-51a5c1827659",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Coffee Chat",
+              "description": "Coffee chat with a colleague.",
+              "start_time": "2026-04-15T18:00:00+00:00",
+              "end_time": "2026-04-15T19:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:12:32.396017+00:00",
+              "updated_at": "2026-04-07T00:12:32.396017+00:00",
+              "aspect_id": "8f54c3e4-c100-4c57-b6e8-1899ffb0ab83",
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            }
+          ],
+          "recurringEvents": [],
+          "tasks": [
+            {
+              "id": "3cc8c62b-07e7-4db4-bb84-2cafb01ff7a4",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Buy a birthday gift for mom",
+              "description": "Pick out and buy a birthday gift for mom.",
+              "status": "pending",
+              "priority": "medium",
+              "due_date": null,
+              "completed_at": null,
+              "parent_goal_id": null,
+              "energy_required": "low",
+              "estimated_duration": 30,
+              "actual_duration": null,
+              "context_required": {},
+              "recurring_pattern": {},
+              "embedding": null,
+              "created_at": "2026-04-07T00:12:44.437002+00:00",
+              "updated_at": "2026-04-07T00:12:44.437002+00:00",
+              "aspect_id": null,
+              "project_id": null
+            }
+          ],
+          "goals": [
+            {
+              "id": "b5df9da5-1d52-4930-bb25-fe4d9604bd8d",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Get a 3.8 GPA this semester",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:10:32.907608+00:00",
+              "updated_at": "2026-04-07T00:10:32.907608+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            },
+            {
+              "id": "c33f8173-9398-4414-b2b4-0cf978d0cf7d",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Run a half marathon in October",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:10:33.012473+00:00",
+              "updated_at": "2026-04-07T00:10:33.012473+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            },
+            {
+              "id": "700285a3-38dc-43c0-a49a-d1e5c4aa85da",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Save $2000 by summer",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:10:33.085545+00:00",
+              "updated_at": "2026-04-07T00:10:33.085545+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            }
+          ],
+          "suggestions": [
+            {
+              "id": "f4489898-57a9-44e8-ae18-95a5ca9743a5",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Deep-work session: finish/advance tonight’s Problem Sets",
+              "description": "You have Problem Sets tonight (Mon Apr 6, 7:00–10:00 PM). This focused 120-minute block helps you make real progress on the assigned problems so you’re not cramming later—supporting your goal of a 3.8 GPA this semester.",
+              "suggestion_type": "task_step",
+              "source_entity_type": "event",
+              "source_entity_id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "aspect_id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "estimated_minutes": 120,
+              "energy_level": "high",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:11:49.466046+00:00",
+              "updated_at": "2026-04-07T00:11:49.466046+00:00"
+            },
+            {
+              "id": "412a9361-91ca-4419-845a-dc11b59f1a20",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "CS 221 prep: review lecture notes + problem practice",
+              "description": "CS 221 meets Tue/Thu 1:30–2:50 PM. A 90-minute prep/review session helps you stay ahead of concepts and supports your goal of a 3.8 GPA this semester.",
+              "suggestion_type": "prep_step",
+              "source_entity_type": "aspect",
+              "source_entity_id": "6a768b50-e572-41d5-90b1-65150ddaf1ea",
+              "aspect_id": "6a768b50-e572-41d5-90b1-65150ddaf1ea",
+              "estimated_minutes": 90,
+              "energy_level": "high",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:11:50.762578+00:00",
+              "updated_at": "2026-04-07T00:11:50.762578+00:00"
+            },
+            {
+              "id": "dc6e726a-251f-4dde-aabb-0f87e1dbd64e",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "MATH 120 study block: problem set + key theorem review",
+              "description": "MATH 120 (MWF 1:30–2:20) requires steady practice. This 120-minute block focuses on solving representative problems and reviewing theorems to improve your GPA goal (3.8).",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "aspect",
+              "source_entity_id": "2734a626-fe8c-47e0-b4e4-38ee1a38083d",
+              "aspect_id": "2734a626-fe8c-47e0-b4e4-38ee1a38083d",
+              "estimated_minutes": 120,
+              "energy_level": "high",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:11:52.165778+00:00",
+              "updated_at": "2026-04-07T00:11:52.165778+00:00"
+            },
+            {
+              "id": "e0f57c30-bd07-42c2-bf8f-f75f71225528",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Half-marathon training: long run + pacing plan",
+              "description": "To reach your goal of running a half marathon in October, you need consistent mileage and pacing. This 60-minute session is a focused long-run effort (or run/walk intervals if needed) plus a quick pacing plan for the next week.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "e08c05b0-7e60-4543-9d17-9f0b3f1dae89",
+              "estimated_minutes": 60,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:11:53.486326+00:00",
+              "updated_at": "2026-04-07T00:11:53.486326+00:00"
+            },
+            {
+              "id": "5b331b1b-f4e7-4fa7-864d-ca30644b1217",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Budget sprint: track spending + set weekly savings target",
+              "description": "Your goal is to save $2000 by summer. This 90-minute sprint updates your current spending, identifies the biggest leaks, and sets a concrete weekly savings target so you know exactly what to cut.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "8f54c3e4-c100-4c57-b6e8-1899ffb0ab83",
+              "estimated_minutes": 90,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:11:54.768196+00:00",
+              "updated_at": "2026-04-07T00:11:54.768196+00:00"
+            },
+            {
+              "id": "ab78076f-28e5-4a41-8753-6a3e3f6b08d6",
+              "user_id": "7de005f2-dd0a-4c73-896a-89104549a58d",
+              "title": "Study session",
+              "description": "Spend focused time studying the most urgent class material or assignments.",
+              "suggestion_type": "general",
+              "source_entity_type": "aspect",
+              "source_entity_id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "aspect_id": "a7262462-15df-49bb-9b6e-0b8c87a7e9a3",
+              "estimated_minutes": 90,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:13:00.384886+00:00",
+              "updated_at": "2026-04-07T00:13:00.384886+00:00"
+            }
+          ],
+          "placementSlots": []
+        },
+        "toolUsageSummary": {
+          "get_profile": 1,
+          "create_aspect": 27,
+          "create_recurring_event": 9,
+          "list_events": 3,
+          "create_event": 3,
+          "search_events": 1,
+          "update_event": 1,
+          "create_task": 1,
+          "list_goals": 1,
+          "create_action_suggestion": 1,
+          "list_action_suggestions": 1
+        },
+        "tokenUsage": {
+          "inputTokens": 338674,
+          "outputTokens": 5388,
+          "totalTokens": 344062,
+          "modelCalls": 41
+        }
+      },
+      "passFail": "FAIL"
+    }
+  ],
+  "behaviorCriteria": [
+    "[Enrichment] Agent must create aspects for each distinct life area mentioned (school, work, hobbies, health)",
+    "[Enrichment] Agent must create recurring events with correct days/times when user shares schedule details",
+    "[Enrichment] Agent must NOT create duplicate aspects or events for the same activity",
+    "[Enrichment] Agent must ask about ALL life areas (school/work, health, personal, daily routine) across the conversation",
+    "[Enrichment] Agent must call tools SILENTLY -- no narrating \"I will now create an aspect for...\"",
+    "[Enrichment] Agent must keep responses to 2-4 sentences, no markdown, no bullet points",
+    "[Enrichment] Agent must create aspect FIRST, then event using that aspect (correct sequencing)",
+    "[Enrichment] Agent must capture goals mentioned by user via create_goal tool",
+    "[Enrichment] Agent must update profile with occupation, work hours, preferences when shared",
+    "[Enrichment] Agent should cover all 5 areas within the turn budget (school, work, health, personal, routine)",
+    "[Conversation] Schedule queries (\"what do I have today\") must call list_events or search_events, not create anything",
+    "[Conversation] Event creation must use the correct aspect for the activity type",
+    "[Conversation] Event modification must search for the existing event first, then update it -- not create a new one",
+    "[Conversation] Event deletion must confirm the right event before deleting (search first)",
+    "[Conversation] Agent must NOT create duplicate events when one already exists at that time",
+    "[Conversation] Agent must be aware of existing schedule when suggesting times (\"do I have time for X\")",
+    "[Conversation] Task creation should use create_task, not create_event for non-time-bound items",
+    "[Conversation] Goal check-ins should call list_goals or check_in_goal, not create new goals",
+    "[Conversation] Responses must be concise and natural -- no markdown headers, no numbered lists unless asked",
+    "[Conversation] Agent must not call unnecessary tools -- a simple greeting needs zero tool calls",
+    "[Conversation] Agent must handle ambiguous time references correctly (\"tomorrow\", \"next Monday\", \"this afternoon\")",
+    "[Conversation] When asked about free time, agent must call find_free_time and give specific windows",
+    "[Scheduler] Every suggestion must reference a specific goal, task, or aspect -- no generic filler",
+    "[Scheduler] Suggestion descriptions must explain WHY (reference the goal/task it advances)",
+    "[Scheduler] High-energy tasks (deep work, studying) must be placed in mornings/early afternoon",
+    "[Scheduler] Low-energy tasks (review, planning) must be placed in evenings",
+    "[Scheduler] No overlapping slots with existing events",
+    "[Scheduler] Minimum 60-minute duration for all slots",
+    "[Scheduler] Maximum 3-4 slots per day, spread across 7 days",
+    "[Scheduler] Multiple life areas must be represented (not all one aspect)",
+    "[Scheduler] Slots must have 30+ minute gaps between them and existing events",
+    "[Anti-pattern] DUPLICATE CREATION: Creating a second \"CS 161 Lecture\" when one already exists at MWF 10:30am",
+    "[Anti-pattern] TOOL NARRATION: \"I will now create an aspect for your class\" instead of just doing it",
+    "[Anti-pattern] GENERIC SUGGESTIONS: \"Watch a TED talk\" or \"Go for a walk\" with no goal connection",
+    "[Anti-pattern] OVER-TOOLING: Calling 5 tools when 1 would suffice",
+    "[Anti-pattern] UNDER-TOOLING: Responding to \"add a meeting\" with text instead of calling create_event",
+    "[Anti-pattern] WRONG TOOL: Using create_event for a task, or create_task for a scheduled meeting",
+    "[Anti-pattern] MARKDOWN IN CHAT: Using ## headers, **bold**, - bullet points in conversational responses",
+    "[Anti-pattern] IGNORING CONTEXT: Suggesting a meeting at 2pm when user has class then",
+    "[Anti-pattern] ASPECT ORPHANS: Creating events without linking to an aspect",
+    "[Anti-pattern] STALE RESPONSES: Not reflecting the current state of the calendar in answers"
+  ],
+  "summary": {
+    "totalPersonas": 1,
+    "passed": 0,
+    "failed": 1,
+    "avgEnrichmentScore": 1,
+    "avgScheduleScore": 1,
+    "avgConversationScore": 3,
+    "avgOverallScore": 1.67,
+    "totalToolCalls": 49,
+    "toolBreakdown": {
+      "get_profile": 1,
+      "create_aspect": 27,
+      "create_recurring_event": 9,
+      "list_events": 3,
+      "create_event": 3,
+      "search_events": 1,
+      "update_event": 1,
+      "create_task": 1,
+      "list_goals": 1,
+      "create_action_suggestion": 1,
+      "list_action_suggestions": 1
+    }
+  }
+}

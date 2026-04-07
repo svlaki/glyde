@@ -62,7 +62,7 @@ export async function extractFacts(
     const response = await client.chat.completions.create({
       model: 'gpt-5.4-nano',
       temperature: 0.1,
-      max_tokens: 500,
+      max_completion_tokens: 500,
       messages: [
         { role: 'system', content: EXTRACTION_PROMPT },
         {

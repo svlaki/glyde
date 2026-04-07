@@ -193,7 +193,7 @@ export class SchedulerAgent extends BaseAgent {
             userId: context.userId,
             timezone: userTimezone,
           },
-          recursionLimit: 10,
+          recursionLimit: 40,
         }
       );
 

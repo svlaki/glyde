@@ -198,7 +198,7 @@ export class OnboardingEnrichmentAgent extends BaseAgent {
             .insert({
               user_id: context.userId,
               session_id: context.sessionId,
-              model_name: 'gpt-5.1',
+              model_name: this.modelName,
               input_tokens: streamInputTokens,
               output_tokens: streamOutputTokens,
               total_tokens: streamInputTokens + streamOutputTokens,

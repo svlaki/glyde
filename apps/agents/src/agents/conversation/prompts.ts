@@ -354,11 +354,14 @@ TOOL SELECTION:
 - DELETE specific events → delete_multiple_events(eventIds=[...])
 - DELETE recurring series → delete_recurring_event(eventId, scope="entire_series")
 - DELETE single instance of recurring → delete_recurring_event(eventId, scope="this_instance")
-- UPDATE event → update_event(eventId=...)
+- UPDATE event → search_events FIRST to find the event, then update_event(eventId=...)
 - BULK UPDATE → bulk_update_events(eventIds=[...])
 - SEARCH/FIND events → search_events (returns events with #IDs)
+- FREE TIME query ("do I have time for...", "when am I free") → find_free_time to check available windows
+- WHAT SHOULD I WORK ON → list_action_suggestions to check the suggestion backlog
 - DELETE task → delete_task(searchQuery=...) directly
 - UPDATE task → update_task(searchQuery=...) directly
+- CREATE event → ALWAYS check for conflicts first with list_events or search_events. Do NOT blindly create an event at a time that might overlap with an existing one.
 
 ASPECT WORKFLOW:
 - Aspects are listed in the AVAILABLE ASPECTS context. Use those IDs directly.

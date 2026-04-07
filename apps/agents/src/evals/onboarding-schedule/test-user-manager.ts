@@ -4,8 +4,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { randomUUID } from 'crypto';
-import type { TestUser } from './types.js';
+import { randomUUID } from 'node:crypto';
+import type { TestUser, TokenUsage } from './types.js';
 
 function getClient() {
   const url = process.env.SUPABASE_URL;
@@ -17,23 +17,36 @@ function getClient() {
 }
 
 /**
- * Create a test user with a minimal profile row.
+ * Create a test user with an auth.users entry and a profile row.
  * Returns the userId and a cleanup function that removes all data.
  */
 export async function createTestUser(characterName: string, timezone: string): Promise<TestUser> {
   const client = getClient();
-  const userId = randomUUID();
+  const email = `eval-${randomUUID().slice(0, 8)}@test.glyde.dev`;
 
-  const { error } = await client.from('profile').insert({
-    id: userId,
-    email: `eval-${userId.slice(0, 8)}@test.glyde.dev`,
-    display_name: characterName,
-    timezone,
-    onboarding_complete: false,
+  // Create auth user first (profile.id has FK to auth.users)
+  const { data: authData, error: authError } = await client.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: { display_name: characterName },
   });
 
-  if (error) {
-    throw new Error(`Failed to create test user: ${error.message}`);
+  if (authError || !authData.user) {
+    throw new Error(`Failed to create auth user: ${authError?.message || 'no user returned'}`);
+  }
+
+  const userId = authData.user.id;
+
+  // Upsert profile (trigger may auto-create it)
+  const { error: profileError } = await client.from('profile').upsert({
+    id: userId,
+    email,
+    display_name: characterName,
+    timezone,
+  });
+
+  if (profileError) {
+    throw new Error(`Failed to create profile: ${profileError.message}`);
   }
 
   console.log(`  [test-user] Created user ${characterName} (${userId.slice(0, 8)}...)`);
@@ -61,7 +74,7 @@ async function cleanupTestUser(userId: string): Promise<void> {
     'goals',
     'notes',
     'aspects',
-    'activity_log',
+    'user_activity_log',
     'agent_token_usage',
     'profile',
   ];
@@ -86,6 +99,12 @@ async function cleanupTestUser(userId: string): Promise<void> {
         console.warn(`  [cleanup] Failed to delete from ${table}: ${error.message}`);
       }
     }
+  }
+
+  // Delete auth user last
+  const { error: authError } = await client.auth.admin.deleteUser(userId);
+  if (authError) {
+    console.warn(`  [cleanup] Failed to delete auth user: ${authError.message}`);
   }
 
   console.log(`  [test-user] Cleaned up user ${userId.slice(0, 8)}...`);
@@ -114,8 +133,8 @@ export async function snapshotUserState(userId: string) {
   ]);
 
   const allEvents = events || [];
-  const recurring = allEvents.filter((e: any) => e.rrule_string);
-  const oneTime = allEvents.filter((e: any) => !e.rrule_string);
+  const recurring = allEvents.filter((e: any) => e.recurrence_rule || e.is_recurring);
+  const oneTime = allEvents.filter((e: any) => !e.recurrence_rule && !e.is_recurring);
 
   return {
     aspects: aspects || [],
@@ -125,5 +144,28 @@ export async function snapshotUserState(userId: string) {
     goals: goals || [],
     suggestions: suggestions || [],
     placementSlots: slots || [],
+  };
+}
+
+/**
+ * Get total token usage for a test user from agent_token_usage table.
+ */
+export async function getTokenUsage(userId: string): Promise<TokenUsage> {
+  const client = getClient();
+
+  const { data } = await client
+    .from('agent_token_usage')
+    .select('input_tokens, output_tokens, total_tokens, model_calls')
+    .eq('user_id', userId);
+
+  if (!data || data.length === 0) {
+    return { inputTokens: 0, outputTokens: 0, totalTokens: 0, modelCalls: 0 };
+  }
+
+  return {
+    inputTokens: data.reduce((sum: number, r: any) => sum + (r.input_tokens || 0), 0),
+    outputTokens: data.reduce((sum: number, r: any) => sum + (r.output_tokens || 0), 0),
+    totalTokens: data.reduce((sum: number, r: any) => sum + (r.total_tokens || 0), 0),
+    modelCalls: data.reduce((sum: number, r: any) => sum + (r.model_calls || 0), 0),
   };
 }

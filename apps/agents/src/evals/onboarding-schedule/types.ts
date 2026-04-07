@@ -8,6 +8,7 @@ export interface CharacterSheet {
   readonly onboardingData: OnboardingDataV2;
   readonly personality: string;
   readonly enrichmentDetails: readonly string[];
+  readonly conversationScenarios: readonly ConversationScenario[];
   readonly expectedOutcomes: {
     readonly minAspects: number;
     readonly minRecurringEvents: number;
@@ -30,9 +31,47 @@ export interface OnboardingDataV2 {
   readonly timezone: string;
 }
 
+/**
+ * A scenario the character would realistically ask the ConversationAgent after enrichment.
+ * Each scenario tests a specific behavior pattern.
+ */
+export interface ConversationScenario {
+  readonly id: string;
+  readonly category: ScenarioCategory;
+  readonly userMessage: string;
+  readonly description: string;
+  readonly expectedBehavior: ExpectedBehavior;
+}
+
+export type ScenarioCategory =
+  | 'schedule-query'       // "what do i have today"
+  | 'event-create'         // "add a meeting friday at 3"
+  | 'event-modify'         // "move my 2pm to 3pm"
+  | 'event-delete'         // "cancel my meeting tomorrow"
+  | 'task-management'      // "remind me to buy groceries"
+  | 'goal-checkin'         // "how am i doing on my goals"
+  | 'suggestion-interact'  // "what should i work on next"
+  | 'context-awareness'    // "do i have time for coffee tomorrow"
+  | 'duplicate-avoidance'  // creating something that already exists
+  | 'edge-case';           // ambiguous or tricky requests
+
+export interface ExpectedBehavior {
+  readonly shouldCallTools: readonly string[];
+  readonly shouldNotCallTools?: readonly string[];
+  readonly responseShould: readonly string[];
+  readonly responseShouldNot?: readonly string[];
+}
+
+export interface ToolCallDetail {
+  readonly name: string;
+  readonly args: Record<string, any>;
+  readonly result?: string;
+}
+
 export interface OnboardingScheduleEvalConfig {
   readonly characters: readonly string[];
   readonly enrichmentTurns: number;
+  readonly conversationEnabled: boolean;
   readonly simulatorModel: string;
   readonly judgeModel: string;
   readonly outputDir: string;
@@ -43,6 +82,17 @@ export interface EnrichmentTurn {
   readonly userMessage: string;
   readonly agentResponse: string;
   readonly toolsCalled: readonly string[];
+  readonly toolDetails: readonly ToolCallDetail[];
+}
+
+export interface ConversationTurn {
+  readonly scenarioId: string;
+  readonly category: ScenarioCategory;
+  readonly userMessage: string;
+  readonly agentResponse: string;
+  readonly toolsCalled: readonly string[];
+  readonly toolDetails: readonly ToolCallDetail[];
+  readonly durationMs: number;
 }
 
 export interface FinalState {
@@ -55,6 +105,13 @@ export interface FinalState {
   readonly placementSlots: readonly Record<string, any>[];
 }
 
+export interface TokenUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly totalTokens: number;
+  readonly modelCalls: number;
+}
+
 export interface PipelineResult {
   readonly character: CharacterSheet;
   readonly testUserId: string;
@@ -62,7 +119,11 @@ export interface PipelineResult {
   readonly enrichmentConversation: readonly EnrichmentTurn[];
   readonly enrichmentDurationMs: number;
   readonly schedulerDurationMs: number;
+  readonly conversationTurns: readonly ConversationTurn[];
+  readonly conversationDurationMs: number;
   readonly finalState: FinalState;
+  readonly toolUsageSummary: Record<string, number>;
+  readonly tokenUsage: TokenUsage;
 }
 
 export interface EnrichmentScore {
@@ -84,10 +145,30 @@ export interface ScheduleScore {
   readonly reasoning: string;
 }
 
+export interface ConversationBehaviorScore {
+  readonly toolCorrectness: number;
+  readonly responseAccuracy: number;
+  readonly duplicateAvoidance: number;
+  readonly contextAwareness: number;
+  readonly overall: number;
+  readonly reasoning: string;
+  readonly scenarioResults: readonly ScenarioResult[];
+}
+
+export interface ScenarioResult {
+  readonly scenarioId: string;
+  readonly category: ScenarioCategory;
+  readonly passed: boolean;
+  readonly toolsExpected: readonly string[];
+  readonly toolsActual: readonly string[];
+  readonly violations: readonly string[];
+}
+
 export interface PersonaEvalResult {
   readonly characterId: string;
   readonly enrichmentScore: EnrichmentScore;
   readonly scheduleScore: ScheduleScore;
+  readonly conversationScore: ConversationBehaviorScore;
   readonly pipelineResult: PipelineResult;
   readonly passFail: 'PASS' | 'FAIL';
 }
@@ -96,13 +177,17 @@ export interface EvalReport {
   readonly timestamp: string;
   readonly config: OnboardingScheduleEvalConfig;
   readonly results: readonly PersonaEvalResult[];
+  readonly behaviorCriteria: readonly string[];
   readonly summary: {
     readonly totalPersonas: number;
     readonly passed: number;
     readonly failed: number;
     readonly avgEnrichmentScore: number;
     readonly avgScheduleScore: number;
+    readonly avgConversationScore: number;
     readonly avgOverallScore: number;
+    readonly totalToolCalls: number;
+    readonly toolBreakdown: Record<string, number>;
   };
 }
 

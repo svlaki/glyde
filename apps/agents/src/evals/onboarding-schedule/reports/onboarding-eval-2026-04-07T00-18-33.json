@@ -1,0 +1,2628 @@
+{
+  "timestamp": "2026-04-07T00:18:33.054Z",
+  "config": {
+    "characters": [
+      "all"
+    ],
+    "enrichmentTurns": 10,
+    "conversationEnabled": true,
+    "simulatorModel": "gpt-5.4-nano",
+    "judgeModel": "gpt-5.4-nano",
+    "outputDir": "src/evals/onboarding-schedule/reports"
+  },
+  "results": [
+    {
+      "characterId": "busy-student",
+      "enrichmentScore": {
+        "aspectDiscovery": 2,
+        "scheduleCapture": 1,
+        "goalExtraction": 3,
+        "conversationQuality": 2,
+        "overall": 1,
+        "reasoning": "The assistant created aspects for some areas (work/health/social/school) but missed key school details (CS 221, MATH 120, and professor/course specifics) and also created duplicate/incorrectly linked events. Recurring events are heavily duplicated and many have wrong times/days (e.g., lift/run/problem sets appear multiple times and are not aligned to the stated schedules), indicating poor schedule capture. Goals were captured (3 total), but the conversation/tool usage shows over-tooling and resulting calendar data would be unreliable."
+      },
+      "scheduleScore": {
+        "suggestionRelevance": 3,
+        "scheduleCompleteness": 2,
+        "timeSlotQuality": 1,
+        "aspectBalance": 2,
+        "descriptionQuality": 4,
+        "overall": 1,
+        "reasoning": "Although the suggestion descriptions are goal-referenced (GPA, CS 161, half-marathon, budgeting), the resulting calendar data shows severe scheduling issues: many duplicate recurring events, no clear placement slots for the 6 suggestions, and several events occur at implausible times (e.g., problem sets 02:00–05:00, study group 21:00–00:00) that conflict with the expected morning/early-afternoon placement for high-energy work and violate gap/conflict constraints. Overall, the schedule as produced would not reliably support Marcus’s goals."
+      },
+      "conversationScore": {
+        "toolCorrectness": 3,
+        "responseAccuracy": 4,
+        "duplicateAvoidance": 3,
+        "contextAwareness": 4,
+        "overall": 3,
+        "reasoning": "Tool usage is mostly aligned (e.g., schedule queries use list_events, tasks use create_task, goal check-ins use list_goals), but the free-time query fails the expected tool requirement (find_free_time). Duplicate avoidance is only partially demonstrated—calendar data shows many duplicated events and the assistant previously acknowledged duplication without clearly performing cleanup, indicating risk of duplicates. Overall responses are relevant and reflect calendar context, but key tool correctness and duplicate-handling are not consistently perfect.",
+        "scenarioResults": [
+          {
+            "scenarioId": "query-today",
+            "category": "schedule-query",
+            "passed": true,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "query-tomorrow",
+            "category": "schedule-query",
+            "passed": true,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "query-free-time",
+            "category": "context-awareness",
+            "passed": false,
+            "toolsExpected": [
+              "find_free_time"
+            ],
+            "toolsActual": [
+              "list_events"
+            ],
+            "violations": [
+              "Missing expected tool: find_free_time"
+            ]
+          },
+          {
+            "scenarioId": "create-simple-event",
+            "category": "event-create",
+            "passed": true,
+            "toolsExpected": [
+              "create_event"
+            ],
+            "toolsActual": [
+              "create_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "create-with-aspect",
+            "category": "event-create",
+            "passed": true,
+            "toolsExpected": [
+              "create_event"
+            ],
+            "toolsActual": [
+              "list_events",
+              "create_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "modify-event",
+            "category": "event-modify",
+            "passed": true,
+            "toolsExpected": [
+              "search_events"
+            ],
+            "toolsActual": [
+              "search_events",
+              "search_events",
+              "update_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "create-task",
+            "category": "task-management",
+            "passed": true,
+            "toolsExpected": [
+              "create_task"
+            ],
+            "toolsActual": [
+              "create_task"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "goal-checkin",
+            "category": "goal-checkin",
+            "passed": true,
+            "toolsExpected": [
+              "list_goals"
+            ],
+            "toolsActual": [
+              "list_goals"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "duplicate-check",
+            "category": "duplicate-avoidance",
+            "passed": true,
+            "toolsExpected": [
+              "list_events"
+            ],
+            "toolsActual": [
+              "list_events",
+              "create_event"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "ambiguous-request",
+            "category": "edge-case",
+            "passed": true,
+            "toolsExpected": [],
+            "toolsActual": [
+              "create_action_suggestion"
+            ],
+            "violations": []
+          },
+          {
+            "scenarioId": "suggestion-query",
+            "category": "suggestion-interact",
+            "passed": true,
+            "toolsExpected": [
+              "list_action_suggestions"
+            ],
+            "toolsActual": [
+              "list_action_suggestions"
+            ],
+            "violations": []
+          }
+        ]
+      },
+      "pipelineResult": {
+        "character": {
+          "id": "busy-student",
+          "name": "Marcus Chen",
+          "onboardingData": {
+            "fullName": "Marcus Chen",
+            "preferredName": "Marcus",
+            "birthday": "2004-03-15",
+            "selectedCalendars": [],
+            "occupation": "Student",
+            "fieldOfStudy": "Computer Science",
+            "aspects": [
+              "School",
+              "Work",
+              "Health",
+              "Social"
+            ],
+            "goals": [
+              "Get a 3.8 GPA this semester",
+              "Run a half marathon in October",
+              "Save $2000 by summer"
+            ],
+            "timezone": "America/Los_Angeles"
+          },
+          "personality": "You are Marcus Chen, a 22-year-old CS junior at Stanford. You are friendly but concise -- you answer questions directly without over-explaining. You sometimes use casual language like \"yeah\" and \"nah\". You volunteer schedule details when asked but don't dump everything at once. You're a bit stressed about balancing school and work but generally upbeat.",
+          "enrichmentDetails": [
+            "I take CS 161 (Algorithms) MWF 10:30am-11:20am in Gates B01 with Professor Roughgarden",
+            "I take CS 221 (AI) TTh 1:30pm-2:50pm in Hewlett 200 with Professor Liang",
+            "I take MATH 120 (Groups and Rings) MWF 1:30pm-2:20pm in room 380-380C",
+            "I work at Blue Bottle Coffee on campus, Tuesday and Thursday mornings 6am-10am, and Saturday 7am-1pm",
+            "I go to the gym (lifting) Monday, Wednesday, Friday around 7:30am before class. Usually takes about an hour",
+            "I run on Tuesday and Thursday evenings around 6pm, training for a half marathon",
+            "I have a study group for CS 161 on Sunday afternoons from 2-5pm at Green Library",
+            "I try to do problem sets on weekday evenings, usually 7-10pm",
+            "I wake up around 6:30am on weekdays and go to bed around midnight",
+            "I play pickup basketball with friends on Saturday afternoons"
+          ],
+          "conversationScenarios": [
+            {
+              "id": "query-today",
+              "category": "schedule-query",
+              "userMessage": "what do i have today",
+              "description": "Basic schedule query - should list events, not create anything",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_task",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "mention specific events or say calendar is empty"
+                ],
+                "responseShouldNot": [
+                  "use markdown headers",
+                  "offer to create events unprompted"
+                ]
+              }
+            },
+            {
+              "id": "query-tomorrow",
+              "category": "schedule-query",
+              "userMessage": "what about tomorrow",
+              "description": "Follow-up schedule query with relative time reference",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "reference tomorrows date or events"
+                ]
+              }
+            },
+            {
+              "id": "query-free-time",
+              "category": "context-awareness",
+              "userMessage": "do i have any free time tomorrow afternoon",
+              "description": "Free time query - should check calendar and respond with specific windows",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "find_free_time"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "mention specific available time windows"
+                ]
+              }
+            },
+            {
+              "id": "create-simple-event",
+              "category": "event-create",
+              "userMessage": "add a dentist appointment friday at 2pm for an hour",
+              "description": "Simple one-time event creation",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_event"
+                ],
+                "shouldNotCallTools": [
+                  "create_recurring_event",
+                  "create_task"
+                ],
+                "responseShould": [
+                  "confirm the event was created"
+                ]
+              }
+            },
+            {
+              "id": "create-with-aspect",
+              "category": "event-create",
+              "userMessage": "i have a coffee chat with a colleague next wednesday at 11am",
+              "description": "Event creation that should use an existing aspect",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_event"
+                ],
+                "shouldNotCallTools": [
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "confirm creation"
+                ]
+              }
+            },
+            {
+              "id": "modify-event",
+              "category": "event-modify",
+              "userMessage": "can you move my dentist appointment to 3pm instead",
+              "description": "Event modification - should search then update, not create new",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "search_events"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "confirm the event was moved or updated"
+                ]
+              }
+            },
+            {
+              "id": "create-task",
+              "category": "task-management",
+              "userMessage": "remind me to buy a birthday gift for my mom",
+              "description": "Task creation for non-time-bound item - should use create_task not create_event",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "create_task"
+                ],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "confirm the task was created"
+                ]
+              }
+            },
+            {
+              "id": "goal-checkin",
+              "category": "goal-checkin",
+              "userMessage": "how am i doing on my goals",
+              "description": "Goal progress query - should list goals, not create new ones",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_goals"
+                ],
+                "shouldNotCallTools": [
+                  "create_goal",
+                  "create_event"
+                ],
+                "responseShould": [
+                  "mention the users existing goals"
+                ]
+              }
+            },
+            {
+              "id": "duplicate-check",
+              "category": "duplicate-avoidance",
+              "userMessage": "add a gym session for tomorrow morning at 7am",
+              "description": "Should check if a gym event already exists at that time before creating",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_events"
+                ],
+                "responseShould": [
+                  "either create it or note a conflict exists"
+                ],
+                "responseShouldNot": [
+                  "create without checking for conflicts"
+                ]
+              }
+            },
+            {
+              "id": "ambiguous-request",
+              "category": "edge-case",
+              "userMessage": "i need to study more",
+              "description": "Vague request - should ask for details or create a suggestion, not a scheduled event",
+              "expectedBehavior": {
+                "shouldCallTools": [],
+                "shouldNotCallTools": [
+                  "create_event",
+                  "create_recurring_event"
+                ],
+                "responseShould": [
+                  "ask for more details about when or what to study"
+                ]
+              }
+            },
+            {
+              "id": "suggestion-query",
+              "category": "suggestion-interact",
+              "userMessage": "what should i work on next",
+              "description": "Should check suggestions or schedule to recommend next activity",
+              "expectedBehavior": {
+                "shouldCallTools": [
+                  "list_action_suggestions"
+                ],
+                "shouldNotCallTools": [
+                  "create_event"
+                ],
+                "responseShould": [
+                  "suggest a specific activity based on goals or backlog"
+                ]
+              }
+            }
+          ],
+          "expectedOutcomes": {
+            "minAspects": 4,
+            "minRecurringEvents": 6,
+            "minGoals": 3,
+            "expectedAspectNames": [
+              "CS 161",
+              "CS 221",
+              "MATH 120",
+              "Blue Bottle",
+              "Health",
+              "Social"
+            ],
+            "expectedSchedulePatterns": [
+              "MWF morning classes",
+              "TTh afternoon class",
+              "TTh morning work shifts",
+              "Saturday work shift",
+              "MWF gym sessions",
+              "TTh evening runs",
+              "Sunday study group"
+            ]
+          }
+        },
+        "testUserId": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+        "onboardingDurationMs": 2543,
+        "enrichmentConversation": [
+          {
+            "turnNumber": 0,
+            "userMessage": "Hey! I just signed up. I'm Marcus.",
+            "agentResponse": "Nice to meet you, Marcus. What’s the next life area you want to set up first: work, health, relationships, finances, home, or something else?",
+            "toolsCalled": [
+              "update_profile"
+            ],
+            "toolDetails": [
+              {
+                "name": "update_profile",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Profile updated: preferred_name = Marcus\",\"tool_call_id\":\"call_EGNvDxnVcxktcx20BN0OgCfx\",\"name\":\"update_profile\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 1,
+            "userMessage": "Health, yeah—so I’ve got a pretty consistent routine. I lift Monday/Wednesday/Friday around 7:30am for about an hour, and I run Tuesday/Thursday evenings around 6pm for my half-marathon training. On top of that, I try to fit in problem sets most weekday evenings from 7–10pm.",
+            "agentResponse": "Got it, Marcus. What’s the next life area you want to set up after health—work/school, relationships, finances, home, or something else?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_5HsgOuSFUQvR7DueD0KHz6Je\",\"name\":\"create_recurring_event\",\"ad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_uhNMgHVecZfUc6NPN4ao7IzO\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metada"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_zQT5tjP5LVVOHF0Z1Dwg8xRh\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              }
+            ]
+          },
+          {
+            "turnNumber": 2,
+            "userMessage": "Work/school next. I work at Blue Bottle Coffee Tuesday/Thursday mornings from 6am–10am and Saturday 7am–1pm. For school, I’ve got a CS study group for CS 161 on Sundays from 2–5pm at Green Library.",
+            "agentResponse": "Got it, Marcus. What’s the next life area you want to set up after work/school—relationships, finances, home, or something else?",
+            "toolsCalled": [
+              "create_aspect",
+              "create_aspect",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"Blue Bottle Coffee\\\" (#3b82f6) with description\",\"tool_call_id\":\"call_Kj43bpl7VevMhc7YwTe9LMQV\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-04-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_KDfnToNzmgkTC2QKJFWnaMH8\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metada"
+              },
+              {
+                "name": "create_aspect",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created aspect: \\\"CS 161\\\" (#8b5cf6) with description\",\"tool_call_id\":\"call_LtQafiZoMManJhVJp9P2GOqJ\",\"name\":\"create_aspect\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-04-30T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_ApGAtE90EUhnXfTJSAvV2Rt0\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-04-30T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_1p41trHLwXdMPurTFSp6CHRn\",\"name\":\"create_recurring_event\",\"ad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Saturday until 2026-04-30T235959\\n**Starting:** Sat, Apr 11 at 7:00 AM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_qhfztvELcHwNyTzPgYPlne8u\",\"name\":\"create_recurring_event\",\"additional_kw"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday until 2026-04-30T235959\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_sHEfSAl03LLUVtYwgTztBobd\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-04-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-04-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_qaePoyu0YFofLg2EMGWT1D4c\",\"name\":\"create_recurring_event\",\"addit"
+              }
+            ]
+          },
+          {
+            "turnNumber": 3,
+            "userMessage": "Relationships—mostly I just keep it simple with friends. I’ve got pickup basketball with friends on Saturday afternoons, and I usually try to keep Sunday afternoons pretty locked in for my CS group so I can stay social the rest of the week. When I’m not doing that, I’m generally in problem-set mode in the evenings.",
+            "agentResponse": "Got it, Marcus. What’s the next life area you want to set up after relationships—finances, home, personal projects, or something else?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_R1opKaxemLd6K4Zlpn1aNQqJ\",\"name\":\"create_recurring_event\",\"addit"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Pickup basketball with friends** in aspect \\\"Social\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 2:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_kAAhjArP4X0mIvYQ2PYWpIwF\",\"name\":\"create_recurring_event\",\"additional_kwargs\":"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_C2XiGVsRKgqr23Toe5AqE3m5\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metada"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_KImaGJ2AnJT3P4F7G36rsqHb\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 7:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_7OqWmqgxL32nIPqWCnVXQgAO\",\"name\":\"create_recurring_event\",\"additional_kw"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday until 2026-06-30T235959\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_BL6ou62Z5BG2OhChgz3g60CE\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_dWsTsXKsoavKXnVPvticWIQI\",\"name\":\"create_recurring_event\",\"ad"
+              }
+            ]
+          },
+          {
+            "turnNumber": 4,
+            "userMessage": "Finances, honestly I don’t really have anything set up I can share yet. Home/personal projects too—I’m pretty focused on class + work right now, so I don’t have a structured plan for those.",
+            "agentResponse": "Thanks, Marcus. What’s the next life area you want to set up after finances and home/personal projects—anything else you want to capture?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Saturday\\n**Starting:** Sat, Apr 11 at 7:00 AM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_nYexjFSIoY2XjXmV6o9hfsZM\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_SSnNiACNS49FR0DR5jNE66RP\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_fnj7olHeDfsXh54yIrtZVdJ2\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_vK67as4UHI4Voet99CDjQQyp\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_VAE1Ea2bgAhq8vBjkaRqn8pP\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"res"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_Luri3359C0J8UesF5Vy6kVjq\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 5,
+            "userMessage": "Yeah—personal projects-wise, I don’t have anything structured, but I’m pretty locked in on my CS problem sets on weekday evenings (usually 7–10pm). For fun, I’ll do pickup basketball with friends on Saturday afternoons. Beyond that, I’m mostly just balancing class/work and keeping my routine steady.",
+            "agentResponse": "Thanks, Marcus. What’s the next life area you want to set up after this—sleep, meals, errands, or anything else?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_9aCmenohbeTbFUvnoOc4wvWI\",\"name\":\"create_recurring_event\",\"ad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday until 2026-06-30T235959\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_dVqu83fqjMKRLSoTtLauZi5V\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 7:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_9ZbLwbrjpCiO98IpPt6JiyK9\",\"name\":\"create_recurring_event\",\"additional_kw"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Pickup basketball with friends** in aspect \\\"Social\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 2:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_TnD5ZyKAP99S1bQ0eiydsUn9\",\"name\":\"create_recurring_event\",\"additional_kwargs\":"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_gwA4RzhDE4L51kU7F7aizKxZ\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_TCOpaBvlUpiTwLlBAVka8VcB\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metada"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_ig3N4z8ldmLoqlPvLLRWEAPy\",\"name\":\"create_recurring_event\",\"addit"
+              }
+            ]
+          },
+          {
+            "turnNumber": 6,
+            "userMessage": "Sleep-wise, I wake up around 6:30am on weekdays and go to bed around midnight. For errands/other stuff, I don’t really have anything consistent set up—most of my time gets eaten by the routine.",
+            "agentResponse": "Thanks, Marcus. What’s the next life area you want to set up after sleep and errands—anything else you want to capture?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_vTfgtWJpJetOsyh6H24axe00\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"res"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_1YVfYrUBvh0PteFkiZDuZQZn\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_540Q0O8txCQbLeqiFqx6aOnF\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday, Saturday\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_5FZgzZaoVsKdUBv7zYBxBF2n\",\"name\":\"create_recurring_event\",\"additional_kwargs\":"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-12-31T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_Fx2xe6vyu42LjiucJLbOiA3j\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ]
+          },
+          {
+            "turnNumber": 7,
+            "userMessage": "Honestly, that’s about it for the consistent stuff. Most of my days are basically class/work plus either lifting/running or problem sets, and the rest is just filling gaps as they come up.",
+            "agentResponse": "Thanks, Marcus. What’s the next life area you want to set up after this—anything else you want to capture?",
+            "toolsCalled": [
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event",
+              "create_recurring_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Problem sets** in aspect \\\"School\\\"\\n**Pattern:** Weekly on Monday, Tuesday, Wednesday, Thursday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_qR1GmqBvtqGOxs6D3wwTvoBd\",\"name\":\"create_recurring_event\",\"ad"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Run** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_81TtwjhV0w6bHGOTEP7MYWBt\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_metada"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Tuesday, Thursday until 2026-06-30T235959\\n**Starting:** Tue, Apr 7 at 6:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_sk6Nfkb446Cs8Q4pwGyXV107\",\"name\":\"create_recurring_event\",\"addit"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**CS 161 study group** in aspect \\\"CS 161\\\"\\n**Pattern:** Weekly on Sunday until 2026-06-30T235959\\n**Starting:** Sun, Apr 12 at 2:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_W67UgkAmQWIRRDXA6QWmKKlx\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"response_m"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Blue Bottle Coffee shift** in aspect \\\"Blue Bottle Coffee\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 7:00 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_bx8lvd8UvWIeHGR5HwSTmkAl\",\"name\":\"create_recurring_event\",\"additional_kw"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Pickup basketball with friends** in aspect \\\"Social\\\"\\n**Pattern:** Weekly on Saturday until 2026-06-30T235959\\n**Starting:** Sat, Apr 11 at 3:00 PM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_D1uiaJMuU30XtBMcLvrHezlM\",\"name\":\"create_recurring_event\",\"additional_kwargs\":"
+              },
+              {
+                "name": "create_recurring_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Recurring event created successfully!\\n\\n**Lift** in aspect \\\"Health\\\"\\n**Pattern:** Weekly on Monday, Wednesday, Friday until 2026-06-30T235959\\n**Starting:** Mon, Apr 6 at 7:30 AM\\n**Until:** 2026-06-30T23:59:59\\n\\nI'll automatically create instances for each occurrence on your calendar.\",\"tool_call_id\":\"call_k6J65Q7PJA3WomVIATti3vnO\",\"name\":\"create_recurring_event\",\"additional_kwargs\":{},\"respon"
+              }
+            ]
+          },
+          {
+            "turnNumber": 8,
+            "userMessage": "I think you’ve got the main routine covered. I’m usually pretty consistent with training timing and then just slotting in problem sets on weekday evenings as needed. If anything changes, it’s mostly around how heavy a week of assignments is.",
+            "agentResponse": "Got it, Marcus. Your setup looks good. Did I miss anything important, or are you ready to keep going later if something changes?",
+            "toolsCalled": [],
+            "toolDetails": []
+          },
+          {
+            "turnNumber": 9,
+            "userMessage": "I think you’ve got the main routine covered. If anything changes, it’s mostly around how heavy a week of assignments is—like whether I need to shift problem sets or study time. Otherwise I’m pretty steady day-to-day.",
+            "agentResponse": "Your setup looks good, Marcus. Did I miss anything important, or are you ready to keep going later if something changes?",
+            "toolsCalled": [],
+            "toolDetails": []
+          }
+        ],
+        "enrichmentDurationMs": 73437,
+        "schedulerDurationMs": 32107,
+        "conversationTurns": [
+          {
+            "scenarioId": "query-today",
+            "category": "schedule-query",
+            "userMessage": "what do i have today",
+            "agentResponse": "You have 7 recurring “Lift” events today, all from 7:30 AM-8:30 AM under Health. They appear duplicated, so if you want, I can help clean that up.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Lift\\\" Mon 4/6 7:30am-8:30am [Health] (recurring) #1d77ccb4-5e2e-4f05-bec9-52685eb6bae0\\n- \\\"Lift\\\" Mon 4/6 7:30am-8:30am [Health] (recurring) #3a08605f-affd-45e9-aaf6-e22aa1c310d1\\n- \\\"Lift\\\" Mon 4/6 7:30am-8:30am [Health] (recurring) #4069bdcc-e09f-4baf-80ca-c54abcf21730\\n- \\\"Lift\\\" Mon 4/6 7:30am-8:30am [Health] (recurring) #58466bf4-19cd-41e3-8baf-ba6434477357\\n- \\\"Lift\\\" Mon 4/6 7"
+              }
+            ],
+            "durationMs": 6269
+          },
+          {
+            "scenarioId": "query-tomorrow",
+            "category": "schedule-query",
+            "userMessage": "what about tomorrow",
+            "agentResponse": "Tomorrow you have Blue Bottle Coffee shift from 6:00 AM-10:00 AM and Problem sets from 7:00 PM-10:00 PM. Both appear duplicated several times, so I can help clean those up if you want.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am @Blue Bottle Coffee [Blue Bottle Coffee] (recurring) #ad829e1a-b254-4a1d-98cf-4a531b63f58b\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am [Blue Bottle Coffee] (recurring) #bf90fd51-9e7f-4f43-8fd5-948ad4b72aea\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am [Blue Bottle Coffee] (recurring) #bccad2f7-9105-48ec-9d60-d6caae96"
+              }
+            ],
+            "durationMs": 6759
+          },
+          {
+            "scenarioId": "query-free-time",
+            "category": "context-awareness",
+            "userMessage": "do i have any free time tomorrow afternoon",
+            "agentResponse": "Yes — you look free tomorrow afternoon from 12:00 PM to 6:00 PM. No events were found in that window.",
+            "toolsCalled": [
+              "list_events"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"No events found between 4/7/2026 and 4/7/2026\",\"tool_call_id\":\"call_vjHAAJrzbqy6HuwiagkCenGj\",\"name\":\"list_events\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 6360
+          },
+          {
+            "scenarioId": "create-simple-event",
+            "category": "event-create",
+            "userMessage": "add a dentist appointment friday at 2pm for an hour",
+            "agentResponse": "Done — I added “Dentist appointment” for Friday, Apr 10 from 2:00 PM to 3:00 PM under Health.",
+            "toolsCalled": [
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Dentist appointment\\\" at Fri, Apr 10 at 2:00 PM in aspect \\\"Health\\\"\",\"tool_call_id\":\"call_psOs8Zd3qs00y8NBJ9gwNN2I\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 7861
+          },
+          {
+            "scenarioId": "create-with-aspect",
+            "category": "event-create",
+            "userMessage": "i have a coffee chat with a colleague next wednesday at 11am",
+            "agentResponse": "Added “Coffee chat with colleague” for Wednesday, Apr 15 from 11:00 AM to 12:00 PM. It doesn’t conflict with your other events that day.",
+            "toolsCalled": [
+              "list_events",
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Lift\\\" Wed 4/15 7:30am-8:30am [Health] (recurring) #7c0725d2-e94e-4171-8fb4-2dd13641ad8c\\n- \\\"Lift\\\" Wed 4/15 7:30am-8:30am [Health] (recurring) #1d77ccb4-5e2e-4f05-bec9-52685eb6bae0\\n- \\\"Lift\\\" Wed 4/15 7:30am-8:30am [Health] (recurring) #97401eea-6629-4a16-8949-20466e134811\\n- \\\"Lift\\\" Wed 4/15 7:30am-8:30am [Health] (recurring) #3a08605f-affd-45e9-aaf6-e22aa1c310d1\\n- \\\"Lift\\\" Wed 4"
+              },
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Coffee chat with colleague\\\" at Wed, Apr 15 at 11:00 AM\",\"tool_call_id\":\"call_nzn8ECktBwI03X7rDCaI5hwv\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 10026
+          },
+          {
+            "scenarioId": "modify-event",
+            "category": "event-modify",
+            "userMessage": "can you move my dentist appointment to 3pm instead",
+            "agentResponse": "Done — I moved “Dentist appointment” to Friday, Apr 10 from 3:00 AM to 4:00 AM. If you meant 3:00 PM instead, I can fix that.",
+            "toolsCalled": [
+              "search_events",
+              "search_events",
+              "update_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "search_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS for \\\"dentist appointment\\\" (showing 10 of 15):\\n- \\\"Run\\\" Thu 4/9 6:00pm-7:00pm [Health] (recurring) #2c1dcc9c-977f-4014-8b3c-82ec709856a5\\n- \\\"Run\\\" Thu 4/9 6:00pm-7:00pm [Health] (recurring) #127dd426-783a-48fd-8a78-5c9e1ca0746f\\n- \\\"Run\\\" Thu 4/9 6:00pm-7:00pm [Health] (recurring) #98a128e3-00ac-45bb-a8c8-11ffaa5135b8\\n- \\\"Run\\\" Thu 4/9 6:00pm-7:00pm [Health] (recurring) #98b2bc6b-f908-4"
+              },
+              {
+                "name": "search_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS for \\\"Dentist appointment\\\":\\n- \\\"Lift\\\" Fri 4/10 7:30am-8:30am [Health] (recurring) #7c0725d2-e94e-4171-8fb4-2dd13641ad8c\\n- \\\"Lift\\\" Fri 4/10 7:30am-8:30am [Health] (recurring) #1d77ccb4-5e2e-4f05-bec9-52685eb6bae0\\n- \\\"Lift\\\" Fri 4/10 7:30am-8:30am [Health] (recurring) #58466bf4-19cd-41e3-8baf-ba6434477357\\n- \\\"Lift\\\" Fri 4/10 7:30am-8:30am [Health] (recurring) #97401eea-6629-4a16-8949-20"
+              },
+              {
+                "name": "update_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENT: \\\"Dentist appointment\\\" has been updated - moved to Friday, April 10 from 3:00 AM to 4:00 AM, reminder removed\",\"tool_call_id\":\"call_PP7QS4KkDyrWWGnpO4iJUWoS\",\"name\":\"update_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 12666
+          },
+          {
+            "scenarioId": "create-task",
+            "category": "task-management",
+            "userMessage": "remind me to buy a birthday gift for my mom",
+            "agentResponse": "Done — I created the task “Buy a birthday gift for mom.”",
+            "toolsCalled": [
+              "create_task"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_task",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Task created: \\\"Buy a birthday gift for mom\\\"\",\"tool_call_id\":\"call_sNBa5gGO0Oy7xZwasg4g34Gj\",\"name\":\"create_task\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5229
+          },
+          {
+            "scenarioId": "goal-checkin",
+            "category": "goal-checkin",
+            "userMessage": "how am i doing on my goals",
+            "agentResponse": "You have 3 active goals: Save $2000 by summer, Run a half marathon in October, and Get a 3.8 GPA this semester. If you want, I can also check their progress details or help you plan next steps.",
+            "toolsCalled": [
+              "list_goals"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_goals",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Found 3 goal(s):\\n1. Save $2000 by summer [ACTIVE]\\n   ID: 17ec6d7a-7007-4abc-a176-26bed72bc15c\\n2. Run a half marathon in October [ACTIVE]\\n   ID: d72620fe-c5ec-4897-be40-d3e7c0a7a143\\n3. Get a 3.8 GPA this semester [ACTIVE]\\n   ID: 985e7964-ff4a-432d-9d05-5d6ca1459622\",\"tool_call_id\":\"call_rHVxlsiNHoRPVqgAvkkbHhSS\",\"name\":\"list_goals\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5559
+          },
+          {
+            "scenarioId": "duplicate-check",
+            "category": "duplicate-avoidance",
+            "userMessage": "add a gym session for tomorrow morning at 7am",
+            "agentResponse": "Added “Gym session” for Tue, Apr 7 from 7:00 AM to 8:00 AM. It overlaps with your “Blue Bottle Coffee shift” from 6:00 AM to 10:00 AM, so you may want to move one of them.",
+            "toolsCalled": [
+              "list_events",
+              "create_event"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_events",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"EVENTS:\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am @Blue Bottle Coffee [Blue Bottle Coffee] (recurring) #ad829e1a-b254-4a1d-98cf-4a531b63f58b\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am [Blue Bottle Coffee] (recurring) #bf90fd51-9e7f-4f43-8fd5-948ad4b72aea\\n- \\\"Blue Bottle Coffee shift\\\" Tue 4/7 6:00am-10:00am [Blue Bottle Coffee] (recurring) #bccad2f7-9105-48ec-9d60-d6caae96"
+              },
+              {
+                "name": "create_event",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Event created successfully: \\\"Gym session\\\" at Tue, Apr 7 at 7:00 AM (Note: overlaps with \\\"Blue Bottle Coffee shift\\\" at the same time)\",\"tool_call_id\":\"call_sABl4PnGq4MVTpFkrItDMxAj\",\"name\":\"create_event\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 9603
+          },
+          {
+            "scenarioId": "ambiguous-request",
+            "category": "edge-case",
+            "userMessage": "i need to study more",
+            "agentResponse": "I added a “Study session” suggestion for 60 minutes. If you want, I can also turn it into a calendar slot.",
+            "toolsCalled": [
+              "create_action_suggestion"
+            ],
+            "toolDetails": [
+              {
+                "name": "create_action_suggestion",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Created action suggestion: \\\"Study session\\\" (general, 60 min)\",\"tool_call_id\":\"call_rttuAu217coUwD0LBChAQbqc\",\"name\":\"create_action_suggestion\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5964
+          },
+          {
+            "scenarioId": "suggestion-query",
+            "category": "suggestion-interact",
+            "userMessage": "what should i work on next",
+            "agentResponse": "Next up: “GPA boost session: review CS 161 grading rubric + target fixes” — it’s a 90-minute goal step and the shorter, more focused option.",
+            "toolsCalled": [
+              "list_action_suggestions"
+            ],
+            "toolDetails": [
+              {
+                "name": "list_action_suggestions",
+                "args": {},
+                "result": "{\"lc\":1,\"type\":\"constructor\",\"id\":[\"langchain_core\",\"messages\",\"ToolMessage\"],\"kwargs\":{\"content\":\"Found 2 suggestion(s):\\n1. \\\"GPA boost session: review CS 161 grading rubric + target fixes\\\" (goal_step, 90 min, open)\\n2. \\\"Do a full CS 161 problem set review (errors + fixes)\\\" (goal_step, 120 min, open)\",\"tool_call_id\":\"call_RJQmSrshaQPswuYrR2fb2z3J\",\"name\":\"list_action_suggestions\",\"additional_kwargs\":{},\"response_metadata\":{}}}"
+              }
+            ],
+            "durationMs": 5617
+          }
+        ],
+        "conversationDurationMs": 87512,
+        "finalState": {
+          "aspects": [
+            {
+              "id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "Blue Bottle Coffee",
+              "color": "#3b82f6",
+              "icon": null,
+              "description": "Marcus works at Blue Bottle Coffee Tuesday/Thursday mornings from 6:00am–10:00am and Saturday 7:00am–1:00pm.",
+              "context": {
+                "role": null,
+                "type": "work",
+                "employer": "Blue Bottle Coffee",
+                "schedule": "Tuesday/Thursday 6:00am–10:00am, Saturday 7:00am–1:00pm"
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:33.717469+00:00",
+              "updated_at": "2026-04-07T00:15:33.717469+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "CS 161",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "CS 161 study group on Sundays from 2:00pm–5:00pm at Green Library.",
+              "context": {
+                "type": "school",
+                "course": "CS 161",
+                "location": "Green Library",
+                "schedule": "Sundays 2:00pm–5:00pm"
+              },
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:33.732961+00:00",
+              "updated_at": "2026-04-07T00:15:33.732961+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "Health",
+              "color": "#ef4444",
+              "icon": null,
+              "description": "Health activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:14.961398+00:00",
+              "updated_at": "2026-04-07T00:15:14.961398+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "School",
+              "color": "#8b5cf6",
+              "icon": null,
+              "description": "School activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:14.871862+00:00",
+              "updated_at": "2026-04-07T00:15:14.871862+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "2bad881d-26c9-4678-9ee4-1cf31642c925",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "Social",
+              "color": "#f97316",
+              "icon": null,
+              "description": "Social activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:14.998383+00:00",
+              "updated_at": "2026-04-07T00:15:14.998383+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            },
+            {
+              "id": "74575843-b6fc-4288-9158-1efbabd2b2aa",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "name": "Work",
+              "color": "#3b82f6",
+              "icon": null,
+              "description": "Work activities and events",
+              "context": {},
+              "display_order": 0,
+              "created_at": "2026-04-07T00:15:14.923316+00:00",
+              "updated_at": "2026-04-07T00:15:14.923316+00:00",
+              "archived_at": null,
+              "visibility": "private"
+            }
+          ],
+          "events": [
+            {
+              "id": "8a4bd6b9-bf69-4586-b795-6ed58eebb08a",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Gym session",
+              "description": null,
+              "start_time": "2026-04-07T14:00:00+00:00",
+              "end_time": "2026-04-07T15:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:18:13.390193+00:00",
+              "updated_at": "2026-04-07T00:18:13.390193+00:00",
+              "aspect_id": null,
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "66a34d88-9000-41e4-990b-53e794bb9d9c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Dentist appointment",
+              "description": null,
+              "start_time": "2026-04-10T10:00:00+00:00",
+              "end_time": "2026-04-10T11:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:17:27.67428+00:00",
+              "updated_at": "2026-04-07T00:17:51.548027+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "4243f5e9-574b-4e28-a0c7-9808d9ea274c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Coffee chat with colleague",
+              "description": null,
+              "start_time": "2026-04-15T18:00:00+00:00",
+              "end_time": "2026-04-15T19:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:17:38.274437+00:00",
+              "updated_at": "2026-04-07T00:17:38.274437+00:00",
+              "aspect_id": null,
+              "recurrence_rule": null,
+              "recurrence_end": null,
+              "parent_event_id": null,
+              "is_recurring": false,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            }
+          ],
+          "recurringEvents": [
+            {
+              "id": "97401eea-6629-4a16-8949-20466e134811",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Lift for about an hour.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:33.71092+00:00",
+              "updated_at": "2026-04-07T00:15:33.71092+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "7c0725d2-e94e-4171-8fb4-2dd13641ad8c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Lift for about an hour.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:50.829565+00:00",
+              "updated_at": "2026-04-07T00:15:50.829565+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "3a08605f-affd-45e9-aaf6-e22aa1c310d1",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Marcus lifts for about an hour.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:09.305632+00:00",
+              "updated_at": "2026-04-07T00:16:09.305632+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "8893117d-2cfe-4806-ba13-09f431ed2d37",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Weight training session",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:24.850819+00:00",
+              "updated_at": "2026-04-07T00:15:24.850819+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "1d77ccb4-5e2e-4f05-bec9-52685eb6bae0",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Lifting workout for Marcus.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.064426+00:00",
+              "updated_at": "2026-04-07T00:16:19.064426+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "4069bdcc-e09f-4baf-80ca-c54abcf21730",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Lifting workout for Marcus.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:00.239064+00:00",
+              "updated_at": "2026-04-07T00:16:00.239064+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "58466bf4-19cd-41e3-8baf-ba6434477357",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Lift",
+              "description": "Weekly lifting workout for health and half-marathon support.",
+              "start_time": "2026-04-06T14:30:00+00:00",
+              "end_time": "2026-04-06T15:30:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.586408+00:00",
+              "updated_at": "2026-04-07T00:15:42.586408+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "4b8df243-e549-420c-af03-ab7fcff9d0dd",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set time.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:59.758635+00:00",
+              "updated_at": "2026-04-07T00:15:59.758635+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "27456c83-6bb5-45d1-a167-8a1b7db5717e",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set time.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.035526+00:00",
+              "updated_at": "2026-04-07T00:16:19.035526+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "dc8661b8-2b37-445d-8f05-b0ff4f8beffa",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set time.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:50.81408+00:00",
+              "updated_at": "2026-04-07T00:15:50.81408+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "f9a12e68-0dce-46c8-af1e-327a72559f40",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Marcus works on problem sets in the evenings.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:09.255153+00:00",
+              "updated_at": "2026-04-07T00:16:09.255153+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "b6458091-34df-4743-80ec-67e69529f91a",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set time",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:24.830691+00:00",
+              "updated_at": "2026-04-07T00:15:24.830691+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "022e35a7-7525-4082-9b16-e27772ed5d0d",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set time.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:33.717721+00:00",
+              "updated_at": "2026-04-07T00:15:33.717721+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "6c72447a-121e-4cdf-8007-3a863ea02630",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Problem sets",
+              "description": "Weekday evening problem set block.",
+              "start_time": "2026-04-07T02:00:00+00:00",
+              "end_time": "2026-04-07T05:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.589989+00:00",
+              "updated_at": "2026-04-07T00:15:42.589989+00:00",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bccad2f7-9105-48ec-9d60-d6caae961af5",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.570268+00:00",
+              "updated_at": "2026-04-07T00:15:42.570268+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "40ca0f78-678f-4457-bcb5-844fefffb810",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.045471+00:00",
+              "updated_at": "2026-04-07T00:16:19.045471+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "ad829e1a-b254-4a1d-98cf-4a531b63f58b",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": "Blue Bottle Coffee",
+              "created_at": "2026-04-07T00:15:33.845294+00:00",
+              "updated_at": "2026-04-07T00:15:33.845294+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "7f02da4a-3de3-4499-a660-d0e0424d6d64",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Marcus works at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:09.295316+00:00",
+              "updated_at": "2026-04-07T00:16:09.295316+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH,SA",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bf90fd51-9e7f-4f43-8fd5-948ad4b72aea",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:59.761985+00:00",
+              "updated_at": "2026-04-07T00:15:59.761985+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "5f8e23e6-568e-4f15-af86-6193c5491523",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-07T13:00:00+00:00",
+              "end_time": "2026-04-07T17:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:50.800181+00:00",
+              "updated_at": "2026-04-07T00:15:50.800181+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "98b2bc6b-f908-4aac-9aa9-14875e929576",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:24.826096+00:00",
+              "updated_at": "2026-04-07T00:15:24.826096+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "c71cf050-38a8-40d6-9e99-19dee8e1b384",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run for Marcus.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:00.248703+00:00",
+              "updated_at": "2026-04-07T00:16:00.248703+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "127dd426-783a-48fd-8a78-5c9e1ca0746f",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:50.805226+00:00",
+              "updated_at": "2026-04-07T00:15:50.805226+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bf378ee3-3ad7-4d72-acc1-35176e883f56",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.580228+00:00",
+              "updated_at": "2026-04-07T00:15:42.580228+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "98a128e3-00ac-45bb-a8c8-11ffaa5135b8",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Marcus runs for half-marathon training.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:09.279562+00:00",
+              "updated_at": "2026-04-07T00:16:09.279562+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "2c1dcc9c-977f-4014-8b3c-82ec709856a5",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run for Marcus.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.041449+00:00",
+              "updated_at": "2026-04-07T00:16:19.041449+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "b9769e54-4db0-4d0d-af65-626ec0ecab0c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run",
+              "description": "Half-marathon training run.",
+              "start_time": "2026-04-08T01:00:00+00:00",
+              "end_time": "2026-04-08T02:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:33.695251+00:00",
+              "updated_at": "2026-04-07T00:15:33.695251+00:00",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=TU,TH;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "ef5fdf46-ae5f-4d48-a51e-9fcd5128ccea",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-11T14:00:00+00:00",
+              "end_time": "2026-04-11T20:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:00.247659+00:00",
+              "updated_at": "2026-04-07T00:16:00.247659+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "21dbec0c-4449-4516-a092-5664164ea9d9",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-11T14:00:00+00:00",
+              "end_time": "2026-04-11T20:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.585217+00:00",
+              "updated_at": "2026-04-07T00:15:42.585217+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bd8a98df-2dae-4436-b4a9-cfae31086e39",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-11T14:00:00+00:00",
+              "end_time": "2026-04-11T20:00:00+00:00",
+              "location": "Blue Bottle Coffee",
+              "created_at": "2026-04-07T00:15:33.815196+00:00",
+              "updated_at": "2026-04-07T00:15:33.815196+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "540830e7-b990-466c-800f-7fc52abfeb65",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-11T14:00:00+00:00",
+              "end_time": "2026-04-11T20:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.042971+00:00",
+              "updated_at": "2026-04-07T00:16:19.042971+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "d09fc531-1be9-4d3e-8a6b-77f4a3720612",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Blue Bottle Coffee shift",
+              "description": "Work shift at Blue Bottle Coffee.",
+              "start_time": "2026-04-11T14:00:00+00:00",
+              "end_time": "2026-04-11T20:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:50.804441+00:00",
+              "updated_at": "2026-04-07T00:15:50.804441+00:00",
+              "aspect_id": "db3bfdb2-a1bf-4474-880b-ff71b3479dd2",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "394c0b4d-2958-4c99-9786-69f99ea707a8",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Pickup basketball with friends",
+              "description": "Pickup basketball with friends.",
+              "start_time": "2026-04-11T21:00:00+00:00",
+              "end_time": "2026-04-11T23:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:15:42.575915+00:00",
+              "updated_at": "2026-04-07T00:15:42.575915+00:00",
+              "aspect_id": "2bad881d-26c9-4678-9ee4-1cf31642c925",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "19a29bdc-baf0-4b49-a34d-b34bd00fe6de",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Pickup basketball with friends",
+              "description": "Pickup basketball with friends.",
+              "start_time": "2026-04-11T21:00:00+00:00",
+              "end_time": "2026-04-11T23:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:00.251706+00:00",
+              "updated_at": "2026-04-07T00:16:00.251706+00:00",
+              "aspect_id": "2bad881d-26c9-4678-9ee4-1cf31642c925",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "7d84ba6f-319e-4012-89e5-33aa5191cc85",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Pickup basketball with friends",
+              "description": "Pickup basketball with friends.",
+              "start_time": "2026-04-11T22:00:00+00:00",
+              "end_time": "2026-04-12T00:00:00+00:00",
+              "location": null,
+              "created_at": "2026-04-07T00:16:19.050528+00:00",
+              "updated_at": "2026-04-07T00:16:19.050528+00:00",
+              "aspect_id": "2bad881d-26c9-4678-9ee4-1cf31642c925",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SA;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "bc898a32-90aa-4cff-a500-9f9536a24543",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "CS 161 study group at Green Library.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:16:00.229632+00:00",
+              "updated_at": "2026-04-07T00:16:00.229632+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "8e9763f9-68bd-4f6c-9ef6-d59df6b879e2",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "Weekly CS 161 study group.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:15:42.581736+00:00",
+              "updated_at": "2026-04-07T00:15:42.581736+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "f17865e5-25b3-418c-9682-5bb5ef46e04e",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "CS 161 study group at Green Library.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:15:50.808939+00:00",
+              "updated_at": "2026-04-07T00:15:50.808939+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "4aaa3804-73b6-4f72-a503-2281db00871f",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "CS 161 study group at Green Library.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:16:19.038425+00:00",
+              "updated_at": "2026-04-07T00:16:19.038425+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20260630T235959",
+              "recurrence_end": "2026-06-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "7189f19c-7853-4839-aef7-e3acfdf70759",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "CS 161 study group at Green Library.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:16:09.279556+00:00",
+              "updated_at": "2026-04-07T00:16:09.279556+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU",
+              "recurrence_end": "2026-12-31T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            },
+            {
+              "id": "f34980a0-f1e8-4185-a088-eed2890ee796",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "CS 161 study group",
+              "description": "CS 161 study group.",
+              "start_time": "2026-04-12T21:00:00+00:00",
+              "end_time": "2026-04-13T00:00:00+00:00",
+              "location": "Green Library",
+              "created_at": "2026-04-07T00:15:33.826437+00:00",
+              "updated_at": "2026-04-07T00:15:33.826437+00:00",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "recurrence_rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20260430T235959",
+              "recurrence_end": "2026-04-30T23:59:59+00:00",
+              "parent_event_id": null,
+              "is_recurring": true,
+              "external_id": null,
+              "google_event_id": null,
+              "connection_id": null,
+              "source": "manual",
+              "visibility": "private",
+              "reflection": null,
+              "is_missed": false,
+              "project_id": null,
+              "local_notes": null,
+              "outlook_event_id": null,
+              "reminder_minutes": null,
+              "is_all_day": false
+            }
+          ],
+          "tasks": [
+            {
+              "id": "392ca604-6a7f-4138-8060-100441c4d250",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Buy a birthday gift for mom",
+              "description": null,
+              "status": "pending",
+              "priority": "medium",
+              "due_date": null,
+              "completed_at": null,
+              "parent_goal_id": null,
+              "energy_required": "low",
+              "estimated_duration": 30,
+              "actual_duration": null,
+              "context_required": {},
+              "recurring_pattern": {},
+              "embedding": null,
+              "created_at": "2026-04-07T00:17:58.728143+00:00",
+              "updated_at": "2026-04-07T00:17:58.728143+00:00",
+              "aspect_id": null,
+              "project_id": null
+            }
+          ],
+          "goals": [
+            {
+              "id": "985e7964-ff4a-432d-9d05-5d6ca1459622",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Get a 3.8 GPA this semester",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:15:15.082395+00:00",
+              "updated_at": "2026-04-07T00:15:15.082395+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            },
+            {
+              "id": "d72620fe-c5ec-4897-be40-d3e7c0a7a143",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Run a half marathon in October",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:15:15.176374+00:00",
+              "updated_at": "2026-04-07T00:15:15.176374+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            },
+            {
+              "id": "17ec6d7a-7007-4abc-a176-26bed72bc15c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Save $2000 by summer",
+              "description": null,
+              "status": "active",
+              "progress": 0,
+              "target_date": null,
+              "goal_type": "SMART",
+              "parent_goal_id": null,
+              "key_results": [],
+              "milestones": null,
+              "blockers": [],
+              "resources_needed": [],
+              "reflection_prompts": {},
+              "priority_score": 5,
+              "energy_requirement": null,
+              "review_frequency": "weekly",
+              "embedding": null,
+              "created_at": "2026-04-07T00:15:15.247217+00:00",
+              "updated_at": "2026-04-07T00:15:15.247217+00:00",
+              "aspect_id": null,
+              "time_horizon": "short_term",
+              "milestone_type": "dated"
+            }
+          ],
+          "suggestions": [
+            {
+              "id": "87360a8d-82ad-4572-a151-b3e2d0061d14",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Study session",
+              "description": "Spend focused time studying on your current coursework or problem sets. Start with the highest-priority class and use a 25–50 minute focus block.",
+              "suggestion_type": "general",
+              "source_entity_type": "aspect",
+              "source_entity_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "aspect_id": null,
+              "estimated_minutes": 60,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:18:20.97208+00:00",
+              "updated_at": "2026-04-07T00:18:20.97208+00:00"
+            },
+            {
+              "id": "8e59ed3e-12e2-4f4a-8806-3101439eba6e",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Do a full CS 161 problem set review (errors + fixes)",
+              "description": "You have CS 161 problem sets tonight (7–10 PM). This session focuses on reviewing your approach, identifying the specific mistakes, and writing the corrected steps so you can improve your score and support your goal of a 3.8 GPA this semester.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "event",
+              "source_entity_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "estimated_minutes": 120,
+              "energy_level": "high",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:16:33.586645+00:00",
+              "updated_at": "2026-04-07T00:16:33.586645+00:00"
+            },
+            {
+              "id": "19417f1c-7fde-4351-abbc-268c5a0a65a7",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Plan your half-marathon training: pick next 2 weeks of workouts",
+              "description": "To work toward running a half marathon in October, you need a concrete plan. This session sets your next two weeks of runs (easy/tempo/long run) and schedules them around your existing commitments.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "estimated_minutes": 90,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:16:34.774993+00:00",
+              "updated_at": "2026-04-07T00:16:34.774993+00:00"
+            },
+            {
+              "id": "b8c919e3-221d-4651-b2eb-6b7fb071ceb5",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Half-marathon strength + mobility session (core + hips)",
+              "description": "Running a half marathon requires injury-resistant strength. This session builds core/hip stability and mobility to support your October half-marathon goal while fitting around your scheduled runs.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "b1909740-c3f9-464a-ab1c-9c416abca01e",
+              "estimated_minutes": 90,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:16:36.027588+00:00",
+              "updated_at": "2026-04-07T00:16:36.027588+00:00"
+            },
+            {
+              "id": "9ed04b53-548d-438c-afc5-64a52754dd1c",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "GPA boost session: review CS 161 grading rubric + target fixes",
+              "description": "To get a 3.8 GPA this semester, you’ll benefit from knowing exactly what earns points. This session reviews the CS 161 grading rubric/feedback patterns and turns them into a short list of targeted improvements for upcoming work.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "f09a1775-3441-46c0-bd7d-689fb13d5d58",
+              "estimated_minutes": 90,
+              "energy_level": "medium",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:16:37.262942+00:00",
+              "updated_at": "2026-04-07T00:16:37.262942+00:00"
+            },
+            {
+              "id": "70afc1c5-2e41-475c-b1d1-4575aba79367",
+              "user_id": "9fc96db8-4f0d-4da9-9c24-395fc7720864",
+              "title": "Budget check-in: map next 30 days to save $2000",
+              "description": "Your goal is to save $2000 by summer. This session updates your budget with upcoming expenses and sets a realistic weekly savings target for the next month.",
+              "suggestion_type": "goal_step",
+              "source_entity_type": "goal",
+              "source_entity_id": "00000000-0000-0000-0000-000000000000",
+              "aspect_id": "11776644-31e0-48c5-af75-44b566e2aa6e",
+              "estimated_minutes": 90,
+              "energy_level": "low",
+              "status": "open",
+              "metadata": {},
+              "created_at": "2026-04-07T00:16:39.316407+00:00",
+              "updated_at": "2026-04-07T00:16:39.316407+00:00"
+            }
+          ],
+          "placementSlots": []
+        },
+        "toolUsageSummary": {
+          "update_profile": 1,
+          "create_recurring_event": 41,
+          "create_aspect": 2,
+          "list_events": 5,
+          "create_event": 3,
+          "search_events": 2,
+          "update_event": 1,
+          "create_task": 1,
+          "list_goals": 1,
+          "create_action_suggestion": 1,
+          "list_action_suggestions": 1
+        },
+        "tokenUsage": {
+          "inputTokens": 368306,
+          "outputTokens": 6796,
+          "totalTokens": 375102,
+          "modelCalls": 44
+        }
+      },
+      "passFail": "FAIL"
+    }
+  ],
+  "behaviorCriteria": [
+    "[Enrichment] Agent must create aspects for each distinct life area mentioned (school, work, hobbies, health)",
+    "[Enrichment] Agent must create recurring events with correct days/times when user shares schedule details",
+    "[Enrichment] Agent must NOT create duplicate aspects or events for the same activity",
+    "[Enrichment] Agent must ask about ALL life areas (school/work, health, personal, daily routine) across the conversation",
+    "[Enrichment] Agent must call tools SILENTLY -- no narrating \"I will now create an aspect for...\"",
+    "[Enrichment] Agent must keep responses to 2-4 sentences, no markdown, no bullet points",
+    "[Enrichment] Agent must create aspect FIRST, then event using that aspect (correct sequencing)",
+    "[Enrichment] Agent must capture goals mentioned by user via create_goal tool",
+    "[Enrichment] Agent must update profile with occupation, work hours, preferences when shared",
+    "[Enrichment] Agent should cover all 5 areas within the turn budget (school, work, health, personal, routine)",
+    "[Conversation] Schedule queries (\"what do I have today\") must call list_events or search_events, not create anything",
+    "[Conversation] Event creation must use the correct aspect for the activity type",
+    "[Conversation] Event modification must search for the existing event first, then update it -- not create a new one",
+    "[Conversation] Event deletion must confirm the right event before deleting (search first)",
+    "[Conversation] Agent must NOT create duplicate events when one already exists at that time",
+    "[Conversation] Agent must be aware of existing schedule when suggesting times (\"do I have time for X\")",
+    "[Conversation] Task creation should use create_task, not create_event for non-time-bound items",
+    "[Conversation] Goal check-ins should call list_goals or check_in_goal, not create new goals",
+    "[Conversation] Responses must be concise and natural -- no markdown headers, no numbered lists unless asked",
+    "[Conversation] Agent must not call unnecessary tools -- a simple greeting needs zero tool calls",
+    "[Conversation] Agent must handle ambiguous time references correctly (\"tomorrow\", \"next Monday\", \"this afternoon\")",
+    "[Conversation] When asked about free time, agent must call find_free_time and give specific windows",
+    "[Scheduler] Every suggestion must reference a specific goal, task, or aspect -- no generic filler",
+    "[Scheduler] Suggestion descriptions must explain WHY (reference the goal/task it advances)",
+    "[Scheduler] High-energy tasks (deep work, studying) must be placed in mornings/early afternoon",
+    "[Scheduler] Low-energy tasks (review, planning) must be placed in evenings",
+    "[Scheduler] No overlapping slots with existing events",
+    "[Scheduler] Minimum 60-minute duration for all slots",
+    "[Scheduler] Maximum 3-4 slots per day, spread across 7 days",
+    "[Scheduler] Multiple life areas must be represented (not all one aspect)",
+    "[Scheduler] Slots must have 30+ minute gaps between them and existing events",
+    "[Anti-pattern] DUPLICATE CREATION: Creating a second \"CS 161 Lecture\" when one already exists at MWF 10:30am",
+    "[Anti-pattern] TOOL NARRATION: \"I will now create an aspect for your class\" instead of just doing it",
+    "[Anti-pattern] GENERIC SUGGESTIONS: \"Watch a TED talk\" or \"Go for a walk\" with no goal connection",
+    "[Anti-pattern] OVER-TOOLING: Calling 5 tools when 1 would suffice",
+    "[Anti-pattern] UNDER-TOOLING: Responding to \"add a meeting\" with text instead of calling create_event",
+    "[Anti-pattern] WRONG TOOL: Using create_event for a task, or create_task for a scheduled meeting",
+    "[Anti-pattern] MARKDOWN IN CHAT: Using ## headers, **bold**, - bullet points in conversational responses",
+    "[Anti-pattern] IGNORING CONTEXT: Suggesting a meeting at 2pm when user has class then",
+    "[Anti-pattern] ASPECT ORPHANS: Creating events without linking to an aspect",
+    "[Anti-pattern] STALE RESPONSES: Not reflecting the current state of the calendar in answers"
+  ],
+  "summary": {
+    "totalPersonas": 1,
+    "passed": 0,
+    "failed": 1,
+    "avgEnrichmentScore": 1,
+    "avgScheduleScore": 1,
+    "avgConversationScore": 3,
+    "avgOverallScore": 1.67,
+    "totalToolCalls": 59,
+    "toolBreakdown": {
+      "update_profile": 1,
+      "create_recurring_event": 41,
+      "create_aspect": 2,
+      "list_events": 5,
+      "create_event": 3,
+      "search_events": 2,
+      "update_event": 1,
+      "create_task": 1,
+      "list_goals": 1,
+      "create_action_suggestion": 1,
+      "list_action_suggestions": 1
+    }
+  }
+}

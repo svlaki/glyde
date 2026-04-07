@@ -6,7 +6,7 @@
 
 import OpenAI from 'openai';
 import { OnboardingEnrichmentAgent } from '../../agents/onboarding-enrichment/OnboardingEnrichmentAgent.js';
-import type { CharacterSheet, EnrichmentTurn, OnboardingScheduleEvalConfig } from './types.js';
+import type { CharacterSheet, EnrichmentTurn, ToolCallDetail, OnboardingScheduleEvalConfig } from './types.js';
 
 interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -20,9 +20,10 @@ async function collectEnrichmentResponse(
   agent: OnboardingEnrichmentAgent,
   agentContext: any,
   userMessage: string,
-): Promise<{ text: string; toolsCalled: string[] }> {
+): Promise<{ text: string; toolsCalled: string[]; toolDetails: ToolCallDetail[] }> {
   let text = '';
   const toolsCalled: string[] = [];
+  const toolDetails: ToolCallDetail[] = [];
 
   const stream = agent.streamMessage(agentContext, userMessage);
   for await (const event of stream) {
@@ -30,12 +31,19 @@ async function collectEnrichmentResponse(
       text += event.content;
     } else if (event.type === 'tool-start' && event.toolName) {
       toolsCalled.push(event.toolName);
+    } else if (event.type === 'tool-end' && event.toolName) {
+      const resultStr = event.toolResult
+        ? (typeof event.toolResult === 'string'
+          ? event.toolResult.slice(0, 500)
+          : JSON.stringify(event.toolResult).slice(0, 500))
+        : undefined;
+      toolDetails.push({ name: event.toolName, args: {}, result: resultStr });
     } else if (event.type === 'error') {
       console.warn(`  [enrichment] Stream error: ${event.content}`);
     }
   }
 
-  return { text, toolsCalled };
+  return { text, toolsCalled, toolDetails };
 }
 
 /**
@@ -52,7 +60,8 @@ async function generateCharacterResponse(
     .map((d, i) => `${i + 1}. ${d}`)
     .join('\n');
 
-  const alreadyShared = conversationHistory
+  // Build a list of details already mentioned so the LLM doesn't repeat them
+  const priorUserMessages = conversationHistory
     .filter(m => m.role === 'user')
     .map(m => m.content)
     .join('\n');
@@ -61,44 +70,49 @@ async function generateCharacterResponse(
 
 You are having a conversation with Glyde, a life management app that is learning about your schedule and life. Glyde will ask you questions about your daily routine, work, school, health, hobbies, etc.
 
-Here are the REAL details about your life that you should share during this conversation. Share them naturally when the topic comes up -- don't dump everything at once, and don't share things that weren't asked about:
+Here are ALL the details about your life. Share them naturally when the topic comes up:
 
 ${detailsList}
 
-RULES:
-- Stay in character at all times
-- Answer questions directly and naturally
-- Share 2-4 specific details per response (times, days, locations, names)
-- If Glyde asks about something not in your details list, say you don't really have anything for that area
-- Don't repeat information you already shared
-- Keep responses to 2-4 sentences
-- Don't ask Glyde questions back -- just answer what was asked
-- On turn ${Math.min(turnNumber + 2, 8)}+, if Glyde asks if there's anything else, say something brief to wrap up
+WHAT YOU HAVE ALREADY SAID IN THIS CONVERSATION (DO NOT REPEAT):
+---
+${priorUserMessages || '(nothing yet)'}
+---
+
+CRITICAL RULES:
+- NEVER repeat information you already shared above. If you already told Glyde about your classes or work schedule, do NOT mention them again.
+- When Glyde asks about a NEW topic (health, personal, routine), answer about THAT topic with NEW details from your list.
+- If Glyde asks "what's next" or "what else", pick a life area you HAVEN'T covered yet and share 2-3 details about it.
+- Share 2-3 specific NEW details per response (times, days, locations, names).
+- Keep responses to 2-4 sentences. Be concise.
+- If Glyde asks about something not in your details list, say you don't really have anything for that area.
+- Don't ask Glyde questions back -- just answer what was asked.
+- On turn ${Math.min(turnNumber + 2, 8)}+, if Glyde asks if there's anything else, say something brief to wrap up.
 
 This is turn ${turnNumber + 1} of the conversation.`;
 
+  // Build messages with correct role mapping:
+  // The character = assistant in this simulation, Glyde = user
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },
   ];
 
-  // Add conversation history
+  // Conversation history: character spoke as "user" in the real chat, Glyde spoke as "assistant"
+  // For the simulator LLM: character = assistant, Glyde's last message = user prompt
   for (const msg of conversationHistory) {
-    messages.push({
-      role: msg.role === 'user' ? 'user' : 'assistant',
-      content: msg.content,
-    });
+    if (msg.role === 'user') {
+      // This was the character's message -- show as assistant (our prior outputs)
+      messages.push({ role: 'assistant', content: msg.content });
+    } else {
+      // This was Glyde's message -- show as user (what we're responding to)
+      messages.push({ role: 'user', content: msg.content });
+    }
   }
-
-  // The last assistant message is what Glyde just said -- now we respond as the character
-  messages.push({
-    role: 'user',
-    content: 'Respond as the character to what Glyde just said. Stay in character. Share relevant details from your life.',
-  });
 
   const response = await openai.chat.completions.create({
     model: config.simulatorModel,
     messages,
-    max_tokens: 300,
+    max_completion_tokens: 300,
     temperature: 0.7,
   });
 
@@ -145,7 +159,7 @@ export async function runEnrichment(
     };
 
     // Get enrichment agent response
-    const { text: agentResponse, toolsCalled } = await collectEnrichmentResponse(agent, agentContext, userMessage);
+    const { text: agentResponse, toolsCalled, toolDetails } = await collectEnrichmentResponse(agent, agentContext, userMessage);
 
     // Track the turn
     const enrichmentTurn: EnrichmentTurn = {
@@ -153,6 +167,7 @@ export async function runEnrichment(
       userMessage,
       agentResponse,
       toolsCalled,
+      toolDetails,
     };
     turns.push(enrichmentTurn);
 

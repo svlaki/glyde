@@ -1,10 +1,161 @@
 /**
  * Character sheets for onboarding-to-schedule eval.
  * Each persona represents a distinct user archetype with specific
- * life patterns that the enrichment chat should discover.
+ * life patterns that the enrichment chat should discover,
+ * plus conversation scenarios that test post-enrichment agent behavior.
  */
 
-import type { CharacterSheet } from './types.js';
+import type { CharacterSheet, ConversationScenario } from './types.js';
+
+/**
+ * Shared conversation scenarios that apply to all characters.
+ * Character-specific details are templated with {name} and {detail} placeholders.
+ */
+function buildScenarios(character: {
+  name: string;
+  occupation: string;
+  timezone: string;
+}): ConversationScenario[] {
+  return [
+    // Schedule queries
+    {
+      id: 'query-today',
+      category: 'schedule-query',
+      userMessage: 'what do i have today',
+      description: 'Basic schedule query - should list events, not create anything',
+      expectedBehavior: {
+        shouldCallTools: ['list_events'],
+        shouldNotCallTools: ['create_event', 'create_task', 'create_recurring_event'],
+        responseShould: ['mention specific events or say calendar is empty'],
+        responseShouldNot: ['use markdown headers', 'offer to create events unprompted'],
+      },
+    },
+    {
+      id: 'query-tomorrow',
+      category: 'schedule-query',
+      userMessage: 'what about tomorrow',
+      description: 'Follow-up schedule query with relative time reference',
+      expectedBehavior: {
+        shouldCallTools: ['list_events'],
+        shouldNotCallTools: ['create_event'],
+        responseShould: ['reference tomorrows date or events'],
+      },
+    },
+    {
+      id: 'query-free-time',
+      category: 'context-awareness',
+      userMessage: 'do i have any free time tomorrow afternoon',
+      description: 'Free time query - should check calendar and respond with specific windows',
+      expectedBehavior: {
+        shouldCallTools: ['find_free_time'],
+        shouldNotCallTools: ['create_event'],
+        responseShould: ['mention specific available time windows'],
+      },
+    },
+
+    // Event creation
+    {
+      id: 'create-simple-event',
+      category: 'event-create',
+      userMessage: 'add a dentist appointment friday at 2pm for an hour',
+      description: 'Simple one-time event creation',
+      expectedBehavior: {
+        shouldCallTools: ['create_event'],
+        shouldNotCallTools: ['create_recurring_event', 'create_task'],
+        responseShould: ['confirm the event was created'],
+      },
+    },
+    {
+      id: 'create-with-aspect',
+      category: 'event-create',
+      userMessage: 'i have a coffee chat with a colleague next wednesday at 11am',
+      description: 'Event creation that should use an existing aspect',
+      expectedBehavior: {
+        shouldCallTools: ['create_event'],
+        shouldNotCallTools: ['create_recurring_event'],
+        responseShould: ['confirm creation'],
+      },
+    },
+
+    // Event modification
+    {
+      id: 'modify-event',
+      category: 'event-modify',
+      userMessage: 'can you move my dentist appointment to 3pm instead',
+      description: 'Event modification - should search then update, not create new',
+      expectedBehavior: {
+        shouldCallTools: ['search_events'],
+        shouldNotCallTools: ['create_event'],
+        responseShould: ['confirm the event was moved or updated'],
+      },
+    },
+
+    // Task management
+    {
+      id: 'create-task',
+      category: 'task-management',
+      userMessage: 'remind me to buy a birthday gift for my mom',
+      description: 'Task creation for non-time-bound item - should use create_task not create_event',
+      expectedBehavior: {
+        shouldCallTools: ['create_task'],
+        shouldNotCallTools: ['create_event', 'create_recurring_event'],
+        responseShould: ['confirm the task was created'],
+      },
+    },
+
+    // Goal check-in
+    {
+      id: 'goal-checkin',
+      category: 'goal-checkin',
+      userMessage: 'how am i doing on my goals',
+      description: 'Goal progress query - should list goals, not create new ones',
+      expectedBehavior: {
+        shouldCallTools: ['list_goals'],
+        shouldNotCallTools: ['create_goal', 'create_event'],
+        responseShould: ['mention the users existing goals'],
+      },
+    },
+
+    // Duplicate avoidance
+    {
+      id: 'duplicate-check',
+      category: 'duplicate-avoidance',
+      userMessage: 'add a gym session for tomorrow morning at 7am',
+      description: 'Should check if a gym event already exists at that time before creating',
+      expectedBehavior: {
+        shouldCallTools: ['list_events'],
+        responseShould: ['either create it or note a conflict exists'],
+        responseShouldNot: ['create without checking for conflicts'],
+      },
+    },
+
+    // Edge case
+    {
+      id: 'ambiguous-request',
+      category: 'edge-case',
+      userMessage: 'i need to study more',
+      description: 'Vague request - should ask for details or create a suggestion, not a scheduled event',
+      expectedBehavior: {
+        shouldCallTools: [],
+        shouldNotCallTools: ['create_event', 'create_recurring_event'],
+        responseShould: ['ask for more details about when or what to study'],
+      },
+    },
+
+    // Suggestion interaction
+    {
+      id: 'suggestion-query',
+      category: 'suggestion-interact',
+      userMessage: 'what should i work on next',
+      description: 'Should check suggestions or schedule to recommend next activity',
+      expectedBehavior: {
+        shouldCallTools: ['list_action_suggestions'],
+        shouldNotCallTools: ['create_event'],
+        responseShould: ['suggest a specific activity based on goals or backlog'],
+      },
+    },
+  ];
+}
 
 export const CHARACTERS: readonly CharacterSheet[] = [
   {
@@ -38,6 +189,7 @@ export const CHARACTERS: readonly CharacterSheet[] = [
       'I wake up around 6:30am on weekdays and go to bed around midnight',
       'I play pickup basketball with friends on Saturday afternoons',
     ],
+    conversationScenarios: buildScenarios({ name: 'Marcus', occupation: 'Student', timezone: 'America/Los_Angeles' }),
     expectedOutcomes: {
       minAspects: 4,
       minRecurringEvents: 6,
@@ -86,6 +238,7 @@ export const CHARACTERS: readonly CharacterSheet[] = [
       'I read for about 30 minutes before bed most nights, around 9:30pm',
       'Sunday mornings I do meal prep for the week, about 2 hours starting at 8am',
     ],
+    conversationScenarios: buildScenarios({ name: 'Sarah', occupation: 'Product Manager', timezone: 'America/New_York' }),
     expectedOutcomes: {
       minAspects: 4,
       minRecurringEvents: 7,
@@ -133,6 +286,7 @@ export const CHARACTERS: readonly CharacterSheet[] = [
       'I cook dinner most nights around 7pm',
       'Friday evenings are usually social -- drinks or dinner with friends',
     ],
+    conversationScenarios: buildScenarios({ name: 'Alex', occupation: 'Freelance Designer', timezone: 'America/Denver' }),
     expectedOutcomes: {
       minAspects: 4,
       minRecurringEvents: 5,
@@ -180,6 +334,7 @@ export const CHARACTERS: readonly CharacterSheet[] = [
       'I usually have dinner with my partner around 6:30pm',
       'Saturdays I try to take fully off. Sundays I do about 3-4 hours of reading papers from 10am to 2pm',
     ],
+    conversationScenarios: buildScenarios({ name: 'Priya', occupation: 'PhD Candidate', timezone: 'America/Chicago' }),
     expectedOutcomes: {
       minAspects: 4,
       minRecurringEvents: 7,
@@ -230,6 +385,7 @@ export const CHARACTERS: readonly CharacterSheet[] = [
       'I call my parents every Sunday evening around 6pm for about an hour',
       'I see a therapist every other Thursday at 5:30pm for an hour',
     ],
+    conversationScenarios: buildScenarios({ name: 'James', occupation: 'Accountant', timezone: 'America/New_York' }),
     expectedOutcomes: {
       minAspects: 4,
       minRecurringEvents: 6,

@@ -166,7 +166,7 @@ export class MemoryService {
       const response = await openai.chat.completions.create({
         model: 'gpt-5.4-nano',
         temperature: 0.1,
-        max_tokens: 600,
+        max_completion_tokens: 600,
         messages: [
           {
             role: 'system',

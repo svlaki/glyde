@@ -129,11 +129,15 @@ function OnboardingContent() {
     }
   }
 
-  // Show post-onboarding agent chat
+  // Show post-onboarding agent chat with context from form data
   if (showPostOnboardingChat) {
     return (
       <Section4OnboardingChat
         onComplete={() => navigate('/calendar', { replace: true })}
+        userName={state.preferredName || state.fullName}
+        occupation={state.occupation}
+        aspects={state.aspects}
+        goals={state.goals}
       />
     )
   }
