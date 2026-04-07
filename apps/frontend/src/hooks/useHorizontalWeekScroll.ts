@@ -63,7 +63,8 @@ export function useHorizontalWeekScroll({
   const getWeekWidth = useCallback(() => {
     const el = scrollRef.current
     if (!el) return 0
-    return el.clientWidth - TIME_GUTTER_WIDTH
+    // Time gutter is now outside the scroll container, so week = full width
+    return el.clientWidth
   }, [scrollRef])
 
   // Set scroll to center week BEFORE browser paints (prevents jitter)

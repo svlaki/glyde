@@ -45,8 +45,8 @@ export function Calendar() {
   const [slotSuggestionIndex, setSlotSuggestionIndex] = useState<Record<string, number>>({})
   const [draggingSlot, setDraggingSlot] = useState<SlotWithSuggestion | null>(null)
   const [resizingSlot, setResizingSlot] = useState<SlotWithSuggestion | null>(null)
-  const [scrollContainerWidth, setScrollContainerWidth] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const timeGutterRef = useRef<HTMLDivElement>(null)
 
   const { getBufferedWeekDates } = useHorizontalWeekScroll({
     scrollRef: scrollContainerRef,
@@ -440,18 +440,18 @@ export function Calendar() {
     return () => clearInterval(timer)
   }, [])
 
-  // Measure scroll container width for explicit week group sizing
+  // Sync time gutter vertical scroll with main scroll container
   useEffect(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) setScrollContainerWidth(entry.contentRect.width)
-    })
-    ro.observe(el)
-    setScrollContainerWidth(el.clientWidth)
-    return () => ro.disconnect()
-  }, [])
+    if (view === 'month') return
+    const main = scrollContainerRef.current
+    const gutter = timeGutterRef.current
+    if (!main || !gutter) return
+    const handler = () => { gutter.scrollTop = main.scrollTop }
+    main.addEventListener('scroll', handler, { passive: true })
+    // Set initial sync
+    gutter.scrollTop = main.scrollTop
+    return () => main.removeEventListener('scroll', handler)
+  }, [view])
 
   // Auto-scroll to 9am when view changes to day/week
   useEffect(() => {
@@ -1264,15 +1264,121 @@ export function Calendar() {
       </div>
 
       {/* Calendar Grid */}
-      <div
-        ref={scrollContainerRef}
-        className={view === 'week' ? 'calendar-week-scroll' : undefined}
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          position: 'relative',
-        }}
-      >
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        {/* Fixed Time Column - outside scroll container so it never scrolls away */}
+        {view !== 'month' && (
+          <div
+            className="calendar-time-gutter"
+            style={{
+              width: '52px',
+              minWidth: '52px',
+              flexShrink: 0,
+              background: colors.bgSecondary,
+              zIndex: 20,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            {/* Inner wrapper scrolls vertically in sync with main grid */}
+            <div
+              ref={timeGutterRef}
+              style={{ height: '100%', overflow: 'hidden' }}
+            >
+              {/* Timezone header - sticky top */}
+              <div style={{
+                position: 'sticky',
+                top: 0,
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: fontSize.xs,
+                fontFamily: fontFamily.sans,
+                fontWeight: fontWeight.normal,
+                color: colors.textTertiary,
+                background: colors.bgSecondary,
+                zIndex: 30,
+              }}>
+                {new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()}
+              </div>
+              {/* All-day banner spacer */}
+              {allDayBannerInfo.height > 0 && (
+                <div style={{
+                  height: `${allDayBannerInfo.height}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: fontSize.xs,
+                  fontFamily: fontFamily.sans,
+                  color: colors.textTertiary,
+                  borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                }}>
+                  all-day
+                </div>
+              )}
+              {/* Spacer for gap between header and first hour */}
+              <div style={{ height: '12px' }} />
+              {hours.map(hour => (
+                <div key={hour} style={{ height: '60px', position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: 'translateY(-50%)',
+                    fontSize: fontSize.xs,
+                    fontFamily: fontFamily.sans,
+                    color: colors.textTertiary,
+                    background: colors.bgSecondary,
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {formatTime(hour)}
+                  </span>
+                </div>
+              ))}
+              {/* Current time label */}
+              {(() => {
+                const now = currentTime
+                const topPos = (now.getHours() * 60) + (now.getMinutes() / 60 * 60) + 36
+                  + allDayBannerInfo.height + 12
+                const todayInView = displayDates.some(d => d.toDateString() === new Date().toDateString())
+                if (!todayInView) return null
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    top: `${topPos}px`,
+                    left: 0,
+                    right: 0,
+                    transform: 'translateY(-50%)',
+                    fontSize: fontSize.xs,
+                    fontFamily: fontFamily.sans,
+                    fontWeight: fontWeight.semibold,
+                    color: colors.error,
+                    background: colors.bgSecondary,
+                    textAlign: 'center',
+                    zIndex: 26,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                  }}>
+                    {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* Main scrollable area */}
+        <div
+          ref={scrollContainerRef}
+          className={view === 'week' ? 'calendar-week-scroll' : undefined}
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            position: 'relative',
+          }}
+        >
         {view === 'month' ? (
           // Month View - Mobile-style grid
           <div style={{ padding: '0', height: '100%', overflow: 'hidden' }}>
@@ -1492,79 +1598,8 @@ export function Calendar() {
             </div>
           </div>
         ) : (
-          // Day/Week View - Mobile-style design
+          // Day/Week View
           <div style={{ display: 'flex', minHeight: '100%', position: 'relative' }}>
-            {/* Time Column - Mobile-style sticky gutter with timezone */}
-            <div style={{
-              width: '52px',
-              minWidth: '52px',
-              flexShrink: 0,
-              position: 'sticky',
-              left: 0,
-              zIndex: 20,
-              background: colors.bgSecondary,
-            }}>
-              {/* Timezone header - sticky top */}
-              <div style={{
-                position: 'sticky',
-                top: 0,
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: fontSize.xs,
-                fontFamily: fontFamily.sans,
-                fontWeight: fontWeight.normal,
-                color: colors.textTertiary,
-                background: colors.bgSecondary,
-                zIndex: 30,
-              }}>
-                {new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop()}
-              </div>
-              {/* All-day banner spacer (matches day column banner height) */}
-              {allDayBannerInfo.height > 0 && (
-                <div style={{
-                  height: `${allDayBannerInfo.height}px`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: fontSize.xs,
-                  fontFamily: fontFamily.sans,
-                  color: colors.textTertiary,
-                  borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-                }}>
-                  all-day
-                </div>
-              )}
-              {/* Spacer for gap between header and first hour */}
-              <div style={{ height: '12px' }} />
-              {hours.map(hour => (
-                <div
-                  key={hour}
-                  style={{
-                    height: '60px',
-                    position: 'relative'
-                  }}
-                >
-                  <span style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    transform: 'translateY(-50%)',
-                    fontSize: fontSize.xs,
-                    fontFamily: fontFamily.sans,
-                    color: colors.textTertiary,
-                    background: colors.bgSecondary,
-                    textAlign: 'center',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {formatTime(hour)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
             {/* Days Columns - grouped by week for horizontal scroll */}
             {(view === 'week'
               ? Array.from({ length: displayDates.length / 7 }, (_, weekIdx) => ({
@@ -1578,12 +1613,8 @@ export function Calendar() {
                 key={weekGroup.key}
                 style={{
                   display: 'flex',
-                  ...(view === 'week' && scrollContainerWidth > 0 ? {
-                    width: `${scrollContainerWidth - 52}px`,
-                    minWidth: `${scrollContainerWidth - 52}px`,
-                    flexShrink: 0,
-                  } : view === 'week' ? {
-                    flex: '0 0 calc(100% - 52px)',
+                  ...(view === 'week' ? {
+                    flex: '0 0 100%',
                   } : {
                     flex: 1,
                   }),
@@ -1937,63 +1968,29 @@ export function Calendar() {
             </div>
             ))}
 
-            {/* Current Time Indicator - red line + sticky label */}
+            {/* Current Time Red Line */}
             {(() => {
               const now = currentTime
-              const currentHour = now.getHours()
-              const currentMinutes = now.getMinutes()
-              const topPosition = (currentHour * 60) + (currentMinutes / 60 * 60) + 36
+              const topPosition = (now.getHours() * 60) + (now.getMinutes() / 60 * 60) + 36
                 + allDayBannerInfo.height + 12
-
-              const todayInView = displayDates.some(date =>
-                date.toDateString() === new Date().toDateString()
-              )
-
+              const todayInView = displayDates.some(d => d.toDateString() === new Date().toDateString())
               if (!todayInView) return null
-
               return (
                 <div style={{
                   position: 'absolute',
                   top: `${topPosition}px`,
                   left: 0,
                   right: 0,
-                  height: 0,
-                  overflow: 'visible',
+                  height: '2px',
+                  background: colors.error,
                   zIndex: 25,
                   pointerEvents: 'none',
-                }}>
-                  {/* Time label in gutter - sticky left */}
-                  <div style={{
-                    position: 'sticky',
-                    left: 0,
-                    width: '52px',
-                    transform: 'translateY(-50%)',
-                    fontSize: fontSize.xs,
-                    fontFamily: fontFamily.sans,
-                    fontWeight: fontWeight.semibold,
-                    color: colors.error,
-                    background: colors.bgSecondary,
-                    textAlign: 'center',
-                    zIndex: 30,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                  </div>
-                  {/* Red line across day columns */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '52px',
-                    right: 0,
-                    height: '2px',
-                    background: colors.error,
-                    zIndex: 25,
-                  }} />
-                </div>
+                }} />
               )
             })()}
           </div>
         )}
+      </div>
       </div>
 
       {/* Unified Event Form - extracted to prevent full Calendar re-renders */}
