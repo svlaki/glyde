@@ -88,16 +88,17 @@ export const createRecurringEventTool = tool(
       validatedAspect = trimmedAspect;
     }
 
-    // Check for duplicate recurring events with similar title
+    // Check for duplicate recurring events with same title AND same recurrence pattern
     const existingEvents = await supabaseService.getEvents(userId);
     const duplicateRecurring = existingEvents.find((e: any) =>
       e.is_recurring &&
-      e.title.toLowerCase().trim() === title.toLowerCase().trim()
+      e.title.toLowerCase().trim() === title.toLowerCase().trim() &&
+      e.recurrence_rule === finalRRule
     );
 
     if (duplicateRecurring) {
-      console.log(`[CREATE-RECURRING-EVENT TOOL] Duplicate found: "${title}" already exists as recurring event ${duplicateRecurring.id}`);
-      return `Recurring event "${title}" already exists on your calendar. No duplicate created.`;
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Duplicate found: "${title}" with same recurrence rule already exists as recurring event ${duplicateRecurring.id}`);
+      return `Recurring event "${title}" with this recurrence pattern already exists on your calendar. No duplicate created.`;
     }
 
     // Convert local times to UTC
