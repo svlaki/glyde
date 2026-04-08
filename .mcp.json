@@ -9,7 +9,7 @@
         "--project-ref=furwuyjptohobrvyyzfy"
       ],
       "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_9a38a2935f739393e072a590546ab18db373ee13"
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
       }
     },
     "sequential-thinking": {
@@ -19,17 +19,6 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
-    },
-    "memory-bank": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@allpepper/memory-bank-mcp@latest"
-      ],
-      "env": {
-        "MEMORY_BANK_ROOT": "C:\\Users\\pipej\\Projects\\glydeproper\\.memory-bank"
-      }
     },
     "playwright": {
       "type": "stdio",

@@ -50,6 +50,7 @@
     "keen-slider": "^6.8.6",
     "lucide-react": "^0.523.0",
     "postcss": "^8.5.6",
+    "prettier": "^3.8.1",
     "react": "^19.1.0",
     "react-big-calendar": "^1.12.1",
     "react-colorful": "^5.6.1",
