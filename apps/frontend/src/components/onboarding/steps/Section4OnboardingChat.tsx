@@ -1,20 +1,69 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTheme } from '../../../lib/themeContext'
 import { getColors } from '../../../styles/colors'
 import { usePlatform } from '../../../hooks/usePlatform'
+import { useAuth } from '../../../lib/authContext'
 import { ChatBot } from '../../ChatBot'
 import type { ChatBotHandle } from '../../ChatBot'
+import { clearChatSession } from '../../ChatBot'
 
 interface Section4OnboardingChatProps {
   onComplete: () => void
+  userName?: string
+  occupation?: string
+  aspects?: string[]
+  goals?: string[]
 }
 
-export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatProps) {
-  const { theme, isDarkMode } = useTheme()
+/**
+ * Build a context-rich auto-send message from onboarding form data.
+ * Gives the agent a head start so it doesn't re-ask what the user already entered.
+ */
+function buildAutoSendMessage(
+  userName?: string,
+  occupation?: string,
+  aspects?: string[],
+  goals?: string[],
+): string {
+  const parts: string[] = []
+
+  if (userName && occupation) {
+    parts.push(`I'm ${userName}, ${occupation}.`)
+  } else if (userName) {
+    parts.push(`I'm ${userName}.`)
+  }
+
+  if (aspects && aspects.length > 0) {
+    const listed = aspects.slice(0, 5).join(', ')
+    parts.push(`I've set up aspects for ${listed}.`)
+  }
+
+  if (goals && goals.length > 0) {
+    const listed = goals.slice(0, 3).join(', ')
+    parts.push(`My goals are ${listed}.`)
+  }
+
+  parts.push("Let's dig in and fill in the details -- schedule, routines, anything I should have on my calendar.")
+
+  return parts.join(' ')
+}
+
+export function Section4OnboardingChat({
+  onComplete,
+  userName,
+  occupation,
+  aspects,
+  goals,
+}: Section4OnboardingChatProps) {
+  const { theme } = useTheme()
   const colors = getColors(theme)
   const { isMobile } = usePlatform()
+  const { user, session } = useAuth()
   const chatRef = useRef<ChatBotHandle>(null)
   const [showContinue, setShowContinue] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  const autoMessage = buildAutoSendMessage(userName, occupation, aspects, goals)
 
   // Show continue button after a delay (30s timeout or when bot responds)
   useEffect(() => {
@@ -28,15 +77,26 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
   useEffect(() => {
     if (showContinue) return
     const interval = setInterval(() => {
-      // Once the bot has finished its first response, show continue
       if (chatRef.current && !chatRef.current.isLoading) {
-        // Give the bot a moment to finish
         setTimeout(() => setShowContinue(true), 2000)
         clearInterval(interval)
       }
     }, 3000)
     return () => clearInterval(interval)
   }, [showContinue])
+
+  // Clear onboarding chat history and navigate to main app
+  const handleTransition = useCallback(async () => {
+    setIsTransitioning(true)
+    try {
+      if (user?.id && session?.access_token) {
+        await clearChatSession(user.id, session.access_token)
+      }
+    } catch (error) {
+      console.warn('[Section4] Failed to clear chat session:', error)
+    }
+    onComplete()
+  }, [user, session, onComplete])
 
   return (
     <div style={{
@@ -82,7 +142,7 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
           compact
           currentPageOverride="onboarding-enrichment"
           targetAgent="onboarding"
-          autoSendMessage="Let's get my life organized. I'm ready to tell you about what I have going on."
+          autoSendMessage={autoMessage}
         />
       </div>
 
@@ -99,7 +159,8 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
       }}>
         <button
           type="button"
-          onClick={onComplete}
+          onClick={handleTransition}
+          disabled={isTransitioning}
           style={{
             padding: '8px 16px',
             borderRadius: '6px',
@@ -107,7 +168,8 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
             backgroundColor: 'transparent',
             color: colors.textTertiary,
             fontSize: '14px',
-            cursor: 'pointer',
+            cursor: isTransitioning ? 'wait' : 'pointer',
+            opacity: isTransitioning ? 0.5 : 1,
           }}
         >
           Skip
@@ -116,7 +178,8 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
         {showContinue && (
           <button
             type="button"
-            onClick={onComplete}
+            onClick={handleTransition}
+            disabled={isTransitioning}
             style={{
               padding: '12px 28px',
               borderRadius: '8px',
@@ -125,10 +188,11 @@ export function Section4OnboardingChat({ onComplete }: Section4OnboardingChatPro
               color: '#ffffff',
               fontSize: '16px',
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: isTransitioning ? 'wait' : 'pointer',
+              opacity: isTransitioning ? 0.7 : 1,
             }}
           >
-            Continue to Calendar
+            {isTransitioning ? 'Loading...' : 'Continue to Calendar'}
           </button>
         )}
       </div>

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
 import { OnboardingEnrichmentAgent } from '../agents/onboarding-enrichment/OnboardingEnrichmentAgent.js';
+import { ScribeAgent } from '../agents/scribe/ScribeAgent.js';
 import { ImageContent } from '../types/agents.js';
 import pdfParse from 'pdf-parse';
 
@@ -18,6 +19,10 @@ async function initializeAgents(): Promise<void> {
   if (!agentRegistry.hasAgent('onboarding')) {
     const onboardingAgent = new OnboardingEnrichmentAgent();
     await agentRegistry.registerAgent(onboardingAgent);
+  }
+  if (!agentRegistry.hasAgent('scribe')) {
+    const scribeAgent = new ScribeAgent();
+    await agentRegistry.registerAgent(scribeAgent);
   }
 }
 

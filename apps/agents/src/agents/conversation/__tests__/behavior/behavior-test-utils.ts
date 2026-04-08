@@ -139,34 +139,18 @@ export function createMockRuleService() {
 }
 
 /**
- * Creates mock ZepMemoryService with default implementations
+ * Creates mock MemoryService with default implementations
  */
-export function createMockZepMemoryService() {
+export function createMockMemoryService() {
   return {
-    getOrCreateSession: vi.fn().mockResolvedValue('test-session-id'),
-    getThreadContext: vi.fn().mockResolvedValue(''),
-    addUserMessage: vi.fn().mockResolvedValue(undefined),
-    addAssistantMessage: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
-/**
- * Creates mock ZepGraphService with default implementations
- */
-export function createMockZepGraphService() {
-  return {
-    addCalendarEvent: vi.fn().mockResolvedValue('graph-event-id'),
-    updateCalendarEvent: vi.fn().mockResolvedValue(undefined),
-    deleteCalendarEvent: vi.fn().mockResolvedValue(undefined),
-    addTask: vi.fn().mockResolvedValue('graph-task-id'),
-    deleteTask: vi.fn().mockResolvedValue(undefined),
-    addGoal: vi.fn().mockResolvedValue('graph-goal-id'),
-    deleteGoal: vi.fn().mockResolvedValue(undefined),
-    searchUserGraphAdvanced: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
-    getEnhancedUserContext: vi.fn().mockResolvedValue({
-      userPatterns: [],
-      communityInsights: [],
-    }),
+    getUserContext: vi.fn().mockResolvedValue(''),
+    persistConversation: vi.fn().mockResolvedValue(undefined),
+    searchFacts: vi.fn().mockResolvedValue([]),
+    addFact: vi.fn().mockResolvedValue(undefined),
+    addFacts: vi.fn().mockResolvedValue(undefined),
+    invalidateFacts: vi.fn().mockResolvedValue(undefined),
+    seedOnboardingData: vi.fn().mockResolvedValue(undefined),
+    rebuildUserContext: vi.fn().mockResolvedValue(''),
   };
 }
 

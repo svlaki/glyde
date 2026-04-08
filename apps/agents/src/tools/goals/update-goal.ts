@@ -1,7 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { getSupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { convertToUTC } from "../../utils/timezoneUtils.js";
 
 export const updateGoalTool = tool(
@@ -14,7 +13,6 @@ export const updateGoalTool = tool(
 
     try {
       const supabaseService = getSupabaseService();
-      const zepGraphService = new ZepGraphService();
 
       // Get original goal to compare changes
       const goals = await supabaseService.getGoals(userId);
@@ -46,25 +44,6 @@ export const updateGoalTool = tool(
       if (!goal) {
         return "Failed to update goal";
       }
-
-      // Update in Zep knowledge graph asynchronously
-      const updateGraph = async () => {
-        try {
-          await zepGraphService.addGoal(userId, {
-            goalId: goal.id,
-            title: goal.title,
-            goal_type: goal.goal_type || 'SMART',
-            status: goal.status || 'active',
-            progress_percentage: progress !== undefined ? progress : (goal.progress || 0),
-            deadline: goal.target_date,
-            time_invested_minutes: 0, // Could be enhanced to track actual time
-          });
-          console.log(`[update-goal] Goal update added to knowledge graph: ${goal.title}`);
-        } catch (error) {
-          console.error('[update-goal] Failed to update knowledge graph (non-critical):', error);
-        }
-      };
-      updateGraph(); // Fire and forget
 
       // Build detailed change description
       const changes: string[] = [];

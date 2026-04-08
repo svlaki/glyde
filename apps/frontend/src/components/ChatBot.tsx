@@ -48,6 +48,36 @@ const AGENT_SERVICE_URL = import.meta.env.VITE_AGENT_SERVICE_URL || 'http://loca
 // Session ID for chat persistence (consistent per user)
 const getSessionId = (userId: string): string => `chat_${userId}`
 
+/**
+ * Clear chat session (both localStorage and server-side).
+ * Standalone utility -- can be called outside of a mounted ChatBot component.
+ * Used by onboarding to wipe the chat before transitioning to the main app.
+ */
+export async function clearChatSession(userId: string, accessToken: string): Promise<void> {
+  // Clear localStorage to a single welcome message
+  const welcomeMsg = {
+    id: 'welcome',
+    text: 'Hello! I\'m here to help manage your schedule. What would you like to do?',
+    sender: 'bot',
+    timestamp: new Date()
+  }
+  localStorage.setItem(`chat_messages_${userId}`, JSON.stringify([welcomeMsg]))
+
+  // Clear server-side chat history
+  try {
+    await fetch(`${AGENT_SERVICE_URL}/api/chat/clear`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ session_id: getSessionId(userId) })
+    })
+  } catch (error) {
+    console.warn('[clearChatSession] Failed to clear server-side chat:', error)
+  }
+}
+
 
 // Send arrow icon
 const SendIcon = ({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) => (

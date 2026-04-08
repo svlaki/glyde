@@ -34,7 +34,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
   const [members, setMembers] = useState<SharedAspectMember[]>([])
   const [friends, setFriends] = useState<Friend[]>([])
   const [selectedFriendId, setSelectedFriendId] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('viewer')
+  const [selectedRole, setSelectedRole] = useState<'member' | 'viewer'>('viewer')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,7 +138,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
     }
   }
 
-  async function handleUpdateRole(memberId: string, newRole: 'editor' | 'viewer') {
+  async function handleUpdateRole(memberId: string, newRole: 'member' | 'viewer') {
     if (!aspect || !accessToken) return
 
     const response = await updateMemberRole(aspect.id, memberId, newRole, accessToken)
@@ -240,10 +240,10 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <select
                       value={selectedRole}
-                      onChange={(e) => setSelectedRole(e.target.value as 'editor' | 'viewer')}
+                      onChange={(e) => setSelectedRole(e.target.value as 'member' | 'viewer')}
                       style={{ ...inputStyle, width: isMobile ? undefined : '100px', flex: isMobile ? 1 : undefined }}
                     >
-                      <option value="editor">Editor</option>
+                      <option value="member">Member</option>
                       <option value="viewer">Viewer</option>
                     </select>
                     <button
@@ -262,7 +262,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                         minHeight: isMobile ? '44px' : 'auto'
                       }}
                     >
-                      Add
+                      Invite
                     </button>
                   </div>
                 </div>
@@ -328,6 +328,19 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                                 Owner
                               </span>
                             )}
+                            {member.status === 'pending' && (
+                              <span style={{
+                                marginLeft: '6px',
+                                fontSize: '10px',
+                                fontWeight: fontWeight.medium,
+                                color: '#f59e0b',
+                                background: 'rgba(245, 158, 11, 0.15)',
+                                padding: '1px 6px',
+                                borderRadius: '8px'
+                              }}>
+                                Pending
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: fontSize.xs, color: colors.textTertiary }}>
                             {member.user?.email}
@@ -338,7 +351,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <select
                             value={member.role}
-                            onChange={(e) => handleUpdateRole(member.id, e.target.value as 'editor' | 'viewer')}
+                            onChange={(e) => handleUpdateRole(member.id, e.target.value as 'member' | 'viewer')}
                             style={{
                               padding: '4px 8px',
                               fontSize: fontSize.xs,
@@ -349,7 +362,7 @@ export function AspectShareModal({ aspect, isOpen, onClose, onAspectUpdated }: A
                               cursor: 'pointer'
                             }}
                           >
-                            <option value="editor">Editor</option>
+                            <option value="member">Member</option>
                             <option value="viewer">Viewer</option>
                           </select>
                           <button

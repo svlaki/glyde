@@ -57,6 +57,7 @@ interface GoalsByAspectProps {
   aspect: Aspect | null
   onEdit?: (() => void) | undefined
   onDelete?: (() => void) | undefined
+  onArchive?: (() => void) | undefined
   onShare?: (() => void) | undefined
   onDescriptionUpdate?: (description: string) => Promise<void>
   onEditEvent?: (event: CalendarEvent) => void
@@ -64,7 +65,7 @@ interface GoalsByAspectProps {
   onEditGoal?: (goal: Goal) => void
 }
 
-export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescriptionUpdate, onEditEvent, onEditTask, onEditGoal }: GoalsByAspectProps) {
+export function GoalsByAspect({ aspect, onEdit, onDelete, onArchive, onShare, onDescriptionUpdate, onEditEvent, onEditTask, onEditGoal }: GoalsByAspectProps) {
   const { user, session } = useAuth()
   const { theme, isDarkMode } = useTheme()
   const colors = getColors(theme)
@@ -365,7 +366,14 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
               e.currentTarget.style.borderColor = colors.border
             }}
           >
-            {aspect.description || 'Click to add a description...'}
+            <span style={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical' as const,
+            }}>
+              {aspect.description || 'Click to add a description...'}
+            </span>
           </div>
         )
       ) : (
@@ -377,7 +385,11 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
             borderRadius: '6px',
             fontSize: fontSize.sm,
             color: colors.textPrimary,
-            lineHeight: lineHeight.normal
+            lineHeight: lineHeight.normal,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical' as const,
           }}>
             {aspect.description}
           </div>
@@ -409,7 +421,7 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
             </div>
           </div>
           {/* Action Buttons */}
-          {(onEdit || onShare || onDelete) && (
+          {(onEdit || onShare || onArchive || onDelete) && (
             <div style={{ display: 'flex', gap: '6px' }}>
               {onEdit && (
                 <EditButton
@@ -428,6 +440,35 @@ export function GoalsByAspect({ aspect, onEdit, onDelete, onShare, onDescription
                   }}
                   title="Share aspect"
                 />
+              )}
+              {onArchive && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onArchive()
+                  }}
+                  title={aspect?.archived_at ? 'Restore aspect' : 'Archive aspect'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: colors.textTertiary,
+                    cursor: 'pointer',
+                    padding: 0,
+                    transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = colors.textSecondary }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = colors.textTertiary }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 1 12.5V5a1 1 0 0 1-1-1V2zm2 3v7.5A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5V5H2zm13-3H1v2h14V2zM5 7.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5z"/>
+                  </svg>
+                </button>
               )}
               {onDelete && (
                 <DeleteButton

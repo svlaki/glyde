@@ -36,7 +36,7 @@ export const getProfileTool = tool(
     name: "get_profile",
     description: "Get user profile information.",
     schema: z.object({
-      section: z.enum(["life", "work", "productivity", "health", "relationships", "routines", "decisionMaking", "communication", "learning", "agentPreferences", "rules"]).optional().nullable().describe("Profile section"),
+      section: z.enum(["values", "preferences", "work_patterns", "personality_traits", "context_data", "habits"]).optional().nullable().describe("Profile section (JSON column name)"),
     }),
   }
 );

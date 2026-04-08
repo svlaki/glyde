@@ -21,7 +21,7 @@
 
 import 'dotenv/config';
 import { SupabaseService } from '../services/SupabaseService.js';
-import { ZepGraphService } from '../services/ZepGraphService.js';
+import { getSupabaseClient } from '../services/SupabaseService.js';
 
 const BATCH_SIZE = 50;
 const MAX_CONCURRENT_USERS = 2;
@@ -117,16 +117,16 @@ async function resetUser(userId: string, supabase: any): Promise<ResetResult> {
 
   console.log(`\n[RESET-USERS] Processing user: ${userId}`);
 
-  // Step 1: Wipe Zep graph
+  // Step 1: Clear memory facts
   try {
-    console.log(`  [ZEP] Wiping Zep graph...`);
-    const zepGraphService = new ZepGraphService();
-    await zepGraphService.cleanupUserGraph(userId);
+    console.log(`  [MEMORY] Clearing memory facts...`);
+    const client = getSupabaseClient();
+    await client.from('memory_facts').delete().eq('user_id', userId);
+    await client.from('user_context_cache').delete().eq('user_id', userId);
     result.zepWiped = true;
-    console.log(`  [ZEP] Successfully wiped`);
+    console.log(`  [MEMORY] Successfully cleared`);
   } catch (error) {
-    // User might not exist in Zep, that's okay
-    console.log(`  [ZEP] No graph or already clean`);
+    console.log(`  [MEMORY] No data or already clean`);
     result.zepWiped = true;
   }
 

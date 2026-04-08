@@ -1,20 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { useAuth } from '../lib/authContext'
 import { useAspects } from '../lib/aspectContext'
 import type { Aspect } from '../lib/aspectContext'
-import { GoalsSection } from '../components/GoalsSection'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors, hexToRgba } from '../styles/colors'
 import { getTypography } from '../styles/typography'
-import { fetchUserNotes, createUserNotes, updateUserNotes } from '../lib/notesService'
-import type { Note } from '../lib/notesService'
-import { fetchUserGoals } from '../lib/goalService'
+import { fetchUserNotes, createUserNotes, updateUserNotes, deleteUserNotes, syncNoteLinks, searchNotesFulltext } from '../lib/notesService'
+import type { SearchResult } from '../lib/notesService'
+import { fetchUserGoals, updateUserGoal, deleteUserGoal } from '../lib/goalService'
 import type { Goal } from '../lib/goalService'
+import { updateUserAspect } from '../lib/aspectService'
+import type { Note } from '../lib/notesService'
 import { supabase } from '../lib/supabase'
 import { usePlatform } from '../hooks/usePlatform'
 import { MobileHeader } from '../components/mobile/MobileHeader'
 import { mobileStyles, mobileSpacing } from '../styles/mobileStyles'
+import { NoteEditor } from '../components/notes/NoteEditor'
+import { NoteGraph } from '../components/notes/NoteGraph'
+import { BacklinksPanel } from '../components/notes/BacklinksPanel'
+import { TemplatePicker } from '../components/notes/TemplatePicker'
+import { FloatingChat } from '../components/FloatingChat'
+import { useKnowledgeGraph } from '../hooks/useKnowledgeGraph'
+import { createEntityLink, deleteEntityLink, saveGraphPositions } from '../lib/knowledgeGraphService'
+import { extractWikiLinks } from '../lib/wikiLinkParser'
 
 export function NotesPage() {
   const { isMobile } = usePlatform()
@@ -32,12 +41,11 @@ function NotesPageDesktop() {
   const { aspects } = useAspects()
   const colors = getColors(theme)
   const typography = getTypography(false)
+  const { data: graphData, isLoading: graphLoading, refetch: refetchGraph } = useKnowledgeGraph()
 
   const [allNotes, setAllNotes] = useState<Note[]>([])
-  const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isEditingRef = useRef(false)
@@ -54,11 +62,30 @@ function NotesPageDesktop() {
   const [isCreating, setIsCreating] = useState(false)
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteAspectId, setNewNoteAspectId] = useState('')
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
+
+  // Entity viewing (goal/aspect from graph click)
+  const [viewingEntity, setViewingEntity] = useState<{
+    type: 'goal' | 'aspect'
+    id: string
+    title: string
+    description: string
+    color: string
+  } | null>(null)
+  const [entityEditContent, setEntityEditContent] = useState('')
 
   // Resizable panel state
   const [leftWidth, setLeftWidth] = useState(() => {
@@ -67,6 +94,11 @@ function NotesPageDesktop() {
   })
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Sort user notes by recent, filtering out scribe notes from the dropdown
+  const sortedNotes = [...allNotes]
+    .filter(n => n.source !== 'scribe')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   const selectedNote = allNotes.find(n => n.id === selectedNoteId) || null
 
@@ -122,7 +154,9 @@ function NotesPageDesktop() {
   // Sync editContent when selected note changes
   useEffect(() => {
     if (selectedNote && !isEditingRef.current) {
-      setEditContent(selectedNote.content || '')
+      const content = selectedNote.content || ''
+      setEditContent(content)
+      latestContentRef.current = content
     }
   }, [selectedNoteId, selectedNote?.content])
 
@@ -142,18 +176,12 @@ function NotesPageDesktop() {
       setError(null)
 
       try {
-        const [notesResult, goalsResult] = await Promise.all([
-          fetchUserNotes(user, session.access_token),
-          fetchUserGoals(user, session.access_token)
-        ])
+        const notesResult = await fetchUserNotes(user, session.access_token)
 
         if (!isSubscribed) return
 
         if (notesResult.error) {
           console.error('Error loading notes:', notesResult.error)
-        }
-        if (goalsResult.error) {
-          console.error('Error loading goals:', goalsResult.error)
         }
 
         if (!isEditingRef.current) {
@@ -162,11 +190,10 @@ function NotesPageDesktop() {
           if (notesResult.notes.length > 0) {
             const currentValid = notesResult.notes.some(n => n.id === selectedNoteId)
             if (!currentValid) {
-              setSelectedNoteId(notesResult.notes[0].id)
+              setSelectedNoteId(notesResult.notes[0]?.id ?? null)
             }
           }
         }
-        setGoals(goalsResult.goals)
       } catch (err) {
         if (isSubscribed) {
           setError('Failed to load data')
@@ -181,23 +208,6 @@ function NotesPageDesktop() {
     }
 
     loadData(initialLoadDone.current)
-
-    const goalsChannel = supabase
-      .channel(`notes-goals-${user.id}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'goals',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(true), 500)
-        }
-      )
-      .subscribe()
 
     const notesChannel = supabase
       .channel(`notes-${user.id}-${Date.now()}`)
@@ -220,68 +230,136 @@ function NotesPageDesktop() {
     return () => {
       isSubscribed = false
       if (refreshTimer) clearTimeout(refreshTimer)
-      supabase.removeChannel(goalsChannel)
       supabase.removeChannel(notesChannel)
     }
   }, [user, session])
 
+  // Sync wiki-links after saving note content
+  const syncLinksForNote = useCallback(async (noteId: string, content: string) => {
+    if (!user || !session?.access_token) return
+    const titles = extractWikiLinks(content)
+    await syncNoteLinks(user, session.access_token, noteId, titles)
+    refetchGraph()
+  }, [user, session?.access_token, refetchGraph])
+
+  // Full-text search handler
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query)
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    if (!query.trim()) {
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+    setIsSearching(true)
+    searchTimeoutRef.current = setTimeout(async () => {
+      if (!user || !session?.access_token) return
+      const result = await searchNotesFulltext(user, session.access_token, query.trim())
+      setSearchResults(result.notes)
+      setIsSearching(false)
+    }, 300)
+  }, [user, session?.access_token])
+
+  // Handle wiki-link click: navigate to linked note or create it
+  const handleWikiLinkClick = useCallback(async (title: string) => {
+    const existing = allNotes.find(n => n.title.toLowerCase() === title.toLowerCase())
+    if (existing) {
+      setSelectedNoteId(existing.id)
+    } else if (user && session?.access_token) {
+      // Create new note with the default aspect
+      const defaultAspectId = aspects.length > 0 ? aspects[0]?.id ?? '' : ''
+      if (!defaultAspectId) return
+      const result = await createUserNotes(user, session.access_token, {
+        title,
+        content: '',
+        aspect_id: defaultAspectId,
+        status: 'active'
+      })
+      if (result.note) {
+        const notesResult = await fetchUserNotes(user, session.access_token)
+        if (!notesResult.error) {
+          setAllNotes(notesResult.notes)
+        }
+        setSelectedNoteId(result.note.id)
+      }
+    }
+  }, [allNotes, user, session?.access_token, aspects])
+
   const handleCreateNote = async () => {
-    if (!user || !session?.access_token || !newNoteTitle.trim() || !newNoteAspectId) return
+    if (!user || !session?.access_token || !newNoteTitle.trim()) return
 
     const result = await createUserNotes(user, session.access_token, {
       title: newNoteTitle.trim(),
-      content: '',
-      aspect_id: newNoteAspectId,
+      content: newNoteContent,
+      aspect_id: newNoteAspectId || undefined,
       status: 'active'
     })
 
     if (result.note) {
-      // Reload all notes to get aspect data from RPC
       const notesResult = await fetchUserNotes(user, session.access_token)
       if (!notesResult.error) {
         setAllNotes(notesResult.notes)
       }
       setSelectedNoteId(result.note.id)
+      setEditContent(newNoteContent)
       setIsCreating(false)
       setNewNoteTitle('')
       setNewNoteAspectId('')
+      setNewNoteContent('')
+      setShowTemplatePicker(false)
     } else if (result.error) {
       setError(result.error)
     }
   }
 
+  // Refs to track editing state -- avoids stale closures in save callbacks
+  const editingNoteIdRef = useRef<string | null>(null)
+  const latestContentRef = useRef<string>('')
+
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
+    latestContentRef.current = newContent
     isEditingRef.current = true
+    const noteId = selectedNoteId
+    editingNoteIdRef.current = noteId
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
-      if (!user || !session?.access_token || !selectedNote) return
+      if (!user || !session?.access_token || !noteId) return
 
-      await updateUserNotes(user, session.access_token, selectedNote.id, {
+      await updateUserNotes(user, session.access_token, noteId, {
         content: newContent
       })
+      syncLinksForNote(noteId, newContent)
+      if (editingNoteIdRef.current === noteId) {
+        isEditingRef.current = false
+      }
     }, 1000)
   }
 
-  const handleBlur = async () => {
-    setIsEditing(false)
-    isEditingRef.current = false
+  const handleBlur = useCallback(async () => {
+    const noteId = editingNoteIdRef.current || selectedNoteId
+    const content = latestContentRef.current
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
     }
 
-    if (!user || !session?.access_token || !selectedNote) return
-    if (editContent === selectedNote.content) return
+    isEditingRef.current = false
+    editingNoteIdRef.current = null
 
-    await updateUserNotes(user, session.access_token, selectedNote.id, {
-      content: editContent
+    if (!user || !session?.access_token || !noteId) return
+
+    // Always save -- the ref has the latest content regardless of React state timing
+    await updateUserNotes(user, session.access_token, noteId, {
+      content
     })
-  }
+    syncLinksForNote(noteId, content)
+  }, [selectedNoteId, user, session?.access_token, syncLinksForNote])
 
   const handleStartEditTitle = () => {
     if (!selectedNote) return
@@ -299,23 +377,120 @@ function NotesPageDesktop() {
     await updateUserNotes(user, session.access_token, selectedNote.id, {
       title: trimmed
     })
-    // Refresh notes list to reflect new title
     const notesResult = await fetchUserNotes(user, session.access_token)
     if (!notesResult.error) {
       setAllNotes(notesResult.notes)
     }
   }
 
-  const selectNote = (noteId: string) => {
-    // Save current edits before switching
-    if (isEditingRef.current && selectedNote) {
-      handleBlur()
+  const selectNote = useCallback(async (noteId: string) => {
+    // Save current note before switching
+    if (isEditingRef.current || saveTimeoutRef.current) {
+      await handleBlur()
     }
+    isEditingRef.current = false
+    editingNoteIdRef.current = null
+    setViewingEntity(null)
     setSelectedNoteId(noteId)
     setDropdownOpen(false)
-    setIsEditing(false)
     setIsEditingTitle(false)
-  }
+    // Immediately sync editor content
+    const note = allNotes.find(n => n.id === noteId)
+    const content = note?.content || ''
+    setEditContent(content)
+    latestContentRef.current = content
+  }, [allNotes, handleBlur])
+
+  // Handle graph node click for goals/aspects
+  const handleGraphNodeClick = useCallback(async (nodeType: string, nodeId: string) => {
+    if (nodeType === 'note') {
+      selectNote(nodeId)
+      return
+    }
+
+    if (nodeType === 'goal' && user && session?.access_token) {
+      const { goals } = await fetchUserGoals(user, session.access_token)
+      const goal = goals.find((g: Goal) => g.id === nodeId)
+      if (goal) {
+        // Look up aspect color from the graph data or aspects list
+        const goalAspect = graphData.goals.find(g => g.id === nodeId)
+        const goalColor = goalAspect?.aspect_color || aspects.find(a => a.name === goal.aspect)?.color || '#6b7280'
+        setViewingEntity({
+          type: 'goal',
+          id: goal.id,
+          title: goal.title,
+          description: goal.description || '',
+          color: goalColor,
+        })
+        setEntityEditContent(goal.description || '')
+        setSelectedNoteId(null)
+      }
+    }
+
+    if (nodeType === 'aspect') {
+      const aspect = aspects.find(a => a.id === nodeId)
+      if (aspect) {
+        setViewingEntity({
+          type: 'aspect',
+          id: aspect.id,
+          title: aspect.name,
+          description: aspect.description || '',
+          color: aspect.color || '#6b7280',
+        })
+        setEntityEditContent(aspect.description || '')
+        setSelectedNoteId(null)
+      }
+    }
+  }, [user, session?.access_token, aspects, graphData, selectNote])
+
+  const handleEntityDescriptionSave = useCallback(async () => {
+    if (!viewingEntity || !user || !session?.access_token) return
+    if (entityEditContent === viewingEntity.description) return
+
+    if (viewingEntity.type === 'goal') {
+      await updateUserGoal(user, session.access_token, viewingEntity.id, {
+        description: entityEditContent,
+      })
+    } else if (viewingEntity.type === 'aspect') {
+      await updateUserAspect(user, viewingEntity.id, {
+        description: entityEditContent,
+      }, session.access_token)
+    }
+
+    setViewingEntity(prev => prev ? { ...prev, description: entityEditContent } : null)
+  }, [viewingEntity, entityEditContent, user, session?.access_token])
+
+  const handleGraphBackgroundAction = useCallback((action: string) => {
+    if (action === 'new-note') {
+      setViewingEntity(null)
+      setIsCreating(true)
+      if (!newNoteAspectId && aspects.length > 0) {
+        setNewNoteAspectId(aspects[0]?.id ?? '')
+      }
+    }
+    if (action === 'new-goal') {
+      // TODO: open goal creation UI when available
+    }
+  }, [aspects, newNoteAspectId])
+
+  const handleNodeAction = useCallback(async (action: string, nodeType: string, nodeId: string) => {
+    if (!user || !session?.access_token) return
+    if (action === 'archive' && nodeType === 'aspect') {
+      await updateUserAspect(user, nodeId, { archived_at: new Date().toISOString() }, session.access_token)
+      refetchGraph()
+    } else if (action === 'delete' && nodeType === 'goal') {
+      await deleteUserGoal(user, session.access_token, nodeId)
+      refetchGraph()
+    } else if (action === 'delete' && nodeType === 'note') {
+      await deleteUserNotes(user, session.access_token, nodeId)
+      setAllNotes(prev => prev.filter(n => n.id !== nodeId))
+      if (selectedNoteId === nodeId) {
+        setSelectedNoteId(null)
+        setEditContent('')
+      }
+      refetchGraph()
+    }
+  }, [user, session?.access_token, selectedNoteId, refetchGraph])
 
   const formatUpdatedAt = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -410,7 +585,7 @@ function NotesPageDesktop() {
               onClick={() => {
                 setIsCreating(!isCreating)
                 if (!newNoteAspectId && aspects.length > 0) {
-                  setNewNoteAspectId(aspects[0].id)
+                  setNewNoteAspectId(aspects[0]?.id ?? '')
                 }
               }}
               style={{
@@ -469,7 +644,7 @@ function NotesPageDesktop() {
                 </span>
               </button>
 
-              {dropdownOpen && allNotes.length > 0 && (
+              {dropdownOpen && sortedNotes.length > 0 && (
                 <div style={{
                   position: 'absolute',
                   top: '100%',
@@ -484,7 +659,7 @@ function NotesPageDesktop() {
                   maxHeight: '300px',
                   overflow: 'auto'
                 }}>
-                  {allNotes.map(note => (
+                  {sortedNotes.map(note => (
                     <button
                       key={note.id}
                       onClick={() => selectNote(note.id)}
@@ -532,6 +707,116 @@ function NotesPageDesktop() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Search bar */}
+          <div ref={searchRef} style={{ position: 'relative', flexShrink: 0 }}>
+            <input
+              type="text"
+              placeholder="Search notes..."
+              value={searchQuery}
+              onChange={e => handleSearch(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: isDarkMode ? '#1f2937' : '#f9fafb',
+                color: colors.textPrimary,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '6px',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {searchQuery.trim() && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '4px',
+                background: isDarkMode ? '#1f2937' : '#ffffff',
+                border: `1px solid ${colors.border}`,
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                zIndex: 60,
+                maxHeight: '300px',
+                overflow: 'auto'
+              }}>
+                {isSearching ? (
+                  <div style={{ padding: '12px', fontSize: '13px', color: colors.textTertiary, textAlign: 'center' }}>
+                    Searching...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div style={{ padding: '12px', fontSize: '13px', color: colors.textTertiary, textAlign: 'center' }}>
+                    No results found
+                  </div>
+                ) : (
+                  searchResults.map(result => (
+                    <button
+                      key={result.id}
+                      onClick={() => {
+                        selectNote(result.id)
+                        setSearchQuery('')
+                        setSearchResults([])
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        borderBottom: `1px solid ${colors.border}`,
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        <span style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: result.aspect_color || '#6b7280',
+                          flexShrink: 0,
+                        }} />
+                        <span style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: colors.textPrimary,
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {result.title}
+                        </span>
+                        <span style={{ fontSize: '11px', color: colors.textTertiary, flexShrink: 0 }}>
+                          {result.aspect_name}
+                        </span>
+                      </div>
+                      {result.content && (
+                        <span style={{
+                          fontSize: '12px',
+                          color: colors.textSecondary,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          paddingLeft: '16px',
+                        }}>
+                          {result.content.slice(0, 100)}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
 
           {/* Inline create form */}
@@ -590,18 +875,49 @@ function NotesPageDesktop() {
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
+              {/* Template picker */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'transparent',
+                    color: showTemplatePicker ? colors.textPrimary : colors.textTertiary,
+                    border: `1px dashed ${colors.border}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    textAlign: 'left',
+                  }}
+                >
+                  {newNoteContent ? 'Template applied' : 'Use a template (optional)'}
+                </button>
+                {showTemplatePicker && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px', zIndex: 60 }}>
+                    <TemplatePicker
+                      onSelect={(content) => {
+                        setNewNoteContent(content)
+                        setShowTemplatePicker(false)
+                      }}
+                      onClose={() => setShowTemplatePicker(false)}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={handleCreateNote}
-                  disabled={!newNoteTitle.trim() || !newNoteAspectId}
+                  disabled={!newNoteTitle.trim()}
                   style={{
                     flex: 1,
                     padding: '8px',
-                    background: (!newNoteTitle.trim() || !newNoteAspectId) ? '#6b7280' : '#3b82f6',
+                    background: (!newNoteTitle.trim()) ? '#6b7280' : '#3b82f6',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: (!newNoteTitle.trim() || !newNoteAspectId) ? 'not-allowed' : 'pointer',
+                    cursor: (!newNoteTitle.trim()) ? 'not-allowed' : 'pointer',
                     fontSize: '13px',
                     fontWeight: '500'
                   }}
@@ -613,6 +929,8 @@ function NotesPageDesktop() {
                     setIsCreating(false)
                     setNewNoteTitle('')
                     setNewNoteAspectId('')
+                    setNewNoteContent('')
+                    setShowTemplatePicker(false)
                   }}
                   style={{
                     padding: '8px 16px',
@@ -641,7 +959,160 @@ function NotesPageDesktop() {
             display: 'flex',
             flexDirection: 'column'
           }}>
-            {allNotes.length === 0 ? (
+            {viewingEntity ? (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '20px',
+                background: `linear-gradient(135deg, ${hexToRgba(viewingEntity.color, 0.03)} 0%, transparent 50%)`
+              }}>
+                {/* Entity type badge */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '4px'
+                }}>
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: viewingEntity.color
+                  }} />
+                  <span style={{
+                    fontSize: '12px',
+                    color: viewingEntity.color,
+                    fontWeight: '500',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {viewingEntity.type}
+                  </span>
+                </div>
+
+                <h2 style={{
+                  ...typography.headingLg,
+                  margin: 0,
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                  padding: '4px 8px',
+                  marginBottom: '12px',
+                }}>
+                  {viewingEntity.title}
+                </h2>
+
+                <label style={{
+                  fontSize: '12px',
+                  color: colors.textTertiary,
+                  fontWeight: 500,
+                  marginBottom: '6px',
+                  paddingLeft: '8px',
+                }}>
+                  Description
+                </label>
+                <textarea
+                  value={entityEditContent}
+                  onChange={(e) => setEntityEditContent(e.target.value)}
+                  onBlur={handleEntityDescriptionSave}
+                  placeholder={`Add a description for this ${viewingEntity.type}...`}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: isDarkMode ? '#1e293b' : '#f9fafb',
+                    color: colors.textPrimary,
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    resize: 'none',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button
+                    onClick={() => setViewingEntity(null)}
+                    style={{
+                      padding: '6px 14px',
+                      background: 'transparent',
+                      color: colors.textSecondary,
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                    }}
+                  >
+                    Back to notes
+                  </button>
+                  {viewingEntity.type === 'aspect' && (
+                    <button
+                      onClick={async () => {
+                        if (!user || !session?.access_token) return
+                        await updateUserAspect(user, viewingEntity.id, { archived_at: new Date().toISOString() }, session.access_token)
+                        setViewingEntity(null)
+                        refetchGraph()
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        border: '1px solid #ef4444',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Archive aspect
+                    </button>
+                  )}
+                  {viewingEntity.type === 'goal' && (
+                    <button
+                      onClick={async () => {
+                        if (!user || !session?.access_token) return
+                        await deleteUserGoal(user, session.access_token, viewingEntity.id)
+                        setViewingEntity(null)
+                        refetchGraph()
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        border: '1px solid #ef4444',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Delete goal
+                    </button>
+                  )}
+                  {viewingEntity.type === 'note' && (
+                    <button
+                      onClick={async () => {
+                        if (!user || !session?.access_token) return
+                        await deleteUserNotes(user, session.access_token, viewingEntity.id)
+                        setAllNotes(prev => prev.filter(n => n.id !== viewingEntity.id))
+                        setViewingEntity(null)
+                        refetchGraph()
+                      }}
+                      style={{
+                        padding: '6px 14px',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        border: '1px solid #ef4444',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Delete note
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : allNotes.length === 0 ? (
               <div style={{
                 flex: 1,
                 display: 'flex',
@@ -658,7 +1129,7 @@ function NotesPageDesktop() {
                   onClick={() => {
                     setIsCreating(true)
                     if (!newNoteAspectId && aspects.length > 0) {
-                      setNewNoteAspectId(aspects[0].id)
+                      setNewNoteAspectId(aspects[0]?.id ?? '')
                     }
                   }}
                   style={{
@@ -705,6 +1176,15 @@ function NotesPageDesktop() {
                   }}>
                     {selectedNote.aspect_name || 'Uncategorized'}
                   </span>
+                  {selectedNote.is_shared && selectedNote.owner_display_name && (
+                    <span style={{
+                      fontSize: '11px',
+                      color: colors.textTertiary,
+                      marginLeft: 'auto',
+                    }}>
+                      by {selectedNote.owner_display_name}
+                    </span>
+                  )}
                 </div>
 
                 {/* Editable Title */}
@@ -759,55 +1239,21 @@ function NotesPageDesktop() {
                       {selectedNote.title}
                     </h2>
                   )}
-                  <span style={{
-                    ...typography.labelSm,
-                    color: colors.textTertiary,
-                    flexShrink: 0,
-                  }}>
-                    {isEditing ? 'Editing...' : 'Click to edit'}
-                  </span>
                 </div>
 
-                {/* Content */}
-                {isEditing ? (
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => handleContentChange(e.target.value)}
-                    onBlur={handleBlur}
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      width: '100%',
-                      padding: '12px',
-                      background: colors.bgSecondary,
-                      color: colors.textPrimary,
-                      border: `1px solid ${colors.border}`,
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      lineHeight: '1.6',
-                      resize: 'none',
-                      fontFamily: 'inherit'
-                    }}
-                  />
-                ) : (
-                  <div
-                    onClick={() => setIsEditing(true)}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      background: colors.bgSecondary,
-                      borderRadius: '8px',
-                      cursor: 'text',
-                      whiteSpace: 'pre-wrap',
-                      fontSize: '14px',
-                      lineHeight: '1.6',
-                      color: editContent ? colors.textPrimary : colors.textTertiary,
-                      overflow: 'auto'
-                    }}
-                  >
-                    {editContent || 'Click to add your notes...'}
-                  </div>
-                )}
+                {/* Content - TipTap Editor */}
+                <NoteEditor
+                  content={editContent}
+                  onChange={handleContentChange}
+                  onWikiLinkClick={handleWikiLinkClick}
+                  notes={allNotes}
+                  placeholder="Start typing... Use [[ to link notes"
+                />
+
+                <BacklinksPanel
+                  noteId={selectedNote.id}
+                  onNoteClick={selectNote}
+                />
               </div>
             ) : (
               <div style={{
@@ -851,24 +1297,39 @@ function NotesPageDesktop() {
           />
         </div>
 
-        {/* RIGHT COLUMN - Goals */}
+        {/* RIGHT COLUMN - Knowledge Graph */}
         <div style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
           overflow: 'hidden',
           minWidth: '300px'
         }}>
-          <div style={{
-            flex: 1,
-            minHeight: 0,
-            overflow: 'auto',
-          }}>
-            <GoalsSection />
-          </div>
+          <NoteGraph
+            graphData={graphData}
+            onNodeClick={handleGraphNodeClick}
+            onCreateLink={async (sourceType, sourceId, targetType, targetId) => {
+              if (!session?.access_token) return
+              await createEntityLink(session.access_token, sourceType, sourceId, targetType, targetId)
+              refetchGraph()
+            }}
+            onDeleteLink={async (linkId) => {
+              if (!session?.access_token) return
+              await deleteEntityLink(session.access_token, linkId)
+              refetchGraph()
+            }}
+            onSavePositions={async (positions) => {
+              if (!session?.access_token) return
+              await saveGraphPositions(session.access_token, positions)
+            }}
+            onBackgroundAction={handleGraphBackgroundAction}
+            onNodeAction={handleNodeAction}
+            isLoading={graphLoading}
+          />
         </div>
       </div>
+
+      <FloatingChat currentPageOverride="notes" />
     </div>
   )
 }
@@ -877,16 +1338,16 @@ function NotesPageDesktop() {
 // MOBILE
 // ============================================================
 
-type MobileView = 'list' | 'edit' | 'goals' | 'create'
+type MobileView = 'list' | 'edit' | 'graph' | 'create'
 
 function NotesPageMobile() {
   const { theme, isDarkMode } = useTheme()
   const { user, session } = useAuth()
   const { aspects } = useAspects()
   const colors = getColors(theme)
+  const { data: graphData, isLoading: graphLoading, refetch: refetchGraph } = useKnowledgeGraph()
 
   const [allNotes, setAllNotes] = useState<Note[]>([])
-  const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -903,10 +1364,17 @@ function NotesPageMobile() {
   // Create form
   const [newNoteTitle, setNewNoteTitle] = useState('')
   const [newNoteAspectId, setNewNoteAspectId] = useState('')
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
 
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editTitle, setEditTitle] = useState('')
+
+  // Sort user notes by recent, filtering out scribe notes from the list
+  const sortedNotes = [...allNotes]
+    .filter(n => n.source !== 'scribe')
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   const selectedNote = allNotes.find(n => n.id === selectedNoteId) || null
 
@@ -932,24 +1400,17 @@ function NotesPageMobile() {
       setError(null)
 
       try {
-        const [notesResult, goalsResult] = await Promise.all([
-          fetchUserNotes(user, session.access_token),
-          fetchUserGoals(user, session.access_token)
-        ])
+        const notesResult = await fetchUserNotes(user, session.access_token)
 
         if (!isSubscribed) return
 
         if (notesResult.error) {
           console.error('Error loading notes:', notesResult.error)
         }
-        if (goalsResult.error) {
-          console.error('Error loading goals:', goalsResult.error)
-        }
 
         if (!isEditingRef.current) {
           setAllNotes(notesResult.notes)
         }
-        setGoals(goalsResult.goals)
       } catch (err) {
         if (isSubscribed) {
           setError('Failed to load data')
@@ -964,23 +1425,6 @@ function NotesPageMobile() {
     }
 
     loadData(initialLoadDone.current)
-
-    const goalsChannel = supabase
-      .channel(`notes-goals-mobile-${user.id}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'goals',
-          filter: `user_id=eq.${user.id}`
-        },
-        () => {
-          if (refreshTimer) clearTimeout(refreshTimer)
-          refreshTimer = setTimeout(() => loadData(true), 500)
-        }
-      )
-      .subscribe()
 
     const notesChannel = supabase
       .channel(`notes-mobile-${user.id}-${Date.now()}`)
@@ -1003,18 +1447,53 @@ function NotesPageMobile() {
     return () => {
       isSubscribed = false
       if (refreshTimer) clearTimeout(refreshTimer)
-      supabase.removeChannel(goalsChannel)
       supabase.removeChannel(notesChannel)
     }
   }, [user, session])
 
+  // Sync wiki-links after saving note content
+  const syncLinksForNote = useCallback(async (noteId: string, content: string) => {
+    if (!user || !session?.access_token) return
+    const titles = extractWikiLinks(content)
+    await syncNoteLinks(user, session.access_token, noteId, titles)
+    refetchGraph()
+  }, [user, session?.access_token, refetchGraph])
+
+  // Handle wiki-link click: navigate to linked note or create it
+  const handleWikiLinkClick = useCallback(async (title: string) => {
+    const existing = allNotes.find(n => n.title.toLowerCase() === title.toLowerCase())
+    if (existing) {
+      setSelectedNoteId(existing.id)
+      setEditContent(existing.content || '')
+      setMobileView('edit')
+    } else if (user && session?.access_token) {
+      const defaultAspectId = aspects.length > 0 ? aspects[0]?.id ?? '' : ''
+      if (!defaultAspectId) return
+      const result = await createUserNotes(user, session.access_token, {
+        title,
+        content: '',
+        aspect_id: defaultAspectId,
+        status: 'active'
+      })
+      if (result.note) {
+        const notesResult = await fetchUserNotes(user, session.access_token)
+        if (!notesResult.error) {
+          setAllNotes(notesResult.notes)
+        }
+        setSelectedNoteId(result.note.id)
+        setEditContent('')
+        setMobileView('edit')
+      }
+    }
+  }, [allNotes, user, session?.access_token, aspects])
+
   const handleCreateNote = async () => {
-    if (!user || !session?.access_token || !newNoteTitle.trim() || !newNoteAspectId) return
+    if (!user || !session?.access_token || !newNoteTitle.trim()) return
 
     const result = await createUserNotes(user, session.access_token, {
       title: newNoteTitle.trim(),
-      content: '',
-      aspect_id: newNoteAspectId,
+      content: newNoteContent,
+      aspect_id: newNoteAspectId || undefined,
       status: 'active'
     })
 
@@ -1024,46 +1503,63 @@ function NotesPageMobile() {
         setAllNotes(notesResult.notes)
       }
       setSelectedNoteId(result.note.id)
-      setEditContent('')
+      setEditContent(newNoteContent)
       setNewNoteTitle('')
       setNewNoteAspectId('')
+      setNewNoteContent('')
+      setShowTemplatePicker(false)
       setMobileView('edit')
     } else if (result.error) {
       setError(result.error)
     }
   }
 
+  // Track which note is being edited so saves target the correct note
+  const editingNoteIdRef = useRef<string | null>(null)
+
   const handleContentChange = (newContent: string) => {
     setEditContent(newContent)
     isEditingRef.current = true
+    const noteId = selectedNoteId
+    editingNoteIdRef.current = noteId
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
-      if (!user || !session?.access_token || !selectedNote) return
+      if (!user || !session?.access_token || !noteId) return
 
-      await updateUserNotes(user, session.access_token, selectedNote.id, {
+      await updateUserNotes(user, session.access_token, noteId, {
         content: newContent
       })
+      syncLinksForNote(noteId, newContent)
+      if (editingNoteIdRef.current === noteId) {
+        isEditingRef.current = false
+      }
     }, 1000)
   }
 
   const handleBlur = async () => {
+    const noteId = editingNoteIdRef.current || selectedNoteId
     setIsEditing(false)
     isEditingRef.current = false
+    editingNoteIdRef.current = null
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
     }
 
-    if (!user || !session?.access_token || !selectedNote) return
-    if (editContent === selectedNote.content) return
+    if (!user || !session?.access_token || !noteId) return
 
-    await updateUserNotes(user, session.access_token, selectedNote.id, {
+    const originalNote = allNotes.find(n => n.id === noteId)
+    if (editContent === (originalNote?.content || '')) return
+
+    await updateUserNotes(user, session.access_token, noteId, {
       content: editContent
     })
+    syncLinksForNote(noteId, editContent)
   }
 
   const openNote = (noteId: string) => {
@@ -1095,6 +1591,26 @@ function NotesPageMobile() {
       setAllNotes(notesResult.notes)
     }
   }
+
+  const handleMobileNodeAction = useCallback(async (action: string, nodeType: string, nodeId: string) => {
+    if (!user || !session?.access_token) return
+    if (action === 'archive' && nodeType === 'aspect') {
+      await updateUserAspect(user, nodeId, { archived_at: new Date().toISOString() }, session.access_token)
+      refetchGraph()
+    } else if (action === 'delete' && nodeType === 'goal') {
+      await deleteUserGoal(user, session.access_token, nodeId)
+      refetchGraph()
+    } else if (action === 'delete' && nodeType === 'note') {
+      await deleteUserNotes(user, session.access_token, nodeId)
+      setAllNotes(prev => prev.filter(n => n.id !== nodeId))
+      if (selectedNoteId === nodeId) {
+        setSelectedNoteId(null)
+        setEditContent('')
+        setMobileView('list')
+      }
+      refetchGraph()
+    }
+  }, [user, session?.access_token, selectedNoteId, refetchGraph])
 
   const formatUpdatedAt = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -1138,6 +1654,8 @@ function NotesPageMobile() {
             setMobileView('list')
             setNewNoteTitle('')
             setNewNoteAspectId('')
+            setNewNoteContent('')
+            setShowTemplatePicker(false)
           }}
         />
         <div style={{
@@ -1185,16 +1703,49 @@ function NotesPageMobile() {
                 <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
+            {/* Template picker */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowTemplatePicker(!showTemplatePicker)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  background: 'transparent',
+                  color: newNoteContent ? colors.textPrimary : colors.textTertiary,
+                  border: `1px dashed ${colors.border}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  minHeight: '44px',
+                }}
+              >
+                {newNoteContent ? 'Template applied' : 'Use a template (optional)'}
+              </button>
+              {showTemplatePicker && (
+                <div style={{ marginTop: '4px' }}>
+                  <TemplatePicker
+                    onSelect={(content) => {
+                      setNewNoteContent(content)
+                      setShowTemplatePicker(false)
+                    }}
+                    onClose={() => setShowTemplatePicker(false)}
+                    isMobile={true}
+                  />
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleCreateNote}
-              disabled={!newNoteTitle.trim() || !newNoteAspectId}
+              disabled={!newNoteTitle.trim()}
               style={{
                 padding: '14px',
-                background: (!newNoteTitle.trim() || !newNoteAspectId) ? '#6b7280' : '#3b82f6',
+                background: (!newNoteTitle.trim()) ? '#6b7280' : '#3b82f6',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '10px',
-                cursor: (!newNoteTitle.trim() || !newNoteAspectId) ? 'not-allowed' : 'pointer',
+                cursor: (!newNoteTitle.trim()) ? 'not-allowed' : 'pointer',
                 fontSize: '16px',
                 fontWeight: '500',
                 minHeight: '44px'
@@ -1304,69 +1855,67 @@ function NotesPageMobile() {
             </span>
           </div>
 
-          {isEditing ? (
-            <textarea
-              value={editContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onBlur={handleBlur}
-              autoFocus
-              style={{
-                width: '100%',
-                minHeight: 'calc(100vh - 200px)',
-                padding: '16px',
-                background: colors.bgSecondary,
-                color: colors.textPrimary,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '12px',
-                borderLeft: `3px solid ${noteColor}`,
-                fontSize: '16px',
-                lineHeight: '1.7',
-                resize: 'none',
-                fontFamily: 'inherit'
-              }}
-            />
-          ) : (
-            <div
-              onClick={() => setIsEditing(true)}
-              style={{
-                padding: '16px',
-                background: colors.bgSecondary,
-                borderRadius: '12px',
-                borderLeft: `3px solid ${noteColor}`,
-                cursor: 'text',
-                whiteSpace: 'pre-wrap',
-                fontSize: '15px',
-                lineHeight: '1.7',
-                color: editContent ? colors.textPrimary : colors.textTertiary,
-                minHeight: 'calc(100vh - 200px)'
-              }}
-            >
-              {editContent || 'Tap to add your notes...'}
-            </div>
-          )}
+          <NoteEditor
+            content={editContent}
+            onChange={handleContentChange}
+            onWikiLinkClick={handleWikiLinkClick}
+            notes={allNotes}
+            placeholder="Start typing... Use [[ to link notes"
+            isMobile={true}
+          />
+
+          <BacklinksPanel
+            noteId={selectedNote.id}
+            onNoteClick={(id) => openNote(id)}
+            isMobile={true}
+          />
         </div>
       </div>
     )
   }
 
-  // ============ FULLSCREEN: Goals ============
-  if (mobileView === 'goals') {
+  // ============ FULLSCREEN: Knowledge Graph ============
+  if (mobileView === 'graph') {
     return (
       <div style={mobileStyles.fullHeight}>
         <MobileHeader
-          title="Goals"
+          title="Knowledge Graph"
           onBack={() => setMobileView('list')}
         />
         <div style={{
           flex: 1,
-          overflow: 'auto',
+          overflow: 'hidden',
           background: colors.bgPrimary,
-          paddingLeft: mobileSpacing.paddingX,
-          paddingRight: mobileSpacing.paddingX,
-          paddingTop: mobileSpacing.paddingTop,
-          paddingBottom: mobileSpacing.paddingBottomNoTabs
         }}>
-          <GoalsSection />
+          <NoteGraph
+            graphData={graphData}
+            onNodeClick={(nodeType, nodeId) => {
+              if (nodeType === 'note') {
+                setSelectedNoteId(nodeId)
+                const note = allNotes.find(n => n.id === nodeId)
+                if (note) {
+                  setEditContent(note.content || '')
+                  setMobileView('edit')
+                }
+              }
+            }}
+            onCreateLink={async (sourceType, sourceId, targetType, targetId) => {
+              if (!session?.access_token) return
+              await createEntityLink(session.access_token, sourceType, sourceId, targetType, targetId)
+              refetchGraph()
+            }}
+            onDeleteLink={async (linkId) => {
+              if (!session?.access_token) return
+              await deleteEntityLink(session.access_token, linkId)
+              refetchGraph()
+            }}
+            onSavePositions={async (positions) => {
+              if (!session?.access_token) return
+              await saveGraphPositions(session.access_token, positions)
+            }}
+            onNodeAction={handleMobileNodeAction}
+            isLoading={graphLoading}
+          />
         </div>
       </div>
     )
@@ -1407,7 +1956,7 @@ function NotesPageMobile() {
           <button
             onClick={() => {
               if (!newNoteAspectId && aspects.length > 0) {
-                setNewNoteAspectId(aspects[0].id)
+                setNewNoteAspectId(aspects[0]?.id ?? '')
               }
               setMobileView('create')
             }}
@@ -1428,7 +1977,7 @@ function NotesPageMobile() {
         </div>
 
         {/* Note cards */}
-        {allNotes.length === 0 ? (
+        {sortedNotes.length === 0 ? (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',
@@ -1439,7 +1988,7 @@ function NotesPageMobile() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-            {allNotes.map(note => {
+            {sortedNotes.map(note => {
               const noteColor = note.aspect_color || '#6b7280'
               return (
                 <button
@@ -1516,9 +2065,9 @@ function NotesPageMobile() {
           </div>
         )}
 
-        {/* Goals card */}
+        {/* Knowledge Graph card */}
         <button
-          onClick={() => setMobileView('goals')}
+          onClick={() => setMobileView('graph')}
           style={{
             width: '100%',
             background: colors.bgPrimary,
@@ -1534,7 +2083,6 @@ function NotesPageMobile() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: goals.length > 0 ? '12px' : '0'
           }}>
             <h2 style={{
               margin: 0,
@@ -1543,39 +2091,22 @@ function NotesPageMobile() {
               color: colors.textPrimary,
               fontFamily: "'EB Garamond', Georgia, serif"
             }}>
-              Goals
+              Knowledge Graph
             </h2>
             <span style={{
               fontSize: '12px',
               color: colors.textTertiary
             }}>
-              Tap to expand
+              Tap to explore
             </span>
           </div>
-          {goals.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', pointerEvents: 'none' }}>
-              {goals.slice(0, 3).map(goal => (
-                <div key={goal.id} style={{
-                  padding: '10px 12px',
-                  background: colors.bgSecondary,
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  color: colors.textSecondary
-                }}>
-                  {goal.title}
-                </div>
-              ))}
-              {goals.length > 3 && (
-                <div style={{
-                  fontSize: '12px',
-                  color: colors.textTertiary,
-                  textAlign: 'center'
-                }}>
-                  +{goals.length - 3} more
-                </div>
-              )}
-            </div>
-          )}
+          <p style={{
+            margin: '8px 0 0',
+            fontSize: '13px',
+            color: colors.textSecondary
+          }}>
+            {graphData.notes.length} notes, {graphData.goals.length} goals, {graphData.links.length} connections
+          </p>
         </button>
       </div>
     </div>

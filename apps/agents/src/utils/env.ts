@@ -11,7 +11,6 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
   PORT: z.string().optional(),
   NODE_ENV: z.string().optional(),
-  ZEP_API_KEY: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -32,7 +31,6 @@ export const env = {
   OPENAI_API_KEY: raw.OPENAI_API_KEY,
   PORT: port,
   NODE_ENV: raw.NODE_ENV ?? 'development',
-  ZEP_API_KEY: raw.ZEP_API_KEY
 } as const;
 
 export const isDevelopment = env.NODE_ENV !== 'production';

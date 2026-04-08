@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 
 import { getSupabaseService } from '../services/SupabaseService.js';
-import { AgentRegistry } from '../agents/AgentRegistry.js';
 import reminderService from '../services/ReminderService.js';
 
 export async function getPendingInteractions(req: Request, res: Response): Promise<Response | void> {
@@ -125,88 +124,10 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     // Mark interaction as responded (not cancelled - that's for dismissals)
     await supabaseService.updateInteractionStatus(interactionId, 'responded');
 
-    // Route the response back to Gerald so it can use tools to act on it
-    const agentRegistry = AgentRegistry.getInstance();
-    const interactionAgent = agentRegistry.getAgent('interaction');
-
-    if (!interactionAgent) {
-      console.warn('[INTERACTION RESPONSE] Interaction agent not available');
-      return res.json({ success: true, message: 'Response recorded' });
-    }
-
-    const userProfile = await supabaseService.getProfile(userId);
-    const timezone = userProfile?.timezone || 'UTC';
-
-    const sessionId = `interaction-response-${userId}-${Date.now()}`;
-    const context = {
-      userId,
-      sessionId,
-      timezone,
-      conversationHistory: [],
-      isInternal: true,
-    };
-
-    // Build a message that tells Gerald what happened and what to do
-    const interactionType = interaction.interaction_type || 'unknown';
-    const metadata = (interaction.metadata || {}) as any;
-    const metadataContext = metadata.context ? ` Context: ${metadata.context}.` : '';
-    const eventIdContext = metadata.eventId ? ` Event ID to update: ${metadata.eventId}.` : '';
-    const eventTitleContext = metadata.eventTitle ? ` Event title: ${metadata.eventTitle}.` : '';
-
-    // Calculate response time
-    let responseTimeContext = '';
-    if (interaction.created_at) {
-      const createdAt = new Date(interaction.created_at);
-      const respondedAt = new Date();
-      const diffMs = respondedAt.getTime() - createdAt.getTime();
-      const diffMinutes = Math.round(diffMs / 60000);
-      if (diffMinutes < 60) {
-        responseTimeContext = `\nResponse time: ${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} after the interaction was created.`;
-      } else {
-        const diffHours = Math.round(diffMinutes / 60 * 10) / 10;
-        responseTimeContext = `\nResponse time: ${diffHours} hour${diffHours === 1 ? '' : 's'} after the interaction was created.`;
-      }
-    }
-
-    // Short-circuit: "Skip", "Chat", "No", "No thanks" need no agent processing
-    const skipResponses = ['skip', 'no', 'no thanks', 'chat', 'dismiss'];
-    if (skipResponses.includes(trimmedResponse.toLowerCase())) {
-      console.log(`[INTERACTION RESPONSE] User said "${trimmedResponse}" — no action needed`);
-      return res.json({ success: true, message: 'Response recorded, no action taken' });
-    }
-
-    const agentMessage = `INTERACTION RESPONSE - The user was asked: "${interaction.question}" (type: ${interactionType}, options: ${JSON.stringify(interaction.options || [])}).${metadataContext}${eventIdContext}${eventTitleContext}
-
-The user responded: "${trimmedResponse}"${responseTimeContext}
-
-Based on this response, take the appropriate action using your tools:
-- If they picked a TIME (e.g. "3:30 PM", "5:00 PM"), create an event at that time using metadata.eventTitle and metadata.duration
-- If they said "yes" or "accept", create the event using metadata.suggestedTime and metadata.duration
-- If they gave a rating (1-10), the rating is already stored automatically. No action needed.
-- If they gave a text response about an existing event (metadata.eventId), UPDATE that event's description
-- If they gave a text response about a goal (metadata.goalId), UPDATE that goal's description
-- If they gave a text response about an aspect, UPDATE that aspect's description
-- Text responses MUST be saved to a visible entity (event/goal/aspect/task). The user NEVER sees your text replies.
-
-Act on what the user wants. Do NOT create new interaction questions - just execute the action.`;
-
-    console.log(`[INTERACTION RESPONSE] Routing to Gerald for processing`);
-
-    // Run Gerald synchronously so we can return confirmation to the user
-    let geraldResult: string | undefined;
-    try {
-      const result = await interactionAgent.processMessage(context, agentMessage);
-      geraldResult = result?.content?.substring?.(0, 500);
-      console.log(`[INTERACTION RESPONSE] Gerald processed response:`, geraldResult);
-    } catch (geraldError: any) {
-      console.error('[INTERACTION RESPONSE] Gerald error:', geraldError?.message);
-    }
-
-    return res.json({
-      success: true,
-      message: 'Response recorded and processed',
-      agentResponse: geraldResult,
-    });
+    // Gerald (interaction agent) disconnected -- role eliminated
+    // Responses are recorded but no longer routed to an agent for processing
+    // See agents/interaction-gerald/ for original implementation if re-enabling
+    return res.json({ success: true, message: 'Response recorded' });
   } catch (error) {
     console.error('[INTERACTION RESPONSE] Error responding to interaction:', error);
     res.status(500).json({ error: 'Failed to process interaction response' });
@@ -249,48 +170,13 @@ export async function generateStartupInteractions(req: Request, res: Response): 
     const userProfile = await supabaseService.getProfile(userId);
     const timezone = userProfile?.timezone || 'UTC';
 
-    // Invoke the interaction agent to generate proactive interactions
-    const agentRegistry = AgentRegistry.getInstance();
-    const interactionAgent = agentRegistry.getAgent('interaction');
-
-    if (!interactionAgent) {
-      console.warn('[STARTUP] Interaction agent not available');
-      return res.status(500).json({ error: 'Agent not available' });
-    }
-
-    const sessionId = `startup-${userId}-${Date.now()}`;
-    const context = {
-      userId,
-      sessionId,
-      timezone,
-      conversationHistory: [],
-      isInternal: true // Internal message - don't store in conversation history
-    };
-
-    // Send message requesting proactive analysis
-    const analyzeMessage = `Analyze the user's calendar and tasks. Generate 0-2 proactive interaction suggestions using the create_interaction tool. Focus on scheduling time for high-priority tasks or preparing for upcoming events.`;
-
-    console.log(`[STARTUP] Generating proactive interactions for user ${userId}`);
-    console.log(`[STARTUP] Message to agent: "${analyzeMessage}"`);
-
-    // Run asynchronously without blocking the response
-    interactionAgent.processMessage(context, analyzeMessage)
-      .then((result) => {
-        console.log(`[STARTUP] Agent response received:`, result);
-      })
-      .catch(error => {
-        console.error('[STARTUP] Error generating startup interactions:', error);
-        console.error('[STARTUP] Full error details:', {
-          message: error?.message,
-          stack: error?.stack,
-          toString: error?.toString()
-        });
-      });
-
+    // Gerald (interaction agent) disconnected -- role eliminated
+    // Startup interaction generation is now a no-op
+    console.log(`[STARTUP] Gerald disconnected, skipping proactive interaction generation for user ${userId}`);
     return res.json({
       success: true,
-      message: 'Startup interaction generation initiated',
-      initiated: true
+      message: 'Interaction generation disabled',
+      initiated: false
     });
   } catch (error) {
     console.error('[STARTUP] Error generating startup interactions:', error);

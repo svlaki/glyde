@@ -2,7 +2,8 @@ export interface SharedEventMember {
   id: string
   event_id: string
   user_id: string
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'member' | 'viewer'
+  status: 'pending' | 'accepted' | 'declined'
   joined_at: string
   user?: {
     id: string
@@ -48,7 +49,7 @@ export async function getEventMembers(
 export async function addEventMember(
   eventId: string,
   userId: string,
-  role: 'editor' | 'viewer',
+  role: 'member' | 'viewer',
   accessToken: string
 ): Promise<ApiResponse<SharedEventMember>> {
   try {
@@ -76,7 +77,7 @@ export async function addEventMember(
 export async function updateEventMemberRole(
   eventId: string,
   memberId: string,
-  role: 'editor' | 'viewer',
+  role: 'member' | 'viewer',
   accessToken: string
 ): Promise<ApiResponse<SharedEventMember>> {
   try {

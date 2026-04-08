@@ -30,6 +30,16 @@ export const updateNotesTool = tool(
         return "Failed to update notes";
       }
 
+      // Sync wiki-links if content was updated
+      if (content) {
+        const wikiLinkMatches = content.match(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
+        const linkedTitles = (wikiLinkMatches || []).map((m: string) => {
+          const match = m.match(/\[\[([^\]|]+)/);
+          return match ? match[1].trim() : '';
+        }).filter(Boolean);
+        await supabaseService.syncNoteLinks(userId, notesId, linkedTitles);
+      }
+
       return `Notes updated: "${notes.title}"`;
     } catch (error) {
       console.error('[update-notes] Error:', error);

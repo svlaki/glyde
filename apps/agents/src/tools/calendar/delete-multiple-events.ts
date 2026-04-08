@@ -1,86 +1,79 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 
 export const deleteMultipleEventsTool = tool(
-  async ({ date, searchQuery }, config) => {
+  async ({ date, eventIds, clearAll }, config) => {
     const userId = config?.configurable?.userId;
     if (!userId) {
       throw new Error("User ID is required for deleting events");
     }
 
-    // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
 
     let eventsToDelete: any[] = [];
 
-    console.log('[DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, searchQuery });
+    console.log('[DELETE-MULTIPLE-EVENTS TOOL] Processing bulk deletion:', { date, eventIds, clearAll });
 
-    if (date) {
-      // Delete events on a specific date - use getRawEvents to avoid expanded recurring instances
+    if (clearAll) {
+      // Delete ALL events — use getRawEvents to get actual DB records
+      eventsToDelete = await supabaseService.getRawEvents(userId);
+    } else if (date) {
+      // Delete all events on a specific date — use getEvents() to include recurring instances
       const startDate = new Date(date);
       const endDate = new Date(date);
       endDate.setDate(endDate.getDate() + 1);
 
-      // Use getRawEvents to get actual DB records, not expanded instances
-      eventsToDelete = await supabaseService.getRawEvents(
+      eventsToDelete = await supabaseService.getEvents(
         userId,
         startDate.toISOString(),
         endDate.toISOString()
       );
-    } else if (searchQuery) {
-      if (searchQuery === "*") {
-        // Delete ALL events - use getRawEvents to get actual DB records
-        eventsToDelete = await supabaseService.getRawEvents(userId);
-      } else {
-        // Search for events using direct search on raw events
-        try {
-          // Get raw events (not expanded) to avoid duplicate deletions
-          const allEvents = await supabaseService.getRawEvents(userId);
-          const matchingEvents = allEvents.filter((event: any) => {
-            const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-            return searchText.includes(searchQuery.toLowerCase());
-          });
-
-          eventsToDelete = matchingEvents;
-          console.log(`🔍 [DELETE-MULTIPLE-EVENTS TOOL] Found ${eventsToDelete.length} events matching: ${searchQuery}`);
-        } catch (error) {
-          console.error('[DELETE-MULTIPLE-EVENTS TOOL] Search error:', error);
-          throw new Error(`Failed to search for events: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
+    } else if (eventIds && eventIds.length > 0) {
+      // Delete specific events by ID
+      const allEvents = await supabaseService.getEvents(userId);
+      eventsToDelete = allEvents.filter((event: any) => eventIds.includes(event.id));
     } else {
-      throw new Error("Either date or searchQuery must be provided");
+      throw new Error("Provide date, eventIds, or clearAll");
     }
 
-    // Deduplicate by event ID (in case any duplicates slipped through)
-    const uniqueEvents = Array.from(new Map(eventsToDelete.map(e => [e.id, e])).values());
-
-    if (uniqueEvents.length === 0) {
+    if (eventsToDelete.length === 0) {
       return "No events found to delete";
     }
 
-    console.log(`[DELETE-MULTIPLE-EVENTS TOOL] Deleting ${uniqueEvents.length} unique events`);
+    console.log(`[DELETE-MULTIPLE-EVENTS TOOL] Deleting ${eventsToDelete.length} events`);
 
     let deletedCount = 0;
     const errors: string[] = [];
+    const deletedParentIds = new Set<string>();
 
-    for (const event of uniqueEvents) {
-      const deleteResult = await supabaseService.deleteEvent(userId, event.id, { source: 'agent', agentType: 'conversation' });
-      if (deleteResult.success) {
-        deletedCount++;
+    for (const event of eventsToDelete) {
+      // Handle recurring event instances — delete just this instance
+      if (event.is_instance && event.parent_event_id) {
+        if (deletedParentIds.has(event.parent_event_id)) continue;
 
-        // Also delete from Zep graph to prevent orphaned nodes
-        try {
-          await zepGraphService.deleteCalendarEvent(userId, event.id, event.title);
-        } catch (graphError) {
-          console.warn(`[DELETE-MULTIPLE-EVENTS TOOL] Failed to remove event from graph (non-critical): ${graphError}`);
-          // Non-critical - event is deleted from DB which is what matters
+        const instanceDate = event.instance_date || event.start_time;
+        const success = await supabaseService.deleteRecurringEventInstance(
+          userId,
+          event.parent_event_id,
+          instanceDate
+        );
+        if (success) {
+          deletedCount++;
+        } else {
+          errors.push(`Failed to delete instance of "${event.title}" on ${instanceDate}`);
         }
       } else {
-        errors.push(`Failed to delete "${event.title}": ${deleteResult.error}`);
+        // Regular event — delete the DB record
+        if (deletedParentIds.has(event.id)) continue;
+
+        const deleteResult = await supabaseService.deleteEvent(userId, event.id, { source: 'agent', agentType: 'conversation' });
+        if (deleteResult.success) {
+          deletedCount++;
+          deletedParentIds.add(event.id);
+        } else {
+          errors.push(`Failed to delete "${event.title}": ${deleteResult.error}`);
+        }
       }
     }
 
@@ -93,10 +86,11 @@ export const deleteMultipleEventsTool = tool(
   },
   {
     name: "delete_multiple_events",
-    description: "Delete multiple events by date or search.",
+    description: "Delete multiple events by date, IDs, or clear all. Get #IDs from CALENDAR context or search_events.",
     schema: z.object({
-      date: z.string().optional().nullable().describe("Date ISO to delete all events from"),
-      searchQuery: z.string().optional().nullable().describe("Search query to find events"),
+      date: z.string().optional().nullable().describe("Date ISO to delete all events from that day"),
+      eventIds: z.array(z.string()).optional().nullable().describe("Event UUIDs to delete"),
+      clearAll: z.boolean().optional().nullable().describe("Delete ALL events (use with caution)"),
     }),
   }
 );

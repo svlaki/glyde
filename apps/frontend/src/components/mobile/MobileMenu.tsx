@@ -98,6 +98,9 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             <a href="/notes" onClick={onClose} style={getActiveStyle('/notes')}>
               Notes
             </a>
+            <a href="/goals" onClick={onClose} style={getActiveStyle('/goals')}>
+              Goals
+            </a>
             <a href="/aspects" onClick={onClose} style={getActiveStyle('/aspects')}>
               Aspects
             </a>

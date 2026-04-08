@@ -82,6 +82,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  touch-action: manipulation;
 }
 
 body {
@@ -561,6 +562,12 @@ input::placeholder, textarea::placeholder {
 * {
   scrollbar-color: var(--color-border) var(--color-background);
   scrollbar-width: thin;
+}
+
+/* Hide horizontal scrollbar for calendar week scroll while keeping vertical */
+.calendar-week-scroll::-webkit-scrollbar:horizontal {
+  height: 0;
+  display: none;
 }
 
 /* Hide scrollbars for horizontal scroll containers on WebKit (Safari/iOS) */

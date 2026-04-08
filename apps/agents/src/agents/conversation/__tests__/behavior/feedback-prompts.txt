@@ -1,0 +1,69 @@
+# ConversationAgent Feedback Loop — Test Prompts
+# ─────────────────────────────────────────────
+# Run: npm run feedback
+# Watch: npm run feedback:watch
+#
+# Lines starting with # are comments and are ignored.
+# Blank lines are ignored.
+# Each non-comment line is a separate message sent to the agent.
+# Messages are sent in order with conversation history persisted between them.
+#
+# ─────────────────────────────────────────────
+
+
+# ── Syllabus / schedule extraction ─────────────────────────────────────────────
+CS 301 – Data Structures | Instructor: Dr. Kim | Office Hours: Tue/Thu 1–2pm Room 204 | Lectures: MWF 10:00–10:50am (starts Jan 13, ends May 2) | Midterm: Feb 28 at 10am, Final: May 9 at 8am | Lab: Thu 3:00–4:50pm | Project 1 due Feb 7, Project 2 due Mar 21, Project 3 due Apr 18
+
+
+# ── Marathon training plan (goal + recurring events cascade) ────────────────────
+I want to run a marathon in October. Set up a 16-week training plan starting next Monday with long runs on Sundays, tempo runs Tuesdays and Thursdays, and rest on Wednesdays and Fridays.
+
+
+# ── Conflict detection test ─────────────────────────────────────────────────────
+Schedule a team standup every weekday at 9am, then schedule a dentist appointment next Tuesday at 9am
+
+
+# ── Bulk reschedule ─────────────────────────────────────────────────────────────
+Move all my work events next week to the week after
+
+
+# ── Ambiguous: should create task not event ─────────────────────────────────────
+I need to review the Q3 budget report before Friday
+
+
+# ── Rule creation ───────────────────────────────────────────────────────────────
+Always block off 30 minutes after any meeting for notes and follow-up
+
+
+# ── Friend + shared event ───────────────────────────────────────────────────────
+Schedule dinner with Alex and Jordan Saturday at 7pm at Nobu and invite them
+
+
+# ── Delete by category ──────────────────────────────────────────────────────────
+Remove all my gym sessions from my calendar
+
+
+# ── Multi-turn: create recurring then surgically update one instance ────────────
+Add a recurring standup Mon/Wed/Fri at 9am
+Change Wednesday's standup to 10am starting next week, keep Mon and Fri the same
+
+
+# ── Shared aspect: create event under a category that belongs to a friend ───────
+Create a "Study Group" aspect shared with my friend Jordan, then schedule a weekly study session every Sunday at 3pm under that aspect
+
+
+# ── Invite friends to an existing event ─────────────────────────────────────────
+Schedule a birthday party for Saturday at 7pm, then add Alex, Jordan, and Sam as guests
+
+
+# ── Create shared recurring event with friends ───────────────────────────────────
+Set up a weekly soccer game every Thursday at 6pm and invite my friends Alex and Jordan
+
+
+# ── Shared event + location ──────────────────────────────────────────────────────
+Schedule brunch with Alex next Sunday at 11am at Tartine Bakery in San Francisco and invite them
+
+
+# ─────────────────────────────────────────────
+# ADD YOUR OWN PROMPTS BELOW THIS LINE
+# ─────────────────────────────────────────────

@@ -20,7 +20,6 @@ export interface GeraldPromptContext {
   rulesContext?: string;
   projectContext?: string;
   recentInteractionContext: string;
-  ratingContext?: string;
   recentActivityContext?: string;
 }
 
@@ -47,7 +46,6 @@ export function buildGeraldSystemPrompt(context: GeraldPromptContext): SystemMes
     rulesContext,
     projectContext,
     recentInteractionContext,
-    ratingContext,
     recentActivityContext
   } = context;
 
@@ -74,76 +72,58 @@ ${eventContext}
 ${taskContext}
 ${goalContext}
 ${recentActivityContext || ''}
-${ratingContext || ''}
 
-YOU HAVE ${toolCount || 'many'} TOOLS including: create/update/delete events, create/update/delete tasks, create/update goals, update aspects, create interactions, create ratings, and more.
+YOU HAVE ${toolCount || 'many'} TOOLS including: create/update/delete events, create/update/delete tasks, create/update goals, update aspects, create interactions, and more.
 
 ========================================
 MODE 1: GENERATING INTERACTIONS
 ========================================
 When asked to generate proactive interactions, use the create_interaction tool.
 
-INTERACTION TYPES:
-1. "yes_no" - Yes/no questions. "Want to schedule a workout?" "Should I add this to your tasks?"
-2. "multiple_choice" - Options to pick from. "Which area needs attention?" with options
-3. "text" - Free-form response. Reflections, check-ins, journaling. "What went well today?"
-4. "rating" - 1-10 scale. Mood, energy, satisfaction. "Rate your sleep quality" with options ["1","2","3","4","5","6","7","8","9","10"]
-5. "time_suggestion" - Proactively suggest a specific time slot. "I found a free slot at 2pm - want to schedule your workout there?" with options ["Yes, 2:00 PM works", "Suggest a different time", "Skip"]
+IMPORTANT: Interactions should be RARE and SIGNIFICANT. Only create interactions for things that genuinely matter — not routine scheduling or minor suggestions. Think weekly reflections, goal check-ins, important decisions, data cleanup.
 
-WHAT INTERACTIONS CAN DO (examples of the 100+ types):
-- Schedule events (workouts, focus blocks, breaks, meetings, social time)
-- Create tasks (to-dos, reminders, daily check-ins, habit trackers)
-- Update tasks (mark complete, change due date, re-categorize)
-- Create goals (SMART goals, habit tracking)
+DO NOT create scheduling or time-suggestion interactions. Event scheduling is handled separately through the calendar.
+DO NOT create rating interactions. Ratings are currently disabled.
+
+INTERACTION TYPES (only these 3):
+1. "yes_no" - Yes/no questions for significant decisions. "Want to create a pre-launch checklist for your beta push?"
+2. "multiple_choice" - Options to pick from. "Which goal needs the most attention this week?" with options
+3. "text" - Free-form response. Reflections, check-ins, journaling. "What went well today?"
+
+WHAT INTERACTIONS SHOULD BE USED FOR:
+- Goal check-ins ("You haven't worked on [GOAL] in 2 weeks - want to revisit your approach?")
+- Weekly reflections ("What area of your life got the most attention this week?")
 - Fix miscategorized items ("Your 'Team Standup' is under Personal - move to Work?")
 - Add missing context ("Your 'Doctor Appt' has no notes - want to add details?")
 - Suggest aspect for untagged items ("'Coffee with Sarah' has no aspect - tag as Social?")
-- Rate life areas (sleep, energy, fitness, work-life balance, stress, mood)
-- Daily reflections ("What's one thing you accomplished today?")
-- Weekly reviews ("Which area got the most attention this week?")
-- Proactive alerts ("You have 3 overdue tasks - want to reschedule?")
-- Habit tracking (water, meditation, reading, exercise, meals, sleep)
-- Goal check-ins ("You haven't worked on [GOAL] in 2 weeks")
 - Data cleanup ("Task 'stuff' has a vague title - want to clarify?")
-- Smart suggestions based on ratings ("Sleep is declining - add a bedtime reminder?")
-- Celebrate wins ("You completed 5 tasks today!")
-- Suggest balance ("Work has 80% of your time - schedule personal time?")
+- Important decisions ("You have 3 overdue tasks - want to reschedule or remove them?")
+- Celebrate significant wins ("You completed all your goals this month!")
 
-CREATING INTERACTIONS - SIMPLE RULES:
-- Just ask a clear question with options. NO complex metadata needed.
-- When the user responds, the response comes back to YOU and you use tools to act on it.
+WHAT INTERACTIONS SHOULD NOT BE USED FOR:
+- Scheduling events or suggesting time slots (handled by calendar)
+- Ratings or scores (disabled)
+- Reminder-style notifications (handled by reminders system)
+- Routine micro-tasks or abstract suggestions
+
+CREATING INTERACTIONS - RULES:
 - ALWAYS include aspectId (UUID from the aspects list) for correct display.
-- Include metadata.context explaining WHY you're suggesting this (so you know the context when processing the response).
-- Optional: metadata.ratingTopic for rating interactions (used to store the score under a topic name).
+- Include metadata.context explaining WHY you're suggesting this.
+- TEXT interactions MUST target a specific entity: always include metadata.eventId, metadata.goalId, metadata.taskId, or metadata.aspectId.
+- Maximum 1-2 interactions per generation. Less is more.
+- NEVER repeat topics from recent interaction history.
+- Do NOT use emojis.
+- Keep questions concise and specific.
+- Every interaction MUST be ACTIONABLE — it must propose a decision, ask for input, or offer to DO something concrete.
 
-EXAMPLE - Schedule workout:
+EXAMPLE - Goal check-in:
 create_interaction(
-  question: "When would you like to schedule a 45-minute cardio session today?",
-  type: "time_suggestion",
-  options: ["4:00 PM", "6:00 PM", "8:00 PM", "Skip"],
-  priority: 4,
-  aspectId: "<Health aspect UUID>",
-  metadata: { "context": "No exercise scheduled today, user has free time at 4pm, 6pm, 8pm", "eventTitle": "Cardio Session", "duration": 45, "suggestedTime": "4:00 PM" }
-)
-
-EXAMPLE - Time selection:
-create_interaction(
-  question: "When would you like to do your upper body workout?",
-  type: "multiple_choice",
-  options: ["7:00am", "12:00pm", "6:00pm", "8:00pm"],
-  priority: 4,
-  aspectId: "<Health aspect UUID>",
-  metadata: { "context": "User wants a 45-minute upper body workout", "eventTitle": "Upper Body Workout", "duration": 45 }
-)
-
-EXAMPLE - Create task suggestion:
-create_interaction(
-  question: "Want me to add 'Review quarterly goals' to your task list?",
+  question: "You haven't made progress on 'Launch MVP' in 2 weeks. Want to break it into smaller tasks?",
   type: "yes_no",
-  options: ["Yes", "Skip"],
-  priority: 3,
-  aspectId: "<Work aspect UUID>",
-  metadata: { "context": "End of quarter approaching, no review task exists" }
+  options: ["Yes, break it down", "Skip"],
+  priority: 4,
+  aspectId: "<Startup aspect UUID>",
+  metadata: { "context": "Goal stalled for 2 weeks", "goalId": "<goal-UUID>" }
 )
 
 EXAMPLE - Fix miscategorized event:
@@ -153,17 +133,7 @@ create_interaction(
   options: ["Yes, move it", "No, keep it"],
   priority: 2,
   aspectId: "<Work aspect UUID>",
-  metadata: { "context": "Event ID: abc-123 is tagged Personal but appears to be work-related", "eventId": "abc-123", "targetAspectId": "<Work UUID>" }
-)
-
-EXAMPLE - Rating:
-create_interaction(
-  question: "How would you rate your sleep quality over the past 5 days?",
-  type: "rating",
-  options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
-  priority: 3,
-  aspectId: "<Health aspect UUID>",
-  metadata: { "context": "Haven't checked sleep in 7 days", "ratingTopic": "Sleep quality" }
+  metadata: { "context": "Event appears miscategorized", "eventId": "abc-123", "targetAspectId": "<Work UUID>" }
 )
 
 EXAMPLE - Define objective for existing event:
@@ -172,105 +142,29 @@ create_interaction(
   type: "text",
   priority: 3,
   aspectId: "<Startup aspect UUID>",
-  metadata: { "context": "Help user define a concrete objective for their focus block", "eventId": "<event-UUID>", "eventTitle": "Startup focus block" }
+  metadata: { "context": "Help user define a concrete objective for their focus block", "eventId": "<event-UUID>" }
 )
-IMPORTANT: When asking about an EXISTING event (e.g., defining its objective or clarifying its purpose), ALWAYS include the eventId in metadata so the response handler can update the event description.
 
-EXAMPLE - Time suggestion (proactive slot finding):
+EXAMPLE - Weekly reflection:
 create_interaction(
-  question: "When would you like to schedule a 45-minute algorithms study session?",
-  type: "time_suggestion",
-  options: ["3:30 PM", "5:00 PM", "7:00 PM", "Skip"],
-  priority: 4,
-  aspectId: "<CS aspect UUID>",
-  metadata: { "context": "Found gaps in calendar, user has pending algorithms task", "eventTitle": "Algorithms Study Time", "duration": 45, "suggestedTime": "3:30 PM" }
-)
-TIME SUGGESTION RULES (CRITICAL):
-- ALWAYS offer 3-4 CONCRETE time slots as options. Check the calendar for ACTUAL free slots and list them.
-- NEVER use "Suggest a different time" as an option — there is no text input, the user cannot type a time.
-- ALWAYS include "Skip" as the last option for dismissal.
-- The options should be JUST the times (e.g. "3:30 PM", "5:00 PM") — not "Yes, 3:30 PM works". Keep them short and tappable.
-- Set metadata.suggestedTime to the FIRST (best) option.
-- Check the calendar to ensure suggested times don't conflict with existing events.
-- Do NOT include "Chat" as an option — the interaction card already has a built-in Reply button for chat.
-
-EXAMPLE - Text reflection:
-create_interaction(
-  question: "What's one thing you accomplished today that you're proud of?",
-  type: "text",
+  question: "Which area of your life got the most attention this week?",
+  type: "multiple_choice",
+  options: ["Work", "Health", "Social", "Personal Growth"],
   priority: 2,
   aspectId: null,
-  metadata: { "context": "Evening reflection prompt" }
+  metadata: { "context": "Weekly reflection prompt" }
 )
 
 ${recentInteractionContext}
 
-CHOOSING THE RIGHT TYPE (CRITICAL):
-- "How do you feel about X?" → ALWAYS use "rating" (1-10), NEVER "text". Feelings have a scale.
-- "How would you rate X?" → "rating"
-- "How is X going?" → "rating" if measurable, "text" only if truly open-ended
-- "What did you accomplish?" → "text" (open-ended, no scale)
-- "What's on your mind?" → "text"
-- "Want to schedule X?" or "When should we schedule X?" → ALWAYS use "time_suggestion" with 3-4 concrete free time slots, "Skip", and "Chat". NEVER use "yes_no" for scheduling.
-- "I found a free slot at X for Y" → "time_suggestion" with that slot plus 2-3 alternatives
-- NEVER use "text" for questions that can be answered with a 1-10 rating
-- NEVER use "yes_no" for event scheduling — always use "time_suggestion" with multiple time options
-
-INTERACTION RULES:
-- BE SPECIFIC in questions and metadata: "Want to schedule a chest workout?" not "Want to schedule a workout?". "Time to work on your resume?" not "Want a focus block?". The specificity carries through to event titles.
-- Always include a specific eventTitle in metadata when suggesting schedulable activities (e.g., "Resume Writing" not "Focus Block")
-- TEXT interactions MUST target a specific entity: always include metadata.eventId, metadata.goalId, metadata.taskId, or metadata.aspectId so the response handler knows WHERE to save the answer. Never ask open-ended text questions with no target entity — the answer has nowhere to go.
-- Maximum 2-3 interactions per generation
-- NEVER repeat topics from recent interaction history
-- Rotate types: don't do 3 scheduling suggestions in a row. Use ALL 5 types over time (yes_no, multiple_choice, text, rating, time_suggestion)
-- Use "time_suggestion" when you spot free calendar gaps that align with pending tasks or goals
-- Check calendar before suggesting times - don't double-book
-- Do NOT suggest things the user already has scheduled today
-- Do NOT suggest "schedule time to plan" for simple tasks
-- Do NOT use emojis
-- Keep questions concise and specific
-- ALWAYS assign aspectId for correct card colors
-- Space rating check-ins at least 5 DAYS apart per topic - check the RATING TRACKER "last asked" dates before creating ANY rating interaction
-- If a rating topic was asked within the last 5 days, DO NOT ask it again in any form (rephrased, different wording, etc.)
-- NEVER create two rating interactions about the same life area in one generation
-- Maximum 1 rating interaction per generation batch. Prioritize scheduling, check-ins, and reflections over ratings.
-- If the user already has many rating topics being tracked, do NOT keep adding more. Focus on re-checking existing topics (after cooldown) instead of creating new ones.
-
-NEVER CREATE REMINDER-STYLE INTERACTIONS (CRITICAL):
-- Interactions are NOT reminders. The reminders system handles "heads up, X is coming up."
-- NEVER create interactions that just inform the user about an upcoming event. "Upcoming: Startup beta push" with options like "Got it / Snooze / Dismiss" is USELESS - what would the user even do with "Got it"?
-- Every interaction MUST be ACTIONABLE - it must propose a decision, ask for input, or offer to DO something concrete.
-- BAD: "Startup beta push is coming up" (that's a reminder, not an interaction)
-- BAD: "You have a meeting in 30 minutes" (reminder, not interaction)
-- BAD: "Don't forget about X" (reminder)
-- GOOD: "Your startup beta push is tomorrow - want to create a pre-launch checklist?" (actionable)
-- GOOD: "You have 2 hours before your beta push - want to schedule a final review session?" (proposes action)
-- If the answer to "what would the user do with this?" is just "acknowledge it", it's a reminder, not an interaction. Don't create it.
-
-EXPIRY RULES (CRITICAL — stale interactions are confusing and annoying):
-Always set expiresAt on every interaction. Use the user's local timezone for all expiry times.
+EXPIRY RULES:
+Always set expiresAt on every interaction. Use the user's local timezone.
 
 1. REFERENCES A SPECIFIC EVENT: expiresAt = event start time minus 15 minutes.
-   - "Want to prep for your 3pm meeting?" → expiresAt = 2:45 PM today
-2. SUGGESTS SCHEDULING SOMETHING TODAY: expiresAt = 1 hour from now.
-   - "Want to schedule a focus block this afternoon?" → expiresAt = current time + 1 hour
-   - Today's scheduling suggestions go stale fast — the user's afternoon fills up.
-3. SUGGESTS SOMETHING FOR TOMORROW: expiresAt = midnight tonight.
-   - "Want to plan your morning routine for tomorrow?" → expiresAt = 11:59 PM today
-4. REFLECTIONS / GENERAL CHECK-INS: expiresAt = 4 hours from now.
-   - "What's one thing you accomplished today?" → expiresAt = current time + 4 hours
-   - These are time-sensitive to the user's current state.
-5. RATINGS: Do NOT set expiresAt — let them use the default 24h. Ratings are always relevant and users should be able to answer them whenever they get around to it.
-6. TASK SUGGESTIONS (no specific time): expiresAt = 8 hours from now.
-   - "Want to add 'Review report' to your task list?" → expiresAt = current time + 8 hours
+2. GENERAL CHECK-INS / REFLECTIONS: expiresAt = 4 hours from now.
+3. TASK/GOAL SUGGESTIONS: expiresAt = 8 hours from now.
 
-NEVER rely on the default 24h expiry. Always calculate and set expiresAt explicitly.
-
-SUGGESTIONS TO AVOID:
-- Repeatedly suggesting meals/snacks unless user explicitly asked
-- Micro-tasks like "plan where to buy X"
-- Abstract suggestions like "prioritize tasks" or "review schedule"
-- Reminder-style "heads up" notifications (use the reminders system instead)
+NEVER rely on the default 24h expiry. Always set expiresAt explicitly.
 
 TIME-SENSITIVE SUGGESTIONS:
 ${timeOfDayContext.suggestions}
@@ -288,12 +182,9 @@ RESPONSE PROCESSING RULES:
 
 RESPONSE HANDLING PATTERNS:
 
-Time selected (e.g. "3:30 PM", "5:00 PM", "accept") → Use create_event at that time (or metadata.suggestedTime if response is "accept"), with duration from metadata
-"Chat" → Do nothing. The topic will be sent to the conversation chat for the user to discuss.
 "Yes" to task creation → Use create_task
 "Yes" to category fix → Use update_event or update_task to change the aspect_id
 "Yes" to adding context → Use update_event or update_task to add description/notes
-Rating score (1-10) → Already auto-stored by the response handler. Use create_rating only if you need to store an additional related rating.
 "No" / "Skip" / "Not now" → Do nothing, respect the user's choice
 Multiple choice selection → Act based on what the option means in context
 "Set a reminder" or reminder request → Use update_event with reminder_minutes to add a reminder to the related event (preferred). Only use create_reminder for standalone reminders that are NOT tied to an event.
@@ -401,8 +292,7 @@ function getTimeOfDayContext(hour: number): { period: string; suggestion: string
       suggestions: `MIDDAY SUGGESTIONS:
 - Progress check on morning priorities
 - Suggest lunch break if calendar is packed
-- Afternoon planning
-- Quick rating check-in`
+- Afternoon planning`
     };
   } else if (hour >= 14 && hour < 17) {
     return {

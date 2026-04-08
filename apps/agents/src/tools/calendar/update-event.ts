@@ -1,13 +1,12 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
-import { convertToUTC } from "../../utils/timezoneUtils.js";
+import { convertToUTC, formatTimeForUser } from "../../utils/timezoneUtils.js";
 import reminderService from "../../services/ReminderService.js";
 
 export const updateEventTool = tool(
-  async ({ eventId, searchQuery, currentStartTime, title, startTime, endTime, location, description, aspect, reflection, isMissed, reminderMinutes }, config) => {
+  async ({ eventId, title, startTime, endTime, location, description, aspect, reflection, isMissed, reminderMinutes }, config) => {
     const userId = config?.configurable?.userId;
     const timezone = config?.configurable?.timezone;
 
@@ -18,97 +17,14 @@ export const updateEventTool = tool(
       return "Timezone is required for updating events. Please try again.";
     }
 
-    let targetEventId = eventId;
-
-    // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
     const aspectService = new AspectService();
 
-    // If no eventId provided, search for the event using Zep and direct search
-    if (!targetEventId && searchQuery) {
-      console.log('[UPDATE-EVENT TOOL] Searching for event to update:', searchQuery);
-
-      try {
-        // Get all events and filter to upcoming ones
-        // We include ALL future events to ensure "tomorrow" events are found regardless of timezone
-        const allEvents = await supabaseService.getEvents(userId);
-        const now = new Date();
-
-        // Use current UTC time minus 24 hours to ensure we don't miss events
-        // that might appear as "today" in the user's timezone but are technically
-        // "yesterday" in UTC (e.g., late night events in US timezones)
-        const cutoffTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-        console.log(`[UPDATE-EVENT TOOL] Filtering events from ${cutoffTime.toISOString()} onwards`);
-        console.log(`[UPDATE-EVENT TOOL] Total events before filter: ${allEvents.length}`);
-
-        // Include events from cutoff onwards (gives 24h buffer for timezone differences)
-        const recentEvents = allEvents.filter((event: any) => {
-          const eventDate = new Date(event.start_time);
-          return eventDate >= cutoffTime;
-        });
-
-        console.log(`[UPDATE-EVENT TOOL] Events after filter: ${recentEvents.length}`);
-
-        // Find matching events using fuzzy matching
-        const normalizedQuery = searchQuery.toLowerCase().trim();
-        const queryWords = normalizedQuery.split(/\s+/).filter(word =>
-          word.length > 1 && !['the', 'a', 'an', 'for', 'to', 'in', 'on', 'at'].includes(word)
-        );
-
-        let matchingEvents = recentEvents.filter((event: any) => {
-          const searchText = `${event.title} ${event.description || ''}`.toLowerCase();
-          const hasMatch = queryWords.some(word => searchText.includes(word));
-          const hasFullMatch = searchText.includes(normalizedQuery);
-          return hasMatch || hasFullMatch;
-        });
-
-        // If currentStartTime is provided, filter to events starting at that exact time
-        if (currentStartTime && matchingEvents.length > 1) {
-          const targetTime = new Date(currentStartTime).getTime();
-          const timeFilteredEvents = matchingEvents.filter((event: any) => {
-            const eventTime = new Date(event.start_time).getTime();
-            // Allow 1 minute tolerance for time matching
-            return Math.abs(eventTime - targetTime) < 60000;
-          });
-
-          if (timeFilteredEvents.length > 0) {
-            matchingEvents = timeFilteredEvents;
-            console.log(`[UPDATE-EVENT TOOL] Filtered to ${matchingEvents.length} event(s) by currentStartTime: ${currentStartTime}`);
-          }
-        }
-
-        if (matchingEvents.length === 0) {
-          return `No event found matching: "${searchQuery}". Please check the event name and try again.`;
-        }
-
-        if (matchingEvents.length > 1) {
-          // Multiple matches - ask for clarification with IDs so agent can be precise
-          const eventsList = matchingEvents.slice(0, 5).map(e => {
-            const eventDate = new Date(e.start_time).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-            const eventTime = new Date(e.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            return `- ${e.title} on ${eventDate} at ${eventTime} (ID: ${e.id})`;
-          }).join('\n');
-
-          throw new Error(`Found ${matchingEvents.length} events matching "${searchQuery}". Which one should I update? Use the eventId parameter or currentStartTime for precision:\n${eventsList}`);
-        }
-
-        targetEventId = matchingEvents[0].id;
-        console.log('[UPDATE-EVENT TOOL] Found event to update:', matchingEvents[0].title);
-      } catch (error) {
-        console.error('[UPDATE-EVENT TOOL] Search error:', error);
-        return `Failed to find event: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      }
-    }
-
-    if (!targetEventId) {
-      return "No event ID provided and no search query given. Please specify which event to update.";
-    }
+    let targetEventId = eventId;
 
     // Get original event to compare changes
     const events = await supabaseService.getEvents(userId);
-    const originalEvent = events.find((e: any) => e.id === targetEventId);
+    const originalEvent = events.find((e: any) => e.id === eventId);
 
     // Check if this is a recurring event instance
     if (originalEvent?.is_instance && originalEvent?.parent_event_id) {
@@ -125,7 +41,7 @@ export const updateEventTool = tool(
           `I can update the title, description, location, or aspect for the entire series if you'd like.`;
       }
 
-      // Reflection and is_missed are per-instance -- create an override event for this instance
+      // Reflection and is_missed are per-instance — create an override event for this instance
       if (reflection !== undefined || isMissed !== undefined) {
         console.log(`[UPDATE-EVENT TOOL] Per-instance update (reflection/missed) for recurring instance`);
         const instanceUpdates: any = {};
@@ -152,7 +68,7 @@ export const updateEventTool = tool(
       targetEventId = originalEvent.parent_event_id;
     }
 
-    // Validate that aspect exists before updating (prevent silent null writes)
+    // Validate that aspect exists before updating
     if (aspect && aspect.trim().length > 0) {
       console.log(`[UPDATE-EVENT TOOL] Validating aspect: "${aspect}"`);
       const existingAspect = await aspectService.getAspectByName(userId, aspect.trim());
@@ -162,10 +78,9 @@ export const updateEventTool = tool(
         const aspectNames = allAspects.map(a => a.name).join(', ');
         return `Aspect "${aspect}" does not exist. Available aspects: [${aspectNames}]. Use an existing aspect or ask the user to create one first with create_aspect.`;
       }
-      console.log(`[UPDATE-EVENT TOOL] Aspect "${aspect}" validated successfully`);
     }
 
-    // Convert local times to UTC for storage (same as create-event)
+    // Convert local times to UTC for storage
     const startTimeUTC = startTime ? convertToUTC(startTime, timezone) : undefined;
     const endTimeUTC = endTime ? convertToUTC(endTime, timezone) : undefined;
 
@@ -191,7 +106,6 @@ export const updateEventTool = tool(
     );
 
     if (!updatedEvent) {
-      // Return error message instead of throwing to prevent LLM retry loops
       return "Failed to update event. The event may have been deleted or you may not have permission to modify it.";
     }
 
@@ -207,11 +121,6 @@ export const updateEventTool = tool(
       }
     }
 
-    // Note: Automatic graph sync disabled to prevent Zep graph bloat
-    // Individual event updates create too many nodes
-    // Graph should only contain summary patterns, not every action
-    // TODO: Implement selective sync only for significant events or via periodic aggregation
-
     // Build detailed change description
     const changes: string[] = [];
     const eventTitle = title || updatedEvent.title || originalEvent?.title || 'Event';
@@ -220,11 +129,9 @@ export const updateEventTool = tool(
       changes.push(`renamed to "${title}"`);
     }
     if (startTimeUTC || endTimeUTC) {
-      const newStartDate = new Date(updatedEvent.start_time);
-      const newEndDate = new Date(updatedEvent.end_time);
-      const dateStr = newStartDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      const startTimeStr = newStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-      const endTimeStr = newEndDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const dateStr = formatTimeForUser(updatedEvent.start_time, timezone, 'EEEE, MMMM d');
+      const startTimeStr = formatTimeForUser(updatedEvent.start_time, timezone, 'h:mm a');
+      const endTimeStr = formatTimeForUser(updatedEvent.end_time, timezone, 'h:mm a');
       changes.push(`moved to ${dateStr} from ${startTimeStr} to ${endTimeStr}`);
     }
     if (aspect && originalEvent?.aspect !== aspect) {
@@ -249,14 +156,12 @@ export const updateEventTool = tool(
   },
   {
     name: "update_event",
-    description: "Update an event by ID or search query.",
+    description: "Update an event by ID. Get the #ID from your CALENDAR context or from search_events.",
     schema: z.object({
-      eventId: z.string().optional().nullable().describe("Event UUID"),
-      searchQuery: z.string().optional().nullable().describe("Fuzzy search query to find event"),
-      currentStartTime: z.string().optional().nullable().describe("Current start time ISO to disambiguate"),
+      eventId: z.string().describe("Event UUID from CALENDAR context (#ID) or search_events results"),
       title: z.string().optional().nullable().describe("New title"),
-      startTime: z.string().optional().nullable().describe("New start time ISO"),
-      endTime: z.string().optional().nullable().describe("New end time ISO"),
+      startTime: z.string().optional().nullable().describe("New start time ISO (in user's timezone)"),
+      endTime: z.string().optional().nullable().describe("New end time ISO (in user's timezone)"),
       location: z.string().optional().nullable().describe("New location"),
       description: z.string().optional().nullable().describe("New description or notes"),
       aspect: z.string().optional().nullable().describe("New aspect name"),

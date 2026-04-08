@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { Calendar } from '../components/Calendar'
 import { ChatBot, ChatBotHandle, ClearIcon } from '../components/ChatBot'
-import { AgentInteractions } from '../components/AgentInteractions'
+import { Inbox } from '../components/Inbox'
 import { TodoList } from '../components/TodoList'
 import { VerticalSidebar, SIDEBAR_WIDTH } from '../components/VerticalSidebar'
 import { getColors } from '../styles/colors'
@@ -65,7 +65,7 @@ function CalendarPageMobile() {
     { id: 'calendar' as const, label: 'Calendar' },
     { id: 'chat' as const, label: 'Chat' },
     { id: 'todos' as const, label: 'Tasks' },
-    { id: 'agents' as const, label: 'Interactions' }
+    { id: 'agents' as const, label: 'Inbox' }
   ]
 
   // Get header title based on active tab
@@ -73,7 +73,7 @@ function CalendarPageMobile() {
     switch (activeTab) {
       case 'chat': return 'Chat'
       case 'todos': return 'Tasks'
-      case 'agents': return 'Interactions'
+      case 'agents': return 'Inbox'
       default: return ''
     }
   }
@@ -206,7 +206,7 @@ function CalendarPageMobile() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
             {renderHeader()}
             <div style={{ flex: 1, minHeight: 0, overflow: 'auto', WebkitOverflowScrolling: 'touch', marginLeft: mobileSpacing.negativeMarginX, marginRight: mobileSpacing.negativeMarginX }}>
-              <AgentInteractions hideHeader onChatReply={handleMobileChatReply} />
+              <Inbox hideHeader onChatReply={handleMobileChatReply} />
             </div>
           </div>
         )}
@@ -435,7 +435,7 @@ function CalendarPageDesktop() {
                 overflow: 'hidden',
                 minHeight: 0
               }}>
-                <AgentInteractions onChatReply={handleChatReply} />
+                <Inbox onChatReply={handleChatReply} />
               </div>
 
               {/* Todo List */}

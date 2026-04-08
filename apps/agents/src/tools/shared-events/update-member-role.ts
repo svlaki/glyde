@@ -27,7 +27,7 @@ export const updateMemberRoleTool = tool(
     schema: z.object({
       eventId: z.string().uuid().describe("Event UUID"),
       memberId: z.string().uuid().describe("Member UUID"),
-      role: z.enum(['editor', 'viewer']).describe("New role"),
+      role: z.enum(['member', 'viewer']).describe("New role: 'member' for full edit access, 'viewer' for read-only"),
     }),
   }
 );

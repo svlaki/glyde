@@ -1,6 +1,6 @@
 import { getSupabaseService } from './SupabaseService.js';
 import { AspectService } from './AspectService.js';
-import { ZepOnboardingSeedService } from './ZepOnboardingSeedService.js';
+import { MemoryService } from './MemoryService.js';
 
 export interface OnboardingData {
   name: string;
@@ -185,17 +185,22 @@ export class OnboardingService {
 
     console.log(`Completed V2 onboarding for user ${userId}`);
 
-    // Step 7: Seed Zep memory with onboarding data (non-blocking)
+    // Step 7: Seed memory with onboarding data (non-blocking)
     try {
-      const zepSeedService = new ZepOnboardingSeedService();
-      const seedResult = await zepSeedService.seedOnboardingData(userId, data, goals_summary);
-
-      if (!seedResult.success) {
-        console.warn(`Zep seeding failed for user ${userId}:`, seedResult.errors);
-      }
+      const memoryService = MemoryService.getInstance();
+      await memoryService.seedOnboardingData(userId, {
+        fullName: data.fullName,
+        preferredName: data.preferredName,
+        birthday: data.birthday,
+        occupation: data.occupation,
+        fieldOfStudy: data.fieldOfStudy,
+        timezone: data.timezone,
+        lifeAspects: data.aspects,
+        calendarPreference: data.selectedCalendars?.join(', '),
+      }, data.goals);
     } catch (error: any) {
-      // Log but don't fail onboarding - Zep seeding is non-critical
-      console.error(`Zep seeding error for user ${userId}:`, error.message);
+      // Log but don't fail onboarding - memory seeding is non-critical
+      console.error(`Memory seeding error for user ${userId}:`, error.message);
     }
   }
 

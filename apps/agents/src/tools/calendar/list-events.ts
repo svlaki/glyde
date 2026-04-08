@@ -1,38 +1,33 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { formatEventTime } from "../../utils/timezoneUtils.js";
+import { formatInTimeZone } from "date-fns-tz";
+import { toDate } from "date-fns";
 
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit, includePast }, config) => {
     const userId = config?.configurable?.userId;
-    const timezone = config?.configurable?.timezone;
+    const timezone = config?.configurable?.timezone || 'America/Los_Angeles';
     const effectiveLimit = limit ?? 20;
 
     if (!userId) {
       throw new Error("User ID is required for listing events");
     }
-    if (!timezone) {
-      throw new Error("Timezone is required for listing events");
-    }
 
     console.log('[LIST-EVENTS TOOL] Listing events:', { startDate, endDate, limit: effectiveLimit, includePast });
 
-    // Initialize service
     const supabaseService = new SupabaseService();
 
-    // Get events as UTC (with recurring events expanded)
+    // Get events (with recurring events expanded)
     let events;
     if (startDate && endDate) {
-      events = await supabaseService.getExpandedEvents(userId, startDate, endDate);
+      events = await supabaseService.getEvents(userId, startDate, endDate);
     } else {
-      events = await supabaseService.getExpandedEvents(userId);
+      events = await supabaseService.getEvents(userId);
 
-      // Filter out past events unless includePast is true (includes ongoing multi-day events)
       if (!includePast) {
         const now = new Date();
         events = events.filter((event: any) => new Date(event.end_time) >= now);
-        console.log(`[LIST-EVENTS TOOL] Filtered to ${events.length} future/ongoing events`);
       }
     }
 
@@ -41,26 +36,29 @@ export const listEventsTool = tool(
       return `No events found${dateRange}`;
     }
 
-    // Sort by start time (UTC)
     events.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-
-    // Take only the requested limit
     const limitedEvents = events.slice(0, effectiveLimit);
 
+    // Use compact format matching CALENDAR context so agent can use #IDs consistently
     const eventList = limitedEvents.map(event => {
-      // Format UTC times for user's timezone
-      const eventTime = formatEventTime(event.start_time, timezone);
-      const aspectLabel = event.aspect ? `\n   🏷️ ${event.aspect}` : '';
-
-      return `${event.title}\n   ${eventTime}${event.location ? `\n   ${event.location}` : ''}${aspectLabel}\n   ID: ${event.id}`;
+      const start = toDate(event.start_time);
+      const end = toDate(event.end_time);
+      const dateStr = formatInTimeZone(start, timezone, 'EEE M/d');
+      const startTime = formatInTimeZone(start, timezone, 'h:mma').toLowerCase();
+      const endTime = formatInTimeZone(end, timezone, 'h:mma').toLowerCase();
+      const loc = event.location ? ` @${event.location}` : '';
+      const aspect = (event as any).aspect_name || (event as any).aspect;
+      const aspectLabel = aspect ? ` [${aspect}]` : '';
+      const recurring = (event as any).is_recurring ? ' (recurring)' : '';
+      return `- "${event.title}" ${dateStr} ${startTime}-${endTime}${loc}${aspectLabel}${recurring} #${event.id}`;
     });
 
-    const totalText = events.length > effectiveLimit ? ` (showing first ${effectiveLimit} of ${events.length})` : '';
-    return `Your upcoming events${totalText}:\n\n${eventList.join('\n\n')}`;
+    const totalText = events.length > effectiveLimit ? ` (showing ${effectiveLimit} of ${events.length})` : '';
+    return `EVENTS${totalText}:\n${eventList.join('\n')}\n\nUse the #ID to perform actions on these events.`;
   },
   {
     name: "list_events",
-    description: "List calendar events, optionally filtered by date range.",
+    description: "List calendar events by date range. Returns events with #IDs for use with action tools.",
     schema: z.object({
       startDate: z.string().optional().nullable().describe("Start date ISO"),
       endDate: z.string().optional().nullable().describe("End date ISO"),

@@ -1,11 +1,9 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { ZepGraphService } from "../../services/ZepGraphService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 import { parseNaturalLanguageRecurrence, formatRRuleForDisplay, validateRRule } from "../../utils/rrule.js";
-import { executeZepOperation } from "../../utils/zep-sync-helper.js";
 
 export const createRecurringEventTool = tool(
   async ({ title, startTime, endTime, recurrence, rrule, aspect, description, location, endDate }, config) => {
@@ -31,7 +29,6 @@ export const createRecurringEventTool = tool(
 
     // Initialize services
     const supabaseService = new SupabaseService();
-    const zepGraphService = new ZepGraphService();
     const aspectService = new AspectService();
 
     // Parse recurrence pattern
@@ -91,6 +88,19 @@ export const createRecurringEventTool = tool(
       validatedAspect = trimmedAspect;
     }
 
+    // Check for duplicate recurring events with same title AND same recurrence pattern
+    const existingEvents = await supabaseService.getEvents(userId);
+    const duplicateRecurring = existingEvents.find((e: any) =>
+      e.is_recurring &&
+      e.title.toLowerCase().trim() === title.toLowerCase().trim() &&
+      e.recurrence_rule === finalRRule
+    );
+
+    if (duplicateRecurring) {
+      console.log(`[CREATE-RECURRING-EVENT TOOL] Duplicate found: "${title}" with same recurrence rule already exists as recurring event ${duplicateRecurring.id}`);
+      return `Recurring event "${title}" with this recurrence pattern already exists on your calendar. No duplicate created.`;
+    }
+
     // Convert local times to UTC
     const startTimeUTC = convertToUTC(startTime, timezone);
     const endTimeUTC = convertToUTC(endTime, timezone);
@@ -116,23 +126,6 @@ export const createRecurringEventTool = tool(
     }
 
     console.log('[CREATE-RECURRING-EVENT TOOL] Recurring event created successfully:', recurringEvent.id);
-
-    // Sync to Zep (fire and forget, non-blocking)
-    executeZepOperation(
-      {
-        userId,
-        entityType: 'event',
-        entityId: recurringEvent.id,
-        operation: 'create',
-        maxRetries: 2
-      },
-      async () => {
-        await zepGraphService.addCalendarEvent(userId, recurringEvent);
-        return recurringEvent.id;
-      }
-    ).catch(err => {
-      console.warn('[CREATE-RECURRING-EVENT TOOL] Non-critical: Failed to sync to Zep:', err);
-    });
 
     const aspectContext = validatedAspect ? ` in aspect "${validatedAspect}"` : '';
     const recurrenceDescription = formatRRuleForDisplay(finalRRule);
