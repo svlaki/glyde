@@ -4,6 +4,7 @@ import { SupabaseService } from "../../services/SupabaseService.js";
 import { AspectService } from "../../services/AspectService.js";
 import { convertToUTC, formatEventTime } from "../../utils/timezoneUtils.js";
 import reminderService from "../../services/ReminderService.js";
+import { DEFAULT_REMINDER_MINUTES } from "../../types/database.js";
 
 export const createEventTool = tool(
   async ({ title, startTime, endTime, location, description, category, visibility, replaceConflicting = false, projectId, reminderMinutes }, config) => {
@@ -137,7 +138,9 @@ export const createEventTool = tool(
       aspect: validatedAspect || '',
       visibility: visibility || 'private',
       project_id: projectId || undefined,
-      reminder_minutes: reminderMinutes != null ? reminderMinutes : undefined
+      reminder_minutes: reminderMinutes != null
+        ? (Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes])
+        : undefined
     }, { source: 'agent', agentType: 'conversation' });
 
     console.log('[CREATE-EVENT TOOL] SupabaseService returned:', event ? 'SUCCESS' : 'NULL');
@@ -149,16 +152,17 @@ export const createEventTool = tool(
 
     console.log('[CREATE-EVENT TOOL] Event created successfully:', event.id);
 
-    // Create reminder in the unified reminders table if reminder_minutes is set
-    if (reminderMinutes != null) {
-      try {
-        await reminderService.syncEventReminder(
-          userId, event.id, title, startTimeUTC, reminderMinutes,
-          event.aspect_id || undefined
-        );
-      } catch (reminderError) {
-        console.warn('[CREATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
-      }
+    // Create reminders in the unified reminders table — use defaults if not specified
+    try {
+      const minutesList = reminderMinutes != null
+        ? (Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes])
+        : DEFAULT_REMINDER_MINUTES;
+      await reminderService.syncEventReminder(
+        userId, event.id, title, startTimeUTC, minutesList,
+        event.aspect_id || undefined
+      );
+    } catch (reminderError) {
+      console.warn('[CREATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
     }
 
     // Add context about aspect in response
@@ -181,7 +185,10 @@ export const createEventTool = tool(
       visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("private|friends|public. Default: private"),
       replaceConflicting: z.boolean().default(false).nullable().describe("True to replace conflicting event"),
       projectId: z.string().optional().nullable().describe("Project UUID to link to"),
-      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Minutes before event for reminder (0-10080)"),
+      reminderMinutes: z.union([
+        z.number().int().min(0).max(10080),
+        z.array(z.number().int().min(0).max(10080))
+      ]).optional().nullable().describe("Minutes before event for reminder(s). Single number or array of numbers (0-10080)."),
     }),
   }
 );

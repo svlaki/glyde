@@ -100,7 +100,11 @@ export const updateEventTool = tool(
         aspect: aspect || undefined,
         reflection: reflection !== undefined && reflection !== null ? reflection : undefined,
         is_missed: isMissed !== undefined && isMissed !== null ? isMissed : undefined,
-        reminder_minutes: reminderMinutes !== undefined ? (reminderMinutes ?? null) : undefined,
+        reminder_minutes: reminderMinutes !== undefined
+          ? (reminderMinutes != null
+            ? (Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes])
+            : null)
+          : undefined,
       },
       { source: 'agent', agentType: 'conversation' }
     );
@@ -109,12 +113,15 @@ export const updateEventTool = tool(
       return "Failed to update event. The event may have been deleted or you may not have permission to modify it.";
     }
 
-    // Sync reminder if reminderMinutes was changed
+    // Sync reminders if reminderMinutes was changed
     if (reminderMinutes !== undefined && updatedEvent) {
       try {
+        const minutesList = reminderMinutes != null
+          ? (Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes])
+          : null;
         await reminderService.syncEventReminder(
           userId, updatedEvent.id, updatedEvent.title, updatedEvent.start_time,
-          reminderMinutes, updatedEvent.aspect_id || undefined
+          minutesList, updatedEvent.aspect_id || undefined
         );
       } catch (reminderError) {
         console.warn('[UPDATE-EVENT TOOL] Reminder sync failed (non-critical):', reminderError);
@@ -147,7 +154,10 @@ export const updateEventTool = tool(
       changes.push(isMissed ? 'marked as missed' : 'marked as attended');
     }
     if (reminderMinutes !== undefined) {
-      changes.push(reminderMinutes != null ? `reminder set to ${reminderMinutes} min before` : 'reminder removed');
+      const mins = reminderMinutes != null
+        ? (Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes])
+        : [];
+      changes.push(mins.length > 0 ? `reminders set to ${mins.join(', ')} min before` : 'reminders removed');
     }
 
     const changeDescription = changes.length > 0 ? ` - ${changes.join(', ')}` : '';
@@ -167,7 +177,10 @@ export const updateEventTool = tool(
       aspect: z.string().optional().nullable().describe("New aspect name"),
       reflection: z.string().optional().nullable().describe("Reflection text for past events"),
       isMissed: z.boolean().optional().nullable().describe("Mark event as missed (true/false)"),
-      reminderMinutes: z.number().int().min(0).max(10080).optional().nullable().describe("Minutes before event for reminder. Null to remove."),
+      reminderMinutes: z.union([
+        z.number().int().min(0).max(10080),
+        z.array(z.number().int().min(0).max(10080))
+      ]).optional().nullable().describe("Minutes before event for reminder(s). Single number or array. Null to remove."),
     }),
   }
 );

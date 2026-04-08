@@ -36,7 +36,7 @@ export interface CalendarEvent {
   reflection?: string
   is_missed?: boolean
   // Reminder field
-  reminder_minutes?: number | null  // Minutes before event to fire a reminder (null = no reminder)
+  reminder_minutes?: number[] | null  // Array of minutes before event to fire reminders (null/empty = no reminders)
   // All-day event flag
   is_all_day?: boolean
   // Google sync fields
@@ -388,7 +388,7 @@ export async function createRecurringEvent(
   location?: string,
   recurrenceEnd?: string,
   accessToken?: string,
-  reminderMinutes?: number | null
+  reminderMinutes?: number[] | null
 ): Promise<{ event: CalendarEvent | null, error: string | null }> {
   try {
     if (!user) {

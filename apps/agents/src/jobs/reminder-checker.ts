@@ -2,22 +2,43 @@ import reminderService from '../services/ReminderService.js';
 import { getSupabaseService } from '../services/SupabaseService.js';
 import { expandRecurrence } from '../utils/rrule.js';
 import pushNotificationService from '../services/PushNotificationService.js';
+import webPushService from '../services/WebPushService.js';
 
 const DELIVERY_INTERVAL_MS = 60 * 1000; // Check for due reminders every 60s
 const RECURRING_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // Top up recurring reminders every 6 hours
+const TOP_UP_CONCURRENCY = 5;
 let deliveryInterval: NodeJS.Timeout | null = null;
 let recurringSyncInterval: NodeJS.Timeout | null = null;
 let isDelivering = false;
 
 /**
- * Check for due reminders and deliver them as interaction cards.
+ * Recover reminders stuck in 'delivering' status for more than 5 minutes.
+ * Safety net for crashes or restarts during delivery.
+ */
+async function recoverStaleDelivering(): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    await getSupabaseService().getClient()
+      .from('reminders')
+      .update({ status: 'pending', updated_at: new Date().toISOString() })
+      .eq('status', 'delivering')
+      .lt('updated_at', cutoff);
+  } catch (error) {
+    console.error('[REMINDER-CHECKER] Error recovering stale delivering reminders:', error);
+  }
+}
+
+/**
+ * Check for due reminders and deliver them via push notification.
  * Runs every 60s - lightweight, just checks trigger_at <= now.
  */
 export async function deliverDueReminders(): Promise<void> {
   if (isDelivering) return;
   isDelivering = true;
   try {
-    const supabaseService = getSupabaseService();
+    // Recover any stuck reminders from previous crashes
+    await recoverStaleDelivering();
+
     const dueReminders = await reminderService.getDueReminders();
 
     if (dueReminders.length === 0) return;
@@ -29,21 +50,25 @@ export async function deliverDueReminders(): Promise<void> {
         const metadata = (reminder.metadata || {}) as Record<string, any>;
         const isEventReminder = !!metadata.event_reminder_id;
 
-        // Deliver reminders via push notification only — NOT as interaction cards.
-        // Interaction cards clutter the panel with "Got it/Snooze" noise.
-        // Reminders belong as toast notifications and are shown on the Reminders page.
-        try {
-          await pushNotificationService.sendToUser(reminder.user_id, {
-            title: isEventReminder ? 'Upcoming Event' : 'Reminder',
-            body: reminder.message,
-            data: { type: 'reminder', reminderId: reminder.id },
-            sound: 'default',
-          });
-        } catch (pushError) {
-          console.error(`[REMINDER-CHECKER] Push failed for ${reminder.id}:`, pushError);
+        const payload = {
+          title: isEventReminder ? 'Upcoming Event' : 'Reminder',
+          body: reminder.message,
+          data: { type: 'reminder', reminderId: reminder.id },
+          sound: 'default' as const,
+        };
+
+        // Deliver via both APNs and Web Push
+        const results = await Promise.allSettled([
+          pushNotificationService.sendToUser(reminder.user_id, payload),
+          webPushService.sendToUser(reminder.user_id, payload),
+        ]);
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            console.error(`[REMINDER-CHECKER] Push delivery failed for ${reminder.id}:`, result.reason);
+          }
         }
 
-        // Mark as delivered (no interaction card ID needed)
+        // Mark as delivered
         await reminderService.markDelivered(reminder.user_id, reminder.id);
         console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} via push notification`);
       } catch (error) {
@@ -68,11 +93,15 @@ export async function syncRecurringEventInstanceReminders(
   eventTitle: string,
   eventStartTime: string,
   recurrenceRule: string,
-  reminderMinutes: number,
+  reminderMinutes: number[] | number,
   aspectId?: string,
   timezone?: string
 ): Promise<void> {
   try {
+    // Normalize: accept single number for backward compatibility
+    const minutesList = Array.isArray(reminderMinutes) ? reminderMinutes : [reminderMinutes];
+    if (minutesList.length === 0) return;
+
     const tz = timezone || 'America/Los_Angeles';
     const now = new Date();
     const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -92,7 +121,7 @@ export async function syncRecurringEventInstanceReminders(
       const instanceDate = instanceStart.toISOString().split('T')[0];
       await reminderService.syncEventReminder(
         userId, eventId, eventTitle, instanceStart.toISOString(),
-        reminderMinutes, aspectId, instanceDate
+        minutesList, aspectId, instanceDate
       );
     }
   } catch (error) {
@@ -103,6 +132,7 @@ export async function syncRecurringEventInstanceReminders(
 /**
  * Top up recurring event reminders for all users.
  * Runs every 6 hours to ensure the next 7 days always have reminders queued.
+ * Processes events with concurrency limit for performance.
  */
 async function topUpRecurringReminders(): Promise<void> {
   try {
@@ -112,6 +142,7 @@ async function topUpRecurringReminders(): Promise<void> {
       .select('id, user_id, title, start_time, reminder_minutes, aspect_id, recurrence_rule')
       .eq('is_recurring', true)
       .is('parent_event_id', null)
+      .not('reminder_minutes', 'eq', '{}')
       .not('reminder_minutes', 'is', null)
       .not('recurrence_rule', 'is', null);
 
@@ -132,14 +163,21 @@ async function topUpRecurringReminders(): Promise<void> {
       }
     }
 
-    for (const event of recurringEvents) {
-      await syncRecurringEventInstanceReminders(
-        event.user_id, event.id, event.title, event.start_time,
-        event.recurrence_rule, event.reminder_minutes,
-        event.aspect_id || undefined,
-        timezoneMap.get(event.user_id)
-      );
-    }
+    // Process events with concurrency limit
+    const queue = [...recurringEvents];
+    const workers = Array.from({ length: TOP_UP_CONCURRENCY }, async () => {
+      while (queue.length > 0) {
+        const event = queue.shift();
+        if (!event) break;
+        await syncRecurringEventInstanceReminders(
+          event.user_id, event.id, event.title, event.start_time,
+          event.recurrence_rule, event.reminder_minutes,
+          event.aspect_id || undefined,
+          timezoneMap.get(event.user_id)
+        );
+      }
+    });
+    await Promise.allSettled(workers);
 
     console.log(`[REMINDER-CHECKER] Topped up recurring reminders for ${recurringEvents.length} event(s)`);
   } catch (error) {

@@ -117,12 +117,12 @@ export function Calendar() {
     onDrop: handlePointerDrop,
   })
 
-  // Helper: fetch events with a 3-month window for performance
-  const fetchEventsWindowed = async () => {
+  // Helper: fetch events with a 3-month window centered on the viewed date
+  const fetchEventsWindowed = useCallback(async (refDate?: Date) => {
     if (!user) return { events: [] as CalendarEvent[], error: null }
-    const n = new Date()
+    const n = refDate || currentDate
     return fetchExpandedEvents(user, session?.access_token, new Date(n.getFullYear(), n.getMonth() - 1, 1), new Date(n.getFullYear(), n.getMonth() + 2, 0))
-  }
+  }, [user, session?.access_token, currentDate])
 
   // Persist friends events toggle
   useEffect(() => {
@@ -432,6 +432,18 @@ export function Calendar() {
     }
   }, [user, session])
 
+  // Re-fetch events when the viewed month changes
+  const [lastFetchedMonth, setLastFetchedMonth] = useState(() => `${currentDate.getFullYear()}-${currentDate.getMonth()}`)
+  useEffect(() => {
+    const key = `${currentDate.getFullYear()}-${currentDate.getMonth()}`
+    if (key !== lastFetchedMonth && user) {
+      setLastFetchedMonth(key)
+      fetchEventsWindowed(currentDate).then(result => {
+        if (result.events) setEvents(result.events)
+      })
+    }
+  }, [currentDate, lastFetchedMonth, user, fetchEventsWindowed])
+
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -456,8 +468,8 @@ export function Calendar() {
   // Auto-scroll to 9am when view changes to day/week
   useEffect(() => {
     if ((view === 'day' || view === 'week') && scrollContainerRef.current) {
-      // Scroll to 9am: (9 hours * 60px per hour) + 40px header = 580px
-      scrollContainerRef.current.scrollTop = 580
+      // Scroll to 9am: 36px header + all-day banner + 12px spacer + 9 hours * 60px
+      scrollContainerRef.current.scrollTop = 36 + allDayBannerInfo.height + 12 + (9 * 60)
     }
   }, [view])
 
@@ -1282,7 +1294,7 @@ export function Calendar() {
             {/* Inner wrapper scrolls vertically in sync with main grid */}
             <div
               ref={timeGutterRef}
-              style={{ height: '100%', overflow: 'hidden' }}
+              style={{ height: '100%', overflow: 'hidden', position: 'relative' }}
             >
               {/* Timezone header - sticky top */}
               <div style={{
@@ -1312,6 +1324,7 @@ export function Calendar() {
                   fontFamily: fontFamily.sans,
                   color: colors.textTertiary,
                   borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                  boxSizing: 'border-box',
                 }}>
                   all-day
                 </div>
@@ -1340,7 +1353,7 @@ export function Calendar() {
               {/* Current time label */}
               {(() => {
                 const now = currentTime
-                const topPos = (now.getHours() * 60) + (now.getMinutes() / 60 * 60) + 36
+                const topPos = (now.getHours() * 60) + now.getMinutes() + 36
                   + allDayBannerInfo.height + 12
                 const todayInView = displayDates.some(d => d.toDateString() === new Date().toDateString())
                 if (!todayInView) return null
@@ -1971,7 +1984,7 @@ export function Calendar() {
             {/* Current Time Red Line */}
             {(() => {
               const now = currentTime
-              const topPosition = (now.getHours() * 60) + (now.getMinutes() / 60 * 60) + 36
+              const topPosition = (now.getHours() * 60) + now.getMinutes() + 36
                 + allDayBannerInfo.height + 12
               const todayInView = displayDates.some(d => d.toDateString() === new Date().toDateString())
               if (!todayInView) return null

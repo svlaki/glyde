@@ -193,7 +193,7 @@ export class ReminderService {
         .update(updatePayload)
         .eq('id', reminderId)
         .eq('user_id', userId)
-        .in('status', ['pending', 'snoozed']);
+        .in('status', ['pending', 'snoozed', 'delivering']);
 
       return !error;
     } catch {
@@ -227,8 +227,8 @@ export class ReminderService {
   }
 
   /**
-   * Sync a reminder for an event. Creates, updates, or dismisses a reminder
-   * based on the event's reminder_minutes setting.
+   * Sync reminders for an event. Creates, updates, or dismisses reminders
+   * based on the event's reminder_minutes array.
    * For recurring events, pass instanceDate to create per-instance reminders.
    */
   async syncEventReminder(
@@ -236,74 +236,137 @@ export class ReminderService {
     eventId: string,
     eventTitle: string,
     eventStartTime: string,
-    reminderMinutes: number | null | undefined,
+    reminderMinutes: number[] | null | undefined,
     aspectId?: string,
     instanceDate?: string
   ): Promise<void> {
     try {
-      if (reminderMinutes == null) {
-        // Remove any existing reminder for this event
-        const existing = await this.findEventReminder(userId, eventId, instanceDate);
-        if (existing && (existing.status === 'pending' || existing.status === 'snoozed')) {
+      const minutesList = reminderMinutes ?? [];
+
+      // Get all existing reminders for this event (1 query)
+      const existingReminders = await this.findEventReminders(userId, eventId, instanceDate);
+
+      // Collect IDs to dismiss in batch
+      const dismissIds: string[] = [];
+
+      if (minutesList.length === 0) {
+        // Dismiss all existing reminders for this event
+        for (const existing of existingReminders) {
+          if (existing.status === 'pending' || existing.status === 'snoozed') {
+            dismissIds.push(existing.id);
+          }
+        }
+        if (dismissIds.length > 0) {
           await this.client
             .from('reminders')
             .update({ status: 'dismissed' })
-            .eq('id', existing.id)
+            .in('id', dismissIds)
             .eq('user_id', userId);
         }
         return;
       }
 
-      const triggerAt = new Date(
-        new Date(eventStartTime).getTime() - reminderMinutes * 60000
-      ).toISOString();
+      const eventStart = new Date(eventStartTime).getTime();
+      const now = new Date().getTime();
 
-      // Don't create reminders for times already past
-      if (new Date(triggerAt) < new Date()) {
-        return;
+      // Build a map of existing reminders by their reminder_minutes_value
+      const existingByValue = new Map<number, Reminder>();
+      for (const r of existingReminders) {
+        const val = r.metadata?.reminder_minutes_value;
+        if (val != null) {
+          existingByValue.set(val, r);
+        }
       }
 
-      const existing = await this.findEventReminder(userId, eventId, instanceDate);
+      const wantedValues = new Set(minutesList);
+      const toCreate: Array<{
+        user_id: string;
+        message: string;
+        trigger_at: string;
+        aspect_id: string | null;
+        created_by: string;
+        metadata: Record<string, any>;
+      }> = [];
 
-      if (existing) {
-        // Update existing if still pending/snoozed
-        if (existing.status === 'pending' || existing.status === 'snoozed') {
-          await this.client
-            .from('reminders')
-            .update({
-              trigger_at: triggerAt,
-              message: eventTitle,
-              aspect_id: aspectId || null,
-            })
-            .eq('id', existing.id)
-            .eq('user_id', userId);
+      // Collect creates and updates
+      for (const minutes of minutesList) {
+        const triggerAt = new Date(eventStart - minutes * 60000).toISOString();
+
+        // Skip reminders for times already past
+        if (new Date(triggerAt).getTime() < now) {
+          continue;
         }
-      } else {
-        // Create new
-        await this.createReminder(userId, {
-          message: eventTitle,
-          trigger_at: triggerAt,
-          aspect_id: aspectId,
-          created_by: 'conversation',
-          metadata: {
-            event_reminder_id: eventId,
-            ...(instanceDate ? { instance_date: instanceDate } : {}),
-          },
-        });
+
+        const existing = existingByValue.get(minutes);
+
+        if (existing) {
+          // Update existing individually (each has different trigger_at)
+          if (existing.status === 'pending' || existing.status === 'snoozed') {
+            await this.client
+              .from('reminders')
+              .update({
+                trigger_at: triggerAt,
+                message: eventTitle,
+                aspect_id: aspectId || null,
+              })
+              .eq('id', existing.id)
+              .eq('user_id', userId);
+          }
+        } else {
+          // Collect for batch insert
+          toCreate.push({
+            user_id: userId,
+            message: eventTitle,
+            trigger_at: triggerAt,
+            aspect_id: aspectId || null,
+            created_by: 'conversation',
+            metadata: {
+              event_reminder_id: eventId,
+              reminder_minutes_value: minutes,
+              ...(instanceDate ? { instance_date: instanceDate } : {}),
+            },
+          });
+        }
+      }
+
+      // Batch insert new reminders (1 query instead of N)
+      if (toCreate.length > 0) {
+        const { error } = await this.client
+          .from('reminders')
+          .insert(toCreate);
+        if (error) {
+          console.error('[ReminderService] Error batch creating reminders:', error);
+        }
+      }
+
+      // Collect unwanted reminders for batch dismiss
+      for (const [value, existing] of existingByValue) {
+        if (!wantedValues.has(value) && (existing.status === 'pending' || existing.status === 'snoozed')) {
+          dismissIds.push(existing.id);
+        }
+      }
+
+      // Batch dismiss (1 query instead of K)
+      if (dismissIds.length > 0) {
+        await this.client
+          .from('reminders')
+          .update({ status: 'dismissed' })
+          .in('id', dismissIds)
+          .eq('user_id', userId);
       }
     } catch (error) {
-      console.error('[ReminderService] Error syncing event reminder:', error);
+      console.error('[ReminderService] Error syncing event reminders:', error);
     }
   }
 
   /**
-   * Find an existing reminder linked to a specific event (and optionally a specific instance).
+   * Find all existing reminders linked to a specific event (and optionally a specific instance).
    */
-  private async findEventReminder(
+  private async findEventReminders(
     userId: string,
     eventId: string,
     instanceDate?: string
-  ): Promise<Reminder | null> {
+  ): Promise<Reminder[]> {
     try {
       let query = this.client
         .from('reminders')
@@ -318,10 +381,10 @@ export class ReminderService {
         query = query.is('metadata->>instance_date', null);
       }
 
-      const { data } = await query.limit(1).maybeSingle();
-      return data || null;
+      const { data } = await query;
+      return data || [];
     } catch {
-      return null;
+      return [];
     }
   }
 

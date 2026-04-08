@@ -47,6 +47,7 @@ export function RuleForm({ rule, isOpen, onClose, onSave }: RuleFormProps) {
       onClose()
     } catch (error) {
       console.error('Error saving rule:', error)
+      alert(error instanceof Error ? error.message : 'Failed to save rule')
     } finally {
       setLoading(false)
     }

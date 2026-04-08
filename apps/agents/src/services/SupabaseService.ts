@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult } from '../types/database.js';
+import { DatabaseEvent, DatabaseChatMessage, DatabaseProfile, VectorSearchResult, DEFAULT_REMINDER_MINUTES } from '../types/database.js';
 import { AgentType } from '../types/agents.js';
 
 // Activity log types
@@ -545,7 +545,7 @@ export class SupabaseService {
           aspect_id: aspectId,
           visibility: event.visibility || 'private', // Default to private for privacy
           project_id: event.project_id || null,
-          reminder_minutes: event.reminder_minutes ?? null
+          reminder_minutes: event.reminder_minutes ?? DEFAULT_REMINDER_MINUTES
         })
         .select()
         .single();
@@ -1071,7 +1071,7 @@ export class SupabaseService {
           recurrence_end: event.recurrence_end || null,
           parent_event_id: null, // This is the parent
           is_recurring: true,
-          reminder_minutes: event.reminder_minutes ?? null
+          reminder_minutes: event.reminder_minutes ?? DEFAULT_REMINDER_MINUTES
         })
         .select()
         .single();

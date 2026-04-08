@@ -76,6 +76,7 @@ import { startNotificationSchedulerJob } from '../jobs/notification-scheduler.js
 import { startScribeScheduler } from '../jobs/scribe-scheduler.js';
 import { authenticateRequest } from './middleware/auth.js';
 import pushNotificationService from '../services/PushNotificationService.js';
+import webPushService from '../services/WebPushService.js';
 import { completeOnboarding, saveOnboardingStep } from './onboarding.js';
 import analyticsRouter from './analytics.js';
 import {
@@ -608,8 +609,9 @@ if (process.env.NODE_ENV !== 'test') {
     startNotificationSchedulerJob();
     startScribeScheduler();
 
-    // Initialize push notification service
+    // Initialize push notification services
     pushNotificationService.initialize();
+    webPushService.initialize();
   });
 
   // Graceful shutdown

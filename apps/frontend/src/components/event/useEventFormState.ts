@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import type { CalendarEvent } from '../../lib/calendarService'
 import { parseRRuleToForm, buildRRuleFromForm, getNextOccurrences } from '../../lib/recurrenceUtils'
 
+const DEFAULT_REMINDER_MINUTES = [60, 15, 5, 0]
+
 export interface RecurrenceState {
   pattern: 'daily' | 'weekly' | 'monthly' | 'yearly'
   interval: number
@@ -69,7 +71,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
   const [startDate, setStartDate] = useState<Date>(new Date())
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [reflection, setReflection] = useState('')
-  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null)
+  const [reminderMinutesList, setReminderMinutesList] = useState<number[]>(DEFAULT_REMINDER_MINUTES)
   const [loading, setLoading] = useState(false)
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurrence, setRecurrence] = useState<RecurrenceState>(defaultRecurrence)
@@ -97,7 +99,8 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setAspect(event.aspect || '')
       setVisibility(event.visibility || 'private')
       setReflection(event.reflection || '')
-      setReminderMinutes(event.reminder_minutes ?? null)
+      const rm = event.reminder_minutes
+      setReminderMinutesList(rm == null ? DEFAULT_REMINDER_MINUTES : Array.isArray(rm) ? rm : [rm])
 
       if (event.start_time) {
         setStartDate(new Date(event.start_time))
@@ -144,7 +147,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
       setAspect('')
       setVisibility('private')
       setReflection('')
-      setReminderMinutes(null)
+      setReminderMinutesList(DEFAULT_REMINDER_MINUTES)
 
       const now = new Date()
       const roundedStart = new Date(now)
@@ -294,7 +297,7 @@ export function useEventFormState({ event, isOpen }: UseEventFormStateOptions) {
     endTimeValue, setEndTimeValue,
 
     // Reminder
-    reminderMinutes, setReminderMinutes,
+    reminderMinutesList, setReminderMinutesList,
 
     // Reflection
     reflection, setReflection,

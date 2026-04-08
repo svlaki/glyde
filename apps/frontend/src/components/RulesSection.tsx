@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTheme } from '../lib/themeContext'
 import { useRules } from '../lib/ruleContext'
 import type { Rule } from '../lib/ruleService'
@@ -22,6 +22,18 @@ export function RulesSection() {
   const [editingRule, setEditingRule] = useState<Rule | undefined>(undefined)
   // For mobile: track whether showing list or detail view
   const [showingDetail, setShowingDetail] = useState(false)
+
+  // Keep selectedRule in sync with rules from context (after edits/toggles)
+  useEffect(() => {
+    if (selectedRule) {
+      const updated = rules.find(r => r.id === selectedRule.id)
+      if (updated && updated !== selectedRule) {
+        setSelectedRule(updated)
+      } else if (!updated) {
+        setSelectedRule(null)
+      }
+    }
+  }, [rules, selectedRule])
 
   // Sort rules: enabled first, then by priority (high to low)
   const sortedRules = [...rules].sort((a, b) => {

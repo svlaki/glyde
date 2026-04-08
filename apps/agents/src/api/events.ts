@@ -3,6 +3,7 @@ import { SupabaseService } from '../services/SupabaseService.js';
 import { logger } from '../utils/logger.js';
 import reminderService from '../services/ReminderService.js';
 import { syncRecurringEventInstanceReminders } from '../jobs/reminder-checker.js';
+import { DEFAULT_REMINDER_MINUTES } from '../types/database.js';
 
 // Singleton pattern for service instance
 let supabaseService: SupabaseService | null = null;
@@ -121,13 +122,12 @@ export async function createUserEvent(req: Request, res: Response): Promise<void
     });
     
     if (createdEvent) {
-      // Sync reminder if reminder_minutes was set
-      if (eventData.reminder_minutes != null) {
-        await reminderService.syncEventReminder(
-          user_id, createdEvent.id, createdEvent.title, createdEvent.start_time,
-          eventData.reminder_minutes, createdEvent.aspect_id || undefined
-        );
-      }
+      // Sync reminders — use explicit value, or fall back to defaults
+      const reminderMinutes = eventData.reminder_minutes ?? DEFAULT_REMINDER_MINUTES;
+      await reminderService.syncEventReminder(
+        user_id, createdEvent.id, createdEvent.title, createdEvent.start_time,
+        reminderMinutes, createdEvent.aspect_id || undefined
+      );
 
       res.json({
         success: true,
@@ -318,14 +318,15 @@ export async function createRecurringEvent(req: Request, res: Response): Promise
     logger.info('Successfully created recurring event', { event_id: event.id, user_id });
 
     // Immediately create reminders for upcoming instances
-    if (reminder_minutes != null && recurrence_rule) {
+    const effectiveReminderMinutes = reminder_minutes ?? DEFAULT_REMINDER_MINUTES;
+    if (Array.isArray(effectiveReminderMinutes) && effectiveReminderMinutes.length > 0 && recurrence_rule) {
       const { data: profile } = await getSupabaseService().getClient()
         .from('profile').select('timezone').eq('id', user_id).single();
       const tz = profile?.timezone || 'America/Los_Angeles';
 
       syncRecurringEventInstanceReminders(
         user_id, event.id, event.title, event.start_time,
-        recurrence_rule, reminder_minutes, event.aspect_id || undefined, tz
+        recurrence_rule, effectiveReminderMinutes, event.aspect_id || undefined, tz
       ).catch(err => console.error('[EVENTS] Failed to sync recurring reminders:', err));
     }
 
@@ -407,7 +408,7 @@ export async function updateRecurringEvent(req: Request, res: Response): Promise
 
       // Sync reminders if reminder_minutes changed on the series
       if (updates.reminder_minutes !== undefined && event.recurrence_rule) {
-        if (updates.reminder_minutes == null) {
+        if (updates.reminder_minutes == null || (Array.isArray(updates.reminder_minutes) && updates.reminder_minutes.length === 0)) {
           // Reminder removed - dismiss all pending event reminders
           await reminderService.dismissEventReminders(user_id, event_id);
         } else {

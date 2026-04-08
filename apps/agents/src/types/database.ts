@@ -1,3 +1,6 @@
+/** Default reminder minutes applied to all new events unless explicitly overridden */
+export const DEFAULT_REMINDER_MINUTES: number[] = [60, 15, 5, 0];
+
 export interface DatabaseEvent {
   id: string;
   user_id: string;
@@ -43,7 +46,7 @@ export interface DatabaseEvent {
   project_name?: string;
 
   // Reminder field
-  reminder_minutes?: number | null;  // Minutes before event to fire a reminder (null = no reminder)
+  reminder_minutes?: number[] | null;  // Array of minutes before event to fire reminders (null/empty = use defaults)
 
   // All-day event flag
   is_all_day?: boolean;

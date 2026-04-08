@@ -59,6 +59,7 @@ export function EventFormUnified({
   const [pendingSaveData, setPendingSaveData] = useState<Partial<CalendarEvent> | null>(null)
   const [pendingRRule, setPendingRRule] = useState<string | undefined>(undefined)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showReminderOptions, setShowReminderOptions] = useState(false)
 
   // Build rrule from current recurrence state
   const buildCurrentRRule = () => {
@@ -100,7 +101,7 @@ export function EventFormUnified({
       start_time: startISO,
       end_time: endISO,
       ...(form.reflection.trim() ? { reflection: form.reflection.trim() } : {}),
-      reminder_minutes: form.reminderMinutes,
+      reminder_minutes: form.reminderMinutesList.length > 0 ? form.reminderMinutesList : null,
     }
   }
 
@@ -131,7 +132,7 @@ export function EventFormUnified({
             ? new Date(form.recurrence.untilDate).toISOString()
             : undefined,
           session?.access_token,
-          form.reminderMinutes
+          form.reminderMinutesList.length > 0 ? form.reminderMinutesList : null
         )
 
         if (error) {
@@ -847,37 +848,164 @@ export function EventFormUnified({
               />
             </div>
 
-            {/* Reminder */}
-            <div>
-              <FormLabel>Reminder</FormLabel>
-              <select
-                value={form.reminderMinutes === null ? '' : String(form.reminderMinutes)}
-                onChange={(e) => {
-                  const val = e.target.value
-                  form.setReminderMinutes(val === '' ? null : Number(val))
-                }}
-                style={{
-                  ...inputStyle,
-                  appearance: 'none',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 14px center',
-                  paddingRight: '36px',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="">No reminder</option>
-                <option value="0">At time of event</option>
-                <option value="5">5 minutes before</option>
-                <option value="10">10 minutes before</option>
-                <option value="15">15 minutes before</option>
-                <option value="30">30 minutes before</option>
-                <option value="60">1 hour before</option>
-                <option value="120">2 hours before</option>
-                <option value="1440">1 day before</option>
-                <option value="2880">2 days before</option>
-              </select>
-            </div>
+            {/* Reminders */}
+            {(() => {
+              const reminderOptions = [
+                { value: 2880, label: '2 days before' },
+                { value: 1440, label: '1 day before' },
+                { value: 120, label: '2 hours before' },
+                { value: 60, label: '1 hour before' },
+                { value: 30, label: '30 minutes before' },
+                { value: 15, label: '15 minutes before' },
+                { value: 10, label: '10 minutes before' },
+                { value: 5, label: '5 minutes before' },
+                { value: 0, label: 'At time of event' },
+              ] as const
+              const availableOptions = reminderOptions.filter(
+                opt => !form.reminderMinutesList.includes(opt.value)
+              )
+              const getLabelForValue = (v: number) =>
+                reminderOptions.find(opt => opt.value === v)?.label ?? `${v} min before`
+
+              return (
+                <div>
+                  <FormLabel>Reminders</FormLabel>
+
+                  {/* Selected reminder chips */}
+                  {form.reminderMinutesList.length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '6px',
+                      marginBottom: '8px',
+                    }}>
+                      {[...form.reminderMinutesList]
+                        .sort((a, b) => b - a)
+                        .map(value => (
+                        <span
+                          key={value}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            fontSize: fontSize.xs,
+                            fontFamily: fontFamily.sans,
+                            color: colors.textPrimary,
+                            background: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {getLabelForValue(value)}
+                          <button
+                            type="button"
+                            onClick={() => form.setReminderMinutesList(
+                              form.reminderMinutesList.filter(v => v !== value)
+                            )}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: '0 2px',
+                              cursor: 'pointer',
+                              color: colors.textTertiary,
+                              fontSize: fontSize.xs,
+                              lineHeight: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add reminder button / dropdown */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowReminderOptions(!showReminderOptions)}
+                      style={{
+                        ...inputStyle,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        color: availableOptions.length === 0 ? colors.textTertiary : colors.textSecondary,
+                      }}
+                    >
+                      <span>{availableOptions.length === 0 ? 'All reminders added' : 'Add a reminder...'}</span>
+                      <svg
+                        width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2"
+                        style={{
+                          transform: showReminderOptions ? 'rotate(180deg)' : 'none',
+                          transition: 'transform 0.15s',
+                        }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+
+                    {showReminderOptions && availableOptions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        background: colors.bgPrimary,
+                        border: `1px solid ${colors.border}`,
+                        borderRadius: '6px',
+                        boxShadow: isDarkMode
+                          ? '0 4px 12px rgba(0,0,0,0.4)'
+                          : '0 4px 12px rgba(0,0,0,0.1)',
+                        zIndex: 10,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                      }}>
+                        {availableOptions.map(({ value, label }) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => {
+                              form.setReminderMinutesList(
+                                [...form.reminderMinutesList, value].sort((a, b) => b - a)
+                              )
+                              setShowReminderOptions(false)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              background: 'none',
+                              border: 'none',
+                              borderBottom: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              fontSize: fontSize.sm,
+                              fontFamily: fontFamily.sans,
+                              color: colors.textPrimary,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = colors.bgHover
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'none'
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Reflection - only for past events being edited */}
             {form.isPastEvent && form.isEditing && (
