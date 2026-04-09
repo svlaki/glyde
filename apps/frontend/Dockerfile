@@ -7,8 +7,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Strip electron packages from package.json (not needed for web/Docker build, saves ~200MB)
+# Note: Capacitor packages are NOT stripped — they are small JS-only deps needed at build time
 RUN apk add --no-cache jq \
-    && jq 'del(.devDependencies["electron"], .devDependencies["electron-builder"], .devDependencies["electron-vite"], .devDependencies["@electron-toolkit/preload"], .devDependencies["@electron-toolkit/utils"], .devDependencies["@capacitor/cli"], .devDependencies["@capacitor/core"], .devDependencies["@capacitor/ios"], .devDependencies["@capacitor/app"], .devDependencies["@capacitor/keyboard"], .devDependencies["@capacitor/push-notifications"])' package.json > package.tmp.json \
+    && jq 'del(.devDependencies["electron"], .devDependencies["electron-builder"], .devDependencies["electron-vite"], .devDependencies["@electron-toolkit/preload"], .devDependencies["@electron-toolkit/utils"])' package.json > package.tmp.json \
     && mv package.tmp.json package.json
 
 # Install dependencies with legacy peer deps to handle React version conflicts
@@ -24,12 +25,14 @@ ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_AGENT_SERVICE_URL
 ARG VITE_GOOGLE_CLIENT_ID
 ARG VITE_ADMIN_USER_IDS
+ARG VITE_VAPID_PUBLIC_KEY
 
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 ENV VITE_AGENT_SERVICE_URL=$VITE_AGENT_SERVICE_URL
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 ENV VITE_ADMIN_USER_IDS=$VITE_ADMIN_USER_IDS
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 
 RUN npm run build
 
