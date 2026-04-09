@@ -27,6 +27,9 @@ services:
       - MICROSOFT_REDIRECT_URI=${MICROSOFT_REDIRECT_URI:-${GOOGLE_CONNECTION_CALLBACK_URI:-${GOOGLE_REDIRECT_URI}}}
       - API_BASE_URL=${API_BASE_URL}
       - ADMIN_USER_IDS=${VITE_ADMIN_USER_IDS}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
+      - VAPID_CONTACT_EMAIL=${VAPID_CONTACT_EMAIL}
     # healthcheck:
     #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
     #   interval: 30s
@@ -55,6 +58,7 @@ services:
       - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - VITE_AGENT_SERVICE_URL=http://localhost:8000
       - VITE_ADMIN_USER_IDS=${VITE_ADMIN_USER_IDS}
+      - VITE_VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
     depends_on:
       agent:
         condition: service_started

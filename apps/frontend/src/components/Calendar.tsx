@@ -1825,6 +1825,27 @@ export function Calendar() {
                   {/* Spacer for gap between header and first hour */}
                   <div style={{ height: '12px' }} />
 
+                  {/* Current Time Red Line */}
+                  {isToday && (() => {
+                    const now = currentTime
+                    const lineTop = (now.getHours() * 60) + now.getMinutes()
+                    return (
+                      <div
+                        data-testid="current-time-line"
+                        style={{
+                          position: 'absolute',
+                          top: `${36 + allDayBannerInfo.height + 12 + lineTop}px`,
+                          left: `-${dayIndex * 100}%`,
+                          width: `${displayDates.length * 100}%`,
+                          height: '2px',
+                          background: colors.error,
+                          zIndex: 50,
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )
+                  })()}
+
                   {/* Time Slots - Mobile-style hour grid */}
                   {hours.map(hour => {
                     const slotEvents = getEventsForSlot(date, hour)
@@ -1981,28 +2002,9 @@ export function Calendar() {
             </div>
             ))}
 
-            {/* Current Time Red Line */}
-            {(() => {
-              const now = currentTime
-              const topPosition = (now.getHours() * 60) + now.getMinutes() + 36
-                + allDayBannerInfo.height + 12
-              const todayInView = displayDates.some(d => d.toDateString() === new Date().toDateString())
-              if (!todayInView) return null
-              return (
-                <div style={{
-                  position: 'absolute',
-                  top: `${topPosition}px`,
-                  left: 0,
-                  right: 0,
-                  height: '2px',
-                  background: colors.error,
-                  zIndex: 25,
-                  pointerEvents: 'none',
-                }} />
-              )
-            })()}
           </div>
         )}
+
       </div>
       </div>
 
