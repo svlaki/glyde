@@ -11,7 +11,6 @@ import { useKeyboard } from '../hooks/useKeyboard'
 import { mobileStyles, mobileSpacing, mobileHeaderStyles } from '../styles/mobileStyles'
 import { CalendarMobileWrapper } from '../components/mobile/CalendarMobileWrapper'
 import { MobileMenu } from '../components/mobile/MobileMenu'
-import { GridLayoutContainer } from '../components/grid/GridLayout'
 
 export function CalendarPage() {
   const { isMobile } = usePlatform()
@@ -288,7 +287,7 @@ function CalendarPageDesktop() {
         overflow: 'hidden',
         height: '100vh',
       }}>
-        <GridLayoutContainer>
+        <>
           <div key="inbox" style={{ overflow: 'hidden' }}>
             <Inbox onChatReply={handleChatReply} />
           </div>
@@ -303,7 +302,7 @@ function CalendarPageDesktop() {
               <ChatBot ref={chatBotRef} />
             </div>
           </div>
-        </GridLayoutContainer>
+        </>
       </div>
     </div>
   )
