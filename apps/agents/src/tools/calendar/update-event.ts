@@ -20,11 +20,12 @@ export const updateEventTool = tool(
     const supabaseService = new SupabaseService();
     const aspectService = new AspectService();
 
-    let targetEventId = eventId;
+    // Strip '#' prefix if the LLM included it from CALENDAR context formatting
+    let targetEventId = typeof eventId === 'string' ? eventId.replace(/^#/, '').trim() : eventId;
 
     // Get original event to compare changes
     const events = await supabaseService.getEvents(userId);
-    const originalEvent = events.find((e: any) => e.id === eventId);
+    const originalEvent = events.find((e: any) => e.id === targetEventId);
 
     // Check if this is a recurring event instance
     if (originalEvent?.is_instance && originalEvent?.parent_event_id) {

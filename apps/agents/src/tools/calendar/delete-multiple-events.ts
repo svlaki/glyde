@@ -11,6 +11,11 @@ export const deleteMultipleEventsTool = tool(
       throw new Error("User ID is required for deleting events");
     }
 
+    // Strip '#' prefix if LLM included it from CALENDAR context
+    eventIds = Array.isArray(eventIds)
+      ? eventIds.map(id => typeof id === 'string' ? id.replace(/^#/, '').trim() : id)
+      : eventIds;
+
     const supabaseService = new SupabaseService();
 
     let eventsToDelete: any[] = [];

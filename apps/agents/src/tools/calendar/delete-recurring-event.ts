@@ -10,6 +10,8 @@ export const deleteRecurringEventTool = tool(
       throw new Error("User ID is required");
     }
 
+    eventId = typeof eventId === 'string' ? eventId.replace(/^#/, '').trim() : eventId;
+
     console.log('[DELETE-RECURRING-EVENT TOOL] Starting deletion:', {
       eventId,
       scope
