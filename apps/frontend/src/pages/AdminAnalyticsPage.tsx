@@ -169,6 +169,31 @@ export function AdminAnalyticsPage() {
     if (isAdmin) loadTab(tab)
   }, [tab, loadTab, isAdmin])
 
+  const resetTokenUsage = useCallback(async () => {
+    if (!session) return
+    if (!window.confirm('Reset all token usage tracking? This cannot be undone.')) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_URL}/api/analytics/context-reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `HTTP ${res.status}`)
+      }
+      setContextData(null)
+      await loadTab('context')
+    } catch (err: any) {
+      setError(err.message || 'Failed to reset token usage')
+      setLoading(false)
+    }
+  }, [session, loadTab])
+
   // Frontend admin guard — API also enforces this server-side
   if (!isAdmin) {
     return (
@@ -228,7 +253,8 @@ export function AdminAnalyticsPage() {
   const formatNum = (n: number) => n.toLocaleString()
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto', color: colors.textPrimary }}>
+    <div style={{ height: '100vh', overflowY: 'auto', padding: '32px', color: colors.textPrimary }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Beta Analytics</h1>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -448,6 +474,23 @@ export function AdminAnalyticsPage() {
       {/* ── Context Tab (Token Usage) ── */}
       {!loading && tab === 'context' && contextData && (
         <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <button
+              onClick={resetTokenUsage}
+              style={{
+                padding: '8px 16px',
+                background: colors.error,
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 600,
+              }}
+            >
+              Reset Token Tracking
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
             <div style={cardStyle}>
               <div style={{ fontSize: '28px', fontWeight: 700 }}>{formatNum(contextData.totals.total_tokens)}</div>
@@ -509,6 +552,7 @@ export function AdminAnalyticsPage() {
       {!loading && tab === 'context' && !contextData && (
         <p style={{ color: colors.textSecondary }}>No token usage data available yet. Data will appear after agent interactions occur.</p>
       )}
+      </div>
     </div>
   )
 }
