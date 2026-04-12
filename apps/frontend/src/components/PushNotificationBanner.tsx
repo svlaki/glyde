@@ -39,10 +39,11 @@ export function PushNotificationBanner() {
     <div
       style={{
         position: 'fixed',
-        top: 16,
-        left: 16,
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
         zIndex: 50,
-        width: 360,
+        width: 400,
         maxWidth: 'calc(100vw - 32px)',
         backgroundColor: colors.bgSecondary,
         border: `1px solid ${colors.border}`,
