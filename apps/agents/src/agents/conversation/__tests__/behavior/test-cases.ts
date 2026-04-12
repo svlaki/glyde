@@ -1642,6 +1642,56 @@ export const behaviorTestCases: BehaviorTestCase[] = [
     ],
     forbiddenTools: ['create_event'],
   },
+  {
+    id: 'correct-005',
+    name: 'Imperative correction: "should be at Xpm"',
+    category: 'correction-undo',
+    prompt: 'should be at 8pm today',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Go out',
+          start_time: '2026-04-11T22:00:00Z',
+          end_time: '2026-04-12T00:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          start_time: containsTime('T20:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-006',
+    name: 'Imperative correction: "yeah i want it to start 10pm"',
+    category: 'correction-undo',
+    prompt: 'yeah i want it to start 10pm',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Go out',
+          start_time: '2026-04-11T20:00:00Z',
+          end_time: '2026-04-11T22:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          start_time: containsTime('T22:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
 
   // ---------------------------------------------------------------------------
   // NATURAL LANGUAGE / MESSY INPUT (4 cases)
