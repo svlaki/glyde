@@ -5,7 +5,7 @@ export interface Reminder {
   user_id: string;
   message: string;
   trigger_at: string;
-  status: 'pending' | 'delivered' | 'snoozed' | 'dismissed';
+  status: 'pending' | 'snoozed' | 'delivering' | 'delivered' | 'dismissed' | 'failed';
   aspect_id?: string;
   created_by: 'conversation' | 'interaction' | 'user';
   metadata: Record<string, any>;
@@ -26,7 +26,7 @@ export interface CreateReminderInput {
 export interface UpdateReminderInput {
   message?: string;
   trigger_at?: string;
-  status?: 'pending' | 'delivered' | 'snoozed' | 'dismissed';
+  status?: 'pending' | 'snoozed' | 'delivering' | 'delivered' | 'dismissed' | 'failed';
   aspect_id?: string;
   metadata?: Record<string, any>;
 }

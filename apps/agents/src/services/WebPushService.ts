@@ -19,7 +19,8 @@ class WebPushService {
   initialize(): void {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
-    const contactEmail = process.env.VAPID_CONTACT_EMAIL || 'mailto:support@glyde.app';
+    const rawContact = process.env.VAPID_CONTACT_EMAIL || 'ashleyxu@stanford.edu';
+    const contactEmail = rawContact.startsWith('mailto:') ? rawContact : `mailto:${rawContact}`;
 
     if (!publicKey || !privateKey) {
       console.warn('[WEB-PUSH] VAPID keys not configured — web push notifications disabled');
