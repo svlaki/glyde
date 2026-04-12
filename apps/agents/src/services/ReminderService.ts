@@ -172,6 +172,10 @@ export class ReminderService {
         return [];
       }
 
+      if (data && data.length > 0) {
+        console.log(`[ReminderService] Found ${data.length} due reminder(s)`);
+      }
+
       return data || [];
     } catch (error) {
       console.error('[ReminderService] Exception fetching due reminders:', error);
@@ -336,6 +340,8 @@ export class ReminderService {
           .insert(toCreate);
         if (error) {
           console.error('[ReminderService] Error batch creating reminders:', error);
+        } else {
+          console.log(`[ReminderService] Created ${toCreate.length} reminder(s) for event "${eventTitle}"`);
         }
       }
 
