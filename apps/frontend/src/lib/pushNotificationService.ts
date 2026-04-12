@@ -19,9 +19,41 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
- * Initialize web push notifications for browser users.
- * Registers a service worker, requests permission, subscribes to push,
- * and sends the subscription to the backend.
+ * Subscribe to web push and register the subscription with the backend.
+ * Assumes permission is already granted.
+ */
+async function subscribeAndRegister(accessToken: string): Promise<void> {
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+  if (!vapidPublicKey) return
+
+  const registration = await navigator.serviceWorker.register('/sw.js')
+  await navigator.serviceWorker.ready
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+  })
+
+  const apiUrl = getApiUrl()
+  await fetch(`${apiUrl}/api/push/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      token: JSON.stringify(subscription),
+      platform: 'web',
+    }),
+  })
+
+  trackEvent('web_push_token_registered', 'push')
+  console.log('[WEB-PUSH] Successfully registered for web push notifications')
+}
+
+/**
+ * Auto-initialize web push for browsers where permission is already granted.
+ * Does NOT request permission (that must happen from a user gesture for Safari).
  */
 async function initializeWebPush(accessToken: string): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -36,46 +68,54 @@ async function initializeWebPush(accessToken: string): Promise<void> {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js')
-    await navigator.serviceWorker.ready
-
-    // Check permission
-    if (Notification.permission === 'denied') {
-      console.log('[WEB-PUSH] Notification permission denied')
-      return
+    if (Notification.permission === 'granted') {
+      await subscribeAndRegister(accessToken)
     }
-
-    if (Notification.permission === 'default') {
-      const result = await Notification.requestPermission()
-      trackEvent('web_push_permission_result', 'push', { status: result })
-      if (result !== 'granted') return
-    }
-
-    // Subscribe to push
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    })
-
-    // Register subscription with backend
-    const apiUrl = getApiUrl()
-    await fetch(`${apiUrl}/api/push/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        token: JSON.stringify(subscription),
-        platform: 'web',
-      }),
-    })
-
-    trackEvent('web_push_token_registered', 'push')
-    console.log('[WEB-PUSH] Successfully registered for web push notifications')
+    // If 'default' or 'denied', don't auto-request — let the banner handle it
   } catch (error) {
     console.error('[WEB-PUSH] Failed to initialize web push:', error)
   }
+}
+
+/**
+ * Request notification permission (must be called from a user gesture)
+ * and subscribe if granted.
+ */
+export async function requestWebPushPermission(accessToken: string): Promise<'granted' | 'denied' | 'default'> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return 'denied'
+  }
+
+  try {
+    const result = await Notification.requestPermission()
+    trackEvent('web_push_permission_result', 'push', { status: result })
+
+    if (result === 'granted') {
+      await subscribeAndRegister(accessToken)
+    }
+
+    return result
+  } catch (error) {
+    console.error('[WEB-PUSH] Failed to request permission:', error)
+    return 'default'
+  }
+}
+
+/**
+ * Check whether the push notification prompt banner should be shown.
+ * Returns true only for web browsers where permission hasn't been decided yet.
+ */
+export function shouldShowPushPrompt(): boolean {
+  if (Capacitor.isNativePlatform()) return false
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
+  if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) return false
+  if (Notification.permission !== 'default') return false
+  if (localStorage.getItem('glyde-push-prompt-dismissed') === 'true') return false
+  return true
+}
+
+export function dismissPushPrompt(): void {
+  localStorage.setItem('glyde-push-prompt-dismissed', 'true')
 }
 
 export async function initializePushNotifications(accessToken: string): Promise<void> {
