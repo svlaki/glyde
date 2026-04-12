@@ -80,6 +80,17 @@ export function getCurrentTimeInTimezone(timezone: string): string {
 }
 
 /**
+ * Get current time as a local ISO string (no Z suffix) in the user's timezone.
+ * Useful for giving the LLM an unambiguous 24-hour anchor for relative time math.
+ */
+export function getCurrentISOInTimezone(timezone: string): string {
+  if (!timezone) throw new Error('Timezone is required for getCurrentISOInTimezone');
+  const now = new Date();
+
+  return formatInTimeZone(now, timezone, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+/**
  * Check if a timezone is valid/supported
  * This is a simple check - date-fns-tz will throw if timezone is invalid
  */

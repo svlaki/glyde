@@ -1,8 +1,18 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { toDate } from "date-fns";
+
+/**
+ * Convert a naive local datetime string to UTC ISO string.
+ */
+function localToUtc(dateStr: string, timezone: string): string {
+  if (/[Zz]$/.test(dateStr) || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr).toISOString();
+  }
+  return fromZonedTime(dateStr, timezone).toISOString();
+}
 
 /**
  * Format events in the same compact format used by the system prompt CALENDAR context.
@@ -36,11 +46,15 @@ export const searchEventsTool = tool(
     try {
       const supabaseService = new SupabaseService();
 
+      // Convert naive local dates to UTC so the DB query covers the correct range
+      const utcStart = startDate ? localToUtc(startDate, timezone) : undefined;
+      const utcEnd = endDate ? localToUtc(endDate, timezone) : undefined;
+
       // Use getEvents() which properly expands recurring instances
       let events = await supabaseService.getEvents(
         userId,
-        startDate || undefined,
-        endDate || undefined
+        utcStart,
+        utcEnd
       );
 
       // Filter out past events unless includePast is true

@@ -1,8 +1,23 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { toDate } from "date-fns";
+
+/**
+ * Convert a naive local datetime string to UTC ISO string.
+ * The model sends dates like "2026-04-07T00:00:00" meaning midnight in the user's timezone,
+ * but the DB stores everything in UTC. Without conversion, a Pacific user's "today" query
+ * would cut off at 5 PM local time (midnight UTC).
+ */
+function localToUtc(dateStr: string, timezone: string): string {
+  // If already has timezone info (Z or +/-offset), use as-is
+  if (/[Zz]$/.test(dateStr) || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr).toISOString();
+  }
+  // Treat as local time in the user's timezone and convert to UTC
+  return fromZonedTime(dateStr, timezone).toISOString();
+}
 
 export const listEventsTool = tool(
   async ({ startDate, endDate, limit, includePast }, config) => {
@@ -18,10 +33,18 @@ export const listEventsTool = tool(
 
     const supabaseService = new SupabaseService();
 
+    // Convert naive local dates to UTC so the DB query covers the correct range
+    const utcStart = startDate ? localToUtc(startDate, timezone) : undefined;
+    const utcEnd = endDate ? localToUtc(endDate, timezone) : undefined;
+
+    if (startDate && utcStart !== startDate) {
+      console.log(`[LIST-EVENTS TOOL] Converted date range: ${startDate} -> ${utcStart}, ${endDate} -> ${utcEnd} (tz: ${timezone})`);
+    }
+
     // Get events (with recurring events expanded)
     let events;
-    if (startDate && endDate) {
-      events = await supabaseService.getEvents(userId, startDate, endDate);
+    if (utcStart && utcEnd) {
+      events = await supabaseService.getEvents(userId, utcStart, utcEnd);
     } else {
       events = await supabaseService.getEvents(userId);
 

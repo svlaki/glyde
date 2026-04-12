@@ -6,10 +6,11 @@ WORKDIR /app
 # Copy package.json and lockfile for deterministic installs
 COPY package.json package-lock.json* ./
 
-# Strip electron packages from package.json (not needed for web/Docker build, saves ~200MB)
+# Strip ALL electron-related packages from package.json (not needed for web/Docker build)
+# Uses walk to remove any key containing "electron" from deps and devDeps
 # Note: Capacitor packages are NOT stripped — they are small JS-only deps needed at build time
 RUN apk add --no-cache jq \
-    && jq 'del(.devDependencies["electron"], .devDependencies["electron-builder"], .devDependencies["electron-vite"], .devDependencies["@electron-toolkit/preload"], .devDependencies["@electron-toolkit/utils"])' package.json > package.tmp.json \
+    && jq '(.dependencies // {}) |= with_entries(select(.key | test("electron"; "i") | not)) | (.devDependencies // {}) |= with_entries(select(.key | test("electron"; "i") | not))' package.json > package.tmp.json \
     && mv package.tmp.json package.json
 
 # Install dependencies with legacy peer deps to handle React version conflicts
