@@ -268,8 +268,8 @@ RULE BEHAVIOR: Only follow [ENABLED] rules. If disabled rule matches user reques
   // Page context
   let pageGuidance = '';
   const page = currentPage || 'dashboard';
-  if (page === 'plan') {
-    pageGuidance = '\nPAGE: plan — Focus on goals, milestones, life planning. Use get_plan/update_plan.';
+  if (page === 'notes') {
+    pageGuidance = '\nPAGE: notes — Focus on notes management. Use get_notes/create_notes/update_notes.';
   }
   // onboarding-enrichment is now handled by dedicated OnboardingEnrichmentAgent
 
@@ -466,10 +466,9 @@ GOAL CREATION FLOW:
    - Skill goals: Proficiency levels
    - Project goals: Phases
    Always 3+ milestones. Calculate due_date from today.
-3. UPDATE LIFE PLAN: get_plan → update_plan (integrate smoothly).
-4. OFFER SCHEDULING: "Want me to block time on your calendar?"
+3. OFFER SCHEDULING: "Want me to block time on your calendar?"
 
-IMPORTANT: Actually CALL create_goal, get_plan, update_plan tools. Don't just describe.`;
+IMPORTANT: Actually CALL create_goal tools. Don't just describe.`;
 
 /**
  * RECURRING_EVENTS section — Recurring event creation and management
@@ -560,16 +559,6 @@ MEMORY TOOLS:
   - Don't use for routine operations or temporary info.`;
 
 /**
- * PLANS_DETAIL section — Life plan tools
- */
-const PLANS_DETAIL = `
-
-LIFE PLAN:
-- get_plan: Read current plan
-- update_plan: Integrate new goals naturally (don't rewrite whole plan)
-- Always update plan when creating goals.`;
-
-/**
  * REMINDERS section
  */
 const REMINDERS_SECTION = `
@@ -606,7 +595,6 @@ export function buildSystemPrompt(context: PromptContext): SystemMessage {
     + FRIENDS_SHARING
     + LOCATION_SEARCH
     + MEMORY_MANAGEMENT
-    + PLANS_DETAIL
     + REMINDERS_SECTION;
 
   // Dynamic context: changes per user/request — appended after static prefix

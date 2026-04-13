@@ -348,8 +348,8 @@ export function GlobalSearch({
               width: '32px',
               height: '32px',
               borderRadius: '6px',
-              background: result.categoryColor
-                ? hexToRgba(result.categoryColor, 0.15)
+              background: result.aspectColor
+                ? hexToRgba(result.aspectColor, 0.15)
                 : colors.bgTertiary,
               display: 'flex',
               alignItems: 'center',
@@ -408,21 +408,21 @@ export function GlobalSearch({
                 }}>
                   {getTypeLabel(result.type)}
                 </span>
-                {result.category && (
+                {result.aspect && (
                   <span style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px'
                   }}>
-                    {result.categoryColor && (
+                    {result.aspectColor && (
                       <span style={{
                         width: '8px',
                         height: '8px',
                         borderRadius: '50%',
-                        background: result.categoryColor
+                        background: result.aspectColor
                       }} />
                     )}
-                    {result.category}
+                    {result.aspect}
                   </span>
                 )}
                 <span>•</span>

@@ -107,9 +107,6 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
             <a href="/friends" onClick={onClose} style={getActiveStyle('/friends')}>
               Friends
             </a>
-            <a href="/ratings" onClick={onClose} style={getActiveStyle('/ratings')}>
-              Ratings
-            </a>
             <a href="/connections" onClick={onClose} style={getActiveStyle('/connections')}>
               Connections
             </a>

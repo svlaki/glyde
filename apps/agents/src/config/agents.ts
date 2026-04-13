@@ -12,7 +12,7 @@ export const AGENT_CONFIG = {
   maxPendingInteractions: 2,
 
   /**
-   * Model to use for the interaction agent (Gerald)
+   * Model to use for agents
    */
   model: 'gpt-5.4-mini',
 

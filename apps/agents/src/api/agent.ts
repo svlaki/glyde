@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { AgentRegistry } from '../agents/AgentRegistry.js';
 import { ConversationAgent } from '../agents/conversation/ConversationAgent.js';
-// Gerald (InteractionAgentGerald) disconnected -- role eliminated
 import { MaintenanceAgentMargaret } from '../agents/maintenance-margaret/MaintenanceAgentMargaret.js';
 import { PlannerAgent } from '../agents/planner/PlannerAgent.js';
 import { SchedulerAgent } from '../agents/scheduler/SchedulerAgent.js';
@@ -15,8 +14,6 @@ let initializationPromise: Promise<void> | null = null;
 async function initializeAgents(): Promise<void> {
   const conversationAgent = new ConversationAgent();
   await agentRegistry.registerAgent(conversationAgent);
-
-  // Gerald (interaction agent) disconnected -- role eliminated
 
   const maintenanceAgent = new MaintenanceAgentMargaret();
   await agentRegistry.registerAgent(maintenanceAgent);

@@ -32,8 +32,8 @@ export interface GoalInsights {
 }
 
 export interface AspectBreakdown {
-  categoryId: string
-  categoryName: string
+  aspectId: string
+  aspectName: string
   eventCount: number
   taskCount: number
   goalCount: number
@@ -222,8 +222,8 @@ export function useProfileData(): ProfileData {
 
     for (const asp of aspects) {
       breakdownMap.set(asp.id, {
-        categoryId: asp.id,
-        categoryName: asp.name,
+        aspectId: asp.id,
+        aspectName: asp.name,
         eventCount: 0,
         taskCount: 0,
         goalCount: 0,

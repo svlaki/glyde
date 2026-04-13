@@ -5,8 +5,8 @@
 ```
 User (Browser) --> Frontend (React/Vite :3000) --> Agent API (Express :8000) --> Supabase (PostgreSQL)
                                                         |                            |
-                                                        +--> OpenAI GPT-5.1          +--> RLS Policies
-                                                        +--> pgvector (Memory)
+                                                        +--> OpenAI GPT-5.4-mini    +--> RLS Policies
+                                                        +--> Zep Cloud (Memory)
                                                         +--> Tavily (Web Search)
                                                         +--> Google Calendar API
                                                         +--> Microsoft Calendar API
@@ -57,7 +57,7 @@ All tables in `public` schema with Row-Level Security (RLS) policies enforcing `
 
 ### Aspect Linking
 
-Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id`). A deprecated `category` text column exists on some tables for backward compatibility.
+Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id`).
 
 ## Agent Architecture
 
@@ -65,14 +65,16 @@ Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id
 
 | Agent | Class | Model | Purpose |
 |---|---|---|---|
-| Conversation | `ConversationAgent` | GPT-5.1 | Main chat interface, 70+ tools via LangGraph |
-| Interaction (Gerald) | `InteractionAgentGerald` | GPT-5.1 | Proactive suggestions with follow-up chaining |
-| Maintenance (Margaret) | `MaintenanceAgentMargaret` | GPT-5.1 | Data hygiene audits, aspect maintenance |
-| Onboarding Enrichment | `OnboardingEnrichmentAgent` | GPT-5.1 | Enriches onboarding context for new users |
+| Conversation | `ConversationAgent` | GPT-5.4-mini | Main chat interface, 82+ tools via LangGraph |
+| Maintenance (Margaret) | `MaintenanceAgentMargaret` | GPT-5.4-mini | Data hygiene audits, aspect maintenance |
+| Planner | `PlannerAgent` | GPT-5.4-mini | Goal decomposition and scheduling plans |
+| Scheduler | `SchedulerAgent` | GPT-5.4-mini | Automated task scheduling and calendar optimization |
+| Scribe | `ScribeAgent` | GPT-5.4-mini | Note research, daily digests, pattern scanning |
+| Onboarding Enrichment | `OnboardingEnrichmentAgent` | GPT-5.4-mini | Enriches onboarding context for new users |
 
 ### Tool System
 
-`ToolRegistry` singleton manages 70+ tools across 15 categories:
+`ToolRegistry` singleton manages 82+ tools across 16+ categories:
 
 | Category | Count | Examples |
 |---|---|---|
@@ -87,18 +89,18 @@ Events, tasks, and goals link to aspects via `aspect_id` (UUID FK to `aspects.id
 | rules | 4 | create_rule, toggle_rule, delete_rule, list_rules |
 | memory | 3 | search-unified, update-advanced, manage-patterns |
 | notes | 3 | create, get, update |
-| interactions | 2 | create_interaction, create_rating |
+| interactions | 1 | create_interaction |
 | profile | 2 | get_profile, update_profile |
-| plans | 2 | get_plan, update_plan |
 | search | 2 | web_search, location_search |
-
-Gerald gets a restricted tool set via `getGeraldAgentTools()`.
+| suggestions | 6 | create_action_suggestion, list_action_suggestions, create_placement_slot, swap_slot_random, confirm_slot, dismiss_slot |
 
 ### Memory System
 
-- **pgvector**: Vector-based persistent memory via Supabase. Stores extracted facts, patterns, preferences with semantic search.
-- **MemoryService**: Unified memory service handling fact extraction (gpt-4.1-mini), context generation, and vector search.
-- **memory_facts table**: Stores user knowledge with embeddings (1536-dim, text-embedding-3-small).
+- **Zep Cloud**: Primary memory layer -- graph-based persistent memory with user/session management.
+- **ZepMemoryService**: Handles memory search, context retrieval, and user session management via Zep Cloud API.
+- **ZepGraphService**: Knowledge graph operations for entity and relationship tracking.
+- **MemoryService**: Unified memory service handling fact extraction, context generation, and pattern management.
+- **memory_facts table**: Stores user knowledge with embeddings (1536-dim, text-embedding-3-small) via pgvector.
 - **user_context_cache table**: Pre-built user context summaries, rebuilt periodically.
 - Fallback: Supabase `chat_messages` table for conversation history.
 
@@ -113,7 +115,7 @@ Each agent has:
 ## API Layer
 
 Express server (`api/server.ts`) with:
-- 60+ POST endpoints organized by domain
+- 31+ POST endpoint modules organized by domain
 - Auth middleware (`authenticateRequest`) validating Supabase JWTs
 - Input sanitization middleware
 - CORS configured for web and mobile clients
@@ -133,8 +135,12 @@ POST /api/friends/*         # Social features
 POST /api/notes/*           # Notes management
 POST /api/projects/*        # Project management
 POST /api/reminders/*       # Reminder management
-POST /api/ratings/*         # Ratings
 POST /api/push/*            # Push notifications
+POST /api/inbox/*           # Unified inbox
+POST /api/suggestions/*     # Action suggestions and placement slots
+POST /api/knowledge-graph/* # Entity linking
+POST /api/note-links/*      # Wiki-style note linking
+POST /api/note-templates/*  # Note templates
 POST /api/analytics/*       # Analytics
 POST /api/connections/*     # OAuth connections
 POST /api/calendar-mappings/* # Calendar sync

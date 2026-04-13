@@ -59,6 +59,7 @@ services:
       - VITE_AGENT_SERVICE_URL=http://localhost:8000
       - VITE_ADMIN_USER_IDS=${VITE_ADMIN_USER_IDS}
       - VITE_VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       agent:
         condition: service_started

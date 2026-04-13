@@ -6,7 +6,7 @@ Glyde is an AI-native life management system. Monorepo with two apps:
 - `apps/agents` - Node.js/Express backend with LangGraph agents (port 8000)
 - `apps/frontend` - React/Vite frontend with TailwindCSS (port 5173, exposed on 3000)
 
-Database: Supabase PostgreSQL with RLS. Memory: pgvector + fact extraction. AI: OpenAI GPT-5.4 family (mini for user-facing, nano for background).
+Database: Supabase PostgreSQL with RLS. Memory: Zep Cloud (graph-based) + pgvector (fact extraction). AI: OpenAI GPT-5.4-mini.
 
 ## Critical Rules
 
@@ -49,20 +49,23 @@ apps/agents/src/
   agents/
     AgentRegistry.ts     # Central registry for all agents
     base/                # BaseAgent abstract class
-    conversation/        # Main ConversationAgent (LangGraph, 70+ tools)
-    interaction-gerald/  # DISCONNECTED - role eliminated
+    conversation/        # Main ConversationAgent (LangGraph, 82+ tools)
     maintenance-margaret/ # Data hygiene auditor
     onboarding-enrichment/ # Onboarding context enrichment agent
-  api/                   # 26 endpoint modules + middleware
+    planner/             # Goal decomposition and scheduling plans
+    scheduler/           # Automated task scheduling
+    scribe/              # Note research, daily digests, pattern scanning
+  api/                   # 31+ endpoint modules + middleware
     server.ts            # Express server
     middleware/auth.ts   # Auth middleware
     aspects.ts, events.ts, tasks.ts, goals.ts, notes.ts
-    projects.ts, reminders.ts, rules.ts, interactions.ts, ratings.ts
+    projects.ts, reminders.ts, rules.ts, interactions.ts
     chat.ts, chat-history.ts, agent.ts, stream.ts
     calendar.ts, connections.ts, friendships.ts
     shared-aspects.ts, shared-events.ts
+    suggestions.ts, inbox.ts, knowledgeGraph.ts, noteLinks.ts, noteTemplates.ts
     user.ts, profile.ts, onboarding.ts, push.ts, analytics.ts
-  services/              # 16+ specialized services
+  services/              # 20 specialized services
     SupabaseService.ts   # Primary data access layer
     AspectService.ts, ProfileService.ts, OnboardingService.ts
     CalendarMappingService.ts, CalendarIntegrationService.ts
@@ -71,9 +74,10 @@ apps/agents/src/
     ConnectionService.ts, RuleService.ts
     FriendshipService.ts, SharedEventService.ts, SharedAspectService.ts
     ProjectService.ts, ReminderService.ts
-    PushNotificationService.ts
+    PushNotificationService.ts, WebPushService.ts
+    MemoryService.ts, SuggestionService.ts
     ZepMemoryService.ts, ZepGraphService.ts, ZepOnboardingSeedService.ts
-  tools/                 # 70+ LangGraph tools across 15 categories
+  tools/                 # 82+ LangGraph tools across 16+ categories
     ToolRegistry.ts      # Singleton tool registry
     aspects/ (5)         # create, update, list, archive, delete
     calendar/ (12)       # create, update, delete, recurring, analyze, free-time, search, bulk
@@ -83,13 +87,14 @@ apps/agents/src/
     reminders/ (4)       # create, update, delete, list
     friends/ (9)         # send-request, accept, decline, list, remove, aspects, notes
     shared-events/ (4)   # add/remove member, get members, update role
-    interactions/ (2)    # create-interaction, create-rating
-    notes/ (3)           # create, get, update
+    shared-aspects/ (4)  # share, get-members, remove-member, update-role
+    interactions/ (1)    # create-interaction
+    notes/ (4)           # create, get, update, scribe-research
     memory/ (3)          # search-unified, update-advanced, manage-patterns
     profile/ (2)         # get-profile, update-profile
-    plans/ (2)           # get-plan, update-plan
     rules/ (4)           # create, list, delete, toggle
     search/ (2)          # web-search, location-search
+    suggestions/ (6)     # create-action, list-actions, create-slot, swap, confirm, dismiss
   config/
     agents.ts            # Agent config (model: gpt-5.4-mini, recursionLimit: 10)
   types/                 # 8 type modules
@@ -102,15 +107,15 @@ apps/agents/src/
     timeSlotFinder.ts, zep-sync-helper.ts
   jobs/                  # 10 background jobs (Zep maintenance, notifications, reminders)
   scripts/               # Zep cleanup utilities
-  evals/                 # Agent evaluation framework (Gerald evals inactive)
+  evals/                 # Agent evaluation framework
 
 apps/frontend/src/
-  pages/                 # 13 pages
+  pages/                 # 12 pages
     CalendarPage.tsx, NotesPage.tsx, ProfilePage.tsx, ProfileEditPage.tsx
     AspectsPage.tsx, GoalsPage.tsx, ProjectsPage.tsx, FriendsPage.tsx
-    RemindersPage.tsx, RatingsPage.tsx, ConnectionsPage.tsx
+    RemindersPage.tsx, ConnectionsPage.tsx
     AdminAnalyticsPage.tsx, OAuthCallbackPage.tsx
-  components/            # 40+ components
+  components/            # 45+ components
     Calendar.tsx, ChatBot.tsx, TodoList.tsx, GlobalSearch.tsx
     FriendsSection.tsx, Auth.tsx, Modal.tsx, ProtectedRoute.tsx
     event/               # Event form, recurrence, sharing (6 files)
@@ -127,7 +132,7 @@ apps/frontend/src/
     ruleService.ts, remindersService.ts, notesService.ts
     connectionService.ts, sharedAspectService.ts, sharedEventService.ts
     onboardingService.ts, searchService.ts, pushNotificationService.ts
-    ratingService.ts, avatarService.ts
+    avatarService.ts
     supabase.ts, apiConfig.ts, apiUtils.ts
     calendarLayoutUtils.ts, timelineUtils.ts, recurrenceUtils.ts
   hooks/                 # 5 custom hooks
@@ -139,13 +144,12 @@ apps/frontend/src/
 ## Key Patterns
 
 ### Aspect System
-Aspects are color-coded life categories (Work, Health, Personal, etc.). Stored in `aspects` table. Events, tasks, and goals link via `aspect_id` (UUID FK). The deprecated `category` text column still exists on some tables.
+Aspects are color-coded life categories (Work, Health, Personal, etc.). Stored in `aspects` table. Events, tasks, and goals link via `aspect_id` (UUID FK).
 
 ### ToolRegistry (Singleton)
 ```typescript
 const registry = ToolRegistry.getInstance();
 const tools = registry.getAllTools();           // ConversationAgent tools
-// Gerald disconnected - getGeraldAgentTools() returns empty array
 ```
 
 ### Agent Prompt Pattern
@@ -176,13 +180,22 @@ interface ApiResponse<T> {
 SUPABASE_URL=             # Supabase project URL
 SUPABASE_SERVICE_ROLE_KEY= # Service role key (bypasses RLS)
 SUPABASE_ANON_KEY=        # Anon key for client operations
-OPENAI_API_KEY=           # OpenAI API key (GPT-5.1)
+OPENAI_API_KEY=           # OpenAI API key (GPT-5.4-mini)
 ZEP_API_KEY=              # Zep Cloud API key
 ZEP_BASE_URL=             # Zep API base URL
 TAVILY_API_KEY=           # Tavily web search API key
 GOOGLE_CLIENT_ID=         # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=     # Google OAuth client secret
 GOOGLE_REDIRECT_URI=      # OAuth redirect URI
+GOOGLE_MAPS_API_KEY=      # Google Maps/Places API key
+MICROSOFT_CLIENT_ID=      # Microsoft OAuth client ID
+MICROSOFT_CLIENT_SECRET=  # Microsoft OAuth client secret
+MICROSOFT_REDIRECT_URI=   # Microsoft OAuth redirect URI
+API_BASE_URL=             # Base URL for API callbacks
+ADMIN_USER_IDS=           # Comma-separated admin user IDs
+VAPID_PUBLIC_KEY=         # VAPID public key for web push
+VAPID_PRIVATE_KEY=        # VAPID private key for web push
+VAPID_CONTACT_EMAIL=      # Contact email for VAPID
 ```
 
 ### Frontend
@@ -190,6 +203,9 @@ GOOGLE_REDIRECT_URI=      # OAuth redirect URI
 VITE_SUPABASE_URL=        # Same as SUPABASE_URL
 VITE_SUPABASE_ANON_KEY=   # Same as SUPABASE_ANON_KEY
 VITE_AGENT_SERVICE_URL=   # Agent API URL (http://localhost:8000)
+VITE_ADMIN_USER_IDS=      # Comma-separated admin user IDs
+VITE_VAPID_PUBLIC_KEY=    # VAPID public key for push notifications
+VITE_GOOGLE_CLIENT_ID=    # Google OAuth client ID (for frontend OAuth flow)
 ```
 
 ## Development

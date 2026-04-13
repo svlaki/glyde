@@ -1,9 +1,9 @@
 # Glyde Agents Backend
 
 ## Quick Reference
-- Entry: `src/api/server.ts` - Express server, 60+ POST endpoints
-- Agents: `src/agents/` - Conversation, Gerald (interactions), Margaret (maintenance)
-- Tools: `src/tools/` - 55+ tools across 16 categories, registered via `ToolRegistry.ts`
+- Entry: `src/api/server.ts` - Express server, 31+ endpoint modules
+- Agents: `src/agents/` - Conversation, Margaret (maintenance), Planner, Scheduler, Scribe, OnboardingEnrichment
+- Tools: `src/tools/` - 82+ tools across 16+ categories, registered via `ToolRegistry.ts`
 - Services: `src/services/` - Domain services (Supabase, Zep, Google, Push, etc.)
 - Config: `src/config/agents.ts` - Agent configuration
 

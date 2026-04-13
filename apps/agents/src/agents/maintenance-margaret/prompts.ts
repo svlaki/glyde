@@ -31,10 +31,10 @@ CORE BEHAVIOR:
 
 OUTPUT FORMAT (STRICT):
 1) Summary (2-4 bullets)
-2) Categorization Checks
-   - Missing category/aspect items
-   - Possible miscategorized items
-3) Aspect (Category) Maintenance
+2) Aspect Assignment Checks
+   - Missing aspect assignments
+   - Possible wrong aspect assignments
+3) Aspect Maintenance
    - Merge candidates
    - Split candidates
    - Retire/archive candidates

@@ -196,13 +196,8 @@ const {
     updateNote: vi.fn().mockResolvedValue({}),
     getNote: vi.fn().mockResolvedValue(null),
 
-    // Plans
-    getPlan: vi.fn().mockResolvedValue(null),
-    updatePlan: vi.fn().mockResolvedValue({}),
-
-    // Activity + ratings (conditionally loaded by agent for context)
+    // Activity (conditionally loaded by agent for context)
     getRecentActivity: vi.fn().mockResolvedValue([]),
-    getRatingSummary: vi.fn().mockResolvedValue([]),
 
     // Client stub — needs .from() for ReminderService and other direct Supabase callers
     getClient: vi.fn().mockReturnValue({
@@ -512,8 +507,6 @@ const serviceMethodToToolName: Record<string, string> = {
   toggleRule: 'toggle_rule',
   // Profile
   updateProfile: 'update_profile',
-  // Plans
-  updatePlan: 'update_plan',
   // Notes
   createNote: 'create_notes',
   updateNote: 'update_notes',
@@ -535,7 +528,6 @@ function extractToolCallsFromMocks(): CapturedToolCall[] {
     'createReminder', 'updateReminder', 'deleteReminder',
     'createNote', 'updateNote',
     'updateProfile',
-    'updatePlan',
   ];
 
   for (const method of supabaseMutations) {

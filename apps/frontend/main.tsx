@@ -17,7 +17,6 @@ import { NotesPage } from './src/pages/NotesPage'
 import { OAuthCallbackPage } from './src/pages/OAuthCallbackPage'
 import { FriendsPage } from './src/pages/FriendsPage'
 import { ProjectsPage } from './src/pages/ProjectsPage'
-import { RatingsPage } from './src/pages/RatingsPage'
 import { RemindersPage } from './src/pages/RemindersPage'
 import { GoalsPage } from './src/pages/GoalsPage'
 const AdminAnalyticsPage = React.lazy(() => import('./src/pages/AdminAnalyticsPage').then(m => ({ default: m.AdminAnalyticsPage })))
@@ -192,16 +191,6 @@ function App() {
                     <ProtectedRoute>
                       <OnboardingCheck>
                         <NotesPage />
-                      </OnboardingCheck>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/ratings"
-                  element={
-                    <ProtectedRoute>
-                      <OnboardingCheck>
-                        <RatingsPage />
                       </OnboardingCheck>
                     </ProtectedRoute>
                   }

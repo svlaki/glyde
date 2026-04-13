@@ -57,8 +57,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       return res.json({ success: true, message: 'Interaction dismissed' });
     }
 
-    // DECLINE PATH: If user said no/skip/decline, cancel without routing to Gerald
-    // Gerald ignores "do nothing" instructions and creates things anyway, so we short-circuit here
+    // DECLINE PATH: If user said no/skip/decline, cancel it
     const declinePatterns = /^(no|no thanks|nah|skip|not now|no,|nope|not today|pass|dismiss|cancel)/i;
     if (declinePatterns.test(trimmedResponse)) {
       console.log(`[INTERACTION RESPONSE] User declined interaction ${interactionId}: "${trimmedResponse}"`);
@@ -73,7 +72,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       return res.status(404).json({ error: 'Interaction not found' });
     }
 
-    // Auto-store rating scores — do NOT route to Gerald (it would create a duplicate)
+    // Auto-store rating scores
     if (interaction.interaction_type === 'rating') {
       const score = parseInt(trimmedResponse, 10);
       if (!isNaN(score) && score >= 1 && score <= 10) {
@@ -93,7 +92,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       } else {
         console.warn(`[INTERACTION RESPONSE] Invalid rating score from response: "${trimmedResponse}"`);
       }
-      // Short-circuit — rating is stored, no need for Gerald to process
+      // Rating stored, return directly
       return res.json({ success: true, message: 'Rating recorded' });
     }
 
@@ -115,8 +114,7 @@ export async function respondToInteraction(req: Request, res: Response): Promise
         await reminderService.snoozeReminder(userId, reminderId, tomorrowAt9.toISOString());
       }
 
-      // Reminder responses are self-contained - no need to route to Gerald
-      // Response already saved above (line 72), just update status
+      // Reminder responses are self-contained, just update status
       await supabaseService.updateInteractionStatus(interactionId, 'responded');
       return res.json({ success: true, message: 'Reminder response processed' });
     }
@@ -124,9 +122,6 @@ export async function respondToInteraction(req: Request, res: Response): Promise
     // Mark interaction as responded (not cancelled - that's for dismissals)
     await supabaseService.updateInteractionStatus(interactionId, 'responded');
 
-    // Gerald (interaction agent) disconnected -- role eliminated
-    // Responses are recorded but no longer routed to an agent for processing
-    // See agents/interaction-gerald/ for original implementation if re-enabling
     return res.json({ success: true, message: 'Response recorded' });
   } catch (error) {
     console.error('[INTERACTION RESPONSE] Error responding to interaction:', error);
@@ -170,9 +165,7 @@ export async function generateStartupInteractions(req: Request, res: Response): 
     const userProfile = await supabaseService.getProfile(userId);
     const timezone = userProfile?.timezone || 'UTC';
 
-    // Gerald (interaction agent) disconnected -- role eliminated
-    // Startup interaction generation is now a no-op
-    console.log(`[STARTUP] Gerald disconnected, skipping proactive interaction generation for user ${userId}`);
+    console.log(`[STARTUP] Proactive interaction generation disabled for user ${userId}`);
     return res.json({
       success: true,
       message: 'Interaction generation disabled',

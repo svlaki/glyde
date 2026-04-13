@@ -14,8 +14,10 @@ interface SlotBlockProps {
   onConfirm: (slotId: string) => void
   onDismiss: (slotId: string) => void
   onClick: (slot: SlotWithSuggestion) => void
-  onDragStart: (e: React.DragEvent, slot: SlotWithSuggestion) => void
-  onDragEnd: () => void
+  onPointerDown: (e: React.PointerEvent, slotId: string) => void
+  isDragSource: boolean
+  isPointerDragging: boolean
+  wasDragRef: React.MutableRefObject<boolean>
   onResizeStart: (e: React.MouseEvent, slot: SlotWithSuggestion) => void
 }
 
@@ -38,8 +40,10 @@ export function SlotBlock({
   onConfirm,
   onDismiss,
   onClick,
-  onDragStart,
-  onDragEnd,
+  onPointerDown,
+  isDragSource,
+  isPointerDragging,
+  wasDragRef,
   onResizeStart,
 }: SlotBlockProps) {
   const [isHovered, setIsHovered] = useState(false)
@@ -132,11 +136,16 @@ export function SlotBlock({
 
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, slot)}
-      onDragEnd={onDragEnd}
+      onPointerDown={(e) => onPointerDown(e, slot.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        if (isPointerDragging || wasDragRef.current) {
+          wasDragRef.current = false
+          return
+        }
+        onClick(slot)
+      }}
       style={{
         position: 'absolute',
         top: `${top}px`,
@@ -149,17 +158,19 @@ export function SlotBlock({
         borderRadius: '4px',
         overflow: 'hidden',
         zIndex: layout.zIndex,
-        cursor: 'default',
+        cursor: isDragSource ? 'grabbing' : 'grab',
         transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         display: 'flex',
         flexDirection: 'column',
         boxShadow: isHovered ? `0 0 0 1px ${hexToRgba(slotColor, 0.3)}` : 'none',
+        opacity: isDragSource ? 0.3 : 1,
+        transform: isDragSource ? 'scale(0.97)' : 'none',
+        touchAction: 'none',
       }}
       title={`Suggestion: ${slot.suggestion_title}\n${startTime}\n${slot.reasoning || ''}`}
     >
       {/* Clickable card content with directional slide */}
       <div
-        onClick={() => onClick(slot)}
         style={{
           flex: 1,
           minHeight: 0,
@@ -168,7 +179,6 @@ export function SlotBlock({
           flexDirection: 'column',
           justifyContent: 'center',
           padding: '2px 6px',
-          cursor: 'pointer',
         }}
       >
         <div style={{ ...slideTransform(), display: 'flex', flexDirection: 'column', gap: '1px' }}>

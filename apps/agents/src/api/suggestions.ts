@@ -300,39 +300,18 @@ export async function confirmUserSlot(req: Request, res: Response): Promise<void
 }
 
 /**
- * Replenish slots using the SchedulerAgent (LLM) for intelligent placement.
- * Only loads calendar + suggestions context (lightweight compared to batch generator).
- * Called after confirm/dismiss to maintain 4 visible slots.
+ * Replenish slots using lightweight DB-only placement (no LLM call).
+ * Finds free time windows and places unplaced suggestions.
+ * Called after confirm/dismiss to maintain visible slots.
  */
 export async function replenishUserSlots(req: Request, res: Response): Promise<void> {
   try {
     const parsed = parseBody(res, z.object({ user_id: uuidSchema }), req.body);
     if (!parsed) return;
 
-    // Count how many unplaced suggestions exist
-    const activeSlots = await suggestionService.listSlots(parsed.user_id, {
-      start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 7 * 86400000).toISOString(),
-    });
-    const openSuggestions = await suggestionService.listSuggestions(parsed.user_id, { status: 'open' });
-    const placedIds = new Set(activeSlots.map(s => s.suggestion_id));
-    const unplaced = openSuggestions.filter(s => !placedIds.has(s.id));
-
-    if (unplaced.length === 0) {
-      res.json({ success: true, replenished: 0, active_count: activeSlots.length, message: 'All suggestions already placed' });
-      return;
-    }
-
-    const scheduler = new SchedulerAgent();
-    await scheduler.initialize();
-
-    await scheduler.processMessage(
-      { userId: parsed.user_id, timezone: 'UTC', sessionId: 'replenish', conversationHistory: [] },
-      `There are ${unplaced.length} suggestions without time slots. Find good free time windows and place them. Vary the times across different days and times of day. Match energy levels to time of day. Use the suggestion's estimated_minutes for slot duration (minimum 60 min).`
-    );
-
+    const created = await suggestionService.replenishSlotsLightweight(parsed.user_id);
     const newActiveCount = await suggestionService.getActiveSlotCount(parsed.user_id);
-    res.json({ success: true, replenished: newActiveCount - activeSlots.length, active_count: newActiveCount });
+    res.json({ success: true, replenished: created, active_count: newActiveCount });
   } catch (error) {
     sendErrorResponse(res, 500, 'Failed to replenish slots', {
       error: error instanceof Error ? error.message : String(error),

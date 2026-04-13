@@ -7,7 +7,7 @@ import type { CalendarMapping } from '../lib/connectionService'
 interface CalendarListItemProps {
   mapping: CalendarMapping
   onToggleSync: (mappingId: string, isSynced: boolean) => void
-  onSetAspect: (mappingId: string, categoryId: string | null) => void
+  onSetAspect: (mappingId: string, aspectId: string | null) => void
   isUpdating?: boolean
 }
 

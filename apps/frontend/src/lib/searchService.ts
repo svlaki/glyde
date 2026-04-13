@@ -17,8 +17,8 @@ export interface SearchResult {
   description?: string
   date?: string
   endDate?: string
-  category?: string
-  categoryColor?: string
+  aspect?: string
+  aspectColor?: string
   status?: string
   priority?: string
   preview: string
@@ -96,8 +96,8 @@ function eventToSearchResult(event: CalendarEvent, query: string): SearchResult 
     description: event.description,
     date: event.start_time,
     endDate: event.end_time,
-    category: event.aspect_name || event.aspect,
-    categoryColor: event.aspect_color,
+    aspect: event.aspect_name || event.aspect,
+    aspectColor: event.aspect_color,
     preview: `${dateStr} at ${timeStr}`,
     relevanceScore: calculateRelevance(query, event.title, event.description),
     originalData: event
@@ -121,8 +121,8 @@ function taskToSearchResult(task: Task, query: string): SearchResult {
     title: task.title,
     description: task.description,
     date: task.due_date,
-    category: task.aspect_name || task.aspect,
-    categoryColor: task.aspect_color,
+    aspect: task.aspect_name || task.aspect,
+    aspectColor: task.aspect_color,
     status: task.status,
     priority: task.priority,
     preview,
@@ -148,7 +148,7 @@ function goalToSearchResult(goal: Goal, query: string): SearchResult {
     title: goal.title,
     description: goal.description,
     date: goal.target_date,
-    category: goal.category,
+    aspect: goal.aspect_name,
     status: goal.status,
     preview,
     relevanceScore: calculateRelevance(query, goal.title, goal.description),

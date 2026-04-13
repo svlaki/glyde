@@ -12,9 +12,7 @@ import { goalTools } from './goals/index.js';
 import { profileTools } from './profile/index.js';
 import { searchTools } from './search/index.js';
 import { memoryTools } from './memory/index.js';
-import { interactionTools } from './interactions/index.js';
 import { rulesTools } from './rules/index.js';
-import { getPlanTool, updatePlanTool } from './plans/index.js';
 import { getNotesTool, createNotesTool, updateNotesTool, scribeResearchTool } from './notes/index.js';
 import { projectTools } from './projects/index.js';
 import { reminderTools } from './reminders/index.js';
@@ -27,9 +25,6 @@ import { swapSlotRandomTool } from './suggestions/swap-slot-random.js';
 import { confirmSlotTool } from './suggestions/confirm-slot.js';
 import { dismissSlotTool } from './suggestions/dismiss-slot.js';
 import { sharedAspectTools } from './shared-aspects/index.js';
-// NOTE: interactionTools imported but NOT registered in default tools
-// Interactions should only be created by Gerald (InteractionAgentGerald), not ConversationAgent
-// This prevents accidental duplicate/proactive suggestions from the conversation flow
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -89,10 +84,6 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
-    // Register plan tools
-    this.tools.set(getPlanTool.name, getPlanTool);
-    this.tools.set(updatePlanTool.name, updatePlanTool);
-
     // Register project tools
     projectTools.forEach(tool => {
       this.tools.set(tool.name, tool);
@@ -132,9 +123,6 @@ export class ToolRegistry {
       this.tools.set(tool.name, tool);
     });
 
-    // NOTE: Interaction tools NOT registered here
-    // Gerald (InteractionAgentGerald) has its own tool set for proactive suggestions
-    // This separation prevents ConversationAgent from accidentally creating interactions
   }
 
   // Register a single tool
@@ -180,9 +168,8 @@ export class ToolRegistry {
       memory: ['search_memory_unified', 'manage_patterns', 'update_memory_advanced'],
       search: ['web_search', 'location_search', 'scribe_research'],
       notes: ['get_notes', 'create_notes', 'update_notes', 'scribe_research'],
-      interactions: ['create_interaction', 'create_rating'],
+      interactions: ['create_interaction'],
       rules: ['create_rule', 'list_rules', 'delete_rule', 'toggle_rule'],
-      plans: ['get_plan', 'update_plan'],
       projects: ['create_project', 'list_projects', 'update_project', 'archive_project', 'unarchive_project', 'delete_project', 'tag_to_project'],
       reminders: ['create_reminder', 'update_reminder', 'delete_reminder', 'list_reminders'],
       friends: ['list_friends', 'get_pending_friend_requests', 'send_friend_request', 'accept_friend_request', 'decline_friend_request', 'remove_friend', 'update_friend_notes', 'add_friend_aspect', 'remove_friend_aspect'],
@@ -193,12 +180,6 @@ export class ToolRegistry {
 
     const toolNames = categoryPrefixes[category] || [];
     return this.getTools(toolNames);
-  }
-
-  // Gerald (InteractionAgentGerald) disconnected -- role eliminated
-  // Method kept for backwards compatibility but returns empty array
-  getGeraldAgentTools(): any[] {
-    return [];
   }
 
   // Get tools for OnboardingEnrichmentAgent — curated set for setup
@@ -258,7 +239,7 @@ export class ToolRegistry {
   }
 
   // Get tool names for a specific category
-  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'plans' | 'projects' | 'reminders' | 'friends' | 'shared-events' | 'shared-aspects' | 'suggestions'): string[] {
+  getToolNames(category?: 'calendar' | 'aspects' | 'tasks' | 'goals' | 'profile' | 'memory' | 'search' | 'interactions' | 'rules' | 'projects' | 'reminders' | 'friends' | 'shared-events' | 'shared-aspects' | 'suggestions'): string[] {
     if (category) {
       return this.getToolsByCategory(category).map(tool => tool.name);
     }

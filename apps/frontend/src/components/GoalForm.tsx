@@ -55,7 +55,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
   const { aspects, refreshAspects, getAspectColor } = useAspects()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
+  const [aspect, setAspect] = useState('')
   const [dueDate, setDueDate] = useState<Date | null>(null)
   const [hasDueDate, setHasDueDate] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -70,7 +70,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
     if (goal) {
       setTitle(goal.title || '')
       setDescription(goal.description || '')
-      setCategory(goal.aspect || '')
+      setAspect(goal.aspect || '')
       if ((goal as any).due_date) {
         setDueDate(new Date((goal as any).due_date))
         setHasDueDate(true)
@@ -81,7 +81,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
     } else {
       setTitle('')
       setDescription('')
-      setCategory('')
+      setAspect('')
       setDueDate(null)
       setHasDueDate(false)
     }
@@ -132,7 +132,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
       await refreshAspects()
       // Auto-select the newly created aspect
       if (aspectData.name) {
-        setCategory(aspectData.name)
+        setAspect(aspectData.name)
       }
       setIsAspectFormOpen(false)
       setEditingField(null)
@@ -152,7 +152,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
         id: goal?.id,
         title: title.trim(),
         description: description.trim() || null,
-        aspect: category || null,
+        aspect: aspect || null,
         due_date: (hasDueDate && dueDate) ? dueDate.toISOString() : null,
       }
       await onSave(goalData)
@@ -211,13 +211,13 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
               Aspect
             </label>
             <div
-              onClick={() => setEditingField(editingField === 'category' ? null : 'category')}
+              onClick={() => setEditingField(editingField === 'aspect' ? null : 'aspect')}
               style={{
                 width: '100%',
                 padding: '10px 12px',
                 fontSize: fontSize.base,
                 background: colors.bgPrimary,
-                color: category ? colors.textPrimary : colors.textSecondary,
+                color: aspect ? colors.textPrimary : colors.textSecondary,
                 border: `1px solid ${colors.border}`,
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -226,23 +226,23 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
                 gap: '8px'
               }}
             >
-              {category ? (
+              {aspect ? (
                 <>
                   {(() => {
-                    const asp = aspects.find(a => a.name === category)
+                    const asp = aspects.find(a => a.name === aspect)
                     return asp ? (
                       <>
                         <div style={{
                           width: '12px',
                           height: '12px',
                           borderRadius: '50%',
-                          background: getAspectColor(category),
+                          background: getAspectColor(aspect),
                           flexShrink: 0
                         }} />
-                        <span>{category}</span>
+                        <span>{aspect}</span>
                       </>
                     ) : (
-                      <span>{category}</span>
+                      <span>{aspect}</span>
                     )
                   })()}
                 </>
@@ -252,7 +252,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
             </div>
 
             {/* Dropdown Menu */}
-            {editingField === 'category' && (
+            {editingField === 'aspect' && (
               <div style={{
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
@@ -267,10 +267,10 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
                 overflowY: 'auto'
               }}>
                 {/* Clear selection option */}
-                {category && (
+                {aspect && (
                   <div
                     onClick={() => {
-                      setCategory('')
+                      setAspect('')
                       setEditingField(null)
                     }}
                     style={{
@@ -299,7 +299,7 @@ export function GoalForm({ goal, isOpen, onClose, onSave, onDelete }: GoalFormPr
                   <div
                     key={cat.id}
                     onClick={() => {
-                      setCategory(cat.name)
+                      setAspect(cat.name)
                       setEditingField(null)
                     }}
                     style={{

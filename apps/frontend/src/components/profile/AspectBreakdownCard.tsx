@@ -166,10 +166,10 @@ export function AspectBreakdownCard({ breakdown }: AspectBreakdownCardProps) {
 
   const slices = useMemo<SliceData[]>(() =>
     breakdown.map(item => ({
-      id: item.categoryId,
-      name: item.categoryName,
+      id: item.aspectId,
+      name: item.aspectName,
       activity: item.eventCount + item.taskCount + item.goalCount,
-      color: getAspectColor(item.categoryName),
+      color: getAspectColor(item.aspectName),
       eventCount: item.eventCount,
       taskCount: item.taskCount,
       goalCount: item.goalCount,

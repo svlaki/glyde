@@ -1,8 +1,8 @@
 # Glyde Frontend
 
 ## Quick Reference
-- Pages: `src/pages/` - 13 pages (Calendar, Goals, Friends, Plan, Profile, etc.)
-- Components: `src/components/` - 49+ components, `src/components/ui/` for Shadcn
+- Pages: `src/pages/` - 12 pages (Calendar, Goals, Friends, Notes, Profile, etc.)
+- Components: `src/components/` - 45+ components, `src/components/ui/` for Shadcn
 - Services: `src/lib/*Service.ts` - API client functions
 - Contexts: `src/lib/*Context.tsx` - Auth, Aspect, Rule, Connection, Theme, Timezone
 - Hooks: `src/hooks/` - Custom hooks (platform, keyboard, avatar, geolocation)

@@ -267,7 +267,7 @@ export class GoogleCalendarSyncService {
     connection: UserConnection,
     calendarId: string,
     mappingId: string,
-    categoryId?: string
+    aspectId?: string
   ): Promise<SyncResult> {
     logger.info('[GoogleCalendarSyncService] Starting initial sync for calendar:', calendarId);
 
@@ -303,12 +303,12 @@ export class GoogleCalendarSyncService {
 
       console.log(`[GoogleCalendarSyncService] Fetched ${allEvents.length} events from calendar ${calendarId}`);
 
-      // Process events with category assignment
+      // Process events with aspect assignment
       const result = await this.processCalendarEvents(
         allEvents,
         connection.user_id,
         connection.id,
-        categoryId
+        aspectId
       );
 
       // Update calendar mapping with sync token
@@ -330,7 +330,7 @@ export class GoogleCalendarSyncService {
     calendarId: string,
     mappingId: string,
     syncToken: string,
-    categoryId?: string
+    aspectId?: string
   ): Promise<SyncResult> {
     logger.info('[GoogleCalendarSyncService] Starting delta sync for calendar:', calendarId);
 
@@ -361,12 +361,12 @@ export class GoogleCalendarSyncService {
 
       console.log(`[GoogleCalendarSyncService] Delta sync: ${allEvents.length} changed events from ${calendarId}`);
 
-      // Process events with category assignment
+      // Process events with aspect assignment
       const result = await this.processCalendarEvents(
         allEvents,
         connection.user_id,
         connection.id,
-        categoryId
+        aspectId
       );
 
       // Update calendar mapping with new sync token
@@ -378,7 +378,7 @@ export class GoogleCalendarSyncService {
       // Handle sync token invalidation (410 Gone)
       if (error.code === 410 || error.status === 410) {
         logger.info('[GoogleCalendarSyncService] Sync token expired for calendar, performing full re-sync');
-        return this.performInitialSyncForCalendar(connection, calendarId, mappingId, categoryId);
+        return this.performInitialSyncForCalendar(connection, calendarId, mappingId, aspectId);
       }
       throw error;
     }
@@ -424,7 +424,7 @@ export class GoogleCalendarSyncService {
     events: calendar_v3.Schema$Event[],
     userId: string,
     connectionId: string,
-    categoryId?: string
+    aspectId?: string
   ): Promise<Omit<SyncResult, 'nextSyncToken'>> {
     let eventsCreated = 0;
     let eventsUpdated = 0;
@@ -478,9 +478,9 @@ export class GoogleCalendarSyncService {
             updated_at: new Date().toISOString()
           };
 
-          // Update category if specified (allows re-sync to fix categories)
-          if (categoryId) {
-            updateData.aspect_id = categoryId;
+          // Update aspect if specified (allows re-sync to fix aspects)
+          if (aspectId) {
+            updateData.aspect_id = aspectId;
           }
 
           const { error } = await supabase
@@ -492,7 +492,7 @@ export class GoogleCalendarSyncService {
             eventsUpdated++;
           }
         } else {
-          // Create new event with optional category assignment
+          // Create new event with optional aspect assignment
           const insertData: Record<string, unknown> = {
             user_id: userId,
             google_event_id: googleEvent.id,
@@ -508,9 +508,9 @@ export class GoogleCalendarSyncService {
             connection_id: connectionId
           };
 
-          // Assign category if specified
-          if (categoryId) {
-            insertData.aspect_id = categoryId;
+          // Assign aspect if specified
+          if (aspectId) {
+            insertData.aspect_id = aspectId;
           }
 
           const { error } = await supabase

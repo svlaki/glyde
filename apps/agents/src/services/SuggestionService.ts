@@ -645,12 +645,38 @@ export class SuggestionService {
    * Returns the number of new slots created.
    */
   /**
+   * Expire stale slots before any replenishment.
+   * Marks slots as expired if their end_time or expires_at is in the past.
+   */
+  private async expireStaleSlots(userId: string): Promise<number> {
+    const now = new Date().toISOString();
+    const { data: stale } = await this.supabase
+      .from('placement_slots')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['proposed', 'edited'])
+      .or(`expires_at.lt.${now},end_time.lt.${now}`);
+
+    if (!stale || stale.length === 0) return 0;
+
+    await this.supabase
+      .from('placement_slots')
+      .update({ status: 'expired', updated_at: now })
+      .in('id', stale.map(s => s.id));
+
+    logger.info(`[SuggestionService] Expired ${stale.length} stale slots for user ${userId}`);
+    return stale.length;
+  }
+
+  /**
    * Lightweight slot replenishment — no LLM call.
    * Places ALL unused suggestions into free time windows.
    * Frontend controls how many to show (4 at a time).
    */
   async replenishSlotsLightweight(userId: string): Promise<number> {
     try {
+      // Expire stale slots first so they don't block new placements
+      await this.expireStaleSlots(userId);
 
       // Get IDs already on active slots
       const { data: activeSlots } = await this.supabase

@@ -45,7 +45,6 @@ import { getUserProjects, createUserProject, updateUserProject, deleteUserProjec
 import { getPendingInteractions, respondToInteraction, clearUserInteractions } from './interactions.js';
 import { listUserSuggestions, createUserSuggestion, updateUserSuggestion, listUserSlots, createUserSlot, moveUserSlot, resizeUserSlot, swapUserSlot, confirmUserSlot, dismissUserSlot, replenishUserSlots, generateSuggestionsBatch } from './suggestions.js';
 import { getInboxItems } from './inbox.js';
-import { getUserRatings, getRatingSummary, createRating, deleteRatingTopic, updateRatingTopic, reorderRatingTopics } from './ratings.js';
 import { getUserRules, createUserRule, updateUserRule, deleteUserRule, toggleUserRule } from './rules.js';
 import {
   getConnections,
@@ -74,6 +73,7 @@ import { startWatchRenewalJob } from '../jobs/watch-renewal.js';
 import { startReminderCheckerJob } from '../jobs/reminder-checker.js';
 import { startNotificationSchedulerJob } from '../jobs/notification-scheduler.js';
 import { startScribeScheduler } from '../jobs/scribe-scheduler.js';
+import { startSlotExpiryJob } from '../jobs/slot-expiry.js';
 import { authenticateRequest } from './middleware/auth.js';
 import pushNotificationService from '../services/PushNotificationService.js';
 import webPushService from '../services/WebPushService.js';
@@ -452,14 +452,6 @@ app.post('/api/interactions/clear', clearUserInteractions);
 // Interactions are now created directly by the agent via create_interaction tool
 // app.post('/api/interactions/generate-startup', generateStartupInteractions);
 
-// Rating endpoints
-app.post('/api/ratings', getUserRatings);
-app.post('/api/ratings/summary', getRatingSummary);
-app.post('/api/ratings/create', createRating);
-app.post('/api/ratings/delete', deleteRatingTopic);
-app.post('/api/ratings/update', updateRatingTopic);
-app.post('/api/ratings/reorder', reorderRatingTopics);
-
 // Rules endpoints
 app.post('/api/rules', getUserRules);
 app.post('/api/rules/create', createUserRule);
@@ -608,6 +600,7 @@ if (process.env.NODE_ENV !== 'test') {
     startReminderCheckerJob();
     startNotificationSchedulerJob();
     startScribeScheduler();
+    startSlotExpiryJob();
 
     // Initialize push notification services
     pushNotificationService.initialize();

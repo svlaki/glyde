@@ -1,35 +1,41 @@
 # Glyde
 
-Glyde is an AI-native life management and coordination system. It centralizes a user's schedule, tasks, goals, and life plan around color-coded **aspects** -- flexible categories that organize every object in the system. A conversational agent handles most actions through natural language, automatically creating events, assigning aspects, filling in details, and keeping everything connected.
+Glyde is an AI-native life management and coordination system. It centralizes a user's schedule, tasks, goals, and notes around color-coded **aspects** -- flexible categories that organize every object in the system. A conversational agent handles most actions through natural language, automatically creating events, assigning aspects, filling in details, and keeping everything connected.
 
 ## Features
 
 | Feature | Status |
 |---|---|
 | Aspects (color-coded life categories) | Built |
-| Calendar (events, recurring events, Google Calendar sync) | Built |
+| Calendar (events, recurring events, Google/Microsoft sync) | Built |
 | Tasks (to-do list with priorities, due dates, aspects) | Built |
 | Goals (milestones, progress tracking, check-ins) | Built |
-| Conversation Agent (30+ tools, natural language) | Built |
-| Interaction Agent Gerald (proactive suggestions, follow-ups) | Built |
+| Notes (wiki-linked, aspect-tagged, multi-note) | Built |
+| Projects (entity grouping, archiving, tagging) | Built |
+| Reminders (time-based notification cards) | Built |
+| Conversation Agent (82+ tools, natural language) | Built |
+| Planner Agent (goal decomposition, scheduling) | Built |
+| Scheduler Agent (automated task scheduling) | Built |
+| Scribe Agent (note research, daily digests) | Built |
 | Maintenance Agent Margaret (data hygiene audits) | Built |
-| Life Plan (phases, timelines, embedded chat) | Built |
+| Onboarding Enrichment Agent (new user setup) | Built |
+| Inbox (unified interactions, invites, friend requests) | Built |
+| Suggestions (action suggestions with placement slots) | Built |
+| Knowledge Graph (entity linking, visualization) | Built |
 | Rules (user-defined agent behavior constraints) | Built |
-| Social (friends, aspect tagging, public events) | Built |
+| Social (friends, aspect tagging, shared events) | Built |
 | Zep Cloud memory (persistent user context) | Built |
 | Web search enrichment (Tavily) | Built |
-| Location tracking | Planned |
-| Fitness tracking | Planned |
-| Sleep tracking | Planned |
+| Push notifications (VAPID web push) | Built |
 
 ## Tech Stack
 
-- **Frontend**: React 18, Vite, TypeScript, TailwindCSS, Framer Motion
-- **Backend**: Node.js, Express, LangGraph, OpenAI GPT-5.1
+- **Frontend**: React 18, Vite 7, TypeScript, TailwindCSS 4, Framer Motion
+- **Backend**: Node.js, Express, LangGraph, OpenAI GPT-5.4-mini
 - **Database**: Supabase (PostgreSQL with RLS)
 - **Memory**: Zep Cloud (graph-based persistent memory)
 - **Search**: Tavily API
-- **Calendar**: Google Calendar API (OAuth2)
+- **Calendar**: Google Calendar API + Microsoft Calendar API (OAuth2)
 - **Infrastructure**: Docker Compose
 
 ## Architecture
@@ -39,32 +45,37 @@ glydeproper/
   apps/
     agents/             # Node.js backend (port 8000)
       src/
-        agents/         # ConversationAgent, Gerald, Margaret
-        api/            # Express routes (60+ endpoints)
-        services/       # SupabaseService, AspectService, etc.
-        tools/          # 55+ LangGraph tools (calendar, tasks, goals, aspects, ...)
+        agents/         # ConversationAgent, Margaret, Planner, Scheduler, Scribe
+        api/            # Express routes (31+ endpoint modules)
+        services/       # 20 domain services
+        tools/          # 82+ LangGraph tools across 16+ categories
         config/         # Agent configuration
+        jobs/           # Background jobs (Zep maintenance, notifications)
     frontend/           # React/Vite frontend (port 5173, exposed on 3000)
       src/
-        components/     # Calendar, ChatBot, Profile, Friends, etc.
-        pages/          # PlanPage, ProfilePage
+        pages/          # CalendarPage, NotesPage, GoalsPage, ProfilePage, etc. (12 pages)
+        components/     # 45+ components (Calendar, ChatBot, Profile, Friends, etc.)
         lib/            # Services, contexts, utilities
         hooks/          # Custom React hooks
+  archive/              # Archived features (Gerald, Ratings, Plans)
   docker-compose.yml    # Agent + Frontend containers
   ARCHITECTURE.md       # Detailed architecture docs
 ```
 
 ### Agent System
 
-- **ConversationAgent**: Main chat interface. Uses LangGraph with 55+ tools across 11 categories (calendar, tasks, goals, aspects, profile, memory, search, interactions, rules, plans, social). Powered by GPT-5.1 with Zep memory context.
-- **InteractionAgentGerald**: Generates proactive suggestions (scheduling, goal check-ins, task reminders) as yes/no or multiple-choice interactions with follow-up chaining.
-- **MaintenanceAgentMargaret**: Audits data hygiene -- flags uncategorized items, suggests aspect merges/splits, proposes description updates.
+- **ConversationAgent**: Main chat interface. Uses LangGraph with 82+ tools across 16+ categories (calendar, tasks, goals, aspects, notes, projects, reminders, memory, search, friends, shared-events, shared-aspects, suggestions, rules, interactions, profile). Powered by GPT-5.4-mini with Zep memory context.
+- **PlannerAgent**: Decomposes goals into milestones and scheduling plans.
+- **SchedulerAgent**: Automates task scheduling and calendar optimization.
+- **ScribeAgent**: Researches and generates notes, daily digests, pattern scanning.
+- **MaintenanceAgentMargaret**: Audits data hygiene -- flags items without aspects, suggests aspect merges/splits, proposes description updates.
+- **OnboardingEnrichmentAgent**: Enriches context for new users during onboarding.
 
 ### Data Model
 
-Core tables: `profile`, `aspects`, `events`, `tasks`, `goals`, `life_plans`, `rules`, `user_interactions`, `interaction_responses`, `user_activity_log`, `user_friendships`, `friend_aspects`.
+Core tables: `profile`, `aspects`, `events`, `tasks`, `goals`, `notes`, `rules`, `user_interactions`, `interaction_responses`, `user_activity_log`, `user_friendships`, `friend_aspects`.
 
-Events, tasks, and goals link to aspects via `aspect_id` (UUID FK). The deprecated `category` text column is still present for backward compatibility.
+Events, tasks, and goals link to aspects via `aspect_id` (UUID FK).
 
 ## Setup
 
@@ -76,6 +87,7 @@ Events, tasks, and goals link to aspects via `aspect_id` (UUID FK). The deprecat
 - Zep Cloud API key
 - Tavily API key (for web search)
 - Google OAuth credentials (for calendar sync)
+- Microsoft OAuth credentials (optional, for Outlook calendar sync)
 
 ### Environment Variables
 
@@ -97,10 +109,24 @@ ZEP_BASE_URL=https://api.getzep.com
 # Search
 TAVILY_API_KEY=your-tavily-key
 
-# Google Calendar (optional)
+# Google Calendar
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/oauth/callback
+GOOGLE_MAPS_API_KEY=your-google-maps-key
+
+# Microsoft Calendar (optional)
+MICROSOFT_CLIENT_ID=your-microsoft-client-id
+MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
+MICROSOFT_REDIRECT_URI=http://localhost:3000/oauth/callback
+
+# Push Notifications
+VAPID_PUBLIC_KEY=your-vapid-public-key
+VAPID_PRIVATE_KEY=your-vapid-private-key
+VAPID_CONTACT_EMAIL=your-email
+
+# Admin
+VITE_ADMIN_USER_IDS=comma-separated-user-ids
 ```
 
 ### Running

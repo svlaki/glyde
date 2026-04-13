@@ -64,7 +64,7 @@ export function Inbox({ hideHeader = false, onChatReply: _onChatReply }: InboxPr
     setItems(prev => prev.filter(i => i.id !== id))
   }
 
-  // --- Interaction handlers (reused from AgentInteractions) ---
+  // --- Interaction handlers ---
   const handleInteractionRespond = async (interactionId: string, response: string) => {
     if (!session || processingIds.has(interactionId)) return
     markProcessing(interactionId)

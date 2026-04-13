@@ -21,6 +21,5 @@ export type ToolCategory =
   | 'search'
   | 'profile'
   | 'projects'
-  | 'plans'
   | 'suggestions'
-  | 'shared-aspects';
+  | 'notes';

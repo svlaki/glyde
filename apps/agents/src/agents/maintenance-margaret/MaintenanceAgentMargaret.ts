@@ -95,9 +95,9 @@ export class MaintenanceAgentMargaret extends BaseAgent {
 
   getCapabilities(): string[] {
     return [
-      "Audit category/aspect coverage for goals, tasks, and events",
-      "Suggest merges/splits for categories based on overlap",
-      "Highlight uncategorized or miscategorized items",
+      "Audit aspect coverage for goals, tasks, and events",
+      "Suggest merges/splits for aspects based on overlap",
+      "Highlight items without aspects or with wrong aspects",
       "Propose aspect description refreshes from observed data",
       "Provide safe, low-risk maintenance recommendations"
     ];
@@ -134,7 +134,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
     const trimmed = goals.slice(0, 50);
     return trimmed.map((goal: any) => {
       return `- ${goal.title || 'Untitled goal'} [status: ${goal.status || 'unknown'}]` +
-        `${goal.category ? ` [category: ${goal.category}]` : ''}` +
+        `${goal.aspect_name ? ` [aspect: ${goal.aspect_name}]` : ''}` +
         `${goal.description ? ` - ${goal.description}` : ''}`;
     }).join('\n');
   }
@@ -147,7 +147,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
     const trimmed = tasks.slice(0, 80);
     return trimmed.map((task: any) => {
       return `- ${task.title || 'Untitled task'} [status: ${task.status || 'unknown'}]` +
-        `${task.category ? ` [category: ${task.category}]` : ''}` +
+        `${task.aspect_name ? ` [aspect: ${task.aspect_name}]` : ''}` +
         `${task.description ? ` - ${task.description}` : ''}`;
     }).join('\n');
   }
@@ -162,7 +162,7 @@ export class MaintenanceAgentMargaret extends BaseAgent {
       const start = event.start_time ? new Date(event.start_time).toISOString() : 'unknown';
       const end = event.end_time ? new Date(event.end_time).toISOString() : 'unknown';
       return `- ${event.title || 'Untitled event'} (${start} → ${end})` +
-        `${event.category || event.category_name ? ` [category: ${event.category_name || event.category}]` : ''}` +
+        `${event.aspect_name ? ` [aspect: ${event.aspect_name}]` : ''}` +
         `${event.description ? ` - ${event.description}` : ''}`;
     }).join('\n');
   }
