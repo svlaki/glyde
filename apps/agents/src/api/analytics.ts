@@ -567,4 +567,17 @@ router.post('/context', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/analytics/context-reset — clear all agent token usage tracking
+router.post('/context-reset', async (req: Request, res: Response) => {
+  try {
+    const db = getSupabaseClient();
+    const { error } = await db.from('agent_token_usage').delete().not('id', 'is', null);
+    if (error) throw error;
+    res.json({ success: true, data: { reset: true } });
+  } catch (error) {
+    console.error('[ANALYTICS] Context reset error:', error);
+    res.status(500).json({ error: 'Failed to reset token usage' });
+  }
+});
+
 export default router;

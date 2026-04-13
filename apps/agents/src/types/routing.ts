@@ -21,5 +21,6 @@ export type ToolCategory =
   | 'search'
   | 'profile'
   | 'projects'
-  | 'suggestions'
-  | 'notes';
+  | 'plans'
+  | 'notes'
+  | 'suggestions';

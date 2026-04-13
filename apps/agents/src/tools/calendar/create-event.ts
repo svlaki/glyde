@@ -177,11 +177,11 @@ export const createEventTool = tool(
     description: "Create a calendar event.",
     schema: z.object({
       title: z.string().describe("Event title"),
-      startTime: z.string().describe("Start time in ISO format (local timezone, no Z)"),
+      startTime: z.string().describe("Start time in ISO format (local timezone, no Z). RULES: 1) 'after [event]' means start when that event ENDS — look up its end_time. 2) Bare numbers without AM/PM default to PM for gym, social, errands, dinner. 3) NEVER pass a time earlier today than the current time."),
       endTime: z.string().describe("End time in ISO format. Default: start + 1 hour"),
       location: z.string().optional().nullable().describe("Event location"),
       description: z.string().optional().nullable().describe("Event description"),
-      category: z.string().optional().nullable().describe("Aspect name (must exist)"),
+      category: z.string().optional().nullable().describe("Aspect name (must exist). Match activity to obvious aspect: gym/exercise/run/yoga → Health, hangout/social/dinner → Personal or Social, study/class → Education."),
       visibility: z.enum(["private", "friends", "public"]).optional().nullable().describe("private|friends|public. Default: private"),
       replaceConflicting: z.boolean().default(false).nullable().describe("True to replace conflicting event"),
       projectId: z.string().optional().nullable().describe("Project UUID to link to"),

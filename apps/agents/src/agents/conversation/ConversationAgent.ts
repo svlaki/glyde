@@ -7,12 +7,14 @@ import projectService from '../../services/ProjectService.js';
 import ruleService from '../../services/RuleService.js';
 import { BaseAgent } from '../base/BaseAgent.js';
 import { AgentContext, AgentResponse, ImageContent } from '../../types/agents.js';
+import { ToolCategory } from '../../types/routing.js';
 import { isValidTimezone } from '../../utils/timezoneUtils.js';
 import { toDate, addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ToolRegistry } from '../../tools/ToolRegistry.js';
 import { reverseGeocode } from '../../tools/search/location-search.js';
 import { buildSystemPrompt } from './prompts.js';
+import { classifyIntent, isOperationalMessage } from './intent-router.js';
 import { DatabaseProfile } from '../../types/database.js';
 import { FriendshipService } from '../../services/FriendshipService.js';
 
@@ -84,6 +86,14 @@ const ConversationState = Annotation.Root({
     reducer: (_existing, update) => update || _existing,
     default: () => '',
   }),
+  selectedToolNames: Annotation<string[]>({
+    reducer: (_existing, update) => update && update.length > 0 ? update : _existing,
+    default: () => [],
+  }),
+  selectedCategories: Annotation<ToolCategory[]>({
+    reducer: (_existing: ToolCategory[], update: ToolCategory[]) => update && update.length > 0 ? update : _existing,
+    default: (): ToolCategory[] => [],
+  }),
 });
 
 type ConversationStateType = typeof ConversationState.State;
@@ -102,26 +112,31 @@ export class ConversationAgent extends BaseAgent {
 
   async processMessage(context: AgentContext, message: string): Promise<AgentResponse> {
     try {
-      // Load memory context using Graphiti
-      const memoryContext = await this.loadMemoryContext(context, 'conversation');
+      // Classify intent early to conditionally load context
+      const categories = classifyIntent(message, (context as any).currentPage);
+      const catSet = new Set(categories);
+      const needsProjects = catSet.has('projects');
+      const needsLocation = catSet.has('search') && !!context.location;
 
       // Pre-load user data for LangGraph context
       const supabaseService = new SupabaseService();
 
-      const reverseGeocodePromise = context.location
+      const reverseGeocodePromise = needsLocation && context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
+      // Always load friends -- lightweight query, and friend names are needed
+      // for context even when intent doesn't explicitly mention "friend"
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
-      // Fetch all user data in parallel
+      // Fetch core data in parallel, skip optional context based on intent
       const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        projectService.getProjects(context.userId),
+        needsProjects ? projectService.getProjects(context.userId) : Promise.resolve([]),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
@@ -237,7 +252,7 @@ export class ConversationAgent extends BaseAgent {
         userFriends: userFriends || [],
         memoryFactContext: memoryFactCtx,
         rulesContext: rulesCtx,
-      });
+      }, { recursionLimit: 15 });
 
       const aiMessages = result.messages.filter((m: any) => m._getType() === "ai");
       const lastAiMessage = aiMessages[aiMessages.length - 1];
@@ -253,10 +268,13 @@ export class ConversationAgent extends BaseAgent {
       }
 
       // Persist conversation to memory (fact extraction happens here)
-      try {
-        await this.persistConversationToMemory(context, message, response);
-      } catch (error) {
-        console.warn('Failed to persist conversation to memory:', error);
+      // Skip for short operational messages that won't contain new user facts
+      if (!isOperationalMessage(message)) {
+        try {
+          await this.persistConversationToMemory(context, message, response);
+        } catch (error) {
+          console.warn('Failed to persist conversation to memory:', error);
+        }
       }
 
       return {
@@ -307,28 +325,36 @@ IMPORTANT INSTRUCTIONS:
       // Immediately yield status so user sees activity
       yield { type: 'status', content: 'Loading your context...' };
 
+      // Classify intent early to conditionally load context
+      const categories = classifyIntent(message, (context as any).currentPage);
+      const catSet = new Set(categories);
+      const needsFriends = catSet.has('friends') || catSet.has('shared-events') || catSet.has('shared-aspects');
+      const needsProjects = catSet.has('projects');
+      const needsLocation = catSet.has('search') && !!context.location;
+
       const supabaseService = new SupabaseService();
 
-      const reverseGeocodePromise = context.location
+      const reverseGeocodePromise = needsLocation && context.location
         ? reverseGeocode(context.location.latitude, context.location.longitude).catch(() => null)
         : Promise.resolve(null);
 
-      const friendshipService = new FriendshipService(supabaseService.getClient());
+      const friendshipService = needsFriends
+        ? new FriendshipService(supabaseService.getClient())
+        : null;
 
-      // Fetch all user data in parallel
-      const [memoryContext, userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
-        this.loadMemoryContext(context, 'conversation'),
+      // Fetch core data in parallel, skip optional context based on intent
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
         supabaseService.getGoals(context.userId),
         supabaseService.getAspects(context.userId),
-        projectService.getProjects(context.userId),
+        needsProjects ? projectService.getProjects(context.userId) : Promise.resolve([]),
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
         supabaseService.getRatingSummary(context.userId),
-        friendshipService.getFriends(context.userId),
+        friendshipService ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
       ]);
 
       const userFriends = (friendsResult as any)?.success ? (friendsResult as any).data || [] : [];
@@ -453,6 +479,7 @@ IMPORTANT INSTRUCTIONS:
       // Stream events from LangGraph
       const eventStream = this.graph.streamEvents(initialState, {
         version: 'v2',
+        recursionLimit: 15,
       });
 
       let fullResponse = '';
@@ -528,10 +555,13 @@ IMPORTANT INSTRUCTIONS:
       }
 
       // Persist conversation to memory after streaming completes
-      try {
-        await this.persistConversationToMemory(context, message, fullResponse);
-      } catch (error) {
-        console.warn('Failed to persist conversation to memory:', error);
+      // Skip for short operational messages that won't contain new user facts
+      if (!isOperationalMessage(message)) {
+        try {
+          await this.persistConversationToMemory(context, message, fullResponse);
+        } catch (error) {
+          console.warn('Failed to persist conversation to memory:', error);
+        }
       }
 
     } catch (error) {
@@ -612,6 +642,19 @@ Use these scores to understand how the user feels about different areas of their
     return `\n\nGOALS (${goals.length}):\n${lines.join('\n')}`;
   }
 
+  /**
+   * Extract the last user message text from the message list for intent classification.
+   */
+  private extractUserMessage(messages: BaseMessage[]): string {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]._getType() === 'human') {
+        const content = messages[i].content;
+        return typeof content === 'string' ? content : '';
+      }
+    }
+    return '';
+  }
+
   private createGraph(): any {
     // Get all tools from ToolRegistry (centralized tool management)
     const toolRegistry = ToolRegistry.getInstance();
@@ -642,19 +685,39 @@ INCOMPLETE WORK:
 CONFLICT CHECK: After creating multiple events, check for time overlaps and flag them.
 Summarize ONLY what ACTUALLY succeeded, with names and times.`;
 
-    // Define the workflow nodes
-    const modelWithTools = this.model.bindTools(allTools);
-
     const callModel = async (state: ConversationStateType) => {
       const lastMsg = state.messages[state.messages.length - 1];
       const isToolReentry = lastMsg?._getType() === 'tool';
+
+      // Determine which tools to bind: reuse from state on re-entry, classify on first call
+      let selectedTools: any[];
+      let selectedToolNames: string[];
+      let selectedCategories: ToolCategory[];
+
+      if (isToolReentry && state.selectedToolNames.length > 0) {
+        // RE-ENTRY: Reuse same tool set from first call
+        selectedTools = toolRegistry.getTools(state.selectedToolNames);
+        selectedToolNames = state.selectedToolNames;
+        selectedCategories = state.selectedCategories;
+      } else {
+        // FIRST CALL: Classify intent and select relevant tools
+        const userMessage = this.extractUserMessage(state.messages);
+        const categories = classifyIntent(userMessage, state.currentPage);
+        selectedTools = toolRegistry.getToolsForCategories(categories);
+        selectedToolNames = selectedTools.map((t: any) => t.name);
+        selectedCategories = categories;
+        console.log(`[INTENT ROUTER] Selected ${selectedTools.length}/${allTools.length} tools for request`);
+      }
+
+      // Bind only the selected tools to the model for this invocation
+      const modelWithTools = this.model.bindTools(selectedTools);
 
       let messages: BaseMessage[];
 
       if (isToolReentry) {
         // RE-ENTRY: Use slim continuation prompt (saves ~3K+ tokens)
         messages = [new SystemMessage(CONTINUATION_PROMPT), ...state.messages];
-        console.log(`[AGENT NODE] Tool re-entry: slim prompt, ${messages.length} messages`);
+        console.log(`[AGENT NODE] Tool re-entry: slim prompt, ${messages.length} messages (${selectedTools.length} tools)`);
       } else {
         // FIRST CALL: Build full system prompt with all context
         const nowUtc = new Date();
@@ -682,7 +745,7 @@ Summarize ONLY what ACTUALLY succeeded, with names and times.`;
           todayFormatted,
           tomorrowFormatted,
           tomorrowDayName,
-          toolCount: allTools.length,
+          toolCount: selectedTools.length,
           zepGraphContext: state.memoryFactContext || '',
           rulesContext: state.rulesContext || '',
           userAspects: state.userAspects,
@@ -697,10 +760,11 @@ Summarize ONLY what ACTUALLY succeeded, with names and times.`;
             ? this.buildRatingContext(state.ratingSummary)
             : undefined,
           userFriends: state.userFriends,
+          activeCategories: selectedCategories,
         });
 
         messages = [systemMessage, ...state.messages];
-        console.log(`[AGENT NODE] Full prompt: ${messages.length} messages (${allTools.length} tools)`);
+        console.log(`[AGENT NODE] Full prompt: ${messages.length} messages (${selectedTools.length} tools bound)`);
       }
 
       const response = await modelWithTools.invoke(messages);
@@ -718,6 +782,8 @@ Summarize ONLY what ACTUALLY succeeded, with names and times.`;
 
       return {
         messages: [response],
+        selectedToolNames,
+        selectedCategories,
       };
     };
 

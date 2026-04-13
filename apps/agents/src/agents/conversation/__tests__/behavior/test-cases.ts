@@ -1277,6 +1277,715 @@ export const behaviorTestCases: BehaviorTestCase[] = [
       },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // RELATIVE TIME (5 cases) — validates NowISO-based time math
+  // ---------------------------------------------------------------------------
+  {
+    id: 'rel-time-001',
+    name: 'Event 15 minutes from now uses PM not AM',
+    category: 'relative-time',
+    prompt: 'make a test event 15 min from now',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+    responseNotContains: ['AM'],
+  },
+  {
+    id: 'rel-time-002',
+    name: 'Event in 2 hours from current time',
+    category: 'relative-time',
+    prompt: 'schedule a call in 2 hours',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+  },
+  {
+    id: 'rel-time-003',
+    name: 'Event 30 minutes from now',
+    category: 'relative-time',
+    prompt: 'add a quick meeting 30 min from now',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+  },
+  {
+    id: 'rel-time-004',
+    name: 'Event in 45 minutes',
+    category: 'relative-time',
+    prompt: 'put a reminder call on my calendar in 45 minutes',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+  },
+  {
+    id: 'rel-time-005',
+    name: 'Event "in an hour" from now',
+    category: 'relative-time',
+    prompt: 'schedule a check-in in an hour',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // TEMPORAL ANCHORING (4 cases) — "after X", "before Y"
+  // ---------------------------------------------------------------------------
+  {
+    id: 'anchor-001',
+    name: 'Schedule after existing event uses its end time',
+    category: 'temporal-anchoring',
+    prompt: 'schedule gym after my rehearsal',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Rehearsal',
+          start_time: '2026-04-12T19:00:00Z',
+          end_time: '2026-04-12T21:30:00Z',
+        },
+      ],
+      existingCategories: [
+        { id: 'cat-1', name: 'Health' },
+        { id: 'cat-2', name: 'Music' },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('gym'),
+          // Should start at or after 9:30 PM (rehearsal end)
+          start_time: (v: any) => typeof v === 'string' && (v.includes('T21:30') || v.includes('T22:') || v.includes('T17:30')),
+        },
+      },
+    ],
+  },
+  {
+    id: 'anchor-002',
+    name: 'Schedule before existing event ends before it starts',
+    category: 'temporal-anchoring',
+    prompt: 'add a 30 min coffee break right before my 3pm meeting',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Team Meeting',
+          start_time: '2026-04-12T15:00:00Z',
+          end_time: '2026-04-12T16:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('coffee'),
+          // Should end at 3pm, start at 2:30pm
+          start_time: (v: any) => typeof v === 'string' && (v.includes('T14:30') || v.includes('T10:30')),
+        },
+      },
+    ],
+  },
+  {
+    id: 'anchor-003',
+    name: 'Inherit PM from anchored event — no AM flip',
+    category: 'temporal-anchoring',
+    prompt: 'add drinks after my dinner',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Dinner with Sarah',
+          start_time: '2026-04-12T19:00:00Z',
+          end_time: '2026-04-12T20:30:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('drinks'),
+          // Must be PM, not flipped to AM
+          start_time: (v: any) => typeof v === 'string' && (v.includes('T20:30') || v.includes('T21:') || v.includes('T16:30') || v.includes('T17:')),
+        },
+      },
+    ],
+  },
+  {
+    id: 'anchor-004',
+    name: 'Squeeze event between two existing events',
+    category: 'temporal-anchoring',
+    prompt: 'i want to squeeze in lunch between my 11am and 2pm',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Morning Workshop',
+          start_time: '2026-04-12T11:00:00Z',
+          end_time: '2026-04-12T12:00:00Z',
+        },
+        {
+          id: 'evt-2',
+          title: 'Afternoon Review',
+          start_time: '2026-04-12T14:00:00Z',
+          end_time: '2026-04-12T15:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('lunch'),
+          // Should fit between noon and 2pm
+          start_time: (v: any) => typeof v === 'string' && (v.includes('T12:') || v.includes('T08:')),
+        },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // AM/PM INFERENCE (4 cases) — bare numbers default to PM
+  // ---------------------------------------------------------------------------
+  {
+    id: 'ampm-001',
+    name: 'Bare "8" for drinks defaults to PM',
+    category: 'ampm-inference',
+    prompt: 'drinks at 8',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: containsTime('T20:00'),
+        },
+      },
+    ],
+  },
+  {
+    id: 'ampm-002',
+    name: 'Bare "6" for yoga defaults to PM',
+    category: 'ampm-inference',
+    prompt: 'yoga at 6',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Health' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: containsTime('T18:00'),
+        },
+      },
+    ],
+  },
+  {
+    id: 'ampm-003',
+    name: 'Bare "5:30" for run is AM (early morning activity)',
+    category: 'ampm-inference',
+    prompt: '5:30 run tomorrow',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Health' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('run'),
+          start_time: containsTime('T05:30'),
+        },
+      },
+    ],
+  },
+  {
+    id: 'ampm-004',
+    name: 'Bare "9" for meeting defaults to AM (work context)',
+    category: 'ampm-inference',
+    prompt: 'team meeting at 9 tomorrow',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Work' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: containsTime('T09:00'),
+        },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // CORRECTION / UNDO (4 cases)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'correct-001',
+    name: 'Update recently created event time',
+    category: 'correction-undo',
+    prompt: 'actually change that dinner to 8pm',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Dinner at Nobu',
+          start_time: '2026-04-12T19:00:00Z',
+          end_time: '2026-04-12T20:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          start_time: containsTime('T20:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-002',
+    name: 'Update event location',
+    category: 'correction-undo',
+    prompt: 'change the location to Mastros instead',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Dinner at Nobu',
+          start_time: '2026-04-12T20:00:00Z',
+          end_time: '2026-04-12T21:00:00Z',
+          location: 'Nobu',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          location: containsText('mastro'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-003',
+    name: 'Delete last created event (nvm / undo)',
+    category: 'correction-undo',
+    prompt: 'nvm delete that',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Gym Session',
+          start_time: '2026-04-12T18:00:00Z',
+          end_time: '2026-04-12T19:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'delete_event',
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-004',
+    name: 'Correct event title',
+    category: 'correction-undo',
+    prompt: 'rename that meeting to "Project Review" instead',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Team Meeting',
+          start_time: '2026-04-12T14:00:00Z',
+          end_time: '2026-04-12T15:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          title: containsText('project review'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-005',
+    name: 'Imperative correction: "should be at Xpm"',
+    category: 'correction-undo',
+    prompt: 'should be at 8pm today',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Go out',
+          start_time: '2026-04-11T22:00:00Z',
+          end_time: '2026-04-12T00:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          start_time: containsTime('T20:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+  {
+    id: 'correct-006',
+    name: 'Imperative correction: "yeah i want it to start 10pm"',
+    category: 'correction-undo',
+    prompt: 'yeah i want it to start 10pm',
+    context: {
+      existingEvents: [
+        {
+          id: 'evt-1',
+          title: 'Go out',
+          start_time: '2026-04-11T20:00:00Z',
+          end_time: '2026-04-11T22:00:00Z',
+        },
+      ],
+    },
+    expectedTools: [
+      {
+        name: 'update_event',
+        argMatchers: {
+          start_time: containsTime('T22:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_event'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // NATURAL LANGUAGE / MESSY INPUT (4 cases)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'natural-001',
+    name: 'Slang: "throw on cal tmrw"',
+    category: 'natural-language',
+    prompt: 'yo can u throw a gym sesh on my cal tmrw at like 6',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Health' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: (v: any) => typeof v === 'string' && (v.toLowerCase().includes('gym') || v.toLowerCase().includes('workout')),
+          start_time: containsTime('T18:00'),
+        },
+      },
+    ],
+  },
+  {
+    id: 'natural-002',
+    name: 'Vague time: "friday afternoon idc what time"',
+    category: 'natural-language',
+    prompt: 'put a haircut on there for friday afternoon idc what time just not before 2',
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('haircut'),
+          // Should be 2pm or later
+          start_time: (v: any) => {
+            if (typeof v !== 'string') return false;
+            const hourMatch = v.match(/T(\d{2}):/);
+            return hourMatch ? parseInt(hourMatch[1]) >= 14 : false;
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'natural-003',
+    name: 'Abbreviated input with typo',
+    category: 'natural-language',
+    prompt: 'mtg w/ jake tues 2pm re: budget reveiw',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Work' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: (v: any) => typeof v === 'string' && v.toLowerCase().includes('jake'),
+          start_time: containsTime('T14:00'),
+        },
+      },
+    ],
+  },
+  {
+    id: 'natural-004',
+    name: 'Implicit event from statement',
+    category: 'natural-language',
+    prompt: "i'm meeting Jake at the library at 4pm tomorrow",
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('jake'),
+          location: containsText('library'),
+          start_time: containsTime('T16:00'),
+        },
+      },
+    ],
+    forbiddenTools: ['create_task'],
+  },
+
+  // ---------------------------------------------------------------------------
+  // MULTI-STEP CASCADE (3 cases) — complex multi-tool sequences
+  // ---------------------------------------------------------------------------
+  {
+    id: 'cascade-001',
+    name: 'Goal + recurring events + task in one message',
+    category: 'multi-step-cascade',
+    prompt: 'I want to train for a half marathon in October. Set a goal, create recurring runs on Tuesdays and Thursdays at 6:30am, and add a task to buy new running shoes this week.',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Health' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_goal',
+        argMatchers: {
+          title: (v: any) => typeof v === 'string' && (v.toLowerCase().includes('marathon') || v.toLowerCase().includes('half')),
+        },
+      },
+      {
+        name: 'create_recurring_event',
+        argMatchers: {
+          title: containsText('run'),
+        },
+      },
+      {
+        name: 'create_task',
+        argMatchers: {
+          title: (v: any) => typeof v === 'string' && (v.toLowerCase().includes('shoe') || v.toLowerCase().includes('running')),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'cascade-002',
+    name: 'Full day planning: multiple events + task',
+    category: 'multi-step-cascade',
+    prompt: 'plan my day tomorrow: gym at 7am, work from 9-5 with a lunch break at noon, dinner at 7pm, and add a task to prep for my morning meeting',
+    context: {
+      existingCategories: [
+        { id: 'cat-1', name: 'Health' },
+        { id: 'cat-2', name: 'Work' },
+        { id: 'cat-3', name: 'Personal' },
+      ],
+    },
+    expectedTools: [
+      { name: 'create_event', argMatchers: { title: containsText('gym') } },
+      { name: 'create_event', argMatchers: { title: containsText('work') } },
+      { name: 'create_event', argMatchers: { title: containsText('lunch') } },
+      { name: 'create_event', argMatchers: { title: containsText('dinner') } },
+      { name: 'create_task', argMatchers: { title: containsText('prep') } },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'cascade-003',
+    name: 'Presentation: event + task (goal may fail schema)',
+    category: 'multi-step-cascade',
+    prompt: 'Schedule a presentation Friday at 2pm and add a task to prepare slides by Thursday',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Work' }],
+    },
+    expectedTools: [
+      { name: 'create_event', argMatchers: { title: containsText('presentation') } },
+      { name: 'create_task', argMatchers: { title: containsText('slide') } },
+    ],
+    allowExtraTools: true,
+  },
+
+  // ---------------------------------------------------------------------------
+  // PAST TIME REJECTION (2 cases) — never schedule in the past
+  // ---------------------------------------------------------------------------
+  {
+    id: 'past-001',
+    name: 'Past time gets shifted forward or flagged',
+    category: 'past-time-rejection',
+    prompt: 'schedule a meeting at 6am today',
+    // Agent may create event shifted to tomorrow or flag the conflict
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          start_time: isDateString(),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'past-002',
+    name: 'Bare number in the past flips to PM',
+    category: 'past-time-rejection',
+    prompt: 'add a call at 8 today',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Work' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          // If it's afternoon, 8 should mean 8pm not 8am
+          start_time: containsTime('T20:00'),
+        },
+      },
+    ],
+  },
+
+  // ---------------------------------------------------------------------------
+  // SHARED EVENTS (3 cases)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'shared-001',
+    name: 'Create event and invite friend',
+    category: 'shared-events',
+    prompt: 'schedule dinner with Alex Saturday at 7pm at Nobu and invite them',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Social' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_event',
+        argMatchers: {
+          title: containsText('dinner'),
+          location: containsText('nobu'),
+          start_time: containsTime('T19:00'),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'shared-002',
+    name: 'Create shared recurring event with friends',
+    category: 'shared-events',
+    prompt: 'set up a weekly soccer game every Thursday at 6pm and invite Alex and Jordan',
+    context: {
+      existingCategories: [{ id: 'cat-1', name: 'Sports' }],
+    },
+    expectedTools: [
+      {
+        name: 'create_recurring_event',
+        argMatchers: {
+          title: containsText('soccer'),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'shared-003',
+    name: 'Create aspect then shared event under it',
+    category: 'shared-events',
+    prompt: 'Create a "Book Club" aspect and schedule a monthly book club meeting on the first Saturday at 2pm',
+    expectedTools: [
+      {
+        name: 'create_category',
+        argMatchers: {
+          name: containsText('book club'),
+        },
+        order: 0,
+      },
+      {
+        name: 'create_recurring_event',
+        argMatchers: {
+          title: containsText('book club'),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+
+  // ---------------------------------------------------------------------------
+  // NOTES & MEMORY (3 cases)
+  // ---------------------------------------------------------------------------
+  {
+    id: 'notes-001',
+    name: 'Save a note with factual info',
+    category: 'notes-memory',
+    prompt: "save a note that my landlord's number is 415-555-1234 and rent is due on the 1st",
+    expectedTools: [
+      {
+        name: 'create_notes',
+        argMatchers: {
+          content: (v: any) => typeof v === 'string' && v.includes('415-555-1234'),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'notes-002',
+    name: 'Create note about meeting takeaways',
+    category: 'notes-memory',
+    prompt: 'make a note: team decided to switch to biweekly sprints starting next month, Jake is leading the migration',
+    expectedTools: [
+      {
+        name: 'create_notes',
+        argMatchers: {
+          content: (v: any) => typeof v === 'string' && (v.toLowerCase().includes('sprint') || v.toLowerCase().includes('biweekly')),
+        },
+      },
+    ],
+    allowExtraTools: true,
+  },
+  {
+    id: 'notes-003',
+    name: 'Search memory for stored info',
+    category: 'notes-memory',
+    prompt: 'what do you know about my work schedule?',
+    expectedTools: [
+      {
+        name: 'search_memory_unified',
+      },
+    ],
+    allowExtraTools: true,
+  },
 ];
 
 /**

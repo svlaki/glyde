@@ -11,6 +11,9 @@ export const deleteEventTool = tool(
       throw new Error("User ID is required for deleting events");
     }
 
+    // Strip '#' prefix if LLM included it from CALENDAR context
+    eventId = typeof eventId === 'string' ? eventId.replace(/^#/, '').trim() : eventId;
+
     const supabaseService = new SupabaseService();
 
     // Look up the event (expanded) to check if it's a recurring instance

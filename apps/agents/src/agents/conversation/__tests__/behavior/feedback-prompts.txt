@@ -11,57 +11,97 @@
 # ─────────────────────────────────────────────
 
 
-# ── Syllabus / schedule extraction ─────────────────────────────────────────────
+# ── Relative time math (AM/PM bug regression) ────────────────────────────────
+make a test event 15 min from now
+schedule a call in 2 hours
+remind me to stretch in 45 minutes
+
+
+# ── Temporal anchoring (before/after existing events) ─────────────────────────
+schedule gym after my last event today
+add a 30 min coffee break right before my 3pm meeting
+i want to squeeze in lunch between my 11am and 2pm
+
+
+# ── AM/PM inference edge cases ────────────────────────────────────────────────
+drinks at 8
+yoga at 6
+meeting at 9
+run at 5:30
+
+
+# ── Syllabus / schedule extraction (complex multi-entity) ────────────────────
 CS 301 – Data Structures | Instructor: Dr. Kim | Office Hours: Tue/Thu 1–2pm Room 204 | Lectures: MWF 10:00–10:50am (starts Jan 13, ends May 2) | Midterm: Feb 28 at 10am, Final: May 9 at 8am | Lab: Thu 3:00–4:50pm | Project 1 due Feb 7, Project 2 due Mar 21, Project 3 due Apr 18
 
 
-# ── Marathon training plan (goal + recurring events cascade) ────────────────────
-I want to run a marathon in October. Set up a 16-week training plan starting next Monday with long runs on Sundays, tempo runs Tuesdays and Thursdays, and rest on Wednesdays and Fridays.
+# ── Multi-step cascade (goal + recurring + tasks) ────────────────────────────
+I want to train for a half marathon in October. Set a goal, create a recurring Tuesday/Thursday run at 6:30am and a long run on Sundays at 7am, and add a task to buy new running shoes this week.
 
 
-# ── Conflict detection test ─────────────────────────────────────────────────────
-Schedule a team standup every weekday at 9am, then schedule a dentist appointment next Tuesday at 9am
+# ── Conflict detection + resolution ──────────────────────────────────────────
+schedule a team standup every weekday at 9am
+actually i have a dentist appointment next Tuesday at 9am, move just that standup to 10am
 
 
-# ── Bulk reschedule ─────────────────────────────────────────────────────────────
-Move all my work events next week to the week after
+# ── Corrections mid-conversation ─────────────────────────────────────────────
+schedule dinner at Nobu on Saturday at 7pm
+wait actually make that 8pm not 7
+and change the location to Mastros
 
 
-# ── Ambiguous: should create task not event ─────────────────────────────────────
-I need to review the Q3 budget report before Friday
+# ── Bulk reschedule ──────────────────────────────────────────────────────────
+move all my work events next week to the week after
 
 
-# ── Rule creation ───────────────────────────────────────────────────────────────
-Always block off 30 minutes after any meeting for notes and follow-up
+# ── Messy natural language / slang ───────────────────────────────────────────
+yo can u throw a gym sesh on my cal tmrw at like 6
+nvm delete that actually
+put a haircut on there for friday afternoon idc what time just not before 2
 
 
-# ── Friend + shared event ───────────────────────────────────────────────────────
-Schedule dinner with Alex and Jordan Saturday at 7pm at Nobu and invite them
+# ── Shared events + friend invites ───────────────────────────────────────────
+schedule dinner with Alex and Jordan Saturday at 7pm at Nobu and invite them
+create a "Study Group" aspect shared with Jordan, then add a weekly study session Sundays at 3pm under it
+set up a weekly soccer game every Thursday at 6pm and invite Alex and Jordan
 
 
-# ── Delete by category ──────────────────────────────────────────────────────────
-Remove all my gym sessions from my calendar
+# ── Notes and memory ─────────────────────────────────────────────────────────
+save a note that my landlord's number is 415-555-1234 and rent is due on the 1st
+what do you know about my work schedule?
 
 
-# ── Multi-turn: create recurring then surgically update one instance ────────────
-Add a recurring standup Mon/Wed/Fri at 9am
-Change Wednesday's standup to 10am starting next week, keep Mon and Fri the same
+# ── Reminders ────────────────────────────────────────────────────────────────
+set a reminder to take out the trash every Sunday night at 8pm
+remind me 30 minutes before my dentist appointment
 
 
-# ── Shared aspect: create event under a category that belongs to a friend ───────
-Create a "Study Group" aspect shared with my friend Jordan, then schedule a weekly study session every Sunday at 3pm under that aspect
+# ── Task vs event disambiguation ─────────────────────────────────────────────
+i need to review the Q3 budget report before Friday
+pick up my prescription from CVS
+meet Jake at the library at 4pm tomorrow
 
 
-# ── Invite friends to an existing event ─────────────────────────────────────────
-Schedule a birthday party for Saturday at 7pm, then add Alex, Jordan, and Sam as guests
+# ── Multi-domain cross-cutting ───────────────────────────────────────────────
+Schedule a presentation Friday at 2pm, add a task to prepare slides by Thursday, and create a goal to improve my public speaking this quarter
+Cancel my dentist appointment and add a task to reschedule it for next month
 
 
-# ── Create shared recurring event with friends ───────────────────────────────────
-Set up a weekly soccer game every Thursday at 6pm and invite my friends Alex and Jordan
+# ── Rule creation + behavioral ───────────────────────────────────────────────
+always block off 30 minutes after any meeting for notes and follow-up
+never schedule anything before 9am on weekdays
 
 
-# ── Shared event + location ──────────────────────────────────────────────────────
-Schedule brunch with Alex next Sunday at 11am at Tartine Bakery in San Francisco and invite them
+# ── Multi-turn: create then surgically modify ────────────────────────────────
+add a recurring standup Mon/Wed/Fri at 9am
+change just Wednesday's standup to 10am starting next week, keep Mon and Fri the same
+
+
+# ── Edge: past time rejection ────────────────────────────────────────────────
+schedule a meeting at 8am today
+
+
+# ── Complex: full day planning ───────────────────────────────────────────────
+plan my day tomorrow: gym at 7am, work from 9-5 with a lunch break at noon, dinner at 7pm, and add a task to prep for my morning meeting
 
 
 # ─────────────────────────────────────────────

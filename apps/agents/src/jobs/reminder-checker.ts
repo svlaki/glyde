@@ -62,15 +62,27 @@ export async function deliverDueReminders(): Promise<void> {
           pushNotificationService.sendToUser(reminder.user_id, payload),
           webPushService.sendToUser(reminder.user_id, payload),
         ]);
+
+        let totalSent = 0;
+        let totalFailed = 0;
         for (const result of results) {
-          if (result.status === 'rejected') {
+          if (result.status === 'fulfilled') {
+            totalSent += result.value.sent;
+            totalFailed += result.value.failed;
+          } else {
             console.error(`[REMINDER-CHECKER] Push delivery failed for ${reminder.id}:`, result.reason);
+            totalFailed++;
           }
         }
 
-        // Mark as delivered
-        await reminderService.markDelivered(reminder.user_id, reminder.id);
-        console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} via push notification`);
+        if (totalSent > 0) {
+          await reminderService.markDelivered(reminder.user_id, reminder.id);
+          console.log(`[REMINDER-CHECKER] Delivered reminder ${reminder.id} (sent: ${totalSent}, failed: ${totalFailed})`);
+        } else {
+          // No notification actually reached any device — mark as failed so it's not silently lost
+          await reminderService.updateReminder(reminder.user_id, reminder.id, { status: 'failed' });
+          console.warn(`[REMINDER-CHECKER] No push sent for reminder ${reminder.id} (no valid tokens or services disabled) — marked as failed`);
+        }
       } catch (error) {
         console.error(`[REMINDER-CHECKER] Failed to deliver reminder ${reminder.id}:`, error);
       }

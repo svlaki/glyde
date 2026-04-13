@@ -1,13 +1,20 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { SupabaseService } from "../../services/SupabaseService.js";
+import { fromZonedTime } from "date-fns-tz";
 
 export const deleteMultipleEventsTool = tool(
   async ({ date, eventIds, clearAll }, config) => {
     const userId = config?.configurable?.userId;
+    const timezone = config?.configurable?.timezone || 'America/Los_Angeles';
     if (!userId) {
       throw new Error("User ID is required for deleting events");
     }
+
+    // Strip '#' prefix if LLM included it from CALENDAR context
+    eventIds = Array.isArray(eventIds)
+      ? eventIds.map(id => typeof id === 'string' ? id.replace(/^#/, '').trim() : id)
+      : eventIds;
 
     const supabaseService = new SupabaseService();
 
@@ -20,14 +27,20 @@ export const deleteMultipleEventsTool = tool(
       eventsToDelete = await supabaseService.getRawEvents(userId);
     } else if (date) {
       // Delete all events on a specific date — use getEvents() to include recurring instances
-      const startDate = new Date(date);
-      const endDate = new Date(date);
-      endDate.setDate(endDate.getDate() + 1);
+      // Convert naive local date to UTC range covering the full local day
+      const dayStart = date.includes('T') ? date : `${date}T00:00:00`;
+      const dayEndStr = date.includes('T') ? date : `${date}T00:00:00`;
+      const dayEndDate = new Date(dayEndStr);
+      dayEndDate.setDate(dayEndDate.getDate() + 1);
+      const dayEndLocal = dayEndDate.toISOString().split('T')[0] + 'T00:00:00';
+
+      const utcStart = fromZonedTime(dayStart, timezone).toISOString();
+      const utcEnd = fromZonedTime(dayEndLocal, timezone).toISOString();
 
       eventsToDelete = await supabaseService.getEvents(
         userId,
-        startDate.toISOString(),
-        endDate.toISOString()
+        utcStart,
+        utcEnd
       );
     } else if (eventIds && eventIds.length > 0) {
       // Delete specific events by ID

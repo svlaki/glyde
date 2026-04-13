@@ -30,9 +30,20 @@ class PushNotificationService {
     }
 
     try {
+      // Restore PEM format: env vars may flatten newlines or strip them entirely
+      let key = keyContent.replace(/\\n/g, '\n');
+      if (!key.includes('\n')) {
+        // Key is completely flat — reconstruct PEM structure
+        const pemBody = key
+          .replace('-----BEGIN PRIVATE KEY-----', '')
+          .replace('-----END PRIVATE KEY-----', '')
+          .trim();
+        key = `-----BEGIN PRIVATE KEY-----\n${pemBody}\n-----END PRIVATE KEY-----`;
+      }
+
       this.provider = new apn.Provider({
         token: {
-          key: keyContent,
+          key,
           keyId,
           teamId,
         },

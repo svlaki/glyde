@@ -12,6 +12,8 @@ export const updateRecurringEventTool = tool(
       throw new Error("User ID is required");
     }
 
+    eventId = typeof eventId === 'string' ? eventId.replace(/^#/, '').trim() : eventId;
+
     console.log('[UPDATE-RECURRING-EVENT TOOL] Starting update:', {
       eventId,
       scope,

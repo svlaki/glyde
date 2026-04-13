@@ -10,6 +10,11 @@ export const bulkUpdateEventsTool = tool(
       throw new Error("User ID is required for bulk updating events");
     }
 
+    // Strip '#' prefix if LLM included it from CALENDAR context
+    eventIds = Array.isArray(eventIds)
+      ? eventIds.map(id => typeof id === 'string' ? id.replace(/^#/, '').trim() : id)
+      : eventIds;
+
     // Validate that at least one update field is provided
     const hasAspect = aspect !== undefined && aspect !== null && aspect !== '';
     const hasTitle = title !== undefined && title !== null && title !== '';

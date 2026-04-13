@@ -187,14 +187,14 @@ const {
     getReminders: vi.fn().mockResolvedValue([]),
 
     // Notes
-    createNote: vi.fn().mockImplementation(async (userId: string, note: any) => ({
+    createNotes: vi.fn().mockImplementation(async (userId: string, note: any) => ({
       id: `note-${Date.now()}`,
       user_id: userId,
       ...note,
       created_at: new Date().toISOString(),
     })),
-    updateNote: vi.fn().mockResolvedValue({}),
-    getNote: vi.fn().mockResolvedValue(null),
+    updateNotes: vi.fn().mockResolvedValue({}),
+    getNotes: vi.fn().mockResolvedValue(null),
 
     // Activity (conditionally loaded by agent for context)
     getRecentActivity: vi.fn().mockResolvedValue([]),
@@ -508,8 +508,8 @@ const serviceMethodToToolName: Record<string, string> = {
   // Profile
   updateProfile: 'update_profile',
   // Notes
-  createNote: 'create_notes',
-  updateNote: 'update_notes',
+  createNotes: 'create_notes',
+  updateNotes: 'update_notes',
 };
 
 // -------------------------------------------------------------------
@@ -526,7 +526,7 @@ function extractToolCallsFromMocks(): CapturedToolCall[] {
     'createTask', 'updateTask', 'deleteTask', 'completeTask',
     'createGoal', 'updateGoal', 'deleteGoal', 'addGoalCheckIn',
     'createReminder', 'updateReminder', 'deleteReminder',
-    'createNote', 'updateNote',
+    'createNotes', 'updateNotes',
     'updateProfile',
   ];
 

@@ -20,11 +20,12 @@ export const updateEventTool = tool(
     const supabaseService = new SupabaseService();
     const aspectService = new AspectService();
 
-    let targetEventId = eventId;
+    // Strip '#' prefix if the LLM included it from CALENDAR context formatting
+    let targetEventId = typeof eventId === 'string' ? eventId.replace(/^#/, '').trim() : eventId;
 
     // Get original event to compare changes
     const events = await supabaseService.getEvents(userId);
-    const originalEvent = events.find((e: any) => e.id === eventId);
+    const originalEvent = events.find((e: any) => e.id === targetEventId);
 
     // Check if this is a recurring event instance
     if (originalEvent?.is_instance && originalEvent?.parent_event_id) {
@@ -170,7 +171,7 @@ export const updateEventTool = tool(
     schema: z.object({
       eventId: z.string().describe("Event UUID from CALENDAR context (#ID) or search_events results"),
       title: z.string().optional().nullable().describe("New title"),
-      startTime: z.string().optional().nullable().describe("New start time ISO (in user's timezone)"),
+      startTime: z.string().optional().nullable().describe("New start time ISO (in user's timezone). RULES: 1) Bare numbers without AM/PM default to PM for gym, social, errands, dinner. 2) NEVER pass a time earlier today than the current time — that would move the event into the past."),
       endTime: z.string().optional().nullable().describe("New end time ISO (in user's timezone)"),
       location: z.string().optional().nullable().describe("New location"),
       description: z.string().optional().nullable().describe("New description or notes"),
