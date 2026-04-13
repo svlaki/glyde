@@ -72,30 +72,6 @@ export async function respondToInteraction(req: Request, res: Response): Promise
       return res.status(404).json({ error: 'Interaction not found' });
     }
 
-    // Auto-store rating scores
-    if (interaction.interaction_type === 'rating') {
-      const score = parseInt(trimmedResponse, 10);
-      if (!isNaN(score) && score >= 1 && score <= 10) {
-        const meta = (interaction.metadata || {}) as any;
-        const ratingTopic = meta.ratingTopic || interaction.question;
-        try {
-          await supabaseService.createRating(userId, {
-            topic: ratingTopic,
-            score,
-            description: meta.ratingDescription,
-            aspectId: interaction.aspect_id || meta.aspectId,
-          });
-          console.log(`[INTERACTION RESPONSE] Rating stored: "${ratingTopic}" = ${score}/10`);
-        } catch (ratingError) {
-          console.error(`[INTERACTION RESPONSE] Failed to store rating:`, ratingError);
-        }
-      } else {
-        console.warn(`[INTERACTION RESPONSE] Invalid rating score from response: "${trimmedResponse}"`);
-      }
-      // Rating stored, return directly
-      return res.json({ success: true, message: 'Rating recorded' });
-    }
-
     // Handle reminder-specific responses (snooze/acknowledge)
     const interactionMeta = (interaction.metadata || {}) as any;
     if (interactionMeta.context === 'reminder_delivery' && interactionMeta.reminderId) {

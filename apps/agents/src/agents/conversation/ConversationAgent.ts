@@ -71,7 +71,7 @@ const ConversationState = Annotation.Root({
     default: () => null,
   }),
   ratingSummary: Annotation<any[]>({
-    reducer: (_existing, update) => update || _existing,
+    reducer: (_existing, update) => update ?? _existing,
     default: () => [],
   }),
   userFriends: Annotation<any[]>({
@@ -130,7 +130,7 @@ export class ConversationAgent extends BaseAgent {
       const friendshipService = new FriendshipService(supabaseService.getClient());
 
       // Fetch core data in parallel, skip optional context based on intent
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
@@ -140,7 +140,6 @@ export class ConversationAgent extends BaseAgent {
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
-        supabaseService.getRatingSummary(context.userId),
         friendshipService.getFriends(context.userId),
       ]);
 
@@ -248,7 +247,7 @@ export class ConversationAgent extends BaseAgent {
         currentPage: (context as any).currentPage || 'dashboard',
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
-        ratingSummary: ratingSummary || [],
+        ratingSummary: [],
         userFriends: userFriends || [],
         memoryFactContext: memoryFactCtx,
         rulesContext: rulesCtx,
@@ -343,7 +342,7 @@ IMPORTANT INSTRUCTIONS:
         : null;
 
       // Fetch core data in parallel, skip optional context based on intent
-      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, ratingSummary, friendsResult] = await Promise.all([
+      const [userProfile, allEvents, allTasks, allGoals, userAspects, userProjects, recentUserActivity, recentAgentActivity, userAddress, friendsResult] = await Promise.all([
         supabaseService.getProfile(context.userId),
         supabaseService.getEvents(context.userId),
         supabaseService.getTasks(context.userId),
@@ -353,7 +352,6 @@ IMPORTANT INSTRUCTIONS:
         supabaseService.getRecentActivity(context.userId, 'user', 30, 20),
         supabaseService.getRecentActivity(context.userId, 'agent', 60, 5),
         reverseGeocodePromise,
-        supabaseService.getRatingSummary(context.userId),
         friendshipService ? friendshipService.getFriends(context.userId) : Promise.resolve({ success: true, data: [] }),
       ]);
 
@@ -468,7 +466,7 @@ IMPORTANT INSTRUCTIONS:
         currentPage: (context as any).currentPage || 'dashboard',
         currentLocation: context.location || null,
         currentAddress: userAddress || null,
-        ratingSummary: ratingSummary || [],
+        ratingSummary: [],
         userFriends: userFriends || [],
         memoryFactContext: memoryFactCtx,
         rulesContext: rulesCtx,
