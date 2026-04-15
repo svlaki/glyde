@@ -234,6 +234,7 @@ export function SlotBlock({
           flexShrink: 0,
           gap: '3px',
         }}
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -283,6 +284,7 @@ export function SlotBlock({
 
       {/* Resize handle */}
       <div
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => {
           e.stopPropagation()
           e.preventDefault()
