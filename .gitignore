@@ -46,6 +46,8 @@ dist/
 AGENTS.md
 .trae/
 .roomodes
+.serena/
+.playwright-mcp/
 
 # Claude Code (commit shared config, ignore personal)
 /.claude/settings.local.json

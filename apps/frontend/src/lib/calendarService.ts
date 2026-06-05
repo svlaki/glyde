@@ -83,8 +83,6 @@ export async function fetchUserEvents(
       body.raw = true;
     }
 
-    console.log('[calendarService] Fetching events:', { url, body });
-
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -102,18 +100,13 @@ export async function fetchUserEvents(
       cache: 'no-store'
     });
 
-    console.log('[calendarService] Response status:', response.status, response.ok);
-
     if (!response.ok) {
       console.error('[calendarService] Failed to fetch events:', response.status);
       return { events: [], error: 'Failed to fetch events from backend' }
     }
 
     const data = await response.json();
-    
-    console.log('[calendarService] Response data:', { success: data.success, eventCount: data.events?.length });
-    console.log('[calendarService] First event:', data.events?.[0]);
-    
+
     if (data.success) {
       return { events: data.events || [], error: null }
     } else {
@@ -324,8 +317,6 @@ export async function fetchExpandedEvents(
       end_date: endDate ? endDate.toISOString() : null
     };
 
-    console.log('[calendarService] Fetching expanded events:', { url, body });
-
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -343,16 +334,12 @@ export async function fetchExpandedEvents(
       cache: 'no-store'
     });
 
-    console.log('[calendarService] Response status:', response.status, response.ok);
-
     if (!response.ok) {
       console.error('[calendarService] Failed to fetch expanded events:', response.status);
       return { events: [], error: 'Failed to fetch expanded events from backend' }
     }
 
     const data = await response.json();
-
-    console.log('[calendarService] Response data:', { success: data.success, eventCount: data.events?.length });
 
     if (data.success) {
       return { events: data.events || [], error: null }

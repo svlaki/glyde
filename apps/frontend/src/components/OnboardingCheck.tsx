@@ -67,7 +67,6 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
 
         // Handle force_reauth flag
         if (data.profile?.force_reauth === true) {
-          console.log('[OnboardingCheck] Force reauth detected, clearing localStorage')
           localStorage.removeItem('onboardingData')
 
           // Clear the flag on the server
@@ -91,7 +90,6 @@ export function OnboardingCheck({ children }: OnboardingCheckProps) {
         if (!hasLocalData) {
           const completedAt = data.profile?.context_data?.onboarding?.completed_at
           if (completedAt) {
-            console.log('[OnboardingCheck] Restoring onboarding data from server')
             // Restore a minimal localStorage entry so future checks are instant
             const restoredData = {
               fullName: data.profile.display_name || '',

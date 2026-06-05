@@ -244,7 +244,6 @@ export function AgentInteractions({ hideHeader = false, onChatReply }: AgentInte
 
       // If there's a follow-up interaction, refetch to show it
       if (responseData.hasFollowUp) {
-        console.log('[AgentInteractions] Follow-up created, refetching interactions')
         await fetchInteractions()
       }
     } catch (err) {

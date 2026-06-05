@@ -55,17 +55,12 @@ export function TodoList({ hideHeader = false }: TodoListProps) {
           table: 'tasks',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          console.log('[TodoList] Real-time task change:', payload.eventType)
+        () => {
           // Reload tasks on any change
           loadTasks()
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[TodoList] Subscribed to real-time task updates')
-        }
-      })
+      .subscribe()
 
     return () => {
       window.removeEventListener('agent-data-changed', handleAgentChange)

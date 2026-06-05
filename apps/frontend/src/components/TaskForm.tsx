@@ -67,11 +67,8 @@ export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormPr
   const [showTimePicker, setShowTimePicker] = useState(false)
   const [timePickerValue, setTimePickerValue] = useState(() => dateToPickerValue(new Date()))
 
-  console.log('[TaskForm] Render - isOpen:', isOpen, 'title:', title, 'task:', task)
-
   useEffect(() => {
     if (task) {
-      console.log('[TaskForm] Populating fields with task:', task)
       setTitle(task.title || '')
       setDescription(task.description || '')
       // Handle different aspect field names
@@ -94,7 +91,6 @@ export function TaskForm({ task, isOpen, onClose, onSave, onDelete }: TaskFormPr
 
       setPriority(task.priority || 'medium')
     } else {
-      console.log('[TaskForm] Resetting fields (no task)')
       setTitle('')
       setDescription('')
       setCategory('')

@@ -65,7 +65,6 @@ export function TimezoneProvider({ children }: { children: ReactNode }) {
 
       if (profile?.timezone) {
         setTimezone(profile.timezone);
-        console.log(`[TimezoneContext] Loaded user timezone: ${profile.timezone}`);
       }
     } catch (error) {
       console.error('Error fetching timezone:', error);

@@ -28,14 +28,8 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
     // Skip keyboard detection on web — no virtual keyboard
     if (!Capacitor.isNativePlatform()) return
 
-    // DEBUG: log to confirm the effect ran — check Safari Web Inspector console
-    console.log('[useKeyboard] effect mounted, setting up listeners')
-    console.log('[useKeyboard] ontouchstart:', 'ontouchstart' in window)
-    console.log('[useKeyboard] maxTouchPoints:', navigator.maxTouchPoints)
-
     let inputFocused = false
     let fullHeight = window.innerHeight
-    console.log('[useKeyboard] initial fullHeight:', fullHeight)
 
     const recalculate = () => {
       if (!inputFocused) {
@@ -46,10 +40,8 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
       // Method 1: body height (Capacitor resize:"body" sets document.body.style.height)
       const bodyHeight = document.body.clientHeight
       const bodyDiff = fullHeight - bodyHeight
-      console.log('[useKeyboard] recalc — bodyHeight:', bodyHeight, 'fullHeight:', fullHeight, 'diff:', bodyDiff)
 
       if (bodyHeight > 0 && bodyDiff > 100) {
-        console.log('[useKeyboard] detected via body resize:', bodyDiff)
         setKeyboardHeight(Math.round(bodyDiff))
         return
       }
@@ -58,48 +50,36 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
       const vv = window.visualViewport
       if (vv) {
         const vvDiff = fullHeight - vv.height
-        console.log('[useKeyboard] vv.height:', vv.height, 'diff:', vvDiff)
         if (vvDiff > 100) {
-          console.log('[useKeyboard] detected via visualViewport:', vvDiff)
           setKeyboardHeight(Math.round(vvDiff))
           return
         }
       }
 
       // Fallback
-      console.log('[useKeyboard] using 300px fallback')
       setKeyboardHeight(300)
     }
 
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as Element
-      console.log('[useKeyboard] focusin:', target?.tagName, (target as HTMLInputElement)?.type)
       if (isInputElement(target)) {
         inputFocused = true
-        console.log('[useKeyboard] input focused, will recalculate in 300ms')
         setTimeout(recalculate, 300)
       }
     }
 
     const onFocusOut = () => {
-      console.log('[useKeyboard] focusout')
       setTimeout(() => {
         if (!isInputElement(document.activeElement)) {
-          console.log('[useKeyboard] no input focused, closing keyboard state')
           inputFocused = false
           setKeyboardHeight(0)
           window.scrollTo(0, 0)
-        } else {
-          console.log('[useKeyboard] focus moved to another input, keeping open')
         }
       }, 100)
     }
 
     // Watch body resize (Capacitor resize:"body" changes body height)
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        console.log('[useKeyboard] body resized:', entry.contentRect.height)
-      }
+    const resizeObserver = new ResizeObserver(() => {
       recalculate()
     })
     resizeObserver.observe(document.body)
@@ -108,7 +88,6 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
     const vv = window.visualViewport
     const onViewportResize = () => {
       if (vv) {
-        console.log('[useKeyboard] visualViewport resize:', vv.height)
         if (vv.height > fullHeight) {
           fullHeight = vv.height
         }
@@ -124,12 +103,8 @@ export function KeyboardProvider({ children }: { children: ReactNode }) {
     }
 
     // Also listen for native Capacitor keyboard events on window (fired by plugin)
-    const onNativeShow = (e: Event) => {
-      console.log('[useKeyboard] native keyboardWillShow event:', e)
-    }
-    const onNativeHide = () => {
-      console.log('[useKeyboard] native keyboardWillHide event')
-    }
+    const onNativeShow = () => {}
+    const onNativeHide = () => {}
     window.addEventListener('keyboardWillShow', onNativeShow)
     window.addEventListener('keyboardWillHide', onNativeHide)
 

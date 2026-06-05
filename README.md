@@ -24,7 +24,7 @@ Glyde is an AI-native life management and coordination system. It centralizes a 
 | Knowledge Graph (entity linking, visualization) | Built |
 | Rules (user-defined agent behavior constraints) | Built |
 | Social (friends, aspect tagging, shared events) | Built |
-| Zep Cloud memory (persistent user context) | Built |
+| Persistent memory (pgvector embeddings + fact extraction) | Built |
 | Web search enrichment (Tavily) | Built |
 | Push notifications (VAPID web push) | Built |
 
@@ -33,7 +33,7 @@ Glyde is an AI-native life management and coordination system. It centralizes a 
 - **Frontend**: React 18, Vite 7, TypeScript, TailwindCSS 4, Framer Motion
 - **Backend**: Node.js, Express, LangGraph, OpenAI GPT-5.4-mini
 - **Database**: Supabase (PostgreSQL with RLS)
-- **Memory**: Zep Cloud (graph-based persistent memory)
+- **Memory**: Supabase pgvector embeddings + LLM-based fact extraction
 - **Search**: Tavily API
 - **Calendar**: Google Calendar API + Microsoft Calendar API (OAuth2)
 - **Infrastructure**: Docker Compose
@@ -50,7 +50,7 @@ glydeproper/
         services/       # 20 domain services
         tools/          # 82+ LangGraph tools across 16+ categories
         config/         # Agent configuration
-        jobs/           # Background jobs (Zep maintenance, notifications)
+        jobs/           # Background jobs (memory, reminders, notifications)
     frontend/           # React/Vite frontend (port 5173, exposed on 3000)
       src/
         pages/          # CalendarPage, NotesPage, GoalsPage, ProfilePage, etc. (12 pages)
@@ -64,7 +64,7 @@ glydeproper/
 
 ### Agent System
 
-- **ConversationAgent**: Main chat interface. Uses LangGraph with 82+ tools across 16+ categories (calendar, tasks, goals, aspects, notes, projects, reminders, memory, search, friends, shared-events, shared-aspects, suggestions, rules, interactions, profile). Powered by GPT-5.4-mini with Zep memory context.
+- **ConversationAgent**: Main chat interface. Uses LangGraph with 82+ tools across 16+ categories (calendar, tasks, goals, aspects, notes, projects, reminders, memory, search, friends, shared-events, shared-aspects, suggestions, rules, interactions, profile). Powered by GPT-5.4-mini with pgvector memory context.
 - **PlannerAgent**: Decomposes goals into milestones and scheduling plans.
 - **SchedulerAgent**: Automates task scheduling and calendar optimization.
 - **ScribeAgent**: Researches and generates notes, daily digests, pattern scanning.
@@ -84,7 +84,6 @@ Events, tasks, and goals link to aspects via `aspect_id` (UUID FK).
 - Docker and Docker Compose
 - Supabase project (with service role key)
 - OpenAI API key
-- Zep Cloud API key
 - Tavily API key (for web search)
 - Google OAuth credentials (for calendar sync)
 - Microsoft OAuth credentials (optional, for Outlook calendar sync)
@@ -96,15 +95,11 @@ Create a `.env` file in the project root:
 ```bash
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=your-service-role-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 SUPABASE_ANON_KEY=your-anon-key
 
 # AI
 OPENAI_API_KEY=your-openai-key
-
-# Memory
-ZEP_API_KEY=your-zep-key
-ZEP_BASE_URL=https://api.getzep.com
 
 # Search
 TAVILY_API_KEY=your-tavily-key
@@ -125,9 +120,17 @@ VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 VAPID_CONTACT_EMAIL=your-email
 
-# Admin
-VITE_ADMIN_USER_IDS=comma-separated-user-ids
+# Admin (gates the analytics dashboard)
+ADMIN_USER_IDS=comma-separated-supabase-user-ids        # backend API gate
+VITE_ADMIN_USER_IDS=comma-separated-supabase-user-ids   # frontend UI gate
+
+# Frontend (Vite)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_AGENT_SERVICE_URL=http://localhost:8000
 ```
+
+> Never commit real secrets. `.env` is git-ignored. The service role key bypasses RLS and must stay server-side only.
 
 ### Running
 
@@ -145,3 +148,10 @@ Frontend changes hot-reload via volume mounts. Agent changes require a rebuild:
 ```bash
 docker compose build --no-cache agent && docker compose up -d agent
 ```
+
+## Security
+
+- All API endpoints sit behind Supabase JWT authentication (`authenticateRequest` middleware).
+- Every table enforces Row Level Security; the service role key is used only by the backend.
+- CORS rejects unknown origins in production; requests are rate-limited and payloads size-capped.
+- The admin analytics dashboard is gated by an explicit `ADMIN_USER_IDS` allowlist.

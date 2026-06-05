@@ -85,8 +85,7 @@ export function GoalsPage() {
           table: 'goals',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          console.log('[GoalsPage] Real-time goals change:', payload.eventType)
+        () => {
           // Debounce: clear existing timer and set new one
           if (refreshTimer) {
             clearTimeout(refreshTimer)

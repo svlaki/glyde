@@ -68,11 +68,6 @@ export async function completeOnboarding(
       return { success: false, error: 'User not authenticated' }
     }
 
-    console.log('🔵 Completing onboarding...')
-    console.log('🔵 API_URL:', API_URL)
-    console.log('🔵 Full URL:', `${API_URL}/api/onboarding/complete`)
-    console.log('🔵 User ID:', user.id)
-
     const response = await fetch(`${API_URL}/api/onboarding/complete`, {
       method: 'POST',
       headers: {
@@ -85,18 +80,13 @@ export async function completeOnboarding(
       })
     })
 
-    console.log('🔵 Response status:', response.status)
-    console.log('🔵 Response ok:', response.ok)
-
     const result = await response.json()
-    console.log('🔵 Response body:', result)
 
     if (!response.ok) {
       console.error('🔴 Onboarding failed:', result.error)
       return { success: false, error: result.error || 'Failed to complete onboarding' }
     }
 
-    console.log('Onboarding completed successfully')
     trackEvent('onboarding_complete', 'engagement')
     return { success: true }
   } catch (error) {

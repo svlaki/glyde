@@ -132,8 +132,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let appUrlListener: any = null
     if (Capacitor.isNativePlatform()) {
       appUrlListener = CapacitorApp.addListener('appUrlOpen', async ({ url }) => {
-        console.log('Deep link received:', url)
-
         // Handle Supabase OAuth callback
         if (url.includes('#access_token=') || url.includes('?access_token=')) {
           const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1])
@@ -176,18 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Trigger startup interactions when user authenticates or app opens
   async function callUserSchemaCreation(session: Session) {
     // User schemas are deprecated in favor of public tables with RLS
-    console.log('User authenticated - using public tables with RLS');
 
     // Deduplicate: only trigger startup once per session
     if (startupTriggeredRef.current.has(session.user.id)) {
-      console.log('ℹ️ Session already initialized for this user');
       return;
     }
     startupTriggeredRef.current.add(session.user.id);
 
     // Interactions are now created directly by the agent via create_interaction tool
     // They can be generated on-demand via the refresh button in the UI
-    console.log('Ready to generate interactions on-demand');
   }
 
   async function signIn(email: string, password: string) {

@@ -48,7 +48,6 @@ async function subscribeAndRegister(accessToken: string): Promise<void> {
   })
 
   trackEvent('web_push_token_registered', 'push')
-  console.log('[WEB-PUSH] Successfully registered for web push notifications')
 }
 
 /**
@@ -57,13 +56,11 @@ async function subscribeAndRegister(accessToken: string): Promise<void> {
  */
 async function initializeWebPush(accessToken: string): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.log('[WEB-PUSH] Browser does not support web push')
     return
   }
 
   const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
   if (!vapidPublicKey) {
-    console.log('[WEB-PUSH] VITE_VAPID_PUBLIC_KEY not configured, skipping')
     return
   }
 
@@ -119,8 +116,6 @@ export function dismissPushPrompt(): void {
 }
 
 export async function initializePushNotifications(accessToken: string): Promise<void> {
-  console.log('[PUSH] initializePushNotifications called, isNative:', Capacitor.isNativePlatform())
-
   // Web browsers: use Web Push API
   if (!Capacitor.isNativePlatform()) {
     await initializeWebPush(accessToken)
@@ -130,7 +125,6 @@ export async function initializePushNotifications(accessToken: string): Promise<
   // Native (iOS/Android): use Capacitor Push Notifications
   try {
     const permStatus = await PushNotifications.checkPermissions()
-    console.log('[PUSH] Current permission status:', permStatus.receive)
 
     if (permStatus.receive === 'prompt') {
       const result = await PushNotifications.requestPermissions()
@@ -169,7 +163,6 @@ export async function initializePushNotifications(accessToken: string): Promise<
     })
 
     PushNotifications.addListener('pushNotificationReceived', (notification) => {
-      console.log('[PUSH] Notification received in foreground:', notification)
       trackEvent('push_notification_received', 'push', {
         type: notification.data?.type || 'unknown',
       })
